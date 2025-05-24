@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 /**
@@ -19,10 +19,10 @@ interface Cell {
 
 // Couleurs des maisons
 const homeColors: Record<string, string> = {
-  yellow: '#FFD700',
-  blue: '#4169E1',
-  green: '#32CD32',
-  red: '#DC143C',
+  yellow: '#FFE44D', // Plus clair que FFD700
+  blue: '#7B9EF3',   // Plus clair que 4169E1  
+  green: '#90EE90',  // Plus clair que 32CD32
+  red: '#FF7F7F',    // Plus clair que DC143C
 };
 
 // Couleurs des chemins
@@ -37,12 +37,82 @@ const pathColors: Record<string, string> = {
   empty: '#F5F5F5',
 };
 
+// Emoji ou cercle pour représenter un pion
+const pawnEmojis: Record<string, string> = {
+  yellow: '🟡',
+  blue: '🔵',
+  green: '🟢',
+  red: '🔴',
+};
+
 const BOARD_SIZE = 15;
+
+const diceDots = [
+  [],
+  [[1, 1]],
+  [[0, 0], [2, 2]],
+  [[0, 0], [1, 1], [2, 2]],
+  [[0, 0], [0, 2], [2, 0], [2, 2]],
+  [[0, 0], [0, 2], [1, 1], [2, 0], [2, 2]],
+  [[0, 0], [0, 2], [1, 0], [1, 2], [2, 0], [2, 2]],
+];
+
+const DiceFace = ({ value, size = 60 }: { value: number, size?: number }) => {
+  // Grille 3x3
+  return (
+    <View style={{
+      width: size,
+      height: size,
+      backgroundColor: '#fff',
+      borderRadius: 12,
+      borderWidth: 2,
+      borderColor: '#333',
+      flexDirection: 'column',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 6,
+    }}>
+      {[0, 1, 2].map(row =>
+        <View key={row} style={{ flexDirection: 'row', flex: 1, width: '100%' }}>
+          {[0, 1, 2].map(col => {
+            const isDot = diceDots[value]?.some(([r, c]) => r === row && c === col);
+            return (
+              <View
+                key={col}
+                style={{
+                  flex: 1,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {isDot ? (
+                  <View style={{
+                    width: size * 0.16,
+                    height: size * 0.16,
+                    borderRadius: size * 0.08,
+                    backgroundColor: '#222',
+                  }} />
+                ) : null}
+              </View>
+            );
+          })}
+        </View>
+      )}
+    </View>
+  );
+};
 
 const LudoBoard: React.FC = () => {
   const { width, height } = useWindowDimensions();
   const boardMaxSize = Math.min(width, height) * 0.95;
   const cellSize = Math.floor(boardMaxSize / BOARD_SIZE);
+
+  // Ordre des joueurs et état du joueur courant
+  const playerOrder: Array<'yellow' | 'blue' | 'red' | 'green'> = ['yellow', 'blue', 'red', 'green'];
+  const [currentPlayer, setCurrentPlayer] = useState<'yellow' | 'blue' | 'red' | 'green'>('yellow');
+
+  const [diceValue, setDiceValue] = useState<number | null>(null);
+  const [rolling, setRolling] = useState(false);
 
   /**
    * Détermine le type de case à chaque position
@@ -153,21 +223,40 @@ const LudoBoard: React.FC = () => {
 
     // Si c'est une maison, on agrandit la case et on met la couleur
     if (cell.type === 'home') {
+      const isCurrent = cell.color === currentPlayer;
+      // Couleur de halo lumineuse pour chaque joueur
+      const glowColors: Record<string, string> = {
+        yellow: '#fff7c0',
+        blue: '#c0d8ff', 
+        green: '#c0ffc0',
+        red: '#ffc0c0',
+      };
       cellStyle = {
         ...cellStyle,
         width: cellSize * 6,
         height: cellSize * 6,
-        // borderRadius: 24,
-        borderWidth: 1,
         backgroundColor: homeColors[cell.color],
         overflow: 'hidden',
         zIndex: 10,
+        alignItems: 'center' as const,
+        justifyContent: 'center' as const,
+        opacity: isCurrent ? 1 : 0.9,
+        borderColor: isCurrent ? glowColors[cell.color] : '#333',
+        borderWidth: isCurrent ? 6 : 1,
+        // Effet lumineux (iOS + Android)
+        ...(isCurrent
+          ? {
+              shadowColor: glowColors[cell.color],
+              shadowOpacity: 0.9,
+              shadowRadius: 24,
+              shadowOffset: { width: 0, height: 0 },
+              elevation: 16,
+            }
+          : {}),
       };
       return (
         <View key={cell.id} style={cellStyle}>
-          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: cellSize * 1, textShadowColor: '#333', textShadowOffset: {width: 1, height: 1}, textShadowRadius: 2 }}>
-            {cell.color.toUpperCase()}
-          </Text>
+          {renderPawn(cell.color, cellSize * 0.8)}
         </View>
       );
     }
@@ -213,21 +302,74 @@ const LudoBoard: React.FC = () => {
     return null;
   };
 
+  const renderPawn = (color: string, size: number) => (
+    <Text style={{ fontSize: size, textAlign: 'center' }}>
+      {pawnEmojis[color]}
+    </Text>
+  );
+
+  // Lancer de dé et passage au joueur suivant
+  const rollDice = () => {
+    setRolling(true);
+    let rolls = 0;
+    const maxRolls = 12; // nombre de faces simulées
+    const interval = setInterval(() => {
+      const value = Math.floor(Math.random() * 6) + 1;
+      setDiceValue(value);
+      rolls++;
+      if (rolls >= maxRolls) {
+        clearInterval(interval);
+        setTimeout(() => {
+          setRolling(false);
+          setCurrentPlayer(prev => {
+            const idx = playerOrder.indexOf(prev);
+            return playerOrder[(idx + 1) % playerOrder.length];
+          });
+        }, 200);
+      }
+    }, 60);
+  };
+
   // Génère le plateau
   const board = generateBoard();
 
+  // Style dynamique pour centrer le plateau
+  const boardAbsoluteWrapper = {
+    position: 'absolute' as const,
+    top: '50%' as const,
+    left: '50%' as const,
+    transform: [
+      { translateX: -0.5 * BOARD_SIZE * cellSize },
+      { translateY: -0.5 * BOARD_SIZE * cellSize },
+    ],
+    zIndex: 5,
+  };
+
   return (
     <View style={styles.container}>
-      <View
-        style={[
-          styles.board,
-          {
-            width: cellSize * BOARD_SIZE,
-            height: cellSize * BOARD_SIZE,
-          },
-        ]}
-      >
-        {board.map(cell => renderCell(cell))}
+      {/* Plateau centré absolument au milieu de l'écran */}
+      <View style={boardAbsoluteWrapper}>
+        <View
+          style={[
+            styles.board,
+            {
+              width: cellSize * BOARD_SIZE,
+              height: cellSize * BOARD_SIZE,
+            },
+          ]}
+        >
+          {board.map(cell => renderCell(cell))}
+        </View>
+      </View>
+      {/* Dé en bas de l'écran */}
+      <View style={styles.diceContainer}>
+        <View
+          style={styles.diceTouchable}
+          onTouchEnd={() => !rolling && rollDice()}
+        >
+          <DiceFace value={diceValue ?? 1} size={60} />
+        </View>
+        
       </View>
     </View>
   );
@@ -236,12 +378,33 @@ const LudoBoard: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
     backgroundColor: 'transparent',
   },
   board: {
     position: 'relative',
+  },
+  diceContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 32,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  diceTouchable: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  diceBox: {
+    width: 60,
+    height: 60,
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#333',
+    marginBottom: 10,
   },
 });
 
