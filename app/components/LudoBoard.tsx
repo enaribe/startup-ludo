@@ -114,6 +114,13 @@ const LudoBoard: React.FC = () => {
   const [diceValue, setDiceValue] = useState<number | null>(null);
   const [rolling, setRolling] = useState(false);
 
+  const [pawns, setPawns] = useState({
+    yellow: 3, // index de {row:6, col:4} dans paths.yellow
+    blue: 'home' as 'home' | number,
+    red: 'home' as 'home' | number,
+    green: 'home' as 'home' | number,
+  });
+
   /**
    * Détermine le type de case à chaque position
    */
@@ -226,10 +233,10 @@ const LudoBoard: React.FC = () => {
       const isCurrent = cell.color === currentPlayer;
       // Couleur de halo lumineuse pour chaque joueur
       const glowColors: Record<string, string> = {
-        yellow: '#fff7c0',
-        blue: '#c0d8ff', 
-        green: '#c0ffc0',
-        red: '#ffc0c0',
+        yellow: '#fffbe0',
+        blue: '#e0ecff',
+        green: '#e0ffe0',
+        red: '#ffe0e0',
       };
       cellStyle = {
         ...cellStyle,
