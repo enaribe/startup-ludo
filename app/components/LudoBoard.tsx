@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import LudoCell from './LudoCell';
+import LudoDice from './LudoDice';
 
 /**
  * Plateau de Ludo : chaque zone de maison (6x6) est une seule grande case colorée,
@@ -115,11 +117,110 @@ const LudoBoard: React.FC = () => {
   const [rolling, setRolling] = useState(false);
 
   const [pawns, setPawns] = useState({
-    yellow: 3, // index de {row:6, col:4} dans paths.yellow
+    yellow: 'home' as 'home' | number,
     blue: 'home' as 'home' | number,
     red: 'home' as 'home' | number,
     green: 'home' as 'home' | number,
   });
+
+  const [doitDeplacer, setDoitDeplacer] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  // Chemin du pion jaune (parcours classique Ludo)
+  const paths: Record<string, Array<{ row: number; col: number }>> = {
+    yellow: [
+      // Sortie maison jaune
+      { row: 6, col: 1 },
+      // Tour du plateau (56 cases sens horaire)
+      { row: 6, col: 2 }, { row: 6, col: 3 }, { row: 6, col: 4 }, { row: 6, col: 5 },
+      { row: 5, col: 6 }, { row: 4, col: 6 }, { row: 3, col: 6 }, { row: 2, col: 6 },
+      { row: 1, col: 6 }, { row: 0, col: 6 }, { row: 0, col: 7 }, { row: 0, col: 8 },
+      { row: 1, col: 8 }, { row: 2, col: 8 }, { row: 3, col: 8 }, { row: 4, col: 8 },
+      { row: 5, col: 8 }, { row: 6, col: 9 }, { row: 6, col: 10 }, { row: 6, col: 11 },
+      { row: 6, col: 12 }, { row: 6, col: 13 }, { row: 6, col: 14 }, { row: 7, col: 14 },
+      { row: 8, col: 14 }, { row: 8, col: 13 }, { row: 8, col: 12 }, { row: 8, col: 11 },
+      { row: 8, col: 10 }, { row: 8, col: 9 }, { row: 9, col: 8 }, { row: 10, col: 8 },
+      { row: 11, col: 8 }, { row: 12, col: 8 }, { row: 13, col: 8 }, { row: 14, col: 8 },
+      { row: 14, col: 7 }, { row: 14, col: 6 }, { row: 13, col: 6 }, { row: 12, col: 6 },
+      { row: 11, col: 6 }, { row: 10, col: 6 }, { row: 9, col: 6 }, { row: 8, col: 5 },
+      { row: 8, col: 4 }, { row: 8, col: 3 }, { row: 8, col: 2 }, { row: 8, col: 1 },
+      { row: 8, col: 0 }, { row: 7, col: 0 }, // Boucle complète
+      // Chemin final jaune (6 cases)
+      { row: 7, col: 1 }, { row: 7, col: 2 }, { row: 7, col: 3 },
+      { row: 7, col: 4 }, { row: 7, col: 5 }, { row: 7, col: 6 },
+      // Centre
+      { row: 7, col: 7 }
+    ],
+    blue: [
+      // Sortie maison bleue
+      { row: 1, col: 8 },
+      // Tour du plateau (56 cases sens horaire)
+      { row: 2, col: 8 }, { row: 3, col: 8 }, { row: 4, col: 8 }, { row: 5, col: 8 },
+      { row: 6, col: 9 }, { row: 6, col: 10 }, { row: 6, col: 11 }, { row: 6, col: 12 },
+      { row: 6, col: 13 }, { row: 6, col: 14 }, { row: 7, col: 14 }, { row: 8, col: 14 },
+      { row: 8, col: 13 }, { row: 8, col: 12 }, { row: 8, col: 11 }, { row: 8, col: 10 },
+      { row: 8, col: 9 }, { row: 9, col: 8 }, { row: 10, col: 8 }, { row: 11, col: 8 },
+      { row: 12, col: 8 }, { row: 13, col: 8 }, { row: 14, col: 8 }, { row: 14, col: 7 },
+      { row: 14, col: 6 }, { row: 13, col: 6 }, { row: 12, col: 6 }, { row: 11, col: 6 },
+      { row: 10, col: 6 }, { row: 9, col: 6 }, { row: 8, col: 5 }, { row: 8, col: 4 },
+      { row: 8, col: 3 }, { row: 8, col: 2 }, { row: 8, col: 1 }, { row: 8, col: 0 },
+      { row: 7, col: 0 }, { row: 6, col: 0 }, { row: 6, col: 1 }, { row: 6, col: 2 },
+      { row: 6, col: 3 }, { row: 6, col: 4 }, { row: 6, col: 5 }, { row: 5, col: 6 },
+      { row: 4, col: 6 }, { row: 3, col: 6 }, { row: 2, col: 6 }, { row: 1, col: 6 },
+      { row: 0, col: 6 }, { row: 0, col: 7 }, // Boucle complète
+      // Chemin final bleu (6 cases)
+      { row: 1, col: 7 }, { row: 2, col: 7 }, { row: 3, col: 7 },
+      { row: 4, col: 7 }, { row: 5, col: 7 }, { row: 6, col: 7 },
+      // Centre
+      { row: 7, col: 7 }
+    ],
+    red: [
+      // Sortie maison rouge
+      { row: 8, col: 13 },
+      // Tour du plateau (56 cases sens horaire)
+      { row: 8, col: 12 }, { row: 8, col: 11 }, { row: 8, col: 10 }, { row: 8, col: 9 },
+      { row: 9, col: 8 }, { row: 10, col: 8 }, { row: 11, col: 8 }, { row: 12, col: 8 },
+      { row: 13, col: 8 }, { row: 14, col: 8 }, { row: 14, col: 7 }, { row: 14, col: 6 },
+      { row: 13, col: 6 }, { row: 12, col: 6 }, { row: 11, col: 6 }, { row: 10, col: 6 },
+      { row: 9, col: 6 }, { row: 8, col: 5 }, { row: 8, col: 4 }, { row: 8, col: 3 },
+      { row: 8, col: 2 }, { row: 8, col: 1 }, { row: 8, col: 0 }, { row: 7, col: 0 },
+      { row: 6, col: 0 }, { row: 6, col: 1 }, { row: 6, col: 2 }, { row: 6, col: 3 },
+      { row: 6, col: 4 }, { row: 6, col: 5 }, { row: 5, col: 6 }, { row: 4, col: 6 },
+      { row: 3, col: 6 }, { row: 2, col: 6 }, { row: 1, col: 6 }, { row: 0, col: 6 },
+      { row: 0, col: 7 }, { row: 0, col: 8 }, { row: 1, col: 8 }, { row: 2, col: 8 },
+      { row: 3, col: 8 }, { row: 4, col: 8 }, { row: 5, col: 8 }, { row: 6, col: 9 },
+      { row: 6, col: 10 }, { row: 6, col: 11 }, { row: 6, col: 12 }, { row: 6, col: 13 },
+      { row: 6, col: 14 }, { row: 7, col: 14 }, // Boucle complète
+      // Chemin final rouge (6 cases)
+      { row: 7, col: 13 }, { row: 7, col: 12 }, { row: 7, col: 11 },
+      { row: 7, col: 10 }, { row: 7, col: 9 }, { row: 7, col: 8 },
+      // Centre
+      { row: 7, col: 7 }
+    ],
+    green: [
+      // Sortie maison verte
+      { row: 13, col: 6 },
+      // Tour du plateau (56 cases sens horaire)
+      { row: 12, col: 6 }, { row: 11, col: 6 }, { row: 10, col: 6 }, { row: 9, col: 6 },
+      { row: 8, col: 5 }, { row: 8, col: 4 }, { row: 8, col: 3 }, { row: 8, col: 2 },
+      { row: 8, col: 1 }, { row: 8, col: 0 }, { row: 7, col: 0 }, { row: 6, col: 0 },
+      { row: 6, col: 1 }, { row: 6, col: 2 }, { row: 6, col: 3 }, { row: 6, col: 4 },
+      { row: 6, col: 5 }, { row: 5, col: 6 }, { row: 4, col: 6 }, { row: 3, col: 6 },
+      { row: 2, col: 6 }, { row: 1, col: 6 }, { row: 0, col: 6 }, { row: 0, col: 7 },
+      { row: 0, col: 8 }, { row: 1, col: 8 }, { row: 2, col: 8 }, { row: 3, col: 8 },
+      { row: 4, col: 8 }, { row: 5, col: 8 }, { row: 6, col: 9 }, { row: 6, col: 10 },
+      { row: 6, col: 11 }, { row: 6, col: 12 }, { row: 6, col: 13 }, { row: 6, col: 14 },
+      { row: 7, col: 14 }, { row: 8, col: 14 }, { row: 8, col: 13 }, { row: 8, col: 12 },
+      { row: 8, col: 11 }, { row: 8, col: 10 }, { row: 8, col: 9 }, { row: 9, col: 8 },
+      { row: 10, col: 8 }, { row: 11, col: 8 }, { row: 12, col: 8 }, { row: 13, col: 8 },
+      { row: 14, col: 8 }, { row: 14, col: 7 }, // Boucle complète
+      // Chemin final vert (6 cases)
+      { row: 13, col: 7 }, { row: 12, col: 7 }, { row: 11, col: 7 },
+      { row: 10, col: 7 }, { row: 9, col: 7 }, { row: 8, col: 7 },
+      // Centre
+      { row: 7, col: 7 }
+    ]
+  };
 
   /**
    * Détermine le type de case à chaque position
@@ -228,6 +329,21 @@ const LudoBoard: React.FC = () => {
       backgroundColor: pathColors.neutral,
     };
 
+    // Affichage des coordonnées en bas à droite
+    const coordonnees = (
+      <Text style={{
+        position: 'absolute',
+        right: 2,
+        bottom: 2,
+        fontSize: cellSize * 0.22,
+        color: '#888',
+        opacity: 0.7,
+        zIndex: 100,
+      }}>
+        ({cell.row},{cell.col})
+      </Text>
+    );
+
     // Si c'est une maison, on agrandit la case et on met la couleur
     if (cell.type === 'home') {
       const isCurrent = cell.color === currentPlayer;
@@ -264,6 +380,7 @@ const LudoBoard: React.FC = () => {
       return (
         <View key={cell.id} style={cellStyle}>
           {renderPawn(cell.color, cellSize * 0.8)}
+          {coordonnees}
         </View>
       );
     }
@@ -287,6 +404,7 @@ const LudoBoard: React.FC = () => {
       return (
         <View key={cell.id} style={cellStyleCenter}>
           <Text style={{ fontSize: cellSize * 1.5, fontWeight: 'bold', color: '#2c3e50' }}>★</Text>
+          {coordonnees}
         </View>
       );
     }
@@ -302,6 +420,7 @@ const LudoBoard: React.FC = () => {
           {symbol ? (
             <Text style={{ fontSize: cellSize * 0.5, fontWeight: 'bold', color: '#2c3e50' }}>{symbol}</Text>
           ) : null}
+          {coordonnees}
         </View>
       );
     }
@@ -315,26 +434,103 @@ const LudoBoard: React.FC = () => {
     </Text>
   );
 
-  // Lancer de dé et passage au joueur suivant
+  // Lancer de dé
   const rollDice = () => {
+    if (doitDeplacer) return;
     setRolling(true);
     let rolls = 0;
-    const maxRolls = 12; // nombre de faces simulées
+    const maxRolls = 12;
+    let finalValue = 1;
     const interval = setInterval(() => {
       const value = Math.floor(Math.random() * 6) + 1;
       setDiceValue(value);
+      finalValue = value;
       rolls++;
       if (rolls >= maxRolls) {
         clearInterval(interval);
         setTimeout(() => {
           setRolling(false);
-          setCurrentPlayer(prev => {
-            const idx = playerOrder.indexOf(prev);
-            return playerOrder[(idx + 1) % playerOrder.length];
-          });
+          setDiceValue(finalValue);
+          const pos = pawns[currentPlayer];
+          if (pos === 'home' && finalValue === 6) {
+            setDoitDeplacer(true);
+            setMessage('Clique sur ton pion pour le sortir de la maison');
+          } else if (typeof pos === 'number') {
+            const path = paths[currentPlayer];
+            const newPos = pos + finalValue;
+            if (newPos < path.length) {
+              setDoitDeplacer(true);
+              setMessage('Clique sur ton pion pour le déplacer');
+            } else {
+              setMessage('Déplacement impossible (fin du chemin), tour suivant.');
+              setTimeout(() => {
+                setMessage(null);
+                setCurrentPlayer(prev => {
+                  const idx = playerOrder.indexOf(prev);
+                  return playerOrder[(idx + 1) % playerOrder.length];
+                });
+                setDiceValue(null);
+              }, 1200);
+            }
+          } else {
+            setMessage('Vous devez faire 6 pour sortir de la maison.');
+            setTimeout(() => {
+              setMessage(null);
+              setCurrentPlayer(prev => {
+                const idx = playerOrder.indexOf(prev);
+                return playerOrder[(idx + 1) % playerOrder.length];
+              });
+              setDiceValue(null);
+            }, 1200);
+          }
         }, 200);
       }
     }, 60);
+  };
+
+  // Déplacement du pion (clic sur la case du pion)
+  const handleCellPress = (cell: Cell) => {
+    if (!doitDeplacer) return;
+    const pos = pawns[currentPlayer];
+    if (pos === 'home' && cell.type === 'home' && cell.color === currentPlayer && (diceValue ?? 1) === 6) {
+      setPawns(prev => ({ ...prev, [currentPlayer]: 0 }));
+      setDoitDeplacer(false);
+      setMessage(null);
+      setDiceValue(null);
+      if ((diceValue ?? 1) === 6) {
+        setTimeout(() => {
+          setMessage('Tu as fait 6, rejoue !');
+        }, 200);
+      } else {
+        setCurrentPlayer(prev => {
+          const idx = playerOrder.indexOf(prev);
+          return playerOrder[(idx + 1) % playerOrder.length];
+        });
+      }
+    } else if (typeof pos === 'number') {
+      const path = paths[currentPlayer];
+      const newPos = pos + (diceValue ?? 1);
+      if (cell.type === 'path' && path[newPos] && cell.row === path[pos].row && cell.col === path[pos].col) {
+        if (newPos < path.length) {
+          setPawns(prev => ({ ...prev, [currentPlayer]: newPos }));
+          setDoitDeplacer(false);
+          setMessage(null);
+          setDiceValue(null);
+          if ((diceValue ?? 1) === 6) {
+            setTimeout(() => {
+              setMessage('Tu as fait 6, rejoue !');
+            }, 200);
+          } else {
+            setCurrentPlayer(prev => {
+              const idx = playerOrder.indexOf(prev);
+              return playerOrder[(idx + 1) % playerOrder.length];
+            });
+          }
+        } else {
+          setMessage('Déplacement impossible (fin du chemin)');
+        }
+      }
+    }
   };
 
   // Génère le plateau
@@ -365,18 +561,42 @@ const LudoBoard: React.FC = () => {
             },
           ]}
         >
-          {board.map(cell => renderCell(cell))}
+          {board.map(cell => {
+            // Pour chaque case, on cherche les pions à afficher
+            const pionsSurCase: Array<'yellow' | 'blue' | 'red' | 'green'> = [];
+            (['yellow', 'blue', 'red', 'green'] as const).forEach(color => {
+              const pos = pawns[color];
+              if (cell.type === 'home' && cell.color === color && pos === 'home') {
+                pionsSurCase.push(color);
+              } else if (cell.type === 'path' && typeof pos === 'number') {
+                const posCoord = paths[color][pos];
+                if (posCoord && cell.row === posCoord.row && cell.col === posCoord.col) {
+                  pionsSurCase.push(color);
+                }
+              }
+            });
+            return (
+              <LudoCell
+                key={cell.id}
+                cell={cell}
+                cellSize={cellSize}
+                pions={pionsSurCase}
+                currentPlayer={currentPlayer}
+                onPress={() => handleCellPress(cell)}
+              />
+            );
+          })}
         </View>
       </View>
       {/* Dé en bas de l'écran */}
       <View style={styles.diceContainer}>
-        <View
-          style={styles.diceTouchable}
-          onTouchEnd={() => !rolling && rollDice()}
-        >
-          <DiceFace value={diceValue ?? 1} size={60} />
-        </View>
-        
+        <LudoDice value={diceValue ?? 1} rolling={rolling || doitDeplacer} onRoll={rollDice} size={60} />
+        <Text style={{ fontSize: 16, fontWeight: 'bold', color: homeColors[currentPlayer], marginTop: 4 }}>
+          Tour du joueur : {currentPlayer.toUpperCase()}
+        </Text>
+        {message && (
+          <Text style={{ color: '#e67e22', fontWeight: 'bold', marginTop: 8 }}>{message}</Text>
+        )}
       </View>
     </View>
   );

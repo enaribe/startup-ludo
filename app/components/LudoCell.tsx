@@ -15,8 +15,8 @@ interface Cell {
 interface LudoCellProps {
   cell: Cell;
   cellSize: number;
+  pions: Array<'yellow' | 'blue' | 'red' | 'green'>;
   currentPlayer: 'yellow' | 'blue' | 'green' | 'red';
-  showPawn?: boolean;
   onPress?: () => void;
 }
 
@@ -37,7 +37,7 @@ const pathColors: Record<string, string> = {
   empty: '#F5F5F5',
 };
 
-const LudoCell: React.FC<LudoCellProps> = ({ cell, cellSize, currentPlayer, showPawn, onPress }) => {
+const LudoCell: React.FC<LudoCellProps> = ({ cell, cellSize, pions, currentPlayer, onPress }) => {
   if (cell.type === 'empty') return null;
 
   const cellLeft = cell.col * cellSize;
@@ -90,7 +90,15 @@ const LudoCell: React.FC<LudoCellProps> = ({ cell, cellSize, currentPlayer, show
     };
     const content = (
       <View key={cell.id} style={cellStyle}>
-        {showPawn && <LudoPawn color={cell.color as any} size={cellSize * 0.8} />}
+        <View style={{ flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          {pions.map(color => (
+            <LudoPawn
+              key={color}
+              color={color}
+              size={color === currentPlayer ? cellSize * 0.9 : cellSize * 0.7}
+            />
+          ))}
+        </View>
       </View>
     );
     return onPress ? (
@@ -131,7 +139,15 @@ const LudoCell: React.FC<LudoCellProps> = ({ cell, cellSize, currentPlayer, show
         {symbol ? (
           <Text style={{ fontSize: cellSize * 0.5, fontWeight: 'bold', color: '#2c3e50' }}>{symbol}</Text>
         ) : null}
-        {showPawn && <LudoPawn color={currentPlayer} size={cellSize * 0.8} />}
+        <View style={{ flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          {pions.map(color => (
+            <LudoPawn
+              key={color}
+              color={color}
+              size={color === currentPlayer ? cellSize * 0.9 : cellSize * 0.7}
+            />
+          ))}
+        </View>
       </View>
     );
     return onPress ? (
