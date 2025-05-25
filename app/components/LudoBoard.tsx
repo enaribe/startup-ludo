@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, Easing, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import LudoCell from './LudoCell';
 import LudoDice from './LudoDice';
+import LudoPawn from './LudoPawn';
 
 /**
  * Plateau de Ludo : chaque zone de maison (6x6) est une seule grande case colorée,
@@ -125,6 +126,81 @@ const LudoBoard: React.FC = () => {
 
   const [doitDeplacer, setDoitDeplacer] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  const [pawnAnim, setPawnAnim] = useState({
+    yellow: useRef(new Animated.ValueXY({ x: 0, y: 0 })).current,
+    blue: useRef(new Animated.ValueXY({ x: 0, y: 0 })).current,
+    red: useRef(new Animated.ValueXY({ x: 0, y: 0 })).current,
+    green: useRef(new Animated.ValueXY({ x: 0, y: 0 })).current,
+  });
+
+  // Fonction utilitaire pour attendre un délai
+  const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+  // Fonction pour animer le déplacement case par case
+  const animatePawnMove = async (color: 'yellow' | 'blue' | 'red' | 'green', from: number, to: number) => {
+    setIsAnimating(true);
+    let current = from;
+    const step = from < to ? 1 : -1;
+    while (current !== to) {
+      current += step;
+      await wait(150);
+    }
+    setIsAnimating(false);
+  };
+
+  // Fonction utilitaire pour obtenir la position pixel d'une case
+  const getCellPosition = (color: 'yellow' | 'blue' | 'red' | 'green', pos: number | 'home') => {
+    if (pos === 'home') {
+      if (color === 'yellow') return { x: 0.5 * cellSize * 6, y: 0.5 * cellSize * 6 };
+      if (color === 'blue') return { x: 0.5 * cellSize * 6 + cellSize * 9, y: 0.5 * cellSize * 6 };
+      if (color === 'red') return { x: 0.5 * cellSize * 6 + cellSize * 9, y: 0.5 * cellSize * 6 + cellSize * 9 };
+      if (color === 'green') return { x: 0.5 * cellSize * 6, y: 0.5 * cellSize * 6 + cellSize * 9 };
+      return { x: 0, y: 0 };
+    } else if (typeof pos === 'number' && paths[color][pos]) {
+      const { row, col } = paths[color][pos];
+      return { x: col * cellSize, y: row * cellSize };
+    }
+    return { x: 0, y: 0 };
+  };
+
+  // Met à jour la position animée d'un pion
+  const movePawnAnimated = async (color: 'yellow' | 'blue' | 'red' | 'green', from: number, to: number) => {
+    setIsAnimating(true);
+    // Synchronise la position animée avec la position réelle avant de commencer
+    const startCoords = getCellPosition(color, from);
+    pawnAnim[color].setValue(startCoords);
+
+    const step = from < to ? 1 : -1;
+    let current = from;
+    while (current !== to) {
+      current += step;
+      const pos = getCellPosition(color, current);
+      await new Promise(resolve => {
+        Animated.timing(pawnAnim[color], {
+          toValue: { x: pos.x, y: pos.y },
+          duration: 220,
+          useNativeDriver: false,
+          easing: Easing.inOut(Easing.ease),
+        }).start(() => resolve(true));
+      });
+      await wait(30);
+    }
+    // Met à jour la position logique du pion à la fin de l'animation
+    setPawns(prev => ({ ...prev, [color]: to }));
+    setIsAnimating(false);
+  };
+
+  // À l'initialisation ou quand pawns change, synchronise la position animée
+  useEffect(() => {
+    (['yellow', 'blue', 'red', 'green'] as const).forEach(color => {
+      const pos = pawns[color];
+      const coords = getCellPosition(color, pos);
+      pawnAnim[color].setValue(coords || { x: 0, y: 0 });
+    });
+  }, [pawns]);
 
   // Chemin du pion jaune (parcours classique Ludo)
   const paths: Record<string, Array<{ row: number; col: number }>> = {
@@ -434,9 +510,41 @@ const LudoBoard: React.FC = () => {
     </Text>
   );
 
+  // Fonction utilitaire pour vérifier si une case est sûre
+  const isSafeCell = (row: number, col: number) => {
+    // On utilise la logique de getPathInfo
+    const info = getPathInfo(row, col);
+    return info.isSafe === true;
+  };
+
+  // Fonction pour gérer la capture d'un pion adverse
+  const handleCapture = (color: 'yellow' | 'blue' | 'red' | 'green', pos: number) => {
+    const { row, col } = paths[color][pos];
+    // Si la case n'est pas sûre ni une maison
+    if (!isSafeCell(row, col)) {
+      // Cherche s'il y a un pion adverse sur cette case
+      const otherColors = playerOrder.filter(c => c !== color);
+      let captured = null;
+      for (const other of otherColors) {
+        const otherPos = pawns[other];
+        if (typeof otherPos === 'number') {
+          const otherCoord = paths[other][otherPos];
+          if (otherCoord && otherCoord.row === row && otherCoord.col === col) {
+            captured = other;
+            break;
+          }
+        }
+      }
+      if (captured) {
+        setPawns(prev => ({ ...prev, [captured]: 'home' }));
+        setMessage('Le pion ' + captured + ' a été capturé et retourne à la maison !');
+      }
+    }
+  };
+
   // Lancer de dé
   const rollDice = () => {
-    if (doitDeplacer) return;
+    if (doitDeplacer || isAnimating) return;
     setRolling(true);
     let rolls = 0;
     const maxRolls = 12;
@@ -448,19 +556,42 @@ const LudoBoard: React.FC = () => {
       rolls++;
       if (rolls >= maxRolls) {
         clearInterval(interval);
-        setTimeout(() => {
+        setTimeout(async () => {
           setRolling(false);
           setDiceValue(finalValue);
           const pos = pawns[currentPlayer];
+          const path = paths[currentPlayer];
+          // Si le pion est à la maison et fait 6, il sort automatiquement
           if (pos === 'home' && finalValue === 6) {
-            setDoitDeplacer(true);
-            setMessage('Clique sur ton pion pour le sortir de la maison');
+            setMessage('Le pion sort de la maison !');
+            setPawns(prev => ({ ...prev, [currentPlayer]: 0 }));
+            await wait(200);
+            handleCapture(currentPlayer, 0);
+            // Si 6, rejoue
+            setTimeout(() => {
+              setMessage('Tu as fait 6, rejoue !');
+            }, 400);
+          // Si le pion est déjà sur le chemin
           } else if (typeof pos === 'number') {
-            const path = paths[currentPlayer];
             const newPos = pos + finalValue;
             if (newPos < path.length) {
-              setDoitDeplacer(true);
-              setMessage('Clique sur ton pion pour le déplacer');
+              setMessage('Le pion avance de ' + finalValue + ' case(s) !');
+              await movePawnAnimated(currentPlayer, pos, newPos);
+              handleCapture(currentPlayer, newPos);
+              // Si 6, rejoue
+              if (finalValue === 6) {
+                setTimeout(() => {
+                  setMessage('Tu as fait 6, rejoue !');
+                }, 400);
+              } else {
+                setTimeout(() => {
+                  setMessage(null);
+                  setCurrentPlayer(prev => {
+                    const idx = playerOrder.indexOf(prev);
+                    return playerOrder[(idx + 1) % playerOrder.length];
+                  });
+                }, 800);
+              }
             } else {
               setMessage('Déplacement impossible (fin du chemin), tour suivant.');
               setTimeout(() => {
@@ -469,7 +600,6 @@ const LudoBoard: React.FC = () => {
                   const idx = playerOrder.indexOf(prev);
                   return playerOrder[(idx + 1) % playerOrder.length];
                 });
-                setDiceValue(null);
               }, 1200);
             }
           } else {
@@ -480,7 +610,6 @@ const LudoBoard: React.FC = () => {
                 const idx = playerOrder.indexOf(prev);
                 return playerOrder[(idx + 1) % playerOrder.length];
               });
-              setDiceValue(null);
             }, 1200);
           }
         }, 200);
@@ -496,7 +625,7 @@ const LudoBoard: React.FC = () => {
       setPawns(prev => ({ ...prev, [currentPlayer]: 0 }));
       setDoitDeplacer(false);
       setMessage(null);
-      setDiceValue(null);
+      handleCapture(currentPlayer, 0);
       if ((diceValue ?? 1) === 6) {
         setTimeout(() => {
           setMessage('Tu as fait 6, rejoue !');
@@ -515,7 +644,7 @@ const LudoBoard: React.FC = () => {
           setPawns(prev => ({ ...prev, [currentPlayer]: newPos }));
           setDoitDeplacer(false);
           setMessage(null);
-          setDiceValue(null);
+          handleCapture(currentPlayer, newPos);
           if ((diceValue ?? 1) === 6) {
             setTimeout(() => {
               setMessage('Tu as fait 6, rejoue !');
@@ -587,10 +716,17 @@ const LudoBoard: React.FC = () => {
             );
           })}
         </View>
+        {/* Pions animés par-dessus le plateau */}
+        <View style={{ position: 'absolute', left: 0, top: 0, width: cellSize * BOARD_SIZE, height: cellSize * BOARD_SIZE, zIndex: 100 }} pointerEvents="none">
+          <LudoPawn color="yellow" size={cellSize * 0.8} animatedPosition={pawnAnim.yellow} />
+          <LudoPawn color="blue" size={cellSize * 0.8} animatedPosition={pawnAnim.blue} />
+          <LudoPawn color="red" size={cellSize * 0.8} animatedPosition={pawnAnim.red} />
+          <LudoPawn color="green" size={cellSize * 0.8} animatedPosition={pawnAnim.green} />
+        </View>
       </View>
       {/* Dé en bas de l'écran */}
       <View style={styles.diceContainer}>
-        <LudoDice value={diceValue ?? 1} rolling={rolling || doitDeplacer} onRoll={rollDice} size={60} />
+        <LudoDice value={diceValue ?? 1} rolling={rolling || isAnimating} onRoll={rollDice} size={60} />
         <Text style={{ fontSize: 16, fontWeight: 'bold', color: homeColors[currentPlayer], marginTop: 4 }}>
           Tour du joueur : {currentPlayer.toUpperCase()}
         </Text>

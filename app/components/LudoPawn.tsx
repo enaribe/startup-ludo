@@ -1,9 +1,10 @@
 import React from 'react';
-import { Text } from 'react-native';
+import { Animated, Text } from 'react-native';
 
 interface LudoPawnProps {
   color: 'yellow' | 'blue' | 'green' | 'red';
   size: number;
+  animatedPosition: Animated.ValueXY;
 }
 
 const pawnEmojis: Record<string, string> = {
@@ -13,9 +14,11 @@ const pawnEmojis: Record<string, string> = {
   red: '🔴',
 };
 
-const LudoPawn: React.FC<LudoPawnProps> = ({ color, size }) => {
+const LudoPawn: React.FC<LudoPawnProps> = ({ color, size, animatedPosition }) => {
   return (
-    <Text style={{ fontSize: size, textAlign: 'center' }}>{pawnEmojis[color]}</Text>
+    <Animated.View style={[{ position: 'absolute' }, animatedPosition.getLayout()]}> 
+      <Text style={{ fontSize: size, textAlign: 'center' }}>{pawnEmojis[color]}</Text>
+    </Animated.View>
   );
 };
 

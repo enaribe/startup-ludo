@@ -1,6 +1,5 @@
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
-import LudoPawn from './LudoPawn';
 
 interface Cell {
   id: string;
@@ -90,15 +89,7 @@ const LudoCell: React.FC<LudoCellProps> = ({ cell, cellSize, pions, currentPlaye
     };
     const content = (
       <View key={cell.id} style={cellStyle}>
-        <View style={{ flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-          {pions.map(color => (
-            <LudoPawn
-              key={color}
-              color={color}
-              size={color === currentPlayer ? cellSize * 0.9 : cellSize * 0.7}
-            />
-          ))}
-        </View>
+        {/* Pions supprimés ici */}
       </View>
     );
     return onPress ? (
@@ -139,15 +130,7 @@ const LudoCell: React.FC<LudoCellProps> = ({ cell, cellSize, pions, currentPlaye
         {symbol ? (
           <Text style={{ fontSize: cellSize * 0.5, fontWeight: 'bold', color: '#2c3e50' }}>{symbol}</Text>
         ) : null}
-        <View style={{ flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-          {pions.map(color => (
-            <LudoPawn
-              key={color}
-              color={color}
-              size={color === currentPlayer ? cellSize * 0.9 : cellSize * 0.7}
-            />
-          ))}
-        </View>
+        {/* Pions supprimés ici */}
       </View>
     );
     return onPress ? (
