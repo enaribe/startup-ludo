@@ -739,6 +739,20 @@ const LudoBoard: React.FC = () => {
 
   return (
     <View style={styles.container}>
+      {/* Header avec menus */}
+      <View style={styles.header}>
+        <Image 
+          source={require('../../assets/images/burger.png')} 
+          style={styles.menuIcon}
+          resizeMode="contain"
+        />
+        <Image 
+          source={require('../../assets/images/aide.png')} 
+          style={styles.helpIcon}
+          resizeMode="contain"
+        />
+      </View>
+      
       {/* Plateau centré absolument au milieu de l'écran */}
       <View style={boardAbsoluteWrapper}>
         <View
@@ -804,26 +818,99 @@ const LudoBoard: React.FC = () => {
           />
         </View>
       </View>
-      {/* Dé en bas de l'écran */}
-      <View style={styles.diceContainer}>
-        <LudoDice value={diceValue ?? 1} rolling={rolling || isAnimating} onRoll={rollDice} size={60} />
-        <Text style={{ fontSize: 16, fontWeight: 'bold', color: homeColors[currentPlayer], marginTop: 4 }}>
-          Tour du joueur : {currentPlayer.toUpperCase()}
-        </Text>
-        {message && (
-          <Text style={{ color: '#e67e22', fontWeight: 'bold', marginTop: 8 }}>{message}</Text>
-        )}
-        {winner && (
-          <View style={{ marginTop: 16, alignItems: 'center' }}>
-            <Text style={{ fontSize: 22, fontWeight: 'bold', color: homeColors[winner] }}>
-              🎉 {winner.toUpperCase()} a gagné la partie ! 🎉
-            </Text>
-            <Text style={{ marginTop: 8 }} onPress={resetGame}>
-              <Text style={{ color: '#2980b9', textDecorationLine: 'underline', fontSize: 16 }}>Rejouer</Text>
-            </Text>
+      {/* Espaces des joueurs avec dés */}
+      {/* Joueur Jaune (en haut à gauche) */}
+      <View style={[styles.playerSpace, styles.topLeft]}>
+        <View style={styles.playerHeader}>
+          <View style={styles.playerIndicator}>
+            <Text style={styles.playerText}>Player 1</Text>
           </View>
-        )}
+          {currentPlayer === 'yellow' && (
+            <LudoDice value={diceValue ?? 1} rolling={rolling || isAnimating} onRoll={rollDice} size={40} />
+          )}
+        </View>
+        <View style={styles.pawnsRow}>
+          {[1, 2, 3, 4].map(i => (
+            <View key={i} style={[styles.pawnSlot, { backgroundColor: '#EDA420' }]}>
+              <Text style={styles.pawnNumber}>{i}</Text>
+            </View>
+          ))}
+        </View>
       </View>
+
+      {/* Joueur Bleu (en haut à droite) */}
+      <View style={[styles.playerSpace, styles.topRight]}>
+        <View style={styles.playerHeader}>
+          <View style={styles.playerIndicator}>
+            <Text style={styles.playerText}>Player 2</Text>
+          </View>
+          {currentPlayer === 'blue' && (
+            <LudoDice value={diceValue ?? 1} rolling={rolling || isAnimating} onRoll={rollDice} size={40} />
+          )}
+        </View>
+        <View style={styles.pawnsRow}>
+          {[1, 2, 3, 4].map(i => (
+            <View key={i} style={[styles.pawnSlot, { backgroundColor: '#1C82BB' }]}>
+              <Text style={styles.pawnNumber}>{i}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* Joueur Vert (en bas à gauche) */}
+      <View style={[styles.playerSpace, styles.bottomLeft]}>
+        <View style={styles.playerHeader}>
+          <View style={styles.playerIndicator}>
+            <Text style={styles.playerText}>Player 4</Text>
+          </View>
+          {currentPlayer === 'green' && (
+            <LudoDice value={diceValue ?? 1} rolling={rolling || isAnimating} onRoll={rollDice} size={40} />
+          )}
+        </View>
+        <View style={styles.pawnsRow}>
+          {[1, 2, 3, 4].map(i => (
+            <View key={i} style={[styles.pawnSlot, { backgroundColor: '#46A24A' }]}>
+              <Text style={styles.pawnNumber}>{i}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* Joueur Rouge (en bas à droite) */}
+      <View style={[styles.playerSpace, styles.bottomRight]}>
+        <View style={styles.playerHeader}>
+          <View style={styles.playerIndicator}>
+            <Text style={styles.playerText}>Player 3</Text>
+          </View>
+          {currentPlayer === 'red' && (
+            <LudoDice value={diceValue ?? 1} rolling={rolling || isAnimating} onRoll={rollDice} size={40} />
+          )}
+        </View>
+        <View style={styles.pawnsRow}>
+          {[1, 2, 3, 4].map(i => (
+            <View key={i} style={[styles.pawnSlot, { backgroundColor: '#E6433C' }]}>
+              <Text style={styles.pawnNumber}>{i}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* Messages et victoire */}
+      {message && (
+        <View style={styles.messageContainer}>
+          <Text style={styles.messageText}>{message}</Text>
+        </View>
+      )}
+      {winner && (
+        <View style={styles.winnerContainer}>
+          <Text style={styles.winnerText}>
+            🎉 {winner.toUpperCase()} a gagné la partie ! 🎉
+          </Text>
+          <Text style={styles.restartText} onPress={resetGame}>
+            Rejouer
+          </Text>
+        </View>
+      )}
     </View>
   );
 };
@@ -833,8 +920,127 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#185893',
   },
+  header: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 80,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 40,
+    zIndex: 100,
+  },
+  menuIcon: {
+    width: 40,
+    height: 40,
+  },
+  helpIcon: {
+    width: 40,
+    height: 40,
+  },
   board: {
     position: 'relative',
+  },
+
+  playerSpace: {
+    position: 'absolute',
+    width: 160,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    padding: 12,
+  },
+  topLeft: {
+    top: '15%',
+    left: '5%',
+  },
+  topRight: {
+    top: '15%',
+    right: '5%',
+  },
+  bottomLeft: {
+    bottom: '15%',
+    left: '5%',
+  },
+  bottomRight: {
+    bottom: '15%',
+    right: '5%',
+  },
+  playerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  playerIndicator: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
+  playerText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  pawnsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  pawnSlot: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  pawnNumber: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  messageContainer: {
+    position: 'absolute',
+    bottom: 100,
+    left: 16,
+    right: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+  },
+  messageText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  winnerContainer: {
+    position: 'absolute',
+    top: '50%',
+    left: 16,
+    right: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    borderRadius: 12,
+    padding: 20,
+    alignItems: 'center',
+    transform: [{ translateY: -50 }],
+  },
+  winnerText: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#fff',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  restartText: {
+    color: '#2980b9',
+    textDecorationLine: 'underline',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   diceContainer: {
     position: 'absolute',
