@@ -3,6 +3,10 @@ import { Animated, Easing, Image, StyleSheet, Text, View, useWindowDimensions } 
 import LudoCell from './LudoCell';
 import LudoDice from './LudoDice';
 import LudoPawn from './LudoPawn';
+import Icon1 from './icons/Icon1';
+import Icon2 from './icons/Icon2';
+import Icon3 from './icons/Icon3';
+import Icon4 from './icons/Icon4';
 
 /**
  * Plateau de Ludo : chaque zone de maison (6x6) est une seule grande case colorée,
@@ -17,7 +21,6 @@ interface Cell {
   type: 'home' | 'center' | 'path' | 'empty';
   color: string;
   isStart?: boolean;
-  isSafe?: boolean;
   homeNumber?: number;
 }
 
@@ -35,7 +38,6 @@ const pathColors: Record<string, string> = {
   blue: '#B0C4DE',
   green: '#90EE90',
   red: '#FFC0CB',
-  safe: '#90EE90',
   neutral: '#fff',
   center: '#FFD700',
   empty: '#F5F5F5',
@@ -131,7 +133,8 @@ const LudoBoard: React.FC = () => {
     green: useRef(new Animated.ValueXY({ x: 0, y: 0 })).current,
   });
 
-  const [winner, setWinner] = useState<null | 'yellow' | 'blue' | 'red' | 'green'>(null);
+  const [finishedPlayers, setFinishedPlayers] = useState<Array<'yellow' | 'blue' | 'red' | 'green'>>([]);
+  const [gameFinished, setGameFinished] = useState(false);
 
   // Fonction utilitaire pour attendre un délai
   const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -227,7 +230,6 @@ const LudoBoard: React.FC = () => {
       { row: 7, col: 1 }, { row: 7, col: 2 }, { row: 7, col: 3 },
       { row: 7, col: 4 }, { row: 7, col: 5 }, { row: 7, col: 6 },
       // Centre
-      { row: 7, col: 7 }
     ],
     blue: [
       // Sortie maison bleue
@@ -250,7 +252,6 @@ const LudoBoard: React.FC = () => {
       { row: 1, col: 7 }, { row: 2, col: 7 }, { row: 3, col: 7 },
       { row: 4, col: 7 }, { row: 5, col: 7 }, { row: 6, col: 7 },
       // Centre
-      { row: 7, col: 7 }
     ],
     red: [
       // Sortie maison rouge
@@ -273,7 +274,6 @@ const LudoBoard: React.FC = () => {
       { row: 7, col: 13 }, { row: 7, col: 12 }, { row: 7, col: 11 },
       { row: 7, col: 10 }, { row: 7, col: 9 }, { row: 7, col: 8 },
       // Centre
-      { row: 7, col: 7 }
     ],
     green: [
       // Sortie maison verte
@@ -296,7 +296,7 @@ const LudoBoard: React.FC = () => {
       { row: 13, col: 7 }, { row: 12, col: 7 }, { row: 11, col: 7 },
       { row: 10, col: 7 }, { row: 9, col: 7 }, { row: 8, col: 7 },
       // Centre
-      { row: 7, col: 7 }
+      
     ]
   };
 
@@ -341,23 +341,12 @@ const LudoBoard: React.FC = () => {
   /**
    * Logique des chemins spéciaux, cases de départ, cases sûres, chemins finaux
    */
-  const getPathInfo = (row: number, col: number): { color: string; isStart?: boolean; isSafe?: boolean; homeNumber?: number } => {
+  const getPathInfo = (row: number, col: number): { color: string; isStart?: boolean; homeNumber?: number } => {
     // Cases de départ
-    if (row === 6 && col === 1) return { color: 'yellow', isStart: true, isSafe: false };
-    if (row === 1 && col === 8) return { color: 'blue', isStart: true, isSafe: false };
-    if (row === 13 && col === 6) return { color: 'green', isStart: true, isSafe: false };
-    if (row === 8 && col === 13) return { color: 'red', isStart: true, isSafe: false };
-    
-
-    // Cases sûres (exemple, à adapter selon ton plateau)
-    if (
-      (row === 2 && col === 6) ||
-      (row === 6 && col === 12) ||
-      (row === 12 && col === 8) ||
-      (row === 8 && col === 2)
-    ) {
-      return { color: 'safe', isSafe: true };
-    }
+    if (row === 6 && col === 1) return { color: 'yellow', isStart: true };
+    if (row === 1 && col === 8) return { color: 'blue', isStart: true };
+    if (row === 13 && col === 6) return { color: 'green', isStart: true };
+    if (row === 8 && col === 13) return { color: 'red', isStart: true };
 
     // Chemins finaux (5 cases avant le centre) avec numéros 5 à 1
     // Jaune : row 7, col 1 à 5 → numéros 5, 4, 3, 2, 1
@@ -500,7 +489,6 @@ const LudoBoard: React.FC = () => {
       let bg = pathColors[cell.color] || pathColors.neutral;
       let symbol = '';
       if (cell.isStart) symbol = '';
-      if (cell.isSafe) symbol = '';
       
       // Couleurs des cercles pour les chemins vers home
       const homeCircleColors: Record<string, string> = {
@@ -553,9 +541,8 @@ const LudoBoard: React.FC = () => {
 
   // Fonction utilitaire pour vérifier si une case est sûre
   const isSafeCell = (row: number, col: number) => {
-    // On utilise la logique de getPathInfo
-    const info = getPathInfo(row, col);
-    return info.isSafe === true;
+    // Plus de cases sûres - tous les pions peuvent être capturés
+    return false;
   };
 
   // Fonction pour gérer la capture d'un pion adverse
@@ -596,12 +583,13 @@ const LudoBoard: React.FC = () => {
     setRolling(false);
     setMessage(null);
     setIsAnimating(false);
-    setWinner(null);
+    setFinishedPlayers([]);
+    setGameFinished(false);
   };
 
   // Lancer de dé
   const rollDice = () => {
-    if (doitDeplacer || isAnimating || winner) return;
+    if (doitDeplacer || isAnimating || gameFinished) return;
     setRolling(true);
     let rolls = 0;
     const maxRolls = 12;
@@ -631,9 +619,34 @@ const LudoBoard: React.FC = () => {
             const newPos = pos + finalValue;
             // Vérifie si le pion peut atteindre exactement la case centrale (homer)
             if (newPos === path.length - 1) {
-              setMessage('Bravo ! Tu es arrivé au centre !');
+              const newFinishedPlayers = [...finishedPlayers, currentPlayer];
+              setFinishedPlayers(newFinishedPlayers);
+              
+              const position = newFinishedPlayers.length;
+              const positionText = position === 1 ? '1er' : position === 2 ? '2ème' : position === 3 ? '3ème' : '4ème';
+              setMessage(`Bravo ! ${currentPlayer.toUpperCase()} termine ${positionText} !`);
+              
               await movePawnAnimated(currentPlayer, pos, newPos);
-              setWinner(currentPlayer);
+              
+              // Vérifie si le jeu est terminé (3 joueurs ont fini)
+              if (newFinishedPlayers.length === 3) {
+                setGameFinished(true);
+                const lastPlayer = playerOrder.find(p => !newFinishedPlayers.includes(p));
+                setTimeout(() => {
+                  setMessage(`Jeu terminé ! Classement final : ${newFinishedPlayers.map((p, i) => `${i + 1}. ${p.toUpperCase()}`).join(', ')}, 4. ${lastPlayer?.toUpperCase()}`);
+                }, 1000);
+                return;
+              }
+              
+              // Passe au joueur suivant qui n'a pas encore fini
+              setTimeout(() => {
+                setMessage(null);
+                let nextPlayerIndex = (playerOrder.indexOf(currentPlayer) + 1) % playerOrder.length;
+                while (newFinishedPlayers.includes(playerOrder[nextPlayerIndex])) {
+                  nextPlayerIndex = (nextPlayerIndex + 1) % playerOrder.length;
+                }
+                setCurrentPlayer(playerOrder[nextPlayerIndex]);
+              }, 2000);
               return;
             } else if (newPos < path.length - 1) {
               setMessage('Le pion avance de ' + finalValue + ' case(s) !');
@@ -647,8 +660,11 @@ const LudoBoard: React.FC = () => {
                 setTimeout(() => {
                   setMessage(null);
                   setCurrentPlayer(prev => {
-                    const idx = playerOrder.indexOf(prev);
-                    return playerOrder[(idx + 1) % playerOrder.length];
+                    let nextPlayerIndex = (playerOrder.indexOf(prev) + 1) % playerOrder.length;
+                    while (finishedPlayers.includes(playerOrder[nextPlayerIndex])) {
+                      nextPlayerIndex = (nextPlayerIndex + 1) % playerOrder.length;
+                    }
+                    return playerOrder[nextPlayerIndex];
                   });
                 }, 800);
               }
@@ -657,8 +673,11 @@ const LudoBoard: React.FC = () => {
               setTimeout(() => {
                 setMessage(null);
                 setCurrentPlayer(prev => {
-                  const idx = playerOrder.indexOf(prev);
-                  return playerOrder[(idx + 1) % playerOrder.length];
+                  let nextPlayerIndex = (playerOrder.indexOf(prev) + 1) % playerOrder.length;
+                  while (finishedPlayers.includes(playerOrder[nextPlayerIndex])) {
+                    nextPlayerIndex = (nextPlayerIndex + 1) % playerOrder.length;
+                  }
+                  return playerOrder[nextPlayerIndex];
                 });
               }, 1200);
             }
@@ -667,8 +686,11 @@ const LudoBoard: React.FC = () => {
             setTimeout(() => {
               setMessage(null);
               setCurrentPlayer(prev => {
-                const idx = playerOrder.indexOf(prev);
-                return playerOrder[(idx + 1) % playerOrder.length];
+                let nextPlayerIndex = (playerOrder.indexOf(prev) + 1) % playerOrder.length;
+                while (finishedPlayers.includes(playerOrder[nextPlayerIndex])) {
+                  nextPlayerIndex = (nextPlayerIndex + 1) % playerOrder.length;
+                }
+                return playerOrder[nextPlayerIndex];
               });
             }, 1200);
           }
@@ -820,78 +842,150 @@ const LudoBoard: React.FC = () => {
       </View>
       {/* Espaces des joueurs avec dés */}
       {/* Joueur Jaune (en haut à gauche) */}
-      <View style={[styles.playerSpace, styles.topLeft]}>
+      <View style={[styles.playerCard, styles.topLeft]}>
         <View style={styles.playerHeader}>
-          <View style={styles.playerIndicator}>
-            <Text style={styles.playerText}>Player 1</Text>
+          <View style={styles.playerInfo}>
+            <View style={styles.playerAvatar}>
+              {finishedPlayers.includes('yellow') && (
+                <Text style={styles.positionText}>
+                  {finishedPlayers.indexOf('yellow') + 1}
+                </Text>
+              )}
+            </View>
+            <Text style={styles.playerName}>Player 1</Text>
           </View>
-          {currentPlayer === 'yellow' && (
+          {currentPlayer === 'yellow' && !finishedPlayers.includes('yellow') && (
             <LudoDice value={diceValue ?? 1} rolling={rolling || isAnimating} onRoll={rollDice} size={40} />
           )}
         </View>
-        <View style={styles.pawnsRow}>
-          {[1, 2, 3, 4].map(i => (
-            <View key={i} style={[styles.pawnSlot, { backgroundColor: '#EDA420' }]}>
-              <Text style={styles.pawnNumber}>{i}</Text>
-            </View>
-          ))}
+        <View style={styles.statsRow}>
+          <View style={styles.statItem}>
+            <Icon1 size={20} color="#EDA420" />
+            <Text style={styles.statNumber}>3</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Icon2 size={20} color="#EDA420" />
+            <Text style={styles.statNumber}>3</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Icon3 size={20} color="#EDA420" />
+            <Text style={styles.statNumber}>1</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Icon4 size={20} color="#EDA420" />
+            <Text style={styles.statNumber}>1</Text>
+          </View>
         </View>
       </View>
 
       {/* Joueur Bleu (en haut à droite) */}
-      <View style={[styles.playerSpace, styles.topRight]}>
+      <View style={[styles.playerCard, styles.topRight]}>
         <View style={styles.playerHeader}>
-          <View style={styles.playerIndicator}>
-            <Text style={styles.playerText}>Player 2</Text>
+          <View style={styles.playerInfo}>
+            <View style={styles.playerAvatar}>
+              {finishedPlayers.includes('blue') && (
+                <Text style={styles.positionText}>
+                  {finishedPlayers.indexOf('blue') + 1}
+                </Text>
+              )}
+            </View>
+            <Text style={styles.playerName}>Player 2</Text>
           </View>
-          {currentPlayer === 'blue' && (
+          {currentPlayer === 'blue' && !finishedPlayers.includes('blue') && (
             <LudoDice value={diceValue ?? 1} rolling={rolling || isAnimating} onRoll={rollDice} size={40} />
           )}
         </View>
-        <View style={styles.pawnsRow}>
-          {[1, 2, 3, 4].map(i => (
-            <View key={i} style={[styles.pawnSlot, { backgroundColor: '#1C82BB' }]}>
-              <Text style={styles.pawnNumber}>{i}</Text>
-            </View>
-          ))}
+        <View style={styles.statsRow}>
+          <View style={styles.statItem}>
+            <Icon1 size={20} color="#1C82BB" />
+            <Text style={styles.statNumber}>3</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Icon2 size={20} color="#1C82BB" />
+            <Text style={styles.statNumber}>3</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Icon3 size={20} color="#1C82BB" />
+            <Text style={styles.statNumber}>1</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Icon4 size={20} color="#1C82BB" />
+            <Text style={styles.statNumber}>1</Text>
+          </View>
         </View>
       </View>
 
       {/* Joueur Vert (en bas à gauche) */}
-      <View style={[styles.playerSpace, styles.bottomLeft]}>
+      <View style={[styles.playerCard, styles.bottomLeft]}>
         <View style={styles.playerHeader}>
-          <View style={styles.playerIndicator}>
-            <Text style={styles.playerText}>Player 4</Text>
+          <View style={styles.playerInfo}>
+            <View style={styles.playerAvatar}>
+              {finishedPlayers.includes('green') && (
+                <Text style={styles.positionText}>
+                  {finishedPlayers.indexOf('green') + 1}
+                </Text>
+              )}
+            </View>
+            <Text style={styles.playerName}>Player 4</Text>
           </View>
-          {currentPlayer === 'green' && (
+          {currentPlayer === 'green' && !finishedPlayers.includes('green') && (
             <LudoDice value={diceValue ?? 1} rolling={rolling || isAnimating} onRoll={rollDice} size={40} />
           )}
         </View>
-        <View style={styles.pawnsRow}>
-          {[1, 2, 3, 4].map(i => (
-            <View key={i} style={[styles.pawnSlot, { backgroundColor: '#46A24A' }]}>
-              <Text style={styles.pawnNumber}>{i}</Text>
-            </View>
-          ))}
+        <View style={styles.statsRow}>
+          <View style={styles.statItem}>
+            <Icon1 size={20} color="#46A24A" />
+            <Text style={styles.statNumber}>3</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Icon2 size={20} color="#46A24A" />
+            <Text style={styles.statNumber}>3</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Icon3 size={20} color="#46A24A" />
+            <Text style={styles.statNumber}>1</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Icon4 size={20} color="#46A24A" />
+            <Text style={styles.statNumber}>1</Text>
+          </View>
         </View>
       </View>
 
       {/* Joueur Rouge (en bas à droite) */}
-      <View style={[styles.playerSpace, styles.bottomRight]}>
+      <View style={[styles.playerCard, styles.bottomRight]}>
         <View style={styles.playerHeader}>
-          <View style={styles.playerIndicator}>
-            <Text style={styles.playerText}>Player 3</Text>
+          <View style={styles.playerInfo}>
+            <View style={styles.playerAvatar}>
+              {finishedPlayers.includes('red') && (
+                <Text style={styles.positionText}>
+                  {finishedPlayers.indexOf('red') + 1}
+                </Text>
+              )}
+            </View>
+            <Text style={styles.playerName}>Player 3</Text>
           </View>
-          {currentPlayer === 'red' && (
+          {currentPlayer === 'red' && !finishedPlayers.includes('red') && (
             <LudoDice value={diceValue ?? 1} rolling={rolling || isAnimating} onRoll={rollDice} size={40} />
           )}
         </View>
-        <View style={styles.pawnsRow}>
-          {[1, 2, 3, 4].map(i => (
-            <View key={i} style={[styles.pawnSlot, { backgroundColor: '#E6433C' }]}>
-              <Text style={styles.pawnNumber}>{i}</Text>
-            </View>
-          ))}
+        <View style={styles.statsRow}>
+          <View style={styles.statItem}>
+            <Icon1 size={20} color="#E6433C" />
+            <Text style={styles.statNumber}>3</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Icon2 size={20} color="#E6433C" />
+            <Text style={styles.statNumber}>3</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Icon3 size={20} color="#E6433C" />
+            <Text style={styles.statNumber}>1</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Icon4 size={20} color="#E6433C" />
+            <Text style={styles.statNumber}>1</Text>
+          </View>
         </View>
       </View>
 
@@ -901,10 +995,10 @@ const LudoBoard: React.FC = () => {
           <Text style={styles.messageText}>{message}</Text>
         </View>
       )}
-      {winner && (
+      {gameFinished && (
         <View style={styles.winnerContainer}>
           <Text style={styles.winnerText}>
-            🎉 {winner.toUpperCase()} a gagné la partie ! 🎉
+            🎉 Partie terminée ! 🎉
           </Text>
           <Text style={styles.restartText} onPress={resetGame}>
             Rejouer
@@ -945,28 +1039,33 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
 
-  playerSpace: {
+  playerCard: {
     position: 'absolute',
-    width: 160,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 12,
+    width: 190,
+    backgroundColor: 'rgba(255, 255, 255, 0.28)',
+    borderRadius: 16,
     padding: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   topLeft: {
-    top: '15%',
-    left: '5%',
+    top: '12%',
+    left: '2%',
   },
   topRight: {
-    top: '15%',
-    right: '5%',
+    top: '12%',
+    right: '2%',
   },
   bottomLeft: {
-    bottom: '15%',
-    left: '5%',
+    bottom: '12%',
+    left: '2%',
   },
   bottomRight: {
-    bottom: '15%',
-    right: '5%',
+    bottom: '12%',
+    right: '2%',
   },
   playerHeader: {
     flexDirection: 'row',
@@ -974,34 +1073,50 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
-  playerIndicator: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
+  playerInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  playerText: {
-    fontSize: 12,
+  playerAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#fff',
+    marginRight: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  positionText: {
+    fontSize: 14,
     fontWeight: 'bold',
     color: '#333',
   },
-  pawnsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  pawnSlot: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#fff',
-  },
-  pawnNumber: {
-    fontSize: 10,
+  playerName: {
+    fontSize: 12,
     fontWeight: 'bold',
     color: '#fff',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  statItem: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 10,
+    paddingHorizontal: 3,
+    paddingVertical: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginHorizontal: 1,
+  },
+
+  statNumber: {
+    fontSize: 9,
+    fontWeight: 'bold',
+    color: '#333',
+    marginLeft: 1,
   },
   messageContainer: {
     position: 'absolute',

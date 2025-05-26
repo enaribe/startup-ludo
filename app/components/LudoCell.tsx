@@ -8,7 +8,6 @@ interface Cell {
   type: 'home' | 'center' | 'path' | 'empty';
   color: string;
   isStart?: boolean;
-  isSafe?: boolean;
   homeNumber?: number;
 }
 
@@ -125,11 +124,10 @@ const LudoCell: React.FC<LudoCellProps> = ({ cell, cellSize, pions, currentPlaye
   }
 
   // Chemin
-  if (cell.type === 'path') {
-    let bg = pathColors[cell.color] || pathColors.neutral;
-    let symbol = '';
-    if (cell.isStart) symbol = '';
-    if (cell.isSafe) symbol = '';
+      if (cell.type === 'path') {
+      let bg = pathColors[cell.color] || pathColors.neutral;
+      let symbol = '';
+      if (cell.isStart) symbol = '';
     
     // Couleurs des cercles pour les chemins vers home
     const homeCircleColors: Record<string, string> = {
