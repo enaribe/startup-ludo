@@ -136,6 +136,8 @@ const LudoBoard: React.FC = () => {
     green: useRef(new Animated.ValueXY({ x: 0, y: 0 })).current,
   });
 
+  const [winner, setWinner] = useState<null | 'yellow' | 'blue' | 'red' | 'green'>(null);
+
   // Fonction utilitaire pour attendre un délai
   const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -542,9 +544,25 @@ const LudoBoard: React.FC = () => {
     }
   };
 
+  // Fonction pour réinitialiser la partie
+  const resetGame = () => {
+    setPawns({
+      yellow: 'home',
+      blue: 'home',
+      red: 'home',
+      green: 'home',
+    });
+    setCurrentPlayer('yellow');
+    setDiceValue(null);
+    setRolling(false);
+    setMessage(null);
+    setIsAnimating(false);
+    setWinner(null);
+  };
+
   // Lancer de dé
   const rollDice = () => {
-    if (doitDeplacer || isAnimating) return;
+    if (doitDeplacer || isAnimating || winner) return;
     setRolling(true);
     let rolls = 0;
     const maxRolls = 12;
@@ -567,18 +585,21 @@ const LudoBoard: React.FC = () => {
             setPawns(prev => ({ ...prev, [currentPlayer]: 0 }));
             await wait(200);
             handleCapture(currentPlayer, 0);
-            // Si 6, rejoue
             setTimeout(() => {
               setMessage('Tu as fait 6, rejoue !');
             }, 400);
-          // Si le pion est déjà sur le chemin
           } else if (typeof pos === 'number') {
             const newPos = pos + finalValue;
-            if (newPos < path.length) {
+            // Vérifie si le pion peut atteindre exactement la case centrale (homer)
+            if (newPos === path.length - 1) {
+              setMessage('Bravo ! Tu es arrivé au centre !');
+              await movePawnAnimated(currentPlayer, pos, newPos);
+              setWinner(currentPlayer);
+              return;
+            } else if (newPos < path.length - 1) {
               setMessage('Le pion avance de ' + finalValue + ' case(s) !');
               await movePawnAnimated(currentPlayer, pos, newPos);
               handleCapture(currentPlayer, newPos);
-              // Si 6, rejoue
               if (finalValue === 6) {
                 setTimeout(() => {
                   setMessage('Tu as fait 6, rejoue !');
@@ -732,6 +753,16 @@ const LudoBoard: React.FC = () => {
         </Text>
         {message && (
           <Text style={{ color: '#e67e22', fontWeight: 'bold', marginTop: 8 }}>{message}</Text>
+        )}
+        {winner && (
+          <View style={{ marginTop: 16, alignItems: 'center' }}>
+            <Text style={{ fontSize: 22, fontWeight: 'bold', color: homeColors[winner] }}>
+              🎉 {winner.toUpperCase()} a gagné la partie ! 🎉
+            </Text>
+            <Text style={{ marginTop: 8 }} onPress={resetGame}>
+              <Text style={{ color: '#2980b9', textDecorationLine: 'underline', fontSize: 16 }}>Rejouer</Text>
+            </Text>
+          </View>
         )}
       </View>
     </View>
