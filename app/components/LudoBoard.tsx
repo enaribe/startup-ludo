@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Animated, Easing, Image, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import LudoCell from './LudoCell';
 import LudoDice from './LudoDice';
 import LudoPawn from './LudoPawn';
@@ -18,11 +18,12 @@ interface Cell {
   color: string;
   isStart?: boolean;
   isSafe?: boolean;
+  homeNumber?: number;
 }
 
 // Couleurs des maisons
 const homeColors: Record<string, string> = {
-  yellow: '#FFE44D', // Plus clair que FFD700
+  yellow: '#FFC966', // Nouvelle couleur jaune
   blue: '#7B9EF3',   // Plus clair que 4169E1  
   green: '#90EE90',  // Plus clair que 32CD32
   red: '#FF7F7F',    // Plus clair que DC143C
@@ -40,13 +41,7 @@ const pathColors: Record<string, string> = {
   empty: '#F5F5F5',
 };
 
-// Emoji ou cercle pour représenter un pion
-const pawnEmojis: Record<string, string> = {
-  yellow: '🟡',
-  blue: '🔵',
-  green: '🟢',
-  red: '🔴',
-};
+
 
 const BOARD_SIZE = 15;
 
@@ -156,14 +151,19 @@ const LudoBoard: React.FC = () => {
   // Fonction utilitaire pour obtenir la position pixel d'une case
   const getCellPosition = (color: 'yellow' | 'blue' | 'red' | 'green', pos: number | 'home') => {
     if (pos === 'home') {
-      if (color === 'yellow') return { x: 0.5 * cellSize * 6, y: 0.5 * cellSize * 6 };
-      if (color === 'blue') return { x: 0.5 * cellSize * 6 + cellSize * 9, y: 0.5 * cellSize * 6 };
-      if (color === 'red') return { x: 0.5 * cellSize * 6 + cellSize * 9, y: 0.5 * cellSize * 6 + cellSize * 9 };
-      if (color === 'green') return { x: 0.5 * cellSize * 6, y: 0.5 * cellSize * 6 + cellSize * 9 };
+      // Centrer les pions dans le milieu de chaque maison 6x6 (ajusté pour pions beaucoup plus grands)
+      if (color === 'yellow') return { x: cellSize * 3 - cellSize * 1.0, y: cellSize * 3 - cellSize * 1.0 };
+      if (color === 'blue') return { x: cellSize * 12 - cellSize * 1.0, y: cellSize * 3 - cellSize * 1.0 };
+      if (color === 'red') return { x: cellSize * 12 - cellSize * 1.0, y: cellSize * 12 - cellSize * 1.0 };
+      if (color === 'green') return { x: cellSize * 3 - cellSize * 1.0, y: cellSize * 12 - cellSize * 1.0 };
       return { x: 0, y: 0 };
     } else if (typeof pos === 'number' && paths[color][pos]) {
       const { row, col } = paths[color][pos];
-      return { x: col * cellSize, y: row * cellSize };
+      // Centrer parfaitement les pions dans les cases
+      // Pour un pion de taille 1.0 (100% de la case), il occupe toute la case
+      const pawnSize = cellSize * 0.5;
+      const centerOffset = (cellSize - pawnSize) / 2;
+      return { x: col * cellSize + centerOffset, y: row * cellSize + centerOffset };
     }
     return { x: 0, y: 0 };
   };
@@ -341,7 +341,7 @@ const LudoBoard: React.FC = () => {
   /**
    * Logique des chemins spéciaux, cases de départ, cases sûres, chemins finaux
    */
-  const getPathInfo = (row: number, col: number): { color: string; isStart?: boolean; isSafe?: boolean } => {
+  const getPathInfo = (row: number, col: number): { color: string; isStart?: boolean; isSafe?: boolean; homeNumber?: number } => {
     // Cases de départ
     if (row === 6 && col === 1) return { color: 'yellow', isStart: true, isSafe: false };
     if (row === 1 && col === 8) return { color: 'blue', isStart: true, isSafe: false };
@@ -359,11 +359,15 @@ const LudoBoard: React.FC = () => {
       return { color: 'safe', isSafe: true };
     }
 
-    // Chemins finaux (5 cases avant le centre)
-    if (row === 7 && col >= 1 && col <= 5) return { color: 'yellow' };
-    if (col === 7 && row >= 1 && row <= 5) return { color: 'blue' };
-    if (row === 7 && col >= 9 && col <= 13) return { color: 'red' };
-    if (col === 7 && row >= 9 && row <= 13) return { color: 'green' };
+    // Chemins finaux (5 cases avant le centre) avec numéros 5 à 1
+    // Jaune : row 7, col 1 à 5 → numéros 5, 4, 3, 2, 1
+    if (row === 7 && col >= 1 && col <= 5) return { color: 'yellow', homeNumber: 6 - col };
+    // Bleu : col 7, row 1 à 5 → numéros 5, 4, 3, 2, 1
+    if (col === 7 && row >= 1 && row <= 5) return { color: 'blue', homeNumber: 6 - row };
+    // Rouge : row 7, col 9 à 13 → numéros 5, 4, 3, 2, 1
+    if (row === 7 && col >= 9 && col <= 13) return { color: 'red', homeNumber: col - 8 };
+    // Vert : col 7, row 9 à 13 → numéros 5, 4, 3, 2, 1
+    if (col === 7 && row >= 9 && row <= 13) return { color: 'green', homeNumber: row - 8 };
     
 
     // Chemin principal (neutre)
@@ -403,7 +407,7 @@ const LudoBoard: React.FC = () => {
       alignItems: 'center' as const,
       justifyContent: 'center' as const,
       borderWidth: 0.5,
-      borderColor: '#333',
+      borderColor: '#DEE4E8',
       backgroundColor: pathColors.neutral,
     };
 
@@ -457,7 +461,7 @@ const LudoBoard: React.FC = () => {
       };
       return (
         <View key={cell.id} style={cellStyle}>
-          {renderPawn(cell.color, cellSize * 0.8)}
+          {renderPawn(cell.color, cellSize * 2.0)}
           {coordonnees}
         </View>
       );
@@ -481,7 +485,11 @@ const LudoBoard: React.FC = () => {
       };
       return (
         <View key={cell.id} style={cellStyleCenter}>
-          <Text style={{ fontSize: cellSize * 1.5, fontWeight: 'bold', color: '#2c3e50' }}>★</Text>
+          <Image 
+            source={require('../../assets/images/Vector.png')} 
+            style={{ width: cellSize * 2, height: cellSize * 2 }}
+            resizeMode="contain"
+          />
           {coordonnees}
         </View>
       );
@@ -491,11 +499,33 @@ const LudoBoard: React.FC = () => {
     if (cell.type === 'path') {
       let bg = pathColors[cell.color] || pathColors.neutral;
       let symbol = '';
-      if (cell.isStart) symbol = '●';
-      if (cell.isSafe) symbol = '△';
+      if (cell.isStart) symbol = '';
+      if (cell.isSafe) symbol = '';
+      
+      // Couleurs des cercles pour les chemins vers home
+      const homeCircleColors: Record<string, string> = {
+        yellow: '#EDA420',
+        green: '#46A24A', 
+        red: '#E6433C',
+        blue: '#1C82BB',
+      };
+      
       return (
         <View key={cell.id} style={{ ...cellStyle, backgroundColor: bg }}>
-          {symbol ? (
+          {cell.homeNumber ? (
+            <View style={{
+              width: cellSize * 0.7,
+              height: cellSize * 0.7,
+              borderRadius: cellSize * 0.35,
+              backgroundColor: homeCircleColors[cell.color] || '#ccc',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+              <Text style={{ fontSize: cellSize * 0.4, fontWeight: 'bold', color: '#fff' }}>
+                {cell.homeNumber}
+              </Text>
+            </View>
+          ) : symbol ? (
             <Text style={{ fontSize: cellSize * 0.5, fontWeight: 'bold', color: '#2c3e50' }}>{symbol}</Text>
           ) : null}
           {coordonnees}
@@ -506,10 +536,19 @@ const LudoBoard: React.FC = () => {
     return null;
   };
 
+  const pawnImages: Record<string, any> = {
+    yellow: require('../../assets/images/yellowpawn.png'),
+    blue: require('../../assets/images/bluepawn.png'),
+    green: require('../../assets/images/greenpawn.png'),
+    red: require('../../assets/images/redpawn.png'),
+  };
+
   const renderPawn = (color: string, size: number) => (
-    <Text style={{ fontSize: size, textAlign: 'center' }}>
-      {pawnEmojis[color]}
-    </Text>
+    <Image 
+      source={pawnImages[color]} 
+      style={{ width: size, height: size }} 
+      resizeMode="contain"
+    />
   );
 
   // Fonction utilitaire pour vérifier si une case est sûre
@@ -708,6 +747,10 @@ const LudoBoard: React.FC = () => {
             {
               width: cellSize * BOARD_SIZE,
               height: cellSize * BOARD_SIZE,
+              borderWidth: 6,
+              borderColor: '#fff',
+              borderRadius: 10,
+              overflow: 'hidden',
             },
           ]}
         >
@@ -739,10 +782,26 @@ const LudoBoard: React.FC = () => {
         </View>
         {/* Pions animés par-dessus le plateau */}
         <View style={{ position: 'absolute', left: 0, top: 0, width: cellSize * BOARD_SIZE, height: cellSize * BOARD_SIZE, zIndex: 100 }} pointerEvents="none">
-          <LudoPawn color="yellow" size={cellSize * 0.8} animatedPosition={pawnAnim.yellow} />
-          <LudoPawn color="blue" size={cellSize * 0.8} animatedPosition={pawnAnim.blue} />
-          <LudoPawn color="red" size={cellSize * 0.8} animatedPosition={pawnAnim.red} />
-          <LudoPawn color="green" size={cellSize * 0.8} animatedPosition={pawnAnim.green} />
+          <LudoPawn 
+            color="yellow" 
+            size={pawns.yellow === 'home' ? cellSize * 2.0 : cellSize * 1.0} 
+            animatedPosition={pawnAnim.yellow} 
+          />
+          <LudoPawn 
+            color="blue" 
+            size={pawns.blue === 'home' ? cellSize * 2.0 : cellSize * 1.0} 
+            animatedPosition={pawnAnim.blue} 
+          />
+          <LudoPawn 
+            color="red" 
+            size={pawns.red === 'home' ? cellSize * 2.0 : cellSize * 1.0} 
+            animatedPosition={pawnAnim.red} 
+          />
+          <LudoPawn 
+            color="green" 
+            size={pawns.green === 'home' ? cellSize * 2.0 : cellSize * 1.0} 
+            animatedPosition={pawnAnim.green} 
+          />
         </View>
       </View>
       {/* Dé en bas de l'écran */}
@@ -772,7 +831,7 @@ const LudoBoard: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: '#185893',
   },
   board: {
     position: 'relative',

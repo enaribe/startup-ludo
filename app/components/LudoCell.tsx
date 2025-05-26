@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { Image, Text, TouchableOpacity, View } from 'react-native';
 
 interface Cell {
   id: string;
@@ -9,6 +9,7 @@ interface Cell {
   color: string;
   isStart?: boolean;
   isSafe?: boolean;
+  homeNumber?: number;
 }
 
 interface LudoCellProps {
@@ -20,16 +21,16 @@ interface LudoCellProps {
 }
 
 const homeColors: Record<string, string> = {
-  yellow: '#FFE44D',
-  blue: '#7B9EF3',
-  green: '#90EE90',
-  red: '#FF7F7F',
+  yellow: '#FFBC40',
+  blue: '#1F91D0',
+  green: '#4CAF50',
+  red: '#F35145',
 };
 const pathColors: Record<string, string> = {
-  yellow: '#FFFACD',
-  blue: '#B0C4DE',
-  green: '#90EE90',
-  red: '#FFC0CB',
+  yellow: '#FFBC40',
+  blue: '#1F91D0',
+  green: '#4CAF50',
+  red: '#F35145',
   safe: '#90EE90',
   neutral: '#fff',
   center: '#FFD700',
@@ -51,8 +52,8 @@ const LudoCell: React.FC<LudoCellProps> = ({ cell, cellSize, pions, currentPlaye
     position: 'absolute' as const,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
-    borderWidth: 0.5,
-    borderColor: '#333',
+    borderWidth: 0.3,
+    borderColor: '#DEE4E8',
     backgroundColor: pathColors.neutral,
   };
 
@@ -75,8 +76,8 @@ const LudoCell: React.FC<LudoCellProps> = ({ cell, cellSize, pions, currentPlaye
       alignItems: 'center' as const,
       justifyContent: 'center' as const,
       opacity: isCurrent ? 1 : 0.9,
-      borderColor: isCurrent ? glowColors[cell.color] : '#333',
-      borderWidth: isCurrent ? 6 : 1,
+      borderColor: isCurrent ? glowColors[cell.color] : '#DEE4E8',
+      borderWidth: isCurrent ? 0.5 : 0.5,
       ...(isCurrent
         ? {
             shadowColor: glowColors[cell.color],
@@ -107,14 +108,18 @@ const LudoCell: React.FC<LudoCellProps> = ({ cell, cellSize, pions, currentPlaye
       position: 'absolute' as const,
       alignItems: 'center' as const,
       justifyContent: 'center' as const,
-      backgroundColor: pathColors.center,
+      backgroundColor: '#FFF',
       borderWidth: 1,
-      borderColor: '#333',
+      borderColor: '#DEE4E8',
       zIndex: 20,
     };
     return (
       <View key={cell.id} style={cellStyleCenter}>
-        <Text style={{ fontSize: cellSize * 1.5, fontWeight: 'bold', color: '#2c3e50' }}>★</Text>
+        <Image
+          source={require('../../assets/images/Vector.png')}
+          style={{ width: cellSize * 2, height: cellSize * 2 }}
+          resizeMode="contain"
+        />
       </View>
     );
   }
@@ -123,11 +128,33 @@ const LudoCell: React.FC<LudoCellProps> = ({ cell, cellSize, pions, currentPlaye
   if (cell.type === 'path') {
     let bg = pathColors[cell.color] || pathColors.neutral;
     let symbol = '';
-    if (cell.isStart) symbol = '●';
-    if (cell.isSafe) symbol = '△';
+    if (cell.isStart) symbol = '';
+    if (cell.isSafe) symbol = '';
+    
+    // Couleurs des cercles pour les chemins vers home
+    const homeCircleColors: Record<string, string> = {
+      yellow: '#EDA420',
+      green: '#46A24A', 
+      red: '#E6433C',
+      blue: '#1C82BB',
+    };
+    
     const content = (
       <View key={cell.id} style={{ ...cellStyle, backgroundColor: bg }}>
-        {symbol ? (
+        {cell.homeNumber ? (
+          <View style={{
+            width: cellSize * 0.7,
+            height: cellSize * 0.7,
+            borderRadius: cellSize * 0.35,
+            backgroundColor: homeCircleColors[cell.color] || '#ccc',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            <Text style={{ fontSize: cellSize * 0.4, fontWeight: 'bold', color: '#fff' }}>
+              {cell.homeNumber}
+            </Text>
+          </View>
+        ) : symbol ? (
           <Text style={{ fontSize: cellSize * 0.5, fontWeight: 'bold', color: '#2c3e50' }}>{symbol}</Text>
         ) : null}
         {/* Pions supprimés ici */}
