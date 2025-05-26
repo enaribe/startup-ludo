@@ -64,7 +64,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
             <View style={[styles.colorSection, { backgroundColor: '#ED3F43' }]} />
           </View>
         </View>
-        <Text style={styles.appName}>LUDO</Text>
+        <Text style={styles.appName}>Startup Ludo</Text>
       </Animated.View>
       
       {/* Barre de progression */}

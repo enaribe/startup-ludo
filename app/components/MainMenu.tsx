@@ -40,18 +40,11 @@ const MainMenu: React.FC<MainMenuProps> = ({ onStartGame }) => {
           <View style={styles.playButtonBackground}>
             {/* Conteneur avec dégradé interne */}
             <LinearGradient
-              colors={['#1F91D0', '#219DE1']}
+              colors={['rgba(196, 196, 196, 0.00)', 'rgba(227, 225, 225, 0.41)']}
               style={styles.playButtonGradient}
               start={{ x: 0.5, y: 0 }}
               end={{ x: 0.5, y: 1 }}
             >
-              {/* Overlay décoratif avec dégradé subtil */}
-              <LinearGradient
-                colors={['rgba(196, 196, 196, 0)', 'rgba(227, 225, 225, 1)']}
-                style={styles.playButtonOverlay}
-                start={{ x: 0.5, y: 0 }}
-                end={{ x: 0.5, y: 0.755 }}
-              />
               <Text style={styles.playButtonText}>Jouer</Text>
             </LinearGradient>
           </View>
