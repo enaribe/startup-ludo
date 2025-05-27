@@ -138,7 +138,7 @@ const LudoCell: React.FC<LudoCellProps> = ({ cell, cellSize, pions, currentPlaye
       blue: '#1C82BB',
     };
     
-    // Couleurs et symboles pour les événements
+    // Couleurs et textes pour les événements
     const eventColors: Record<string, string> = {
       quiz: '#4A90E2',      // Bleu
       financement: '#50C878', // Vert
@@ -146,11 +146,11 @@ const LudoCell: React.FC<LudoCellProps> = ({ cell, cellSize, pions, currentPlaye
       evenement: '#FFB347',  // Orange
     };
     
-    const eventSymbols: Record<string, string> = {
-      quiz: '?',
-      financement: '$',
-      duel: '⚔',
-      evenement: '★',
+    const eventTexts: Record<string, string> = {
+      quiz: 'QUIZ',
+      financement: 'FINANCEMENT',
+      duel: 'DUEL',
+      evenement: 'ÉVÉNEMENT',
     };
     
     const content = (
@@ -170,9 +170,9 @@ const LudoCell: React.FC<LudoCellProps> = ({ cell, cellSize, pions, currentPlaye
           </View>
         ) : cell.eventType ? (
           <View style={{
-            width: cellSize * 0.6,
-            height: cellSize * 0.6,
-            borderRadius: cellSize * 0.3,
+            width: cellSize * 0.9,
+            height: cellSize * 0.4,
+            borderRadius: cellSize * 0.1,
             backgroundColor: eventColors[cell.eventType],
             alignItems: 'center',
             justifyContent: 'center',
@@ -180,12 +180,12 @@ const LudoCell: React.FC<LudoCellProps> = ({ cell, cellSize, pions, currentPlaye
             borderColor: '#fff',
           }}>
             <Text style={{ 
-              fontSize: cellSize * 0.25, 
+              fontSize: cellSize * 0.12, 
               fontWeight: 'bold', 
               color: '#fff',
               textAlign: 'center'
             }}>
-              {eventSymbols[cell.eventType]}
+              {eventTexts[cell.eventType]}
             </Text>
           </View>
         ) : symbol ? (

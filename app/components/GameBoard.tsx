@@ -247,7 +247,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
           {
             width: cellSize * BOARD_SIZE,
             height: cellSize * BOARD_SIZE,
-            borderWidth: 6,
+            borderWidth: 1,
             borderColor: '#fff',
             borderRadius: 10,
             overflow: 'hidden',
@@ -296,28 +296,28 @@ const GameBoard: React.FC<GameBoardProps> = ({
         {activePlayers.includes('yellow') && (
           <LudoPawn 
             color="yellow" 
-            size={pawns.yellow === 'home' ? cellSize * 2.0 : cellSize * 1.0} 
+            size={pawns.yellow === 'home' ? cellSize * 2.0 : cellSize * 1.3} 
             animatedPosition={pawnAnim.yellow} 
           />
         )}
         {activePlayers.includes('blue') && (
           <LudoPawn 
             color="blue" 
-            size={pawns.blue === 'home' ? cellSize * 2.0 : cellSize * 1.0} 
+            size={pawns.blue === 'home' ? cellSize * 2.0 : cellSize * 1.3} 
             animatedPosition={pawnAnim.blue} 
           />
         )}
         {activePlayers.includes('red') && (
           <LudoPawn 
             color="red" 
-            size={pawns.red === 'home' ? cellSize * 2.0 : cellSize * 1.0} 
+            size={pawns.red === 'home' ? cellSize * 2.0 : cellSize * 1.3} 
             animatedPosition={pawnAnim.red} 
           />
         )}
         {activePlayers.includes('green') && (
           <LudoPawn 
             color="green" 
-            size={pawns.green === 'home' ? cellSize * 2.0 : cellSize * 1.0} 
+            size={pawns.green === 'home' ? cellSize * 2.0 : cellSize * 1.3} 
             animatedPosition={pawnAnim.green} 
           />
         )}

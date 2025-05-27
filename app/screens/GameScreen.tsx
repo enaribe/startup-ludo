@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { ImageBackground, StyleSheet, useWindowDimensions } from 'react-native';
-import EventLegend from '../components/EventLegend';
+import EventPopup from '../components/EventPopup';
 import GameBoard, { Cell } from '../components/GameBoard';
 import GameHeader from '../components/GameHeader';
 import GameMessages from '../components/GameMessages';
@@ -27,7 +27,13 @@ const GameScreen: React.FC<GameScreenProps> = ({ numberOfPlayers, onResetGame })
     rollDice,
     syncPawnPositions,
     computerPlay,
+    closeEventPopup,
   } = useGameLogic(numberOfPlayers);
+
+  // Debug: Log de l'état du popup
+  useEffect(() => {
+    console.log('GameScreen - Popup visible:', gameState.showEventPopup, 'Type:', gameState.currentEventType);
+  }, [gameState.showEventPopup, gameState.currentEventType]);
 
   // Synchronise les positions des pions quand ils changent
   useEffect(() => {
@@ -99,8 +105,6 @@ const GameScreen: React.FC<GameScreenProps> = ({ numberOfPlayers, onResetGame })
     >
       <GameHeader />
       
-      <EventLegend />
-      
       <GameBoard
         cellSize={cellSize}
         currentPlayer={gameState.currentPlayer}
@@ -139,6 +143,12 @@ const GameScreen: React.FC<GameScreenProps> = ({ numberOfPlayers, onResetGame })
         message={gameState.message}
         gameFinished={gameState.gameFinished}
         onResetGame={handleCompleteReset}
+      />
+
+      <EventPopup
+        visible={gameState.showEventPopup}
+        eventType={gameState.currentEventType}
+        onClose={closeEventPopup}
       />
     </ImageBackground>
   );
