@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
-import { Dimensions, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Image, ImageBackground, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
 
@@ -10,14 +10,11 @@ interface MainMenuProps {
 
 const MainMenu: React.FC<MainMenuProps> = ({ onStartGame }) => {
   return (
-    <View style={styles.container}>
-      {/* Arrière-plan avec dégradé exact du Figma */}
-      <LinearGradient
-        colors={['#095A93', '#204395']}
-        style={styles.background}
-        start={{ x: 0.5, y: 0.418 }}
-        end={{ x: 0.5, y: 1 }}
-      />
+    <ImageBackground 
+      source={require('../../assets/images/bg.png')} 
+      style={styles.container}
+      resizeMode="cover"
+    >
       
       {/* Motif décoratif radial */}
       <View style={styles.decorativePattern}>
@@ -50,14 +47,13 @@ const MainMenu: React.FC<MainMenuProps> = ({ onStartGame }) => {
           </View>
         </TouchableOpacity>
       </View>
-    </View>
+    </ImageBackground>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#095A93',
   },
   background: {
     position: 'absolute',

@@ -6,6 +6,7 @@ interface LudoDiceProps {
   rolling: boolean;
   onRoll: () => void;
   size?: number;
+  disabled?: boolean;
 }
 
 const diceDots = [
@@ -18,25 +19,26 @@ const diceDots = [
   [[0, 0], [0, 2], [1, 0], [1, 2], [2, 0], [2, 2]],
 ];
 
-const LudoDice: React.FC<LudoDiceProps> = ({ value, rolling, onRoll, size = 60 }) => {
+const LudoDice: React.FC<LudoDiceProps> = ({ value, rolling, onRoll, size = 60, disabled = false }) => {
   return (
     <TouchableOpacity
-      activeOpacity={0.7}
-      onPress={() => !rolling && onRoll()}
-      disabled={rolling}
+      activeOpacity={disabled ? 1 : 0.7}
+      onPress={() => !rolling && !disabled && onRoll()}
+      disabled={rolling || disabled}
       style={{ alignItems: 'center', justifyContent: 'center' }}
     >
       <View style={{
         width: size,
         height: size,
-        backgroundColor: '#fff',
+        backgroundColor: disabled ? '#f0f0f0' : '#fff',
         borderRadius: 12,
         borderWidth: 2,
-        borderColor: '#333',
+        borderColor: disabled ? '#999' : '#333',
         flexDirection: 'column',
         justifyContent: 'center',
         alignItems: 'center',
         padding: 6,
+        opacity: disabled ? 0.7 : 1,
       }}>
         {[0, 1, 2].map(row =>
           <View key={row} style={{ flexDirection: 'row', flex: 1, width: '100%' }}>
@@ -56,7 +58,7 @@ const LudoDice: React.FC<LudoDiceProps> = ({ value, rolling, onRoll, size = 60 }
                       width: size * 0.16,
                       height: size * 0.16,
                       borderRadius: size * 0.08,
-                      backgroundColor: '#222',
+                      backgroundColor: disabled ? '#666' : '#222',
                     }} />
                   ) : null}
                 </View>
