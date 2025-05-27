@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { ImageBackground, StyleSheet, useWindowDimensions } from 'react-native';
+import EventLegend from '../components/EventLegend';
 import GameBoard, { Cell } from '../components/GameBoard';
 import GameHeader from '../components/GameHeader';
 import GameMessages from '../components/GameMessages';
@@ -97,6 +98,8 @@ const GameScreen: React.FC<GameScreenProps> = ({ numberOfPlayers, onResetGame })
       resizeMode="cover"
     >
       <GameHeader />
+      
+      <EventLegend />
       
       <GameBoard
         cellSize={cellSize}
