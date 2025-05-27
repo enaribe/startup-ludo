@@ -4,9 +4,10 @@
     "slug": "startup-ludo",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/ludo.png",
     "scheme": "startupludo",
     "userInterfaceStyle": "automatic",
+    "primaryColor": "#095A93",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true
@@ -28,10 +29,10 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/ludo.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "backgroundColor": "#185893"
         }
       ]
     ],

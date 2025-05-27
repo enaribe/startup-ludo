@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useState } from 'react';
-import { Animated, Dimensions, StyleSheet, Text, View } from 'react-native';
+import { Animated, Dimensions, Image, StyleSheet, Text, View } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
 
@@ -54,15 +54,11 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
       {/* Logo central */}
       <Animated.View style={[styles.logoContainer, { opacity: logoOpacity }]}>
         <View style={styles.ludoLogo}>
-          {/* Représentation stylisée du logo de Ludo */}
-          <View style={styles.boardSection}>
-            <View style={[styles.colorSection, { backgroundColor: '#1F91D0' }]} />
-            <View style={[styles.colorSection, { backgroundColor: '#59B224' }]} />
-          </View>
-          <View style={styles.boardSection}>
-            <View style={[styles.colorSection, { backgroundColor: '#FFBC40' }]} />
-            <View style={[styles.colorSection, { backgroundColor: '#ED3F43' }]} />
-          </View>
+          <Image 
+            source={require('../../assets/images/ludo.png')}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
         </View>
         <Text style={styles.appName}>Startup Ludo</Text>
       </Animated.View>
@@ -117,6 +113,10 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.3,
     shadowRadius: 10,
+  },
+  logoImage: {
+    width: '100%',
+    height: '100%',
   },
   boardSection: {
     flex: 1,
