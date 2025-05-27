@@ -11,6 +11,7 @@ interface GameState {
   diceValue: number | null;
   rolling: boolean;
   pawns: Record<PlayerColor, PawnPosition>;
+  tokens: Record<PlayerColor, number>; // Système de jetons
   doitDeplacer: boolean;
   message: string | null;
   isAnimating: boolean;
@@ -21,6 +22,7 @@ interface GameState {
   showEventPopup: boolean;
   currentEventType: 'quiz' | 'financement' | 'duel' | 'evenement' | null;
   pendingEvent: { color: PlayerColor; eventType: 'quiz' | 'financement' | 'duel' | 'evenement' } | null;
+  lastTokenChange: number;
 }
 
 const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
@@ -62,6 +64,12 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
       red: 'home',
       green: 'home',
     },
+    tokens: {
+      yellow: 0,
+      blue: 0,
+      red: 0,
+      green: 0,
+    },
     doitDeplacer: false,
     message: null,
     isAnimating: false,
@@ -72,6 +80,7 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
     showEventPopup: false,
     currentEventType: null,
     pendingEvent: null,
+    lastTokenChange: 0,
   });
 
   // Animations des pions
@@ -98,7 +107,22 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
       { row: 14, col: 7 }, { row: 14, col: 6 }, { row: 13, col: 6 }, { row: 12, col: 6 },
       { row: 11, col: 6 }, { row: 10, col: 6 }, { row: 9, col: 6 }, { row: 8, col: 5 },
       { row: 8, col: 4 }, { row: 8, col: 3 }, { row: 8, col: 2 }, { row: 8, col: 1 },
+      { row: 8, col: 0 }, { row: 7, col: 0 }, { row: 6, col: 0 },
+      // Boucle supplémentaire pour continuer le tour
+      { row: 6, col: 1 }, { row: 6, col: 2 }, { row: 6, col: 3 }, { row: 6, col: 4 }, { row: 6, col: 5 },
+      { row: 5, col: 6 }, { row: 4, col: 6 }, { row: 3, col: 6 }, { row: 2, col: 6 },
+      { row: 1, col: 6 }, { row: 0, col: 6 }, { row: 0, col: 7 }, { row: 0, col: 8 },
+      { row: 1, col: 8 }, { row: 2, col: 8 }, { row: 3, col: 8 }, { row: 4, col: 8 },
+      { row: 5, col: 8 }, { row: 6, col: 9 }, { row: 6, col: 10 }, { row: 6, col: 11 },
+      { row: 6, col: 12 }, { row: 6, col: 13 }, { row: 6, col: 14 }, { row: 7, col: 14 },
+      { row: 8, col: 14 }, { row: 8, col: 13 }, { row: 8, col: 12 }, { row: 8, col: 11 },
+      { row: 8, col: 10 }, { row: 8, col: 9 }, { row: 9, col: 8 }, { row: 10, col: 8 },
+      { row: 11, col: 8 }, { row: 12, col: 8 }, { row: 13, col: 8 }, { row: 14, col: 8 },
+      { row: 14, col: 7 }, { row: 14, col: 6 }, { row: 13, col: 6 }, { row: 12, col: 6 },
+      { row: 11, col: 6 }, { row: 10, col: 6 }, { row: 9, col: 6 }, { row: 8, col: 5 },
+      { row: 8, col: 4 }, { row: 8, col: 3 }, { row: 8, col: 2 }, { row: 8, col: 1 },
       { row: 8, col: 0 }, { row: 7, col: 0 },
+      // Chemin final vers le centre (seulement si 7+ jetons)
       { row: 7, col: 1 }, { row: 7, col: 2 }, { row: 7, col: 3 },
       { row: 7, col: 4 }, { row: 7, col: 5 }, { row: 7, col: 6 },
     ],
@@ -116,7 +140,22 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
       { row: 7, col: 0 }, { row: 6, col: 0 }, { row: 6, col: 1 }, { row: 6, col: 2 },
       { row: 6, col: 3 }, { row: 6, col: 4 }, { row: 6, col: 5 }, { row: 5, col: 6 },
       { row: 4, col: 6 }, { row: 3, col: 6 }, { row: 2, col: 6 }, { row: 1, col: 6 },
+      { row: 0, col: 6 }, { row: 0, col: 7 }, { row: 0, col: 8 },
+      // Boucle supplémentaire pour continuer le tour
+      { row: 1, col: 8 }, { row: 2, col: 8 }, { row: 3, col: 8 }, { row: 4, col: 8 }, { row: 5, col: 8 },
+      { row: 6, col: 9 }, { row: 6, col: 10 }, { row: 6, col: 11 }, { row: 6, col: 12 },
+      { row: 6, col: 13 }, { row: 6, col: 14 }, { row: 7, col: 14 }, { row: 8, col: 14 },
+      { row: 8, col: 13 }, { row: 8, col: 12 }, { row: 8, col: 11 }, { row: 8, col: 10 },
+      { row: 8, col: 9 }, { row: 9, col: 8 }, { row: 10, col: 8 }, { row: 11, col: 8 },
+      { row: 12, col: 8 }, { row: 13, col: 8 }, { row: 14, col: 8 }, { row: 14, col: 7 },
+      { row: 14, col: 6 }, { row: 13, col: 6 }, { row: 12, col: 6 }, { row: 11, col: 6 },
+      { row: 10, col: 6 }, { row: 9, col: 6 }, { row: 8, col: 5 }, { row: 8, col: 4 },
+      { row: 8, col: 3 }, { row: 8, col: 2 }, { row: 8, col: 1 }, { row: 8, col: 0 },
+      { row: 7, col: 0 }, { row: 6, col: 0 }, { row: 6, col: 1 }, { row: 6, col: 2 },
+      { row: 6, col: 3 }, { row: 6, col: 4 }, { row: 6, col: 5 }, { row: 5, col: 6 },
+      { row: 4, col: 6 }, { row: 3, col: 6 }, { row: 2, col: 6 }, { row: 1, col: 6 },
       { row: 0, col: 6 }, { row: 0, col: 7 },
+      // Chemin final vers le centre (seulement si 7+ jetons)
       { row: 1, col: 7 }, { row: 2, col: 7 }, { row: 3, col: 7 },
       { row: 4, col: 7 }, { row: 5, col: 7 }, { row: 6, col: 7 },
     ],
@@ -134,7 +173,22 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
       { row: 0, col: 7 }, { row: 0, col: 8 }, { row: 1, col: 8 }, { row: 2, col: 8 },
       { row: 3, col: 8 }, { row: 4, col: 8 }, { row: 5, col: 8 }, { row: 6, col: 9 },
       { row: 6, col: 10 }, { row: 6, col: 11 }, { row: 6, col: 12 }, { row: 6, col: 13 },
+      { row: 6, col: 14 }, { row: 7, col: 14 }, { row: 8, col: 14 },
+      // Boucle supplémentaire pour continuer le tour
+      { row: 8, col: 13 }, { row: 8, col: 12 }, { row: 8, col: 11 }, { row: 8, col: 10 }, { row: 8, col: 9 },
+      { row: 9, col: 8 }, { row: 10, col: 8 }, { row: 11, col: 8 }, { row: 12, col: 8 },
+      { row: 13, col: 8 }, { row: 14, col: 8 }, { row: 14, col: 7 }, { row: 14, col: 6 },
+      { row: 13, col: 6 }, { row: 12, col: 6 }, { row: 11, col: 6 }, { row: 10, col: 6 },
+      { row: 9, col: 6 }, { row: 8, col: 5 }, { row: 8, col: 4 }, { row: 8, col: 3 },
+      { row: 8, col: 2 }, { row: 8, col: 1 }, { row: 8, col: 0 }, { row: 7, col: 0 },
+      { row: 6, col: 0 }, { row: 6, col: 1 }, { row: 6, col: 2 }, { row: 6, col: 3 },
+      { row: 6, col: 4 }, { row: 6, col: 5 }, { row: 5, col: 6 }, { row: 4, col: 6 },
+      { row: 3, col: 6 }, { row: 2, col: 6 }, { row: 1, col: 6 }, { row: 0, col: 6 },
+      { row: 0, col: 7 }, { row: 0, col: 8 }, { row: 1, col: 8 }, { row: 2, col: 8 },
+      { row: 3, col: 8 }, { row: 4, col: 8 }, { row: 5, col: 8 }, { row: 6, col: 9 },
+      { row: 6, col: 10 }, { row: 6, col: 11 }, { row: 6, col: 12 }, { row: 6, col: 13 },
       { row: 6, col: 14 }, { row: 7, col: 14 },
+      // Chemin final vers le centre (seulement si 7+ jetons)
       { row: 7, col: 13 }, { row: 7, col: 12 }, { row: 7, col: 11 },
       { row: 7, col: 10 }, { row: 7, col: 9 }, { row: 7, col: 8 },
     ],
@@ -152,7 +206,22 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
       { row: 7, col: 14 }, { row: 8, col: 14 }, { row: 8, col: 13 }, { row: 8, col: 12 },
       { row: 8, col: 11 }, { row: 8, col: 10 }, { row: 8, col: 9 }, { row: 9, col: 8 },
       { row: 10, col: 8 }, { row: 11, col: 8 }, { row: 12, col: 8 }, { row: 13, col: 8 },
+      { row: 14, col: 8 }, { row: 14, col: 7 }, { row: 14, col: 6 },
+      // Boucle supplémentaire pour continuer le tour
+      { row: 13, col: 6 }, { row: 12, col: 6 }, { row: 11, col: 6 }, { row: 10, col: 6 }, { row: 9, col: 6 },
+      { row: 8, col: 5 }, { row: 8, col: 4 }, { row: 8, col: 3 }, { row: 8, col: 2 },
+      { row: 8, col: 1 }, { row: 8, col: 0 }, { row: 7, col: 0 }, { row: 6, col: 0 },
+      { row: 6, col: 1 }, { row: 6, col: 2 }, { row: 6, col: 3 }, { row: 6, col: 4 },
+      { row: 6, col: 5 }, { row: 5, col: 6 }, { row: 4, col: 6 }, { row: 3, col: 6 },
+      { row: 2, col: 6 }, { row: 1, col: 6 }, { row: 0, col: 6 }, { row: 0, col: 7 },
+      { row: 0, col: 8 }, { row: 1, col: 8 }, { row: 2, col: 8 }, { row: 3, col: 8 },
+      { row: 4, col: 8 }, { row: 5, col: 8 }, { row: 6, col: 9 }, { row: 6, col: 10 },
+      { row: 6, col: 11 }, { row: 6, col: 12 }, { row: 6, col: 13 }, { row: 6, col: 14 },
+      { row: 7, col: 14 }, { row: 8, col: 14 }, { row: 8, col: 13 }, { row: 8, col: 12 },
+      { row: 8, col: 11 }, { row: 8, col: 10 }, { row: 8, col: 9 }, { row: 9, col: 8 },
+      { row: 10, col: 8 }, { row: 11, col: 8 }, { row: 12, col: 8 }, { row: 13, col: 8 },
       { row: 14, col: 8 }, { row: 14, col: 7 },
+      // Chemin final vers le centre (seulement si 7+ jetons)
       { row: 13, col: 7 }, { row: 12, col: 7 }, { row: 11, col: 7 },
       { row: 10, col: 7 }, { row: 9, col: 7 }, { row: 8, col: 7 },
     ]
@@ -160,6 +229,17 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
 
   // Fonction utilitaire pour attendre un délai
   const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+  // Fonction pour ajouter des jetons à un joueur
+  const addTokens = (color: PlayerColor, amount: number) => {
+    setGameState(prev => ({
+      ...prev,
+      tokens: {
+        ...prev.tokens,
+        [color]: prev.tokens[color] + amount
+      }
+    }));
+  };
 
   // Distribution des événements (même logique que dans GameBoard.tsx)
   const createEventDistribution = (): Record<string, 'quiz' | 'financement' | 'duel' | 'evenement'> => {
@@ -236,6 +316,19 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
   const eventDistribution = createEventDistribution();
   console.log('Distribution des événements:', eventDistribution);
 
+  // Fonction pour vérifier si un joueur peut entrer dans le chemin final
+  const canEnterFinalPath = (color: PlayerColor): boolean => {
+    return gameState.tokens[color] >= 7;
+  };
+
+  // Positions où chaque joueur peut entrer dans son chemin final
+  const finalPathEntryPositions = {
+    yellow: 99, // Position dans le chemin étendu où il peut entrer dans le chemin final
+    blue: 99,   // Position dans le chemin étendu où il peut entrer dans le chemin final
+    red: 99,    // Position dans le chemin étendu où il peut entrer dans le chemin final  
+    green: 99   // Position dans le chemin étendu où il peut entrer dans le chemin final
+  };
+
   // Fonction pour vérifier et déclencher un événement
   const checkAndTriggerEvent = (color: PlayerColor, position: number, diceValue: number = 0) => {
     const { row, col } = paths[color][position];
@@ -246,6 +339,66 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
     console.log(`État actuel popup: visible=${gameState.showEventPopup}, type=${gameState.currentEventType}`);
     
     if (eventType) {
+      // Système de gains/pertes aléatoires selon le type d'événement
+      let tokensChange = 0;
+      const randomOutcome = Math.random();
+      
+      switch (eventType) {
+        case 'quiz':
+          if (randomOutcome < 0.6) {
+            tokensChange = 1; // 60% chance de gagner 1 jeton
+          } else if (randomOutcome < 0.8) {
+            tokensChange = 0; // 20% chance de ne rien gagner
+          } else {
+            tokensChange = -1; // 20% chance de perdre 1 jeton
+          }
+          break;
+        case 'financement':
+          if (randomOutcome < 0.7) {
+            tokensChange = 2; // 70% chance de gagner 2 jetons
+          } else if (randomOutcome < 0.85) {
+            tokensChange = 1; // 15% chance de gagner 1 jeton
+          } else {
+            tokensChange = -1; // 15% chance de perdre 1 jeton
+          }
+          break;
+        case 'duel':
+          if (randomOutcome < 0.5) {
+            tokensChange = 2; // 50% chance de gagner 2 jetons
+          } else if (randomOutcome < 0.7) {
+            tokensChange = 0; // 20% chance de ne rien gagner
+          } else {
+            tokensChange = -2; // 30% chance de perdre 2 jetons
+          }
+          break;
+        case 'evenement':
+          if (randomOutcome < 0.4) {
+            tokensChange = 1; // 40% chance de gagner 1 jeton
+          } else if (randomOutcome < 0.7) {
+            tokensChange = 0; // 30% chance de ne rien gagner
+          } else {
+            tokensChange = -1; // 30% chance de perdre 1 jeton
+          }
+          break;
+      }
+      
+      // Ajouter/retirer les jetons (ne pas descendre en dessous de 0)
+      if (tokensChange !== 0) {
+        setGameState(prev => ({
+          ...prev,
+          tokens: {
+            ...prev.tokens,
+            [color]: Math.max(0, prev.tokens[color] + tokensChange)
+          }
+        }));
+      }
+      
+      // Stocker le changement de jetons pour l'affichage dans le popup
+      setGameState(prev => ({
+        ...prev,
+        lastTokenChange: tokensChange
+      }));
+      
       // Si le joueur a fait 6, on met à jour/stocke l'événement en attente (écrase le précédent)
       if (diceValue === 6) {
         console.log(`Événement ${eventType} mis à jour en attente car le joueur a fait 6 et va rejouer`);
@@ -425,6 +578,12 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
         red: 'home',
         green: 'home',
       },
+      tokens: {
+        yellow: 0,
+        blue: 0,
+        red: 0,
+        green: 0,
+      },
       doitDeplacer: false,
       message: null,
       isAnimating: false,
@@ -434,6 +593,7 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
       showEventPopup: false,
       currentEventType: null,
       pendingEvent: null,
+      lastTokenChange: 0,
     }));
   };
 
@@ -540,15 +700,30 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
               }, 1000); // Réduit de 2000 à 1000ms
               return;
             } else if (newPos < path.length - 1) {
-              const moveMessage = gameState.isComputerGame 
-                ? (currentPlayerAtThisTime === 'yellow' ? `Votre pion avance de ${finalValue} case(s) !` : `Le pion de l'ordinateur avance de ${finalValue} case(s) !`) 
-                : `Le pion avance de ${finalValue} case(s) !`;
-              
-              setGameState(prev => ({ ...prev, message: moveMessage }));
-              await movePawnAnimated(currentPlayerAtThisTime, pos, newPos, cellSize);
-              handleCapture(currentPlayerAtThisTime, newPos);
-              // Déclencher l'événement après l'animation (avec la valeur du dé)
-              checkAndTriggerEvent(currentPlayerAtThisTime, newPos, finalValue);
+              // Vérifier si le joueur essaie d'entrer dans le chemin final sans assez de jetons
+              if (newPos >= finalPathEntryPositions[currentPlayerAtThisTime] && !canEnterFinalPath(currentPlayerAtThisTime)) {
+                const tokensNeeded = 7 - gameState.tokens[currentPlayerAtThisTime];
+                const tokenMessage = gameState.isComputerGame 
+                  ? `Vous avez besoin de ${tokensNeeded} jeton(s) de plus pour entrer dans le chemin final ! Continuez le tour du plateau.`
+                  : `Vous avez besoin de ${tokensNeeded} jeton(s) de plus pour entrer dans le chemin final ! Continuez le tour du plateau.`;
+                
+                setGameState(prev => ({ ...prev, message: tokenMessage }));
+                
+                // Le joueur continue sur le chemin étendu (boucle supplémentaire)
+                await movePawnAnimated(currentPlayerAtThisTime, pos, newPos, cellSize);
+                handleCapture(currentPlayerAtThisTime, newPos);
+                checkAndTriggerEvent(currentPlayerAtThisTime, newPos, finalValue);
+              } else {
+                const moveMessage = gameState.isComputerGame 
+                  ? (currentPlayerAtThisTime === 'yellow' ? `Votre pion avance de ${finalValue} case(s) !` : `Le pion de l'ordinateur avance de ${finalValue} case(s) !`) 
+                  : `Le pion avance de ${finalValue} case(s) !`;
+                
+                setGameState(prev => ({ ...prev, message: moveMessage }));
+                await movePawnAnimated(currentPlayerAtThisTime, pos, newPos, cellSize);
+                handleCapture(currentPlayerAtThisTime, newPos);
+                // Déclencher l'événement après l'animation (avec la valeur du dé)
+                checkAndTriggerEvent(currentPlayerAtThisTime, newPos, finalValue);
+              }
               
               if (finalValue === 6) {
                 setTimeout(() => {

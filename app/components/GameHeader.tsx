@@ -1,14 +1,20 @@
 import React from 'react';
-import { Image, StyleSheet, View } from 'react-native';
+import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 
-const GameHeader: React.FC = () => {
+interface GameHeaderProps {
+  onMenuPress: () => void;
+}
+
+const GameHeader: React.FC<GameHeaderProps> = ({ onMenuPress }) => {
   return (
     <View style={styles.header}>
-      <Image 
-        source={require('../../assets/images/burger.png')} 
-        style={styles.menuIcon}
-        resizeMode="contain"
-      />
+      <TouchableOpacity onPress={onMenuPress}>
+        <Image 
+          source={require('../../assets/images/burger.png')} 
+          style={styles.menuIcon}
+          resizeMode="contain"
+        />
+      </TouchableOpacity>
       <Image 
         source={require('../../assets/images/aide.png')} 
         style={styles.helpIcon}

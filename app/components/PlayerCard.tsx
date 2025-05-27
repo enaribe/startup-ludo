@@ -1,10 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import LudoDice from './LudoDice';
-import Icon1 from './icons/Icon1';
-import Icon2 from './icons/Icon2';
-import Icon3 from './icons/Icon3';
-import Icon4 from './icons/Icon4';
 
 interface PlayerCardProps {
   color: 'yellow' | 'blue' | 'red' | 'green';
@@ -18,6 +14,7 @@ interface PlayerCardProps {
   isAnimating: boolean;
   onRollDice: () => void;
   isComputerPlayer?: boolean;
+  tokens: number; // Nombre de jetons du joueur
 }
 
 const PlayerCard: React.FC<PlayerCardProps> = ({
@@ -32,6 +29,7 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
   isAnimating,
   onRollDice,
   isComputerPlayer = false,
+  tokens,
 }) => {
   const colorMap = {
     yellow: '#EDA420',
@@ -70,22 +68,19 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
           />
         )}
       </View>
-      <View style={styles.statsRow}>
-        <View style={styles.statItem}>
-          <Icon1 size={20} color={colorMap[color]} />
-          <Text style={styles.statNumber}>3</Text>
+      <View style={styles.tokensRow}>
+        <View style={styles.tokenContainer}>
+          <Text style={styles.tokenLabel}>Jetons:</Text>
+          <View style={styles.tokenBadge}>
+            <Text style={styles.tokenNumber}>{tokens}</Text>
+          </View>
         </View>
-        <View style={styles.statItem}>
-          <Icon2 size={20} color={colorMap[color]} />
-          <Text style={styles.statNumber}>3</Text>
-        </View>
-        <View style={styles.statItem}>
-          <Icon3 size={20} color={colorMap[color]} />
-          <Text style={styles.statNumber}>1</Text>
-        </View>
-        <View style={styles.statItem}>
-          <Icon4 size={20} color={colorMap[color]} />
-          <Text style={styles.statNumber}>1</Text>
+        <View style={styles.statusContainer}>
+          {tokens >= 7 ? (
+            <Text style={styles.statusReady}>✓ Prêt pour la finale</Text>
+          ) : (
+            <Text style={styles.statusNotReady}>Besoin de {7 - tokens} jeton(s)</Text>
+          )}
         </View>
       </View>
     </View>
@@ -150,26 +145,47 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#fff',
   },
-  statsRow: {
+  tokensRow: {
+    flexDirection: 'column',
+    gap: 4,
+  },
+  tokenContainer: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
   },
-  statItem: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 10,
-    paddingHorizontal: 3,
+  tokenLabel: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  tokenBadge: {
+    backgroundColor: '#FFD700',
+    borderRadius: 12,
+    paddingHorizontal: 8,
     paddingVertical: 2,
-    flexDirection: 'row',
+    minWidth: 24,
     alignItems: 'center',
-    flex: 1,
-    marginHorizontal: 1,
   },
-  statNumber: {
-    fontSize: 9,
+  tokenNumber: {
+    fontSize: 12,
     fontWeight: 'bold',
     color: '#333',
-    marginLeft: 1,
+  },
+  statusContainer: {
+    alignItems: 'center',
+  },
+  statusReady: {
+    fontSize: 9,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+    textAlign: 'center',
+  },
+  statusNotReady: {
+    fontSize: 9,
+    fontWeight: 'bold',
+    color: '#FF9800',
+    textAlign: 'center',
   },
 });
 

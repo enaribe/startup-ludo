@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface GameMessagesProps {
   message: string | null;
@@ -10,7 +10,7 @@ interface GameMessagesProps {
 const GameMessages: React.FC<GameMessagesProps> = ({ 
   message, 
   gameFinished, 
-  onResetGame 
+  onResetGame
 }) => {
   return (
     <>
@@ -25,9 +25,9 @@ const GameMessages: React.FC<GameMessagesProps> = ({
           <Text style={styles.winnerText}>
             🎉 Partie terminée ! 🎉
           </Text>
-          <Text style={styles.restartText} onPress={onResetGame}>
-            Nouvelle partie
-          </Text>
+          <TouchableOpacity style={styles.newGameButton} onPress={onResetGame}>
+            <Text style={styles.newGameButtonText}>Nouvelle partie</Text>
+          </TouchableOpacity>
         </View>
       )}
     </>
@@ -68,11 +68,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 12,
   },
-  restartText: {
-    color: '#2980b9',
-    textDecorationLine: 'underline',
-    fontSize: 16,
+  newGameButton: {
+    backgroundColor: '#2980b9',
+    borderRadius: 8,
+    padding: 12,
+  },
+  newGameButtonText: {
+    color: '#fff',
     fontWeight: 'bold',
+    fontSize: 16,
   },
 });
 

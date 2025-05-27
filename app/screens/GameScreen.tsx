@@ -117,7 +117,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ numberOfPlayers, onResetGame })
       style={styles.container}
       resizeMode="cover"
     >
-      <GameHeader />
+      <GameHeader onMenuPress={handleCompleteReset} />
       
       <GameBoard
         cellSize={cellSize}
@@ -149,6 +149,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ numberOfPlayers, onResetGame })
             isAnimating={gameState.isAnimating}
             onRollDice={() => rollDice(cellSize)}
             isComputerPlayer={isComputerPlayer}
+            tokens={gameState.tokens[color]}
           />
         );
       })}
@@ -162,6 +163,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ numberOfPlayers, onResetGame })
       <EventPopup
         visible={gameState.showEventPopup}
         eventType={gameState.currentEventType}
+        tokenChange={gameState.lastTokenChange}
         onClose={closeEventPopup}
       />
     </ImageBackground>

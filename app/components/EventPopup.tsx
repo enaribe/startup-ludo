@@ -4,10 +4,11 @@ import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 interface EventPopupProps {
   visible: boolean;
   eventType: 'quiz' | 'financement' | 'duel' | 'evenement' | null;
+  tokenChange: number;
   onClose: () => void;
 }
 
-const EventPopup: React.FC<EventPopupProps> = ({ visible, eventType, onClose }) => {
+const EventPopup: React.FC<EventPopupProps> = ({ visible, eventType, tokenChange, onClose }) => {
   if (!eventType) return null;
 
   const getEventConfig = (type: string) => {
@@ -57,6 +58,26 @@ const EventPopup: React.FC<EventPopupProps> = ({ visible, eventType, onClose }) 
 
   const config = getEventConfig(eventType);
 
+  const getTokenMessage = () => {
+    if (tokenChange > 0) {
+      return `🪙 Vous gagnez ${tokenChange} jeton${tokenChange > 1 ? 's' : ''} !`;
+    } else if (tokenChange < 0) {
+      return `💸 Vous perdez ${Math.abs(tokenChange)} jeton${Math.abs(tokenChange) > 1 ? 's' : ''} !`;
+    } else {
+      return `😐 Aucun jeton gagné ou perdu cette fois.`;
+    }
+  };
+
+  const getTokenContainerStyle = () => {
+    if (tokenChange > 0) {
+      return { backgroundColor: '#90EE90' }; // Vert clair pour gain
+    } else if (tokenChange < 0) {
+      return { backgroundColor: '#FFB6C1' }; // Rouge clair pour perte
+    } else {
+      return { backgroundColor: '#D3D3D3' }; // Gris pour neutre
+    }
+  };
+
   return (
     <Modal
       visible={visible}
@@ -73,6 +94,12 @@ const EventPopup: React.FC<EventPopupProps> = ({ visible, eventType, onClose }) 
           <View style={styles.content}>
             <Text style={styles.description}>{config.description}</Text>
             <Text style={styles.eventContent}>{config.content}</Text>
+            
+            <View style={[styles.tokensContainer, getTokenContainerStyle()]}>
+              <Text style={styles.tokensText}>
+                {getTokenMessage()}
+              </Text>
+            </View>
             
             {config.options && (
               <View style={styles.optionsContainer}>
@@ -155,6 +182,19 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     textAlign: 'center',
     color: '#666',
+  },
+  tokensContainer: {
+    backgroundColor: '#FFD700',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 15,
+    alignItems: 'center',
+  },
+  tokensText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    textAlign: 'center',
   },
   optionsContainer: {
     marginTop: 10,
