@@ -308,12 +308,12 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
       await new Promise(resolve => {
         Animated.timing(pawnAnim[color], {
           toValue: { x: pos.x, y: pos.y },
-          duration: 220,
+          duration: 150, // Réduit de 220 à 150ms pour une animation plus rapide
           useNativeDriver: false,
           easing: Easing.inOut(Easing.ease),
         }).start(() => resolve(true));
       });
-      await wait(30);
+      await wait(20); // Réduit de 30 à 20ms
     }
     
     setGameState(prev => ({ 
@@ -364,8 +364,8 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
       return;
     }
 
-    // Attendre un peu pour simuler la réflexion de l'ordinateur
-    await wait(1000 + Math.random() * 1500);
+    // Attendre un peu pour simuler la réflexion de l'ordinateur (réduit pour plus de rapidité)
+    await wait(300 + Math.random() * 500); // Réduit de 1000-2500ms à 300-800ms
     
     // L'ordinateur lance le dé automatiquement
     rollDice(cellSize);
@@ -446,8 +446,8 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
               // Remettre diceValue à null après un délai pour permettre un nouveau lancer
               setTimeout(() => {
                 setGameState(prev => ({ ...prev, diceValue: null, message: null }));
-              }, 1500);
-            }, 400);
+              }, 800); // Réduit de 1500 à 800ms
+            }, 200); // Réduit de 400 à 200ms
           } else if (typeof pos === 'number') {
             const newPos = pos + finalValue;
             
@@ -494,7 +494,7 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
                     currentPlayer: prev.activePlayers[nextPlayerIndex]
                   };
                 });
-              }, 2000);
+              }, 1000); // Réduit de 2000 à 1000ms
               return;
             } else if (newPos < path.length - 1) {
               const moveMessage = gameState.isComputerGame 
@@ -517,8 +517,8 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
                   // Remettre diceValue à null après un délai pour permettre un nouveau lancer
                   setTimeout(() => {
                     setGameState(prev => ({ ...prev, diceValue: null, message: null }));
-                  }, 1500);
-                }, 400);
+                  }, 800); // Réduit de 1500 à 800ms
+                }, 200); // Réduit de 400 à 200ms
               } else {
                 setTimeout(() => {
                   setGameState(prev => {
@@ -533,7 +533,7 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
                       currentPlayer: prev.activePlayers[nextPlayerIndex]
                     };
                   });
-                }, 800);
+                }, 400); // Réduit de 800 à 400ms
               }
             } else {
               setGameState(prev => ({ ...prev, message: 'Déplacement impossible (fin du chemin), tour suivant.' }));
@@ -550,7 +550,7 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
                     currentPlayer: prev.activePlayers[nextPlayerIndex]
                   };
                 });
-              }, 1200);
+              }, 600); // Réduit de 1200 à 600ms
             }
           } else {
             const homeMessage = gameState.isComputerGame 
@@ -570,7 +570,7 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
                   currentPlayer: prev.activePlayers[nextPlayerIndex]
                 };
               });
-            }, 1200);
+            }, 600); // Réduit de 1200 à 600ms
           }
         }, 200);
       }

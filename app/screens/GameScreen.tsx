@@ -90,12 +90,26 @@ const GameScreen: React.FC<GameScreenProps> = ({ numberOfPlayers, onResetGame })
     }
   };
 
-  const playerConfigs = [
-    { color: 'yellow' as const, name: getPlayerName('yellow'), position: 'topLeft' as const },
-    { color: 'blue' as const, name: getPlayerName('blue'), position: 'topRight' as const },
-    { color: 'green' as const, name: getPlayerName('green'), position: 'bottomLeft' as const },
-    { color: 'red' as const, name: getPlayerName('red'), position: 'bottomRight' as const },
-  ];
+  // Configuration des joueurs avec adaptation pour le mode 1 joueur
+  const getPlayerConfigs = () => {
+    if (gameState.isComputerGame) {
+      // En mode 1 joueur : mettre le joueur humain en bas pour faciliter l'accès
+      return [
+        { color: 'yellow' as const, name: getPlayerName('yellow'), position: 'bottomLeft' as const }, // Joueur humain en bas
+        { color: 'red' as const, name: getPlayerName('red'), position: 'topRight' as const }, // Ordinateur en haut
+      ];
+    } else {
+      // Configuration normale pour les autres modes
+      return [
+        { color: 'yellow' as const, name: getPlayerName('yellow'), position: 'topLeft' as const },
+        { color: 'blue' as const, name: getPlayerName('blue'), position: 'topRight' as const },
+        { color: 'green' as const, name: getPlayerName('green'), position: 'bottomLeft' as const },
+        { color: 'red' as const, name: getPlayerName('red'), position: 'bottomRight' as const },
+      ];
+    }
+  };
+
+  const playerConfigs = getPlayerConfigs();
 
   return (
     <ImageBackground 
