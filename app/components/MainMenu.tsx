@@ -80,10 +80,10 @@ const styles = StyleSheet.create({
   },
   gameImageContainer: {
     position: 'absolute',
-    left: 1.84,
-    top: 76,
-    width: 386,
-    height: 446,
+    left: width * 0.05, // 5% de marge à gauche
+    top: height * 0.09, // 9% depuis le haut
+    width: width * 0.9, // 90% de la largeur de l'écran
+    height: height * 0.53, // 53% de la hauteur de l'écran
     justifyContent: 'center',
     alignItems: 'center',
   },
