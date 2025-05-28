@@ -59,16 +59,16 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
     diceValue: null,
     rolling: false,
     pawns: {
-      yellow: 'home',
-      blue: 'home',
-      red: 'home',
-      green: 'home',
+      yellow: 47, // Position 47, si dé = 3+, essaiera d'entrer dans chemin final
+      blue: 48,   // Position 48, si dé = 2+, essaiera d'entrer dans chemin final  
+      red: 46,    // Position 46, si dé = 4+, essaiera d'entrer dans chemin final
+      green: 49,  // Position 49, si dé = 1+, essaiera d'entrer dans chemin final
     },
     tokens: {
-      yellow: 0,
-      blue: 0,
-      red: 0,
-      green: 0,
+      yellow: 3,  // Pas assez de jetons (besoin de 7)
+      blue: 8,    // Assez de jetons
+      red: 5,     // Pas assez de jetons
+      green: 7,   // Juste assez de jetons
     },
     doitDeplacer: false,
     message: null,
@@ -91,7 +91,7 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
     green: useRef(new Animated.ValueXY({ x: 0, y: 0 })).current,
   });
 
-  // Chemins des pions
+  // Chemins des pions - SEULEMENT le chemin de base (pas de boucle supplémentaire)
   const paths: Record<string, Array<{ row: number; col: number }>> = {
     yellow: [
       { row: 6, col: 1 },
@@ -107,22 +107,8 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
       { row: 14, col: 7 }, { row: 14, col: 6 }, { row: 13, col: 6 }, { row: 12, col: 6 },
       { row: 11, col: 6 }, { row: 10, col: 6 }, { row: 9, col: 6 }, { row: 8, col: 5 },
       { row: 8, col: 4 }, { row: 8, col: 3 }, { row: 8, col: 2 }, { row: 8, col: 1 },
-      { row: 8, col: 0 }, { row: 7, col: 0 }, { row: 6, col: 0 },
-      // Boucle supplémentaire pour continuer le tour
-      { row: 6, col: 1 }, { row: 6, col: 2 }, { row: 6, col: 3 }, { row: 6, col: 4 }, { row: 6, col: 5 },
-      { row: 5, col: 6 }, { row: 4, col: 6 }, { row: 3, col: 6 }, { row: 2, col: 6 },
-      { row: 1, col: 6 }, { row: 0, col: 6 }, { row: 0, col: 7 }, { row: 0, col: 8 },
-      { row: 1, col: 8 }, { row: 2, col: 8 }, { row: 3, col: 8 }, { row: 4, col: 8 },
-      { row: 5, col: 8 }, { row: 6, col: 9 }, { row: 6, col: 10 }, { row: 6, col: 11 },
-      { row: 6, col: 12 }, { row: 6, col: 13 }, { row: 6, col: 14 }, { row: 7, col: 14 },
-      { row: 8, col: 14 }, { row: 8, col: 13 }, { row: 8, col: 12 }, { row: 8, col: 11 },
-      { row: 8, col: 10 }, { row: 8, col: 9 }, { row: 9, col: 8 }, { row: 10, col: 8 },
-      { row: 11, col: 8 }, { row: 12, col: 8 }, { row: 13, col: 8 }, { row: 14, col: 8 },
-      { row: 14, col: 7 }, { row: 14, col: 6 }, { row: 13, col: 6 }, { row: 12, col: 6 },
-      { row: 11, col: 6 }, { row: 10, col: 6 }, { row: 9, col: 6 }, { row: 8, col: 5 },
-      { row: 8, col: 4 }, { row: 8, col: 3 }, { row: 8, col: 2 }, { row: 8, col: 1 },
       { row: 8, col: 0 }, { row: 7, col: 0 },
-      // Chemin final vers le centre (seulement si 7+ jetons)
+      // Chemin final vers le centre (positions 50-55)
       { row: 7, col: 1 }, { row: 7, col: 2 }, { row: 7, col: 3 },
       { row: 7, col: 4 }, { row: 7, col: 5 }, { row: 7, col: 6 },
     ],
@@ -140,22 +126,8 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
       { row: 7, col: 0 }, { row: 6, col: 0 }, { row: 6, col: 1 }, { row: 6, col: 2 },
       { row: 6, col: 3 }, { row: 6, col: 4 }, { row: 6, col: 5 }, { row: 5, col: 6 },
       { row: 4, col: 6 }, { row: 3, col: 6 }, { row: 2, col: 6 }, { row: 1, col: 6 },
-      { row: 0, col: 6 }, { row: 0, col: 7 }, { row: 0, col: 8 },
-      // Boucle supplémentaire pour continuer le tour
-      { row: 1, col: 8 }, { row: 2, col: 8 }, { row: 3, col: 8 }, { row: 4, col: 8 }, { row: 5, col: 8 },
-      { row: 6, col: 9 }, { row: 6, col: 10 }, { row: 6, col: 11 }, { row: 6, col: 12 },
-      { row: 6, col: 13 }, { row: 6, col: 14 }, { row: 7, col: 14 }, { row: 8, col: 14 },
-      { row: 8, col: 13 }, { row: 8, col: 12 }, { row: 8, col: 11 }, { row: 8, col: 10 },
-      { row: 8, col: 9 }, { row: 9, col: 8 }, { row: 10, col: 8 }, { row: 11, col: 8 },
-      { row: 12, col: 8 }, { row: 13, col: 8 }, { row: 14, col: 8 }, { row: 14, col: 7 },
-      { row: 14, col: 6 }, { row: 13, col: 6 }, { row: 12, col: 6 }, { row: 11, col: 6 },
-      { row: 10, col: 6 }, { row: 9, col: 6 }, { row: 8, col: 5 }, { row: 8, col: 4 },
-      { row: 8, col: 3 }, { row: 8, col: 2 }, { row: 8, col: 1 }, { row: 8, col: 0 },
-      { row: 7, col: 0 }, { row: 6, col: 0 }, { row: 6, col: 1 }, { row: 6, col: 2 },
-      { row: 6, col: 3 }, { row: 6, col: 4 }, { row: 6, col: 5 }, { row: 5, col: 6 },
-      { row: 4, col: 6 }, { row: 3, col: 6 }, { row: 2, col: 6 }, { row: 1, col: 6 },
       { row: 0, col: 6 }, { row: 0, col: 7 },
-      // Chemin final vers le centre (seulement si 7+ jetons)
+      // Chemin final vers le centre (positions 50-55)
       { row: 1, col: 7 }, { row: 2, col: 7 }, { row: 3, col: 7 },
       { row: 4, col: 7 }, { row: 5, col: 7 }, { row: 6, col: 7 },
     ],
@@ -173,22 +145,8 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
       { row: 0, col: 7 }, { row: 0, col: 8 }, { row: 1, col: 8 }, { row: 2, col: 8 },
       { row: 3, col: 8 }, { row: 4, col: 8 }, { row: 5, col: 8 }, { row: 6, col: 9 },
       { row: 6, col: 10 }, { row: 6, col: 11 }, { row: 6, col: 12 }, { row: 6, col: 13 },
-      { row: 6, col: 14 }, { row: 7, col: 14 }, { row: 8, col: 14 },
-      // Boucle supplémentaire pour continuer le tour
-      { row: 8, col: 13 }, { row: 8, col: 12 }, { row: 8, col: 11 }, { row: 8, col: 10 }, { row: 8, col: 9 },
-      { row: 9, col: 8 }, { row: 10, col: 8 }, { row: 11, col: 8 }, { row: 12, col: 8 },
-      { row: 13, col: 8 }, { row: 14, col: 8 }, { row: 14, col: 7 }, { row: 14, col: 6 },
-      { row: 13, col: 6 }, { row: 12, col: 6 }, { row: 11, col: 6 }, { row: 10, col: 6 },
-      { row: 9, col: 6 }, { row: 8, col: 5 }, { row: 8, col: 4 }, { row: 8, col: 3 },
-      { row: 8, col: 2 }, { row: 8, col: 1 }, { row: 8, col: 0 }, { row: 7, col: 0 },
-      { row: 6, col: 0 }, { row: 6, col: 1 }, { row: 6, col: 2 }, { row: 6, col: 3 },
-      { row: 6, col: 4 }, { row: 6, col: 5 }, { row: 5, col: 6 }, { row: 4, col: 6 },
-      { row: 3, col: 6 }, { row: 2, col: 6 }, { row: 1, col: 6 }, { row: 0, col: 6 },
-      { row: 0, col: 7 }, { row: 0, col: 8 }, { row: 1, col: 8 }, { row: 2, col: 8 },
-      { row: 3, col: 8 }, { row: 4, col: 8 }, { row: 5, col: 8 }, { row: 6, col: 9 },
-      { row: 6, col: 10 }, { row: 6, col: 11 }, { row: 6, col: 12 }, { row: 6, col: 13 },
       { row: 6, col: 14 }, { row: 7, col: 14 },
-      // Chemin final vers le centre (seulement si 7+ jetons)
+      // Chemin final vers le centre (positions 50-55)
       { row: 7, col: 13 }, { row: 7, col: 12 }, { row: 7, col: 11 },
       { row: 7, col: 10 }, { row: 7, col: 9 }, { row: 7, col: 8 },
     ],
@@ -206,22 +164,8 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
       { row: 7, col: 14 }, { row: 8, col: 14 }, { row: 8, col: 13 }, { row: 8, col: 12 },
       { row: 8, col: 11 }, { row: 8, col: 10 }, { row: 8, col: 9 }, { row: 9, col: 8 },
       { row: 10, col: 8 }, { row: 11, col: 8 }, { row: 12, col: 8 }, { row: 13, col: 8 },
-      { row: 14, col: 8 }, { row: 14, col: 7 }, { row: 14, col: 6 },
-      // Boucle supplémentaire pour continuer le tour
-      { row: 13, col: 6 }, { row: 12, col: 6 }, { row: 11, col: 6 }, { row: 10, col: 6 }, { row: 9, col: 6 },
-      { row: 8, col: 5 }, { row: 8, col: 4 }, { row: 8, col: 3 }, { row: 8, col: 2 },
-      { row: 8, col: 1 }, { row: 8, col: 0 }, { row: 7, col: 0 }, { row: 6, col: 0 },
-      { row: 6, col: 1 }, { row: 6, col: 2 }, { row: 6, col: 3 }, { row: 6, col: 4 },
-      { row: 6, col: 5 }, { row: 5, col: 6 }, { row: 4, col: 6 }, { row: 3, col: 6 },
-      { row: 2, col: 6 }, { row: 1, col: 6 }, { row: 0, col: 6 }, { row: 0, col: 7 },
-      { row: 0, col: 8 }, { row: 1, col: 8 }, { row: 2, col: 8 }, { row: 3, col: 8 },
-      { row: 4, col: 8 }, { row: 5, col: 8 }, { row: 6, col: 9 }, { row: 6, col: 10 },
-      { row: 6, col: 11 }, { row: 6, col: 12 }, { row: 6, col: 13 }, { row: 6, col: 14 },
-      { row: 7, col: 14 }, { row: 8, col: 14 }, { row: 8, col: 13 }, { row: 8, col: 12 },
-      { row: 8, col: 11 }, { row: 8, col: 10 }, { row: 8, col: 9 }, { row: 9, col: 8 },
-      { row: 10, col: 8 }, { row: 11, col: 8 }, { row: 12, col: 8 }, { row: 13, col: 8 },
       { row: 14, col: 8 }, { row: 14, col: 7 },
-      // Chemin final vers le centre (seulement si 7+ jetons)
+      // Chemin final vers le centre (positions 50-55)
       { row: 13, col: 7 }, { row: 12, col: 7 }, { row: 11, col: 7 },
       { row: 10, col: 7 }, { row: 9, col: 7 }, { row: 8, col: 7 },
     ]
@@ -314,7 +258,7 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
   };
 
   const eventDistribution = createEventDistribution();
-  console.log('Distribution des événements:', eventDistribution);
+  // console.log('Distribution des événements:', eventDistribution);
 
   // Fonction pour vérifier si un joueur peut entrer dans le chemin final
   const canEnterFinalPath = (color: PlayerColor): boolean => {
@@ -323,10 +267,61 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
 
   // Positions où chaque joueur peut entrer dans son chemin final
   const finalPathEntryPositions = {
-    yellow: 99, // Position dans le chemin étendu où il peut entrer dans le chemin final
-    blue: 99,   // Position dans le chemin étendu où il peut entrer dans le chemin final
-    red: 99,    // Position dans le chemin étendu où il peut entrer dans le chemin final  
-    green: 99   // Position dans le chemin étendu où il peut entrer dans le chemin final
+    yellow: 100, // Position 100 = { row: 7, col: 1 } (première case du chemin final)
+    blue: 100,   // Position 100 = { row: 1, col: 7 } (première case du chemin final)
+    red: 100,    // Position 100 = { row: 7, col: 13 } (première case du chemin final)
+    green: 100   // Position 100 = { row: 13, col: 7 } (première case du chemin final)
+  };
+
+  // Fonction pour calculer la position réelle avec la logique de boucle
+  const calculateRealPosition = (color: PlayerColor, targetPosition: number): number => {
+    const path = paths[color];
+    const MAIN_PATH_LENGTH = 50; // Positions 0-49 pour le tour principal
+    
+    // Si la position est dans le chemin de base normal
+    if (targetPosition < path.length) {
+      return targetPosition;
+    }
+    
+    // Si le pion dépasse, calculer la position en boucle dans le chemin principal
+    const overflow = targetPosition - MAIN_PATH_LENGTH;
+    const cyclicPosition = overflow % MAIN_PATH_LENGTH;
+    return cyclicPosition;
+  };
+
+  // Fonction pour calculer la position quand le joueur ne peut pas entrer dans le chemin final
+  const calculateLoopPosition = (color: PlayerColor, currentPos: number, diceValue: number): number => {
+    const MAIN_PATH_LENGTH = 50; // Le chemin principal fait 50 cases (0-49)
+    
+    // Si le joueur est déjà dans le chemin final (position >= 50) et ne peut pas continuer,
+    // il doit retourner au chemin principal
+    if (currentPos >= 50) {
+      // Calculer combien de cases il voudrait avancer dans le chemin final
+      const finalPathSteps = diceValue;
+      // Le retourner au début du chemin principal avec le nombre de cases correspondant
+      return finalPathSteps - 1; // -1 car on commence à 0
+    }
+    
+    // Si on est dans le chemin principal et qu'on dépasse la position 49,
+    // on continue la boucle dans le chemin principal
+    const wouldBePosition = currentPos + diceValue;
+    
+    if (wouldBePosition >= MAIN_PATH_LENGTH) {
+      // On dépasse la fin du chemin principal, on fait une boucle
+      const overflow = wouldBePosition - MAIN_PATH_LENGTH;
+      return overflow; // 0, 1, 2, 3, etc.
+    }
+    
+    return wouldBePosition; // Position normale
+  };
+
+  // Fonction pour déterminer si une position mène au chemin final RESTRICTIF
+  const wouldEnterFinalPath = (currentPos: number, diceValue: number): boolean => {
+    const targetPos = currentPos + diceValue;
+    // La position 50 est accessible à tous (première case du chemin final)
+    // Seules les positions 51+ nécessitent des jetons
+    // Donc on vérifie si on va de < 51 vers >= 51
+    return currentPos < 51 && targetPos >= 51;
   };
 
   // Fonction pour vérifier et déclencher un événement
@@ -478,12 +473,17 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
       if (color === 'red') return { x: cellSize * 9 + homeCenterOffset, y: cellSize * 9 + homeCenterOffset };
       if (color === 'green') return { x: cellSize * 0 + homeCenterOffset, y: cellSize * 9 + homeCenterOffset };
       return { x: 0, y: 0 };
-    } else if (typeof pos === 'number' && paths[color][pos]) {
-      const { row, col } = paths[color][pos];
-      // Pour les pions sur le plateau, ils sont maintenant plus gros pour être mieux visibles (cellSize * 1.3)
-      const pawnSize = cellSize * 1.3;
-      const centerOffset = (cellSize - pawnSize) / 2;
-      return { x: col * cellSize + centerOffset, y: row * cellSize + centerOffset };
+    } else if (typeof pos === 'number') {
+      // Utiliser la position réelle calculée pour les positions au-delà du chemin principal
+      const realPos = pos >= paths[color].length ? calculateRealPosition(color, pos) : pos;
+      
+      if (paths[color][realPos]) {
+        const { row, col } = paths[color][realPos];
+        // Pour les pions sur le plateau, ils sont maintenant plus gros pour être mieux visibles (cellSize * 1.3)
+        const pawnSize = cellSize * 1.3;
+        const centerOffset = (cellSize - pawnSize) / 2;
+        return { x: col * cellSize + centerOffset, y: row * cellSize + centerOffset };
+      }
     }
     return { x: 0, y: 0 };
   };
@@ -573,16 +573,16 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
       diceValue: null,
       rolling: false,
       pawns: {
-        yellow: 'home',
-        blue: 'home',
-        red: 'home',
-        green: 'home',
+        yellow: 47, // Position 47, si dé = 3+, essaiera d'entrer dans chemin final
+        blue: 48,   // Position 48, si dé = 2+, essaiera d'entrer dans chemin final  
+        red: 46,    // Position 46, si dé = 4+, essaiera d'entrer dans chemin final
+        green: 49,  // Position 49, si dé = 1+, essaiera d'entrer dans chemin final
       },
       tokens: {
-        yellow: 0,
-        blue: 0,
-        red: 0,
-        green: 0,
+        yellow: 3,  // Pas assez de jetons (besoin de 7)
+        blue: 8,    // Assez de jetons
+        red: 5,     // Pas assez de jetons
+        green: 7,   // Juste assez de jetons
       },
       doitDeplacer: false,
       message: null,
@@ -654,8 +654,106 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
           } else if (typeof pos === 'number') {
             const newPos = pos + finalValue;
             
-            // Vérifie si le pion peut atteindre exactement la case centrale
-            if (newPos === path.length - 1) {
+            // NOUVELLE VÉRIFICATION : Si le pion est déjà dans le chemin final (positions 50-55)
+            if (pos >= 50) {
+              console.log(`DEBUG: ${currentPlayerAtThisTime} est déjà dans le chemin final (position ${pos})`);
+              
+              // Vérifie si le pion peut atteindre exactement la case centrale
+              if (newPos === path.length - 1) {
+                const newFinishedPlayers = [...gameState.finishedPlayers, currentPlayerAtThisTime];
+                const position = newFinishedPlayers.length;
+                const positionText = position === 1 ? '1er' : position === 2 ? '2ème' : position === 3 ? '3ème' : '4ème';
+                
+                const winnerName = gameState.isComputerGame 
+                  ? (currentPlayerAtThisTime === 'yellow' ? 'Vous' : "L'ordinateur") 
+                  : currentPlayerAtThisTime.toUpperCase();
+                setGameState(prev => ({
+                  ...prev,
+                  finishedPlayers: newFinishedPlayers,
+                  message: `Bravo ! ${winnerName} termine ${positionText} !`
+                }));
+                
+                await movePawnAnimated(currentPlayerAtThisTime, pos, newPos, cellSize);
+                
+                // Vérifie si le jeu est terminé
+                if (newFinishedPlayers.length === gameState.activePlayers.length - 1) {
+                  setGameState(prev => ({ ...prev, gameFinished: true }));
+                  const lastPlayer = gameState.activePlayers.find(p => !newFinishedPlayers.includes(p));
+                  setTimeout(() => {
+                    const ranking = newFinishedPlayers.map((p, i) => `${i + 1}. ${p.toUpperCase()}`).join(', ');
+                    const finalRanking = lastPlayer ? `${ranking}, ${gameState.activePlayers.length}. ${lastPlayer.toUpperCase()}` : ranking;
+                    setGameState(prev => ({ ...prev, message: `Jeu terminé ! Classement final : ${finalRanking}` }));
+                  }, 1000);
+                  return;
+                }
+                
+                // Passe au joueur suivant
+                setTimeout(() => {
+                  setGameState(prev => {
+                    let nextPlayerIndex = (prev.activePlayers.indexOf(prev.currentPlayer) + 1) % prev.activePlayers.length;
+                    while (newFinishedPlayers.includes(prev.activePlayers[nextPlayerIndex])) {
+                      nextPlayerIndex = (nextPlayerIndex + 1) % prev.activePlayers.length;
+                    }
+                    return {
+                      ...prev,
+                      message: null,
+                      diceValue: null,
+                      currentPlayer: prev.activePlayers[nextPlayerIndex]
+                    };
+                  });
+                }, 1000);
+                return;
+              }
+              // Si le pion peut avancer dans le chemin final sans dépasser
+              else if (newPos < path.length - 1) {
+                // VÉRIFICATION DES JETONS même pour les pions déjà dans le chemin final
+                const currentTokens = gameState.tokens[currentPlayerAtThisTime];
+                const hasEnoughTokens = currentTokens >= 7;
+                
+                console.log(`DEBUG: Pion ${currentPlayerAtThisTime} dans le chemin final veut avancer de ${pos} vers ${newPos}`);
+                console.log(`DEBUG: Jetons actuels: ${currentTokens}, Besoin: 7, Peut continuer: ${hasEnoughTokens}`);
+                
+                if (hasEnoughTokens) {
+                  // Il a assez de jetons, il peut continuer dans le chemin final
+                  const moveMessage = gameState.isComputerGame 
+                    ? (currentPlayerAtThisTime === 'yellow' ? `Votre pion avance dans le chemin final !` : `Le pion de l'ordinateur avance dans le chemin final !`) 
+                    : `Le pion avance dans le chemin final !`;
+                  
+                  console.log(`DEBUG: Avancement autorisé dans le chemin final de ${pos} vers ${newPos}`);
+                  setGameState(prev => ({ ...prev, message: moveMessage }));
+                  await movePawnAnimated(currentPlayerAtThisTime, pos, newPos, cellSize);
+                  // Pas de capture possible dans le chemin final
+                  // Pas d'événement dans le chemin final
+                } else {
+                  // Il n'a pas assez de jetons, il doit retourner au chemin principal
+                  const tokensNeeded = 7 - currentTokens;
+                  const loopPosition = calculateLoopPosition(currentPlayerAtThisTime, pos, finalValue);
+                  
+                  console.log(`DEBUG: Continuation refusée, retour au chemin principal. Position calculée: ${loopPosition}`);
+                  
+                  const tokenMessage = gameState.isComputerGame 
+                    ? `Vous avez besoin de ${tokensNeeded} jeton(s) de plus pour progresser dans le chemin final ! Retour au plateau.`
+                    : `Vous avez besoin de ${tokensNeeded} jeton(s) de plus pour progresser dans le chemin final ! Retour au plateau.`;
+                  
+                  setGameState(prev => ({ ...prev, message: tokenMessage }));
+                  await movePawnAnimated(currentPlayerAtThisTime, pos, loopPosition, cellSize);
+                  handleCapture(currentPlayerAtThisTime, loopPosition);
+                  checkAndTriggerEvent(currentPlayerAtThisTime, loopPosition, finalValue);
+                }
+              }
+              // Si le mouvement dépasserait la fin du chemin final, le pion reste sur place
+              else {
+                const stayMessage = gameState.isComputerGame 
+                  ? (currentPlayerAtThisTime === 'yellow' ? `Vous ne pouvez pas avancer, le dé est trop élevé !` : `L'ordinateur ne peut pas avancer, le dé est trop élevé !`) 
+                  : `Mouvement impossible, le dé est trop élevé !`;
+                
+                console.log(`DEBUG: Mouvement impossible dans le chemin final, pion reste en position ${pos}`);
+                setGameState(prev => ({ ...prev, message: stayMessage }));
+                // Le pion reste à sa position actuelle, pas d'animation
+              }
+            }
+            // Vérifie si le pion peut atteindre exactement la case centrale (pour les pions pas encore dans le chemin final)
+            else if (newPos === path.length - 1) {
               const newFinishedPlayers = [...gameState.finishedPlayers, currentPlayerAtThisTime];
               const position = newFinishedPlayers.length;
               const positionText = position === 1 ? '1er' : position === 2 ? '2ème' : position === 3 ? '3ème' : '4ème';
@@ -697,70 +795,91 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
                     currentPlayer: prev.activePlayers[nextPlayerIndex]
                   };
                 });
-              }, 1000); // Réduit de 2000 à 1000ms
+              }, 1000);
               return;
-            } else if (newPos < path.length - 1) {
-              // Vérifier si le joueur essaie d'entrer dans le chemin final sans assez de jetons
-              if (newPos >= finalPathEntryPositions[currentPlayerAtThisTime] && !canEnterFinalPath(currentPlayerAtThisTime)) {
-                const tokensNeeded = 7 - gameState.tokens[currentPlayerAtThisTime];
+            }
+            // Nouvelle logique intelligente de déplacement
+            else if (wouldEnterFinalPath(pos, finalValue)) {
+              // Le joueur essaie d'entrer dans le chemin final
+              // Capturer les valeurs actuelles pour éviter les problèmes de closure
+              const currentTokens = gameState.tokens[currentPlayerAtThisTime];
+              const hasEnoughTokens = currentTokens >= 7;
+              
+              console.log(`DEBUG: ${currentPlayerAtThisTime} essaie d'entrer dans le chemin final`);
+              console.log(`DEBUG: Position actuelle: ${pos}, Dé: ${finalValue}, Nouvelle position: ${newPos}`);
+              console.log(`DEBUG: Jetons actuels: ${currentTokens}, Besoin: 7, Peut entrer: ${hasEnoughTokens}`);
+              
+              if (hasEnoughTokens) {
+                // Il a assez de jetons, il peut entrer
+                const moveMessage = gameState.isComputerGame 
+                  ? (currentPlayerAtThisTime === 'yellow' ? `Votre pion entre dans le chemin final !` : `Le pion de l'ordinateur entre dans le chemin final !`) 
+                  : `Le pion entre dans le chemin final !`;
+                
+                console.log(`DEBUG: Entrée autorisée dans le chemin final`);
+                setGameState(prev => ({ ...prev, message: moveMessage }));
+                await movePawnAnimated(currentPlayerAtThisTime, pos, newPos, cellSize);
+                handleCapture(currentPlayerAtThisTime, newPos);
+                checkAndTriggerEvent(currentPlayerAtThisTime, newPos, finalValue);
+              } else {
+                // Il n'a pas assez de jetons, on utilise la boucle supplémentaire
+                const tokensNeeded = 7 - currentTokens;
+                const loopPosition = calculateLoopPosition(currentPlayerAtThisTime, pos, finalValue);
+                
+                console.log(`DEBUG: Entrée refusée, utilisation de la boucle. Position calculée: ${loopPosition}`);
+                
                 const tokenMessage = gameState.isComputerGame 
                   ? `Vous avez besoin de ${tokensNeeded} jeton(s) de plus pour entrer dans le chemin final ! Continuez le tour du plateau.`
                   : `Vous avez besoin de ${tokensNeeded} jeton(s) de plus pour entrer dans le chemin final ! Continuez le tour du plateau.`;
                 
                 setGameState(prev => ({ ...prev, message: tokenMessage }));
-                
-                // Le joueur continue sur le chemin étendu (boucle supplémentaire)
-                await movePawnAnimated(currentPlayerAtThisTime, pos, newPos, cellSize);
-                handleCapture(currentPlayerAtThisTime, newPos);
-                checkAndTriggerEvent(currentPlayerAtThisTime, newPos, finalValue);
-              } else {
+                await movePawnAnimated(currentPlayerAtThisTime, pos, loopPosition, cellSize);
+                handleCapture(currentPlayerAtThisTime, loopPosition);
+                checkAndTriggerEvent(currentPlayerAtThisTime, loopPosition, finalValue);
+              }
+            } else if (newPos < path.length - 1) {
+              // Déplacement normal sur le plateau
+              const moveMessage = gameState.isComputerGame 
+                ? (currentPlayerAtThisTime === 'yellow' ? `Votre pion avance de ${finalValue} case(s) !` : `Le pion de l'ordinateur avance de ${finalValue} case(s) !`) 
+                : `Le pion avance de ${finalValue} case(s) !`;
+              
+              setGameState(prev => ({ ...prev, message: moveMessage }));
+              await movePawnAnimated(currentPlayerAtThisTime, pos, newPos, cellSize);
+              handleCapture(currentPlayerAtThisTime, newPos);
+              checkAndTriggerEvent(currentPlayerAtThisTime, newPos, finalValue);
+            } else {
+              // Déplacement impossible ou utilisation de la boucle
+              const realPosition = calculateRealPosition(currentPlayerAtThisTime, newPos);
+              
+              if (realPosition !== newPos) {
+                // On utilise la boucle supplémentaire
                 const moveMessage = gameState.isComputerGame 
-                  ? (currentPlayerAtThisTime === 'yellow' ? `Votre pion avance de ${finalValue} case(s) !` : `Le pion de l'ordinateur avance de ${finalValue} case(s) !`) 
-                  : `Le pion avance de ${finalValue} case(s) !`;
+                  ? (currentPlayerAtThisTime === 'yellow' ? `Votre pion continue le tour du plateau !` : `Le pion de l'ordinateur continue le tour du plateau !`) 
+                  : `Le pion continue le tour du plateau !`;
                 
                 setGameState(prev => ({ ...prev, message: moveMessage }));
-                await movePawnAnimated(currentPlayerAtThisTime, pos, newPos, cellSize);
-                handleCapture(currentPlayerAtThisTime, newPos);
-                // Déclencher l'événement après l'animation (avec la valeur du dé)
-                checkAndTriggerEvent(currentPlayerAtThisTime, newPos, finalValue);
-              }
-              
-              if (finalValue === 6) {
-                setTimeout(() => {
-                  const message = gameState.isComputerGame 
-                    ? (currentPlayerAtThisTime === 'yellow' ? 'Vous avez fait 6, rejouez !' : "L'ordinateur a fait 6, il rejoue !") 
-                    : 'Tu as fait 6, rejoue !';
-                  setGameState(prev => ({ ...prev, message }));
-                  
-                  // Remettre diceValue à null après un délai pour permettre un nouveau lancer
-                  setTimeout(() => {
-                    setGameState(prev => ({ ...prev, diceValue: null, message: null }));
-                  }, 800); // Réduit de 1500 à 800ms
-                }, 200); // Réduit de 400 à 200ms
+                await movePawnAnimated(currentPlayerAtThisTime, pos, realPosition, cellSize);
+                handleCapture(currentPlayerAtThisTime, realPosition);
+                checkAndTriggerEvent(currentPlayerAtThisTime, realPosition, finalValue);
               } else {
-                // Le tour se termine (pas de 6), l'événement de la case actuelle a déjà été affiché par checkAndTriggerEvent
-                // On efface l'événement en attente car on privilégie la dernière case
-                setGameState(prev => ({ ...prev, pendingEvent: null }));
+                setGameState(prev => ({ ...prev, message: 'Déplacement impossible (fin du chemin), tour suivant.' }));
+                triggerPendingEvent();
+              }
+            }
+            
+            // Gestion des tours suivants
+            if (finalValue === 6) {
+              setTimeout(() => {
+                const message = gameState.isComputerGame 
+                  ? (currentPlayerAtThisTime === 'yellow' ? 'Vous avez fait 6, rejouez !' : "L'ordinateur a fait 6, il rejoue !") 
+                  : 'Tu as fait 6, rejoue !';
+                setGameState(prev => ({ ...prev, message }));
                 
                 setTimeout(() => {
-                  setGameState(prev => {
-                    let nextPlayerIndex = (prev.activePlayers.indexOf(prev.currentPlayer) + 1) % prev.activePlayers.length;
-                    while (prev.finishedPlayers.includes(prev.activePlayers[nextPlayerIndex])) {
-                      nextPlayerIndex = (nextPlayerIndex + 1) % prev.activePlayers.length;
-                    }
-                    return {
-                      ...prev,
-                      message: null,
-                      diceValue: null,
-                      currentPlayer: prev.activePlayers[nextPlayerIndex]
-                    };
-                  });
-                }, 400); // Réduit de 800 à 400ms
-              }
+                  setGameState(prev => ({ ...prev, diceValue: null, message: null }));
+                }, 800);
+              }, 200);
             } else {
-              setGameState(prev => ({ ...prev, message: 'Déplacement impossible (fin du chemin), tour suivant.' }));
-              // Le tour se termine, mais pas d'événement sur cette case, déclencher l'événement en attente s'il y en a un
-              triggerPendingEvent();
+              setGameState(prev => ({ ...prev, pendingEvent: null }));
               
               setTimeout(() => {
                 setGameState(prev => {
@@ -775,7 +894,7 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
                     currentPlayer: prev.activePlayers[nextPlayerIndex]
                   };
                 });
-              }, 600); // Réduit de 1200 à 600ms
+              }, 400);
             }
           } else {
             const homeMessage = gameState.isComputerGame 
