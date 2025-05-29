@@ -20,6 +20,7 @@ interface GameState {
   computerPlayers: PlayerColor[];
   showEventPopup: boolean;
   currentEventType: 'quiz' | 'financement' | 'duel' | 'evenement' | null;
+  pendingEvent: { color: PlayerColor; eventType: 'quiz' | 'financement' | 'duel' | 'evenement' } | null;
 }
 
 const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
@@ -70,6 +71,7 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
     computerPlayers: getComputerPlayers(numberOfPlayers),
     showEventPopup: false,
     currentEventType: null,
+    pendingEvent: null,
   });
 
   // Animations des pions
@@ -235,21 +237,32 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
   console.log('Distribution des événements:', eventDistribution);
 
   // Fonction pour vérifier et déclencher un événement
-  const checkAndTriggerEvent = (color: PlayerColor, position: number) => {
+  const checkAndTriggerEvent = (color: PlayerColor, position: number, diceValue: number = 0) => {
     const { row, col } = paths[color][position];
     const cellKey = `${row}-${col}`;
     const eventType = eventDistribution[cellKey];
     
-    console.log(`Vérification événement pour ${color} position ${position} (${row},${col}): ${eventType || 'aucun'}`);
+    console.log(`Vérification événement pour ${color} position ${position} (${row},${col}): ${eventType || 'aucun'}, dé: ${diceValue}`);
     console.log(`État actuel popup: visible=${gameState.showEventPopup}, type=${gameState.currentEventType}`);
     
     if (eventType) {
+      // Si le joueur a fait 6, on met à jour/stocke l'événement en attente (écrase le précédent)
+      if (diceValue === 6) {
+        console.log(`Événement ${eventType} mis à jour en attente car le joueur a fait 6 et va rejouer`);
+        setGameState(prev => ({
+          ...prev,
+          pendingEvent: { color, eventType } // Écrase l'événement précédent s'il y en avait un
+        }));
+        return;
+      }
+      
       console.log(`Déclenchement événement ${eventType} dans 700ms`);
       // Fermer d'abord tout popup existant, puis afficher le nouveau
       setGameState(prev => ({
         ...prev,
         showEventPopup: false,
-        currentEventType: null
+        currentEventType: null,
+        pendingEvent: null // Effacer tout événement en attente car on affiche celui-ci
       }));
       
       setTimeout(() => {
@@ -260,6 +273,35 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
           currentEventType: eventType
         }));
       }, 700); // Délai plus long pour s'assurer que l'animation est terminée
+    } else if (diceValue === 6) {
+      // Si pas d'événement sur cette case mais le joueur a fait 6, effacer l'événement en attente
+      console.log(`Pas d'événement sur cette case, effacement de l'événement en attente`);
+      setGameState(prev => ({
+        ...prev,
+        pendingEvent: null
+      }));
+    }
+  };
+
+  // Fonction pour déclencher un événement en attente
+  const triggerPendingEvent = () => {
+    if (gameState.pendingEvent) {
+      console.log(`Déclenchement de l'événement en attente: ${gameState.pendingEvent.eventType} pour ${gameState.pendingEvent.color}`);
+      
+      setGameState(prev => ({
+        ...prev,
+        showEventPopup: false,
+        currentEventType: null,
+        pendingEvent: null
+      }));
+      
+      setTimeout(() => {
+        setGameState(prev => ({
+          ...prev,
+          showEventPopup: true,
+          currentEventType: gameState.pendingEvent!.eventType
+        }));
+      }, 700);
     }
   };
 
@@ -391,6 +433,7 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
       currentPlayer: prev.activePlayers[0],
       showEventPopup: false,
       currentEventType: null,
+      pendingEvent: null,
     }));
   };
 
@@ -435,8 +478,8 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
             
             await wait(200);
             handleCapture(currentPlayerAtThisTime, 0);
-            // Déclencher l'événement après avoir mis à jour l'état
-            checkAndTriggerEvent(currentPlayerAtThisTime, 0);
+            // Déclencher l'événement après avoir mis à jour l'état (avec la valeur du dé)
+            checkAndTriggerEvent(currentPlayerAtThisTime, 0, finalValue);
             setTimeout(() => {
               const message = gameState.isComputerGame 
                 ? (currentPlayerAtThisTime === 'yellow' ? 'Vous avez fait 6, rejouez !' : "L'ordinateur a fait 6, il rejoue !") 
@@ -504,8 +547,8 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
               setGameState(prev => ({ ...prev, message: moveMessage }));
               await movePawnAnimated(currentPlayerAtThisTime, pos, newPos, cellSize);
               handleCapture(currentPlayerAtThisTime, newPos);
-              // Déclencher l'événement après l'animation
-              checkAndTriggerEvent(currentPlayerAtThisTime, newPos);
+              // Déclencher l'événement après l'animation (avec la valeur du dé)
+              checkAndTriggerEvent(currentPlayerAtThisTime, newPos, finalValue);
               
               if (finalValue === 6) {
                 setTimeout(() => {
@@ -520,6 +563,10 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
                   }, 800); // Réduit de 1500 à 800ms
                 }, 200); // Réduit de 400 à 200ms
               } else {
+                // Le tour se termine (pas de 6), l'événement de la case actuelle a déjà été affiché par checkAndTriggerEvent
+                // On efface l'événement en attente car on privilégie la dernière case
+                setGameState(prev => ({ ...prev, pendingEvent: null }));
+                
                 setTimeout(() => {
                   setGameState(prev => {
                     let nextPlayerIndex = (prev.activePlayers.indexOf(prev.currentPlayer) + 1) % prev.activePlayers.length;
@@ -537,6 +584,9 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
               }
             } else {
               setGameState(prev => ({ ...prev, message: 'Déplacement impossible (fin du chemin), tour suivant.' }));
+              // Le tour se termine, mais pas d'événement sur cette case, déclencher l'événement en attente s'il y en a un
+              triggerPendingEvent();
+              
               setTimeout(() => {
                 setGameState(prev => {
                   let nextPlayerIndex = (prev.activePlayers.indexOf(prev.currentPlayer) + 1) % prev.activePlayers.length;
@@ -557,6 +607,9 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
               ? (currentPlayerAtThisTime === 'yellow' ? 'Vous devez faire 6 pour sortir de la maison.' : "L'ordinateur doit faire 6 pour sortir de la maison.") 
               : 'Vous devez faire 6 pour sortir de la maison.';
             setGameState(prev => ({ ...prev, message: homeMessage }));
+            // Le tour se termine, mais le pion reste à la maison, déclencher l'événement en attente s'il y en a un
+            triggerPendingEvent();
+            
             setTimeout(() => {
               setGameState(prev => {
                 let nextPlayerIndex = (prev.activePlayers.indexOf(prev.currentPlayer) + 1) % prev.activePlayers.length;
