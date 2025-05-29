@@ -1,6 +1,9 @@
 import React from 'react';
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
+// Import du type PlayerColor
+type PlayerColor = 'yellow' | 'blue' | 'red' | 'green';
+
 interface EventConfig {
   title: string;
   description: string;
@@ -20,6 +23,12 @@ interface EventPopupProps {
   pendingQuizTokens: number; // Jetons en attente pour les quiz
   onClose: () => void;
   onQuizAnswer?: (selectedIndex: number) => void; // Fonction pour les réponses de quiz
+  // Props pour les duels
+  duelPlayers?: [PlayerColor, PlayerColor] | null; // Les deux joueurs du duel en cours
+  duelVoters?: [PlayerColor, PlayerColor] | null; // Les deux joueurs qui votent pour le duel
+  duelVotes?: { [key in PlayerColor]?: 'accept' | 'refuse' | null }; // Votes des joueurs
+  onDuelVote?: (player: PlayerColor, vote: 'accept' | 'refuse') => void; // Fonction pour voter
+  quizAnswerSelected?: boolean; // Pour savoir si le joueur a choisi une réponse au quiz
 }
 
 const EventPopup: React.FC<EventPopupProps> = ({ 
@@ -29,7 +38,12 @@ const EventPopup: React.FC<EventPopupProps> = ({
   eventData, 
   pendingQuizTokens,
   onClose, 
-  onQuizAnswer 
+  onQuizAnswer,
+  duelPlayers,
+  duelVoters,
+  duelVotes,
+  onDuelVote,
+  quizAnswerSelected
 }) => {
   if (!eventType) return null;
 
@@ -143,11 +157,53 @@ const EventPopup: React.FC<EventPopupProps> = ({
     >
       <View style={styles.overlay}>
         <View style={[styles.popup, { borderColor: config.color }]}>
+          {/* Vote du premier juge - EN HAUT */}
+          {eventType === 'duel' && duelVoters && duelVotes && (
+            <View style={styles.topVoteSection}>
+              <View style={styles.judgeVoteContainer}>
+                <Text style={styles.judgeName}>
+                  {duelVoters[0].toUpperCase()} (Juge)
+                </Text>
+                <View style={styles.voteButtons}>
+                  <TouchableOpacity
+                    style={[
+                      styles.voteButton,
+                      styles.acceptButton,
+                      duelVotes[duelVoters[0]] === 'accept' ? styles.selectedVote : {}
+                    ]}
+                    onPress={() => onDuelVote && onDuelVote(duelVoters[0], 'accept')}
+                    disabled={duelVotes[duelVoters[0]] !== undefined}
+                  >
+                    <Text style={styles.voteButtonText}>✅</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.voteButton,
+                      styles.refuseButton,
+                      duelVotes[duelVoters[0]] === 'refuse' ? styles.selectedVote : {}
+                    ]}
+                    onPress={() => onDuelVote && onDuelVote(duelVoters[0], 'refuse')}
+                    disabled={duelVotes[duelVoters[0]] !== undefined}
+                  >
+                    <Text style={styles.voteButtonText}>❌</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          )}
+
           <View style={[styles.header, { backgroundColor: config.color }]}>
             <Text style={styles.title}>{config.title}</Text>
           </View>
           
           <View style={styles.content}>
+            {/* Informations du duel */}
+            {eventType === 'duel' && duelPlayers && (
+              <Text style={styles.duelInfo}>
+                Duel entre {duelPlayers[0].toUpperCase()} et {duelPlayers[1].toUpperCase()}
+              </Text>
+            )}
+
             <Text style={styles.description}>{config.description}</Text>
             
             {config.content && (
@@ -158,11 +214,33 @@ const EventPopup: React.FC<EventPopupProps> = ({
               <Text style={styles.category}>Catégorie: {config.category}</Text>
             )}
             
-            <View style={[styles.tokensContainer, getTokenContainerStyle()]}>
-              <Text style={styles.tokensText}>
-                {getTokenMessage()}
-              </Text>
-            </View>
+            {/* Résultat du duel */}
+            {eventType === 'duel' && duelVotes && Object.keys(duelVotes).length === 2 && (
+              <View style={styles.duelResultContainer}>
+                <Text style={styles.duelResult}>
+                  {(() => {
+                    const votes = Object.values(duelVotes);
+                    const acceptCount = votes.filter(v => v === 'accept').length;
+                    if (acceptCount === 2) {
+                      return '🎉 Duel réussi ! Les duellistes gagnent des jetons !';
+                    } else if (acceptCount === 0) {
+                      return '💸 Duel échoué ! Les duellistes perdent des jetons !';
+                    } else {
+                      return '😐 Résultat mitigé ! Les duellistes ne reçoivent rien.';
+                    }
+                  })()}
+                </Text>
+              </View>
+            )}
+
+            {/* Affichage normal des jetons pour les autres événements */}
+            {eventType !== 'duel' && (
+              <View style={[styles.tokensContainer, getTokenContainerStyle()]}>
+                <Text style={styles.tokensText}>
+                  {getTokenMessage()}
+                </Text>
+              </View>
+            )}
             
             {config.options && (
               <View style={styles.optionsContainer}>
@@ -171,8 +249,7 @@ const EventPopup: React.FC<EventPopupProps> = ({
                     key={index}
                     style={[
                       styles.optionButton, 
-                      { borderColor: config.color },
-                      config.correctAnswer === index ? { backgroundColor: `${config.color}20` } : {}
+                      { borderColor: config.color }
                     ]}
                     onPress={eventType === 'quiz' ? () => handleQuizOptionPress(index) : undefined}
                     disabled={eventType !== 'quiz'}
@@ -186,14 +263,64 @@ const EventPopup: React.FC<EventPopupProps> = ({
             )}
           </View>
           
-          <TouchableOpacity 
-            style={[styles.closeButton, { backgroundColor: config.color }]}
-            onPress={onClose}
-          >
-            <Text style={styles.closeButtonText}>
-              {eventType === 'quiz' ? 'Continuer' : 'Continuer'}
-            </Text>
-          </TouchableOpacity>
+          {/* Vote du deuxième juge - EN BAS */}
+          {eventType === 'duel' && duelVoters && duelVotes && (
+            <View style={styles.bottomVoteSection}>
+              <View style={styles.judgeVoteContainer}>
+                <Text style={styles.judgeName}>
+                  {duelVoters[1].toUpperCase()} (Juge)
+                </Text>
+                <View style={styles.voteButtons}>
+                  <TouchableOpacity
+                    style={[
+                      styles.voteButton,
+                      styles.acceptButton,
+                      duelVotes[duelVoters[1]] === 'accept' ? styles.selectedVote : {}
+                    ]}
+                    onPress={() => onDuelVote && onDuelVote(duelVoters[1], 'accept')}
+                    disabled={duelVotes[duelVoters[1]] !== undefined}
+                  >
+                    <Text style={styles.voteButtonText}>✅</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.voteButton,
+                      styles.refuseButton,
+                      duelVotes[duelVoters[1]] === 'refuse' ? styles.selectedVote : {}
+                    ]}
+                    onPress={() => onDuelVote && onDuelVote(duelVoters[1], 'refuse')}
+                    disabled={duelVotes[duelVoters[1]] !== undefined}
+                  >
+                    <Text style={styles.voteButtonText}>❌</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* Bouton de fermeture seulement si ce n'est pas un duel en cours */}
+          {!(eventType === 'duel' && duelVotes && Object.keys(duelVotes).length < 2) && (
+            <TouchableOpacity 
+              style={[
+                styles.closeButton, 
+                { backgroundColor: config.color },
+                // Désactiver le bouton pour les quiz sans réponse sélectionnée
+                (eventType === 'quiz' && !quizAnswerSelected) ? styles.disabledButton : {}
+              ]}
+              onPress={onClose}
+              disabled={eventType === 'quiz' && !quizAnswerSelected}
+            >
+              <Text style={[
+                styles.closeButtonText,
+                (eventType === 'quiz' && !quizAnswerSelected) ? styles.disabledButtonText : {}
+              ]}>
+                {eventType === 'quiz' ? 
+                  (!quizAnswerSelected ? 'Choisissez une réponse' : 'Continuer') : 
+                  'Continuer'
+                }
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </Modal>
@@ -296,6 +423,86 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  topVoteSection: {
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+    backgroundColor: '#f0f8ff',
+    borderBottomWidth: 2,
+    borderBottomColor: '#e0e0e0',
+  },
+  bottomVoteSection: {
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+    backgroundColor: '#fff8f0',
+    borderTopWidth: 2,
+    borderTopColor: '#e0e0e0',
+  },
+  judgeVoteContainer: {
+    padding: 15,
+    alignItems: 'center',
+  },
+  judgeName: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+    textAlign: 'center',
+    color: '#333',
+  },
+  duelInfo: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    textAlign: 'center',
+    color: '#333',
+  },
+  voteButtons: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 15,
+  },
+  voteButton: {
+    borderWidth: 2,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  acceptButton: {
+    backgroundColor: '#90EE90',
+    borderColor: '#32CD32',
+  },
+  refuseButton: {
+    backgroundColor: '#FFB6C1',
+    borderColor: '#FF69B4',
+  },
+  selectedVote: {
+    borderColor: '#000',
+    borderWidth: 3,
+  },
+  voteButtonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  duelResultContainer: {
+    marginTop: 15,
+    padding: 12,
+    backgroundColor: '#E6F3FF',
+    borderRadius: 8,
+  },
+  duelResult: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    color: '#333',
+  },
+  disabledButton: {
+    backgroundColor: '#ccc',
+  },
+  disabledButtonText: {
+    color: '#999',
   },
 });
 

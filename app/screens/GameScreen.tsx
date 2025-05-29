@@ -29,6 +29,10 @@ const GameScreen: React.FC<GameScreenProps> = ({ numberOfPlayers, onResetGame })
     computerPlay,
     closeEventPopup,
     handleQuizAnswer,
+    executeChallengeMoveBack,
+    getDuelOpponent,
+    handleDuelVote,
+    getDuelVoters,
   } = useGameLogic(numberOfPlayers);
 
   // Debug: Log de l'état du popup
@@ -112,6 +116,19 @@ const GameScreen: React.FC<GameScreenProps> = ({ numberOfPlayers, onResetGame })
 
   const playerConfigs = getPlayerConfigs();
 
+  // Gérer la fermeture du popup et le recul pour les challenges
+  const handleEventPopupClose = async () => {
+    const wasChallenge = gameState.currentEventType === 'challenge';
+    closeEventPopup();
+    
+    // Si c'était un challenge, exécuter le recul après un petit délai
+    if (wasChallenge) {
+      setTimeout(() => {
+        executeChallengeMoveBack(cellSize);
+      }, 100);
+    }
+  };
+
   return (
     <ImageBackground 
       source={require('../../assets/images/bg.png')} 
@@ -167,8 +184,13 @@ const GameScreen: React.FC<GameScreenProps> = ({ numberOfPlayers, onResetGame })
         tokenChange={gameState.lastTokenChange}
         eventData={gameState.currentEventData}
         pendingQuizTokens={gameState.pendingQuizTokens}
-        onClose={closeEventPopup}
+        onClose={handleEventPopupClose}
         onQuizAnswer={handleQuizAnswer}
+        duelPlayers={gameState.duelPlayers}
+        duelVoters={gameState.duelVoters}
+        duelVotes={gameState.duelVotes}
+        onDuelVote={handleDuelVote}
+        quizAnswerSelected={gameState.quizAnswerSelected}
       />
     </ImageBackground>
   );
