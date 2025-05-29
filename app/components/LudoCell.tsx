@@ -9,7 +9,7 @@ interface Cell {
   color: string;
   isStart?: boolean;
   homeNumber?: number;
-  eventType?: 'quiz' | 'financement' | 'duel' | 'evenement';
+  eventType?: 'quiz' | 'financement' | 'duel' | 'opportunite' | 'challenge';
 }
 
 interface LudoCellProps {
@@ -143,14 +143,16 @@ const LudoCell: React.FC<LudoCellProps> = ({ cell, cellSize, pions, currentPlaye
       quiz: '#4A90E2',      // Bleu
       financement: '#50C878', // Vert
       duel: '#FF6B6B',      // Rouge
-      evenement: '#FFB347',  // Orange
+      opportunite: '#FFB347',  // Orange
+      challenge: '#9B59B6',   // Violet
     };
     
     const eventTexts: Record<string, string> = {
       quiz: 'QUIZ',
       financement: 'FINANCEMENT',
       duel: 'DUEL',
-      evenement: 'ÉVÉNEMENT',
+      opportunite: 'OPPORTUNITÉ',
+      challenge: 'CHALLENGE',
     };
     
     const content = (

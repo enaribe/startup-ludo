@@ -71,15 +71,26 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
       <View style={styles.tokensRow}>
         <View style={styles.tokenContainer}>
           <Text style={styles.tokenLabel}>Jetons:</Text>
-          <View style={styles.tokenBadge}>
-            <Text style={styles.tokenNumber}>{tokens}</Text>
+          <View style={[
+            styles.tokenBadge, 
+            tokens < 0 ? styles.tokenBadgeNegative : {}
+          ]}>
+            <Text style={[
+              styles.tokenNumber,
+              tokens < 0 ? styles.tokenNumberNegative : {}
+            ]}>
+              {tokens}
+            </Text>
           </View>
         </View>
         <View style={styles.statusContainer}>
           {tokens >= 7 ? (
             <Text style={styles.statusReady}>✓ Prêt pour la finale</Text>
           ) : (
-            <Text style={styles.statusNotReady}>Besoin de {7 - tokens} jeton(s)</Text>
+            <Text style={styles.statusNotReady}>
+              Besoin de {Math.max(0, 7 - tokens)} jeton(s)
+              {tokens < 0 ? ` (actuellement ${tokens})` : ''}
+            </Text>
           )}
         </View>
       </View>
@@ -167,10 +178,16 @@ const styles = StyleSheet.create({
     minWidth: 24,
     alignItems: 'center',
   },
+  tokenBadgeNegative: {
+    backgroundColor: '#FF6B6B',
+  },
   tokenNumber: {
     fontSize: 12,
     fontWeight: 'bold',
     color: '#333',
+  },
+  tokenNumberNegative: {
+    color: '#fff',
   },
   statusContainer: {
     alignItems: 'center',

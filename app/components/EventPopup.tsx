@@ -1,64 +1,106 @@
 import React from 'react';
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-interface EventPopupProps {
-  visible: boolean;
-  eventType: 'quiz' | 'financement' | 'duel' | 'evenement' | null;
-  tokenChange: number;
-  onClose: () => void;
+interface EventConfig {
+  title: string;
+  description: string;
+  content?: string;
+  options?: string[] | null;
+  correctAnswer?: number;
+  category?: string;
+  color: string;
+  icon?: string;
 }
 
-const EventPopup: React.FC<EventPopupProps> = ({ visible, eventType, tokenChange, onClose }) => {
+interface EventPopupProps {
+  visible: boolean;
+  eventType: 'quiz' | 'financement' | 'duel' | 'opportunite' | 'challenge' | null;
+  tokenChange: number;
+  eventData: any; // Les vraies données de l'événement depuis le JSON
+  pendingQuizTokens: number; // Jetons en attente pour les quiz
+  onClose: () => void;
+  onQuizAnswer?: (selectedIndex: number) => void; // Fonction pour les réponses de quiz
+}
+
+const EventPopup: React.FC<EventPopupProps> = ({ 
+  visible, 
+  eventType, 
+  tokenChange, 
+  eventData, 
+  pendingQuizTokens,
+  onClose, 
+  onQuizAnswer 
+}) => {
   if (!eventType) return null;
 
-  const getEventConfig = (type: string) => {
-    switch (type) {
-      case 'quiz':
-        return {
-          title: '📚 Quiz',
-          description: 'Répondez correctement à la question pour continuer !',
-          content: 'Question : Quelle est la capitale de la France ?',
-          options: ['A) Lyon', 'B) Paris', 'C) Marseille', 'D) Toulouse'],
-          color: '#4A90E2'
-        };
-      case 'financement':
-        return {
-          title: '💰 Financement',
-          description: 'Vous avez obtenu un financement !',
-          content: 'Félicitations ! Vous recevez 1000€ pour développer votre startup.',
-          options: null,
-          color: '#50C878'
-        };
-      case 'duel':
-        return {
-          title: '⚔️ Duel',
-          description: 'Affrontez un autre joueur !',
-          content: 'Choisissez votre stratégie pour ce duel entrepreneurial.',
-          options: ['Négociation', 'Innovation', 'Marketing', 'Finance'],
-          color: '#FF6B6B'
-        };
-      case 'evenement':
-        return {
-          title: '⭐ Événement',
-          description: 'Un événement spécial se produit !',
-          content: 'Vous participez à un salon de l\'entrepreneuriat. Nouvelle opportunité !',
-          options: null,
-          color: '#FFB347'
-        };
-      default:
-        return {
-          title: 'Événement',
-          description: '',
-          content: '',
-          options: null,
-          color: '#ccc'
-        };
+  const getEventConfig = (type: string, data: any): EventConfig => {
+    const baseConfig = {
+      quiz: {
+        title: '📚 Quiz',
+        color: '#4A90E2',
+        icon: '🧠'
+      },
+      financement: {
+        title: '💰 Financement',
+        color: '#50C878',
+        icon: '💰'
+      },
+      duel: {
+        title: '⚔️ Duel',
+        color: '#FF6B6B',
+        icon: '⚔️'
+      },
+      opportunite: {
+        title: '🚀 Opportunité',
+        color: '#FFB347',
+        icon: '🚀'
+      },
+      challenge: {
+        title: '⚡ Challenge',
+        color: '#9B59B6',
+        icon: '⚡'
+      }
+    }[type];
+
+    if (!baseConfig) {
+      return {
+        title: 'Événement',
+        description: '',
+        content: '',
+        options: null,
+        color: '#ccc'
+      };
     }
+
+    // Utiliser les vraies données si disponibles
+    if (data) {
+      return {
+        ...baseConfig,
+        title: baseConfig.title,
+        description: data.title || data.question || 'Événement du secteur Santé & Bien-être',
+        content: data.description || data.content || '',
+        options: type === 'quiz' ? (data.options || null) : null, // Options seulement pour les quiz
+        correctAnswer: data.correctAnswer,
+        category: data.category
+      };
+    }
+
+    // Fallback si pas de données
+    return {
+      ...baseConfig,
+      description: `Événement ${type} - Aucune donnée disponible`,
+      content: '',
+      options: null
+    };
   };
 
-  const config = getEventConfig(eventType);
+  const config = getEventConfig(eventType, eventData);
 
   const getTokenMessage = () => {
+    if (eventType === 'quiz' && pendingQuizTokens > 0) {
+      return `🎯 Répondez correctement pour gagner ${pendingQuizTokens} jeton${pendingQuizTokens > 1 ? 's' : ''} !`;
+    }
+    
     if (tokenChange > 0) {
       return `🪙 Vous gagnez ${tokenChange} jeton${tokenChange > 1 ? 's' : ''} !`;
     } else if (tokenChange < 0) {
@@ -69,12 +111,26 @@ const EventPopup: React.FC<EventPopupProps> = ({ visible, eventType, tokenChange
   };
 
   const getTokenContainerStyle = () => {
+    if (eventType === 'quiz' && pendingQuizTokens > 0) {
+      return { backgroundColor: '#87CEEB' }; // Bleu clair pour quiz en attente
+    }
+    
     if (tokenChange > 0) {
       return { backgroundColor: '#90EE90' }; // Vert clair pour gain
     } else if (tokenChange < 0) {
       return { backgroundColor: '#FFB6C1' }; // Rouge clair pour perte
     } else {
       return { backgroundColor: '#D3D3D3' }; // Gris pour neutre
+    }
+  };
+
+  const handleQuizOptionPress = (index: number) => {
+    if (eventType === 'quiz' && onQuizAnswer) {
+      onQuizAnswer(index);
+      // Fermer le popup après avoir répondu
+      setTimeout(() => {
+        onClose();
+      }, 1500); // Laisser le temps de voir le résultat
     }
   };
 
@@ -93,7 +149,14 @@ const EventPopup: React.FC<EventPopupProps> = ({ visible, eventType, tokenChange
           
           <View style={styles.content}>
             <Text style={styles.description}>{config.description}</Text>
-            <Text style={styles.eventContent}>{config.content}</Text>
+            
+            {config.content && (
+              <Text style={styles.eventContent}>{config.content}</Text>
+            )}
+            
+            {config.category && (
+              <Text style={styles.category}>Catégorie: {config.category}</Text>
+            )}
             
             <View style={[styles.tokensContainer, getTokenContainerStyle()]}>
               <Text style={styles.tokensText}>
@@ -103,11 +166,16 @@ const EventPopup: React.FC<EventPopupProps> = ({ visible, eventType, tokenChange
             
             {config.options && (
               <View style={styles.optionsContainer}>
-                {config.options.map((option, index) => (
+                {config.options.map((option: string, index: number) => (
                   <TouchableOpacity
                     key={index}
-                    style={[styles.optionButton, { borderColor: config.color }]}
-                    onPress={onClose}
+                    style={[
+                      styles.optionButton, 
+                      { borderColor: config.color },
+                      config.correctAnswer === index ? { backgroundColor: `${config.color}20` } : {}
+                    ]}
+                    onPress={eventType === 'quiz' ? () => handleQuizOptionPress(index) : undefined}
+                    disabled={eventType !== 'quiz'}
                   >
                     <Text style={[styles.optionText, { color: config.color }]}>
                       {option}
@@ -123,7 +191,7 @@ const EventPopup: React.FC<EventPopupProps> = ({ visible, eventType, tokenChange
             onPress={onClose}
           >
             <Text style={styles.closeButtonText}>
-              {eventType === 'quiz' ? 'Répondre' : 'Continuer'}
+              {eventType === 'quiz' ? 'Continuer' : 'Continuer'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -180,6 +248,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     marginBottom: 15,
+    textAlign: 'center',
+    color: '#666',
+  },
+  category: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 10,
     textAlign: 'center',
     color: '#666',
   },

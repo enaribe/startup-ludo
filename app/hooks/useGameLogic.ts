@@ -1,6 +1,9 @@
 import { useRef, useState } from 'react';
 import { Animated, Easing } from 'react-native';
 
+// Import des données du secteur santé
+const santeData = require('../../data/sectors/sante-bien-etre.json');
+
 export type PlayerColor = 'yellow' | 'blue' | 'red' | 'green';
 export type PawnPosition = 'home' | number;
 
@@ -11,7 +14,7 @@ interface GameState {
   diceValue: number | null;
   rolling: boolean;
   pawns: Record<PlayerColor, PawnPosition>;
-  tokens: Record<PlayerColor, number>; // Système de jetons
+  tokens: Record<PlayerColor, number>; // Système de jetons (peut être négatif)
   doitDeplacer: boolean;
   message: string | null;
   isAnimating: boolean;
@@ -20,9 +23,12 @@ interface GameState {
   isComputerGame: boolean;
   computerPlayers: PlayerColor[];
   showEventPopup: boolean;
-  currentEventType: 'quiz' | 'financement' | 'duel' | 'evenement' | null;
-  pendingEvent: { color: PlayerColor; eventType: 'quiz' | 'financement' | 'duel' | 'evenement' } | null;
+  currentEventType: 'quiz' | 'financement' | 'duel' | 'opportunite' | 'challenge' | null;
+  pendingEvent: { color: PlayerColor; eventType: 'quiz' | 'financement' | 'duel' | 'opportunite' | 'challenge' } | null;
   lastTokenChange: number;
+  currentEventData: any; // Pour stocker les données de l'événement actuel
+  pendingQuizTokens: number; // Jetons en attente pour le quiz
+  eventPlayerColor: PlayerColor | null; // Le joueur concerné par l'événement en cours
 }
 
 const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
@@ -59,16 +65,16 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
     diceValue: null,
     rolling: false,
     pawns: {
-      yellow: 47, // Position 47, si dé = 3+, essaiera d'entrer dans chemin final
-      blue: 48,   // Position 48, si dé = 2+, essaiera d'entrer dans chemin final  
-      red: 46,    // Position 46, si dé = 4+, essaiera d'entrer dans chemin final
-      green: 49,  // Position 49, si dé = 1+, essaiera d'entrer dans chemin final
+      yellow: 'home', // Position 47, si dé = 3+, essaiera d'entrer dans chemin final
+      blue: 'home',   // Position 48, si dé = 2+, essaiera d'entrer dans chemin final  
+      red: 'home',    // Position 46, si dé = 4+, essaiera d'entrer dans chemin final
+      green: 'home',  // Position 49, si dé = 1+, essaiera d'entrer dans chemin final
     },
     tokens: {
-      yellow: 3,  // Pas assez de jetons (besoin de 7)
-      blue: 8,    // Assez de jetons
-      red: 5,     // Pas assez de jetons
-      green: 7,   // Juste assez de jetons
+      yellow: 0,  // Pas assez de jetons (besoin de 7)
+      blue: 0,    // Assez de jetons
+      red: 0,     // Pas assez de jetons
+      green: 0,   // Juste assez de jetons
     },
     doitDeplacer: false,
     message: null,
@@ -81,6 +87,9 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
     currentEventType: null,
     pendingEvent: null,
     lastTokenChange: 0,
+    currentEventData: null,
+    pendingQuizTokens: 0,
+    eventPlayerColor: null,
   });
 
   // Animations des pions
@@ -185,76 +194,87 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
     }));
   };
 
-  // Distribution des événements (même logique que dans GameBoard.tsx)
-  const createEventDistribution = (): Record<string, 'quiz' | 'financement' | 'duel' | 'evenement'> => {
-    const BOARD_SIZE = 15;
+  // Distribution FIXE des événements sur le plateau
+  const createEventDistribution = (): Record<string, 'quiz' | 'financement' | 'duel' | 'opportunite' | 'challenge'> => {
+    // Distribution fixe et déterministe pour tous les jeux
+    const fixedDistribution: Record<string, 'quiz' | 'financement' | 'duel' | 'opportunite' | 'challenge'> = {
+      // Ligne horizontale du haut (row 6, de gauche à droite)
+      '6-0': 'financement',
+      // '6-1': PAS D'ÉVÉNEMENT - case de départ yellow
+      '6-2': 'quiz',
+      '6-3': 'opportunite', 
+      '6-4': 'quiz',
+      '6-5': 'challenge',
+      '6-9': 'quiz',
+      '6-10': 'duel',
+      '6-11': 'quiz',
+      '6-12': 'opportunite',
+      '6-13': 'quiz',  // Nouvelle case avec événement
+      '6-14': 'financement',
+      
+      // Ligne horizontale du bas (row 8, de droite à gauche)
+      '8-14': 'quiz',
+      // '8-13': PAS D'ÉVÉNEMENT - case de départ red
+      '8-12': 'quiz',
+      '8-11': 'opportunite',
+      '8-10': 'quiz',
+      '8-9': 'duel',
+      '8-5': 'quiz',
+      '8-4': 'challenge',
+      '8-3': 'quiz',
+      '8-2': 'opportunite',
+      '8-1': 'quiz',
+      '8-0': 'financement',
+      
+      // Ligne verticale de gauche (col 6, de haut en bas)
+      '0-6': 'quiz',
+      '1-6': 'challenge',
+      '2-6': 'quiz',
+      '3-6': 'duel',
+      '4-6': 'quiz',
+      '5-6': 'opportunite',
+      '9-6': 'quiz',
+      '10-6': 'challenge',
+      '11-6': 'quiz',
+      '12-6': 'opportunite',
+      // '13-6': PAS D'ÉVÉNEMENT - case de départ green
+      '14-6': 'financement',
+      
+      // Ligne verticale de droite (col 8, de bas en haut)
+      '14-8': 'quiz',
+      '13-8': 'opportunite',
+      '12-8': 'quiz',
+      '11-8': 'challenge',
+      '10-8': 'quiz',
+      '9-8': 'duel',
+      '5-8': 'quiz',
+      '4-8': 'opportunite',
+      '3-8': 'quiz',
+      '2-8': 'challenge',
+      // '1-8': PAS D'ÉVÉNEMENT - case de départ blue
+      '0-8': 'quiz',
+      
+      // Angles spéciaux
+      '0-7': 'quiz',    // Entre les lignes verticales en haut
+      '14-7': 'quiz',   // Entre les lignes verticales en bas  
+      '7-0': 'quiz',    // Entre les lignes horizontales à gauche
+      '7-14': 'quiz',   // Entre les lignes horizontales à droite
+      
+      // Cases de transition importantes
+      '7-1': 'financement',  // Entrée chemin final yellow
+      '1-7': 'financement',  // Entrée chemin final blue
+      '7-13': 'financement', // Entrée chemin final red
+      '13-7': 'financement', // Entrée chemin final green
+    };
     
-    // Cases de chemin valides (excluant départ, centre et chemins finaux) - même logique que GameBoard
-    const pathCells: Array<{row: number, col: number}> = [];
+    console.log('Distribution FIXE créée avec répartition équilibrée');
     
-    for (let row = 0; row < BOARD_SIZE; row++) {
-      for (let col = 0; col < BOARD_SIZE; col++) {
-        // Vérifier si c'est une case de chemin valide pour un événement
-        if (
-          ((row === 6 || row === 7 || row === 8) && (col >= 0 && col <= 14)) ||
-          ((col === 6 || col === 7 || col === 8) && (row >= 0 && row <= 14))
-        ) {
-          // Exclure le centre
-          if (row >= 6 && row <= 8 && col >= 6 && col <= 8) continue;
-          
-          // Exclure les cases de départ
-          if ((row === 6 && col === 1) || (row === 1 && col === 8) || 
-              (row === 13 && col === 6) || (row === 8 && col === 13)) continue;
-              
-          // Exclure les chemins finaux (cases colorées vers le centre)
-          if ((row === 7 && col >= 1 && col <= 5) || 
-              (col === 7 && row >= 1 && row <= 5) ||
-              (row === 7 && col >= 9 && col <= 13) || 
-              (col === 7 && row >= 9 && row <= 13)) continue;
-              
-          pathCells.push({row, col});
-        }
-      }
-    }
+    // Compter les types pour vérification
+    const counts = { quiz: 0, financement: 0, duel: 0, opportunite: 0, challenge: 0 };
+    Object.values(fixedDistribution).forEach(type => counts[type]++);
+    console.log('Répartition des événements:', counts);
     
-    // Distribution fixe des événements selon les spécifications
-    const eventDistribution: Record<string, 'quiz' | 'financement' | 'duel' | 'evenement'> = {};
-    
-    // Positions spécifiques pour les duels (4 cases stratégiques)
-    const duelPositions = [
-      {row: 6, col: 3}, {row: 3, col: 6}, {row: 11, col: 6}, {row: 6, col: 11}
-    ];
-    
-    // Positions spécifiques pour les financements (8 cases bien réparties)
-    const financementPositions = [
-      {row: 6, col: 0}, {row: 6, col: 2}, {row: 0, col: 6}, {row: 2, col: 6},
-      {row: 6, col: 12}, {row: 6, col: 14}, {row: 12, col: 6}, {row: 14, col: 6}
-    ];
-    
-    // Assigner les duels
-    duelPositions.forEach(pos => {
-      if (pathCells.some(cell => cell.row === pos.row && cell.col === pos.col)) {
-        eventDistribution[`${pos.row}-${pos.col}`] = 'duel';
-      }
-    });
-    
-    // Assigner les financements
-    financementPositions.forEach(pos => {
-      if (pathCells.some(cell => cell.row === pos.row && cell.col === pos.col)) {
-        eventDistribution[`${pos.row}-${pos.col}`] = 'financement';
-      }
-    });
-    
-    // Assigner quiz et événements aux cases restantes
-    pathCells.forEach((cell, index) => {
-      const cellKey = `${cell.row}-${cell.col}`;
-      if (!eventDistribution[cellKey]) {
-        eventDistribution[cellKey] = index % 2 === 0 ? 'quiz' : 'evenement';
-      }
-    });
-    
-    console.log(`Distribution créée pour ${pathCells.length} cases du plateau`);
-    return eventDistribution;
+    return fixedDistribution;
   };
 
   const eventDistribution = createEventDistribution();
@@ -324,6 +344,43 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
     return currentPos < 51 && targetPos >= 51;
   };
 
+  // Fonction pour sélectionner un élément aléatoire dans les données JSON
+  const getRandomEventData = (eventType: 'quiz' | 'financement' | 'duel' | 'opportunite' | 'challenge') => {
+    try {
+      let dataArray: any[] = [];
+      
+      switch (eventType) {
+        case 'quiz':
+          dataArray = santeData.quiz || [];
+          break;
+        case 'financement':
+          dataArray = santeData.financement || [];
+          break;
+        case 'duel':
+          dataArray = santeData.duel || [];
+          break;
+        case 'opportunite':
+          dataArray = santeData.opportunites || [];
+          break;
+        case 'challenge':
+          dataArray = santeData.challenges || [];
+          break;
+      }
+      
+      if (dataArray.length === 0) {
+        console.warn(`Aucune donnée trouvée pour ${eventType}`);
+        return null;
+      }
+      
+      // Sélectionner un élément aléatoire
+      const randomIndex = Math.floor(Math.random() * dataArray.length);
+      return dataArray[randomIndex];
+    } catch (error) {
+      console.error(`Erreur lors de la récupération des données pour ${eventType}:`, error);
+      return null;
+    }
+  };
+
   // Fonction pour vérifier et déclencher un événement
   const checkAndTriggerEvent = (color: PlayerColor, position: number, diceValue: number = 0) => {
     const { row, col } = paths[color][position];
@@ -334,83 +391,90 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
     console.log(`État actuel popup: visible=${gameState.showEventPopup}, type=${gameState.currentEventType}`);
     
     if (eventType) {
-      // Système de gains/pertes aléatoires selon le type d'événement
-      let tokensChange = 0;
-      const randomOutcome = Math.random();
+      // Récupérer les vraies données depuis le JSON
+      const eventData = getRandomEventData(eventType);
+      console.log(`Données événement sélectionnées:`, eventData);
       
-      switch (eventType) {
-        case 'quiz':
-          if (randomOutcome < 0.6) {
-            tokensChange = 1; // 60% chance de gagner 1 jeton
-          } else if (randomOutcome < 0.8) {
-            tokensChange = 0; // 20% chance de ne rien gagner
-          } else {
-            tokensChange = -1; // 20% chance de perdre 1 jeton
-          }
-          break;
-        case 'financement':
-          if (randomOutcome < 0.7) {
-            tokensChange = 2; // 70% chance de gagner 2 jetons
-          } else if (randomOutcome < 0.85) {
-            tokensChange = 1; // 15% chance de gagner 1 jeton
-          } else {
-            tokensChange = -1; // 15% chance de perdre 1 jeton
-          }
-          break;
-        case 'duel':
-          if (randomOutcome < 0.5) {
-            tokensChange = 2; // 50% chance de gagner 2 jetons
-          } else if (randomOutcome < 0.7) {
-            tokensChange = 0; // 20% chance de ne rien gagner
-          } else {
-            tokensChange = -2; // 30% chance de perdre 2 jetons
-          }
-          break;
-        case 'evenement':
-          if (randomOutcome < 0.4) {
-            tokensChange = 1; // 40% chance de gagner 1 jeton
-          } else if (randomOutcome < 0.7) {
-            tokensChange = 0; // 30% chance de ne rien gagner
-          } else {
-            tokensChange = -1; // 30% chance de perdre 1 jeton
-          }
-          break;
-      }
-      
-      // Ajouter/retirer les jetons (ne pas descendre en dessous de 0)
-      if (tokensChange !== 0) {
-        setGameState(prev => ({
-          ...prev,
-          tokens: {
-            ...prev.tokens,
-            [color]: Math.max(0, prev.tokens[color] + tokensChange)
-          }
-        }));
-      }
-      
-      // Stocker le changement de jetons pour l'affichage dans le popup
-      setGameState(prev => ({
-        ...prev,
-        lastTokenChange: tokensChange
-      }));
-      
-      // Si le joueur a fait 6, on met à jour/stocke l'événement en attente (écrase le précédent)
+      // Si le joueur a fait 6, TOUJOURS stocker l'événement en attente (peu importe le type)
       if (diceValue === 6) {
-        console.log(`Événement ${eventType} mis à jour en attente car le joueur a fait 6 et va rejouer`);
+        console.log(`Événement ${eventType} mis en attente car le joueur a fait 6 et va rejouer`);
         setGameState(prev => ({
           ...prev,
-          pendingEvent: { color, eventType } // Écrase l'événement précédent s'il y en avait un
+          pendingEvent: { color, eventType },
+          currentEventData: eventData
         }));
-        return;
+        return; // Ne pas déclencher l'événement maintenant
       }
       
+      // Si ce n'est pas un 6, déclencher l'événement normalement
+      // Calculer les jetons selon les données réelles ou système par défaut
+      let tokensChange = 0;
+      
+      if (eventData && eventData.tokens) {
+        tokensChange = eventData.tokens;
+      } else if (eventData && eventData.rewards) {
+        // Pour les duels qui ont une structure rewards
+        tokensChange = eventData.rewards.success || 0;
+      } else {
+        const randomOutcome = Math.random();
+        
+        switch (eventType) {
+          case 'quiz':
+            tokensChange = randomOutcome < 0.6 ? 1 : (randomOutcome < 0.8 ? 0 : -1);
+            break;
+          case 'financement':
+            tokensChange = randomOutcome < 0.7 ? 2 : (randomOutcome < 0.85 ? 1 : -1);
+            break;
+          case 'duel':
+            tokensChange = randomOutcome < 0.5 ? 2 : (randomOutcome < 0.7 ? 0 : -2);
+            break;
+          case 'opportunite':
+            tokensChange = randomOutcome < 0.4 ? 1 : (randomOutcome < 0.7 ? 0 : -1);
+            break;
+          case 'challenge':
+            tokensChange = randomOutcome < 0.2 ? 0 : (randomOutcome < 0.6 ? -1 : -2);
+            break;
+        }
+      }
+      
+      // Pour les quiz, on stocke les jetons en attente et laisse le joueur répondre
+      if (eventType === 'quiz') {
+        const potentialTokens = Math.abs(tokensChange) || 1;
+        
+        setGameState(prev => ({
+          ...prev,
+          pendingQuizTokens: potentialTokens,
+          lastTokenChange: 0,
+          currentEventData: eventData,
+          eventPlayerColor: color
+        }));
+      } else {
+        // Pour les autres événements, appliquer directement les jetons
+        if (tokensChange !== 0) {
+          setGameState(prev => ({
+            ...prev,
+            tokens: {
+              ...prev.tokens,
+              [color]: prev.tokens[color] + tokensChange
+            }
+          }));
+        }
+        
+        setGameState(prev => ({
+          ...prev,
+          lastTokenChange: tokensChange,
+          currentEventData: eventData,
+          eventPlayerColor: color
+        }));
+      }
+      
+      // Déclencher l'événement immédiatement (car ce n'est pas un 6)
       console.log(`Déclenchement événement ${eventType} dans 700ms`);
-      // Fermer d'abord tout popup existant, puis afficher le nouveau
       setGameState(prev => ({
         ...prev,
         showEventPopup: false,
         currentEventType: null,
-        pendingEvent: null // Effacer tout événement en attente car on affiche celui-ci
+        pendingEvent: null
       }));
       
       setTimeout(() => {
@@ -420,37 +484,116 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
           showEventPopup: true,
           currentEventType: eventType
         }));
-      }, 700); // Délai plus long pour s'assurer que l'animation est terminée
+      }, 700);
     } else if (diceValue === 6) {
-      // Si pas d'événement sur cette case mais le joueur a fait 6, effacer l'événement en attente
-      console.log(`Pas d'événement sur cette case, effacement de l'événement en attente`);
-      setGameState(prev => ({
-        ...prev,
-        pendingEvent: null
-      }));
+      // Si pas d'événement sur cette case mais le joueur a fait 6, ne rien faire
+      console.log(`Pas d'événement sur cette case, le joueur va rejouer`);
     }
   };
 
   // Fonction pour déclencher un événement en attente
   const triggerPendingEvent = () => {
-    if (gameState.pendingEvent) {
-      console.log(`Déclenchement de l'événement en attente: ${gameState.pendingEvent.eventType} pour ${gameState.pendingEvent.color}`);
+    if (gameState.pendingEvent && gameState.currentEventData) {
+      const { color, eventType } = gameState.pendingEvent;
+      const eventData = gameState.currentEventData;
       
-      setGameState(prev => ({
-        ...prev,
-        showEventPopup: false,
-        currentEventType: null,
-        pendingEvent: null
-      }));
+      console.log(`Déclenchement de l'événement en attente: ${eventType} pour ${color}`);
       
+      // Calculer les jetons selon les données réelles ou système par défaut
+      let tokensChange = 0;
+      
+      if (eventData && eventData.tokens) {
+        tokensChange = eventData.tokens;
+      } else if (eventData && eventData.rewards) {
+        // Pour les duels qui ont une structure rewards
+        tokensChange = eventData.rewards.success || 0;
+      } else {
+        const randomOutcome = Math.random();
+        
+        switch (eventType) {
+          case 'quiz':
+            tokensChange = randomOutcome < 0.6 ? 1 : (randomOutcome < 0.8 ? 0 : -1);
+            break;
+          case 'financement':
+            tokensChange = randomOutcome < 0.7 ? 2 : (randomOutcome < 0.85 ? 1 : -1);
+            break;
+          case 'duel':
+            tokensChange = randomOutcome < 0.5 ? 2 : (randomOutcome < 0.7 ? 0 : -2);
+            break;
+          case 'opportunite':
+            tokensChange = randomOutcome < 0.4 ? 1 : (randomOutcome < 0.7 ? 0 : -1);
+            break;
+          case 'challenge':
+            tokensChange = randomOutcome < 0.2 ? 0 : (randomOutcome < 0.6 ? -1 : -2);
+            break;
+        }
+      }
+      
+      // Pour les quiz, on stocke les jetons en attente et laisse le joueur répondre
+      if (eventType === 'quiz') {
+        const potentialTokens = Math.abs(tokensChange) || 1;
+        
+        setGameState(prev => ({
+          ...prev,
+          pendingQuizTokens: potentialTokens,
+          lastTokenChange: 0,
+          showEventPopup: false,
+          currentEventType: null,
+          pendingEvent: null,
+          eventPlayerColor: color
+        }));
+      } else {
+        // Pour les autres événements, appliquer directement les jetons
+        if (tokensChange !== 0) {
+          setGameState(prev => ({
+            ...prev,
+            tokens: {
+              ...prev.tokens,
+              [color]: prev.tokens[color] + tokensChange
+            }
+          }));
+        }
+        
+        setGameState(prev => ({
+          ...prev,
+          lastTokenChange: tokensChange,
+          showEventPopup: false,
+          currentEventType: null,
+          pendingEvent: null,
+          eventPlayerColor: color
+        }));
+      }
+      
+      // Déclencher l'affichage du popup
       setTimeout(() => {
         setGameState(prev => ({
           ...prev,
           showEventPopup: true,
-          currentEventType: gameState.pendingEvent!.eventType
+          currentEventType: eventType
         }));
       }, 700);
     }
+  };
+
+  // Fonction pour gérer les réponses de quiz
+  const handleQuizAnswer = (selectedIndex: number) => {
+    const isCorrect = gameState.currentEventData && gameState.currentEventData.correctAnswer === selectedIndex;
+    const tokensToChange = isCorrect ? gameState.pendingQuizTokens : -gameState.pendingQuizTokens;
+    const targetPlayer = gameState.eventPlayerColor || gameState.currentPlayer; // Fallback sur currentPlayer
+    
+    // Appliquer le changement de jetons au bon joueur
+    setGameState(prev => ({
+      ...prev,
+      tokens: {
+        ...prev.tokens,
+        [targetPlayer]: prev.tokens[targetPlayer] + tokensToChange
+      },
+      lastTokenChange: tokensToChange,
+      pendingQuizTokens: 0,
+      eventPlayerColor: null
+    }));
+    
+    console.log(`Quiz ${isCorrect ? 'correct' : 'incorrect'}: ${tokensToChange} jetons pour ${targetPlayer}`);
   };
 
   // Fonction pour fermer le popup d'événement
@@ -458,7 +601,9 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
     setGameState(prev => ({
       ...prev,
       showEventPopup: false,
-      currentEventType: null
+      currentEventType: null,
+      pendingQuizTokens: 0,
+      eventPlayerColor: null
     }));
   };
 
@@ -573,16 +718,16 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
       diceValue: null,
       rolling: false,
       pawns: {
-        yellow: 47, // Position 47, si dé = 3+, essaiera d'entrer dans chemin final
-        blue: 48,   // Position 48, si dé = 2+, essaiera d'entrer dans chemin final  
-        red: 46,    // Position 46, si dé = 4+, essaiera d'entrer dans chemin final
-        green: 49,  // Position 49, si dé = 1+, essaiera d'entrer dans chemin final
+        yellow: 'home', // Position 47, si dé = 3+, essaiera d'entrer dans chemin final
+        blue: 'home',   // Position 48, si dé = 2+, essaiera d'entrer dans chemin final  
+        red: 'home',    // Position 46, si dé = 4+, essaiera d'entrer dans chemin final
+        green: 'home',  // Position 49, si dé = 1+, essaiera d'entrer dans chemin final
       },
       tokens: {
-        yellow: 3,  // Pas assez de jetons (besoin de 7)
-        blue: 8,    // Assez de jetons
-        red: 5,     // Pas assez de jetons
-        green: 7,   // Juste assez de jetons
+        yellow: 0,  // Pas assez de jetons (besoin de 7)
+        blue: 0,    // Assez de jetons
+        red: 0,     // Pas assez de jetons
+        green: 0,   // Juste assez de jetons
       },
       doitDeplacer: false,
       message: null,
@@ -594,6 +739,9 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
       currentEventType: null,
       pendingEvent: null,
       lastTokenChange: 0,
+      currentEventData: null,
+      pendingQuizTokens: 0,
+      eventPlayerColor: null,
     }));
   };
 
@@ -649,7 +797,7 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
               // Remettre diceValue à null après un délai pour permettre un nouveau lancer
               setTimeout(() => {
                 setGameState(prev => ({ ...prev, diceValue: null, message: null }));
-              }, 800); // Réduit de 1500 à 800ms
+              }, 800);
             }, 200); // Réduit de 400 à 200ms
           } else if (typeof pos === 'number') {
             const newPos = pos + finalValue;
@@ -879,7 +1027,8 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
                 }, 800);
               }, 200);
             } else {
-              setGameState(prev => ({ ...prev, pendingEvent: null }));
+              // Le joueur n'a pas fait 6, déclencher l'événement en attente s'il y en a un
+              triggerPendingEvent();
               
               setTimeout(() => {
                 setGameState(prev => {
@@ -943,6 +1092,7 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
     getCellPosition,
     computerPlay,
     closeEventPopup,
+    handleQuizAnswer,
   };
 };
 

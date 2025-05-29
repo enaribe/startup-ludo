@@ -12,7 +12,7 @@ interface Cell {
   color: string;
   isStart?: boolean;
   homeNumber?: number;
-  eventType?: 'quiz' | 'financement' | 'duel' | 'evenement';
+  eventType?: 'quiz' | 'financement' | 'duel' | 'opportunite' | 'challenge';
 }
 
 interface GameBoardProps {
@@ -48,74 +48,88 @@ const BOARD_SIZE = 15;
 
 /**
  * Génère une distribution fixe des événements sur le plateau
- * 4 duels, 8 financements, le reste quiz et événements
+ * Distribution identique à celle de useGameLogic.ts
  */
-const createFixedEventDistribution = (): Record<string, 'quiz' | 'financement' | 'duel' | 'evenement'> => {
-  // Cases de chemin valides (excluant départ, centre et chemins finaux)
-  const pathCells: Array<{row: number, col: number}> = [];
+const createFixedEventDistribution = (): Record<string, 'quiz' | 'financement' | 'duel' | 'opportunite' | 'challenge'> => {
+  // Distribution fixe et déterministe pour tous les jeux
+  const fixedDistribution: Record<string, 'quiz' | 'financement' | 'duel' | 'opportunite' | 'challenge'> = {
+    // Ligne horizontale du haut (row 6, de gauche à droite)
+    '6-0': 'financement',
+    // '6-1': PAS D'ÉVÉNEMENT - case de départ yellow
+    '6-2': 'quiz',
+    '6-3': 'opportunite', 
+    '6-4': 'quiz',
+    '6-5': 'challenge',
+    '6-9': 'quiz',
+    '6-10': 'duel',
+    '6-11': 'quiz',
+    '6-12': 'opportunite',
+    '6-13': 'quiz',  // Nouvelle case avec événement
+    '6-14': 'financement',
+    
+    // Ligne horizontale du bas (row 8, de droite à gauche)
+    '8-14': 'quiz',
+    // '8-13': PAS D'ÉVÉNEMENT - case de départ red
+    '8-12': 'quiz',
+    '8-11': 'opportunite',
+    '8-10': 'quiz',
+    '8-9': 'duel',
+    '8-5': 'quiz',
+    '8-4': 'challenge',
+    '8-3': 'quiz',
+    '8-2': 'opportunite',
+    '8-1': 'quiz',
+    '8-0': 'financement',
+    
+    // Ligne verticale de gauche (col 6, de haut en bas)
+    '0-6': 'quiz',
+    '1-6': 'challenge',
+    '2-6': 'quiz',
+    '3-6': 'duel',
+    '4-6': 'quiz',
+    '5-6': 'opportunite',
+    '9-6': 'quiz',
+    '10-6': 'challenge',
+    '11-6': 'quiz',
+    '12-6': 'opportunite',
+    // '13-6': PAS D'ÉVÉNEMENT - case de départ green
+    '14-6': 'financement',
+    
+    // Ligne verticale de droite (col 8, de bas en haut)
+    '14-8': 'quiz',
+    '13-8': 'opportunite',
+    '12-8': 'quiz',
+    '11-8': 'challenge',
+    '10-8': 'quiz',
+    '9-8': 'duel',
+    '5-8': 'quiz',
+    '4-8': 'opportunite',
+    '3-8': 'quiz',
+    '2-8': 'challenge',
+    // '1-8': PAS D'ÉVÉNEMENT - case de départ blue
+    '0-8': 'quiz',
+    
+    // Angles spéciaux
+    '0-7': 'quiz',    // Entre les lignes verticales en haut
+    '14-7': 'quiz',   // Entre les lignes verticales en bas  
+    '7-0': 'quiz',    // Entre les lignes horizontales à gauche
+    '7-14': 'quiz',   // Entre les lignes horizontales à droite
+    
+    // Cases de transition importantes
+    '7-1': 'financement',  // Entrée chemin final yellow
+    '1-7': 'financement',  // Entrée chemin final blue
+    '7-13': 'financement', // Entrée chemin final red
+    '13-7': 'financement', // Entrée chemin final green
+  };
   
-  for (let row = 0; row < BOARD_SIZE; row++) {
-    for (let col = 0; col < BOARD_SIZE; col++) {
-      // Vérifier si c'est une case de chemin valide pour un événement
-      if (
-        ((row === 6 || row === 7 || row === 8) && (col >= 0 && col <= 14)) ||
-        ((col === 6 || col === 7 || col === 8) && (row >= 0 && row <= 14))
-      ) {
-        // Exclure le centre
-        if (row >= 6 && row <= 8 && col >= 6 && col <= 8) continue;
-        
-        // Exclure les cases de départ
-        if ((row === 6 && col === 1) || (row === 1 && col === 8) || 
-            (row === 13 && col === 6) || (row === 8 && col === 13)) continue;
-            
-        // Exclure les chemins finaux (cases colorées vers le centre)
-        if ((row === 7 && col >= 1 && col <= 5) || 
-            (col === 7 && row >= 1 && row <= 5) ||
-            (row === 7 && col >= 9 && col <= 13) || 
-            (col === 7 && row >= 9 && row <= 13)) continue;
-            
-        pathCells.push({row, col});
-      }
-    }
-  }
+  console.log('Distribution FIXE GameBoard créée avec répartition équilibrée');
   
-  // Distribution fixe des événements selon les spécifications
-  const eventDistribution: Record<string, 'quiz' | 'financement' | 'duel' | 'evenement'> = {};
+  // Compter les types pour vérification
+  const counts = { quiz: 0, financement: 0, duel: 0, opportunite: 0, challenge: 0 };
+  Object.values(fixedDistribution).forEach(type => counts[type]++);
+  console.log('Répartition GameBoard des événements:', counts);
   
-  // Positions spécifiques pour les duels (4 cases stratégiques)
-  const duelPositions = [
-    {row: 6, col: 3}, {row: 3, col: 6}, {row: 11, col: 6}, {row: 6, col: 11}
-  ];
-  
-  // Positions spécifiques pour les financements (8 cases bien réparties)
-  const financementPositions = [
-    {row: 6, col: 0}, {row: 6, col: 2}, {row: 0, col: 6}, {row: 2, col: 6},
-    {row: 6, col: 12}, {row: 6, col: 14}, {row: 12, col: 6}, {row: 14, col: 6}
-  ];
-  
-  // Assigner les duels
-  duelPositions.forEach(pos => {
-    if (pathCells.some(cell => cell.row === pos.row && cell.col === pos.col)) {
-      eventDistribution[`${pos.row}-${pos.col}`] = 'duel';
-    }
-  });
-  
-  // Assigner les financements
-  financementPositions.forEach(pos => {
-    if (pathCells.some(cell => cell.row === pos.row && cell.col === pos.col)) {
-      eventDistribution[`${pos.row}-${pos.col}`] = 'financement';
-    }
-  });
-  
-  // Assigner quiz et événements aux cases restantes
-  pathCells.forEach((cell, index) => {
-    const cellKey = `${cell.row}-${cell.col}`;
-    if (!eventDistribution[cellKey]) {
-      eventDistribution[cellKey] = index % 2 === 0 ? 'quiz' : 'evenement';
-    }
-  });
-  
-  return eventDistribution;
+  return fixedDistribution;
 };
 
 // Distribution fixe des événements (générée une seule fois)

@@ -28,6 +28,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ numberOfPlayers, onResetGame })
     syncPawnPositions,
     computerPlay,
     closeEventPopup,
+    handleQuizAnswer,
   } = useGameLogic(numberOfPlayers);
 
   // Debug: Log de l'état du popup
@@ -164,7 +165,10 @@ const GameScreen: React.FC<GameScreenProps> = ({ numberOfPlayers, onResetGame })
         visible={gameState.showEventPopup}
         eventType={gameState.currentEventType}
         tokenChange={gameState.lastTokenChange}
+        eventData={gameState.currentEventData}
+        pendingQuizTokens={gameState.pendingQuizTokens}
         onClose={closeEventPopup}
+        onQuizAnswer={handleQuizAnswer}
       />
     </ImageBackground>
   );
