@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
-import LudoBoard from "./components/LudoBoard";
 import MainMenu from "./components/MainMenu";
 import SplashScreen from "./components/SplashScreen";
 import GameModeSelectionScreen from "./screens/GameModeSelectionScreen";
+import GameScreen from "./screens/GameScreen";
 import PlayerSelectionScreen from "./screens/PlayerSelectionScreen";
+import RandomCardScreen from "./screens/RandomCardScreen";
 
-type AppState = 'splash' | 'menu' | 'modeSelection' | 'playerSelection' | 'game';
+type AppState = 'splash' | 'menu' | 'modeSelection' | 'playerSelection' | 'randomCard' | 'game';
 type GameMode = 'online' | 'friends' | 'simple';
 
 export default function Index() {
   const [appState, setAppState] = useState<AppState>('splash');
   const [selectedMode, setSelectedMode] = useState<GameMode>('simple');
+  const [numberOfPlayers, setNumberOfPlayers] = useState<1 | 2 | 3 | 4>(1);
 
   const handleSplashFinish = () => {
     setAppState('menu');
@@ -32,8 +34,20 @@ export default function Index() {
   };
 
   const handlePlayerSelection = (players: 1 | 2 | 3 | 4) => {
-    // Ici on peut passer le nombre de joueurs au jeu
+    // Sauvegarder le nombre de joueurs sélectionné
+    setNumberOfPlayers(players);
+    // Après la sélection du nombre de joueurs, aller au tirage de carte secteur
+    setAppState('randomCard');
+  };
+
+  const handleStartFinalGame = () => {
+    // Lancer le jeu final directement depuis RandomCardScreen
     setAppState('game');
+  };
+
+  const handleResetGame = () => {
+    // Retourner au menu principal quand on quitte le jeu
+    setAppState('menu');
   };
 
   if (appState === 'splash') {
@@ -52,5 +66,9 @@ export default function Index() {
     return <PlayerSelectionScreen onStartGame={handlePlayerSelection} />;
   }
 
-  return <LudoBoard />;
+  if (appState === 'randomCard') {
+    return <RandomCardScreen onStartGame={handleStartFinalGame} />;
+  }
+
+  return <GameScreen numberOfPlayers={numberOfPlayers} onResetGame={handleResetGame} />;
 }
