@@ -46,14 +46,6 @@ const GameModeSelectionScreen: React.FC<GameModeSelectionScreenProps> = ({ onSel
               end={{ x: 0.5, y: 1 }}
             >
               {/* Icône dé */}
-              <View style={styles.iconContainer}>
-                <View style={styles.diceIcon}>
-                  <View style={styles.diceFace} />
-                  <View style={styles.diceDot1} />
-                  <View style={styles.diceDot2} />
-                  <View style={styles.diceDot3} />
-                </View>
-              </View>
               <Text style={styles.modeButtonText}>Mode simple</Text>
             </LinearGradient>
           </View>
@@ -72,12 +64,6 @@ const GameModeSelectionScreen: React.FC<GameModeSelectionScreenProps> = ({ onSel
               end={{ x: 0.5, y: 1 }}
             >
               {/* Icône globe */}
-              <View style={styles.iconContainer}>
-                <View style={styles.globeIcon}>
-                  <View style={styles.globeBase} />
-                  <View style={styles.globeLines} />
-                </View>
-              </View>
               <Text style={styles.modeButtonText}>Play Online</Text>
             </LinearGradient>
           </View>
