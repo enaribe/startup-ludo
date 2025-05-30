@@ -1,8 +1,461 @@
 {
-  "secteur": "Tourisme & Hôtellerie",
-  "code": "tourisme",
-  "quiz": [],
-  "duels": [],
-  "opportunites": [],
-  "challenges": []
-} 
+  "edition": "Tourisme & Hôtellerie",
+  "opportunites": [
+    {
+      "id": "opp_1",
+      "title": "Saison touristique exceptionnelle",
+      "description": "Les conditions météorologiques parfaites et les événements culturels locaux attirent un nombre record de visiteurs. Votre taux d'occupation dépasse 95%.",
+      "tokens": 3
+    },
+    {
+      "id": "opp_2",
+      "title": "Adhésion à un réseau d'hôteliers",
+      "description": "Vous rejoignez une chaîne hôtelière ou un groupement local qui renforce votre visibilité et mutualise les coûts. Bénéficiez de tarifs préférentiels et d'une centrale de réservation commune.",
+      "tokens": 2
+    },
+    {
+      "id": "opp_3",
+      "title": "Certification écologique obtenue",
+      "description": "Votre établissement répond aux standards de tourisme durable. Accédez au marché du tourisme responsable et attirez une clientèle premium soucieuse d'environnement.",
+      "tokens": 3
+    },
+    {
+      "id": "opp_4",
+      "title": "Partenariat avec un tour-opérateur",
+      "description": "Un accord avec un voyagiste sécurise vos réservations pour toute la saison. Bénéficiez de tarifs garantis et d'un flux constant de clients.",
+      "tokens": 3
+    },
+    {
+      "id": "opp_5",
+      "title": "Système de réservation en ligne efficace",
+      "description": "Vous installez une plateforme de réservation moderne avec paiement en ligne. Augmentez vos réservations directes et réduisez les commissions intermédiaires.",
+      "tokens": 2
+    },
+    {
+      "id": "opp_6",
+      "title": "Accès à des financements touristiques",
+      "description": "Vous obtenez des subventions gouvernementales pour la modernisation de vos infrastructures. Vos services s'améliorent significativement dès la première saison.",
+      "tokens": 3
+    },
+    {
+      "id": "opp_7",
+      "title": "Diversification des services",
+      "description": "Vous proposez désormais hébergement, restauration et activités sur votre site. Cette stratégie réduit la dépendance saisonnière et stabilise vos revenus.",
+      "tokens": 2
+    },
+    {
+      "id": "opp_8",
+      "title": "Branding et marketing innovant",
+      "description": "Votre identité visuelle et votre stratégie digitale séduisent les voyageurs connectés. Votre présence sur les réseaux sociaux génère une nouvelle clientèle.",
+      "tokens": 3
+    },
+    {
+      "id": "opp_9",
+      "title": "Équipements modernisés",
+      "description": "Vous investissez dans des infrastructures qui multiplient votre capacité d'accueil. Cette modernisation améliore l'expérience client et votre réputation.",
+      "tokens": 3
+    },
+    {
+      "id": "opp_10",
+      "title": "Accès à des espaces événementiels",
+      "description": "Vous développez une offre MICE (réunions, conférences) qui fonctionne toute l'année. Diversifiez vos revenus au-delà du tourisme de loisirs.",
+      "tokens": 3
+    },
+    {
+      "id": "opp_11",
+      "title": "Programme de développement touristique régional",
+      "description": "Vous intégrez un programme qui vous forme aux nouvelles tendances du tourisme. Accédez à un réseau professionnel et des financements spécialisés.",
+      "tokens": 3
+    },
+    {
+      "id": "opp_12",
+      "title": "Programme de digitalisation touristique",
+      "description": "Vous bénéficiez d'une formation en marketing digital appliqué au tourisme. Créez une solution TravelTech innovante.",
+      "tokens": 2,
+      "extra": "avance d'une case"
+    },
+    {
+      "id": "opp_13",
+      "title": "Programme de tourisme communautaire",
+      "description": "Vous rejoignez un programme de développement du tourisme local participatif. Obtenez un appui pour créer des expériences authentiques.",
+      "tokens": 3
+    },
+    {
+      "id": "opp_14",
+      "title": "Programme d'écotourisme",
+      "description": "Vous êtes sélectionné(e) pour un programme de tourisme durable. Accédez à des équipements écologiques et des formations spécialisées.",
+      "tokens": 2
+    },
+    {
+      "id": "opp_15",
+      "title": "Programme de tourisme culturel",
+      "description": "Vous intégrez un cluster culturel et patrimonial. Bénéficiez d'un accompagnement pour valoriser le patrimoine local et créer des circuits thématiques.",
+      "tokens": 3
+    }
+  ],
+  "challenges": [
+    {
+      "id": "chal_1",
+      "title": "Crise sanitaire",
+      "description": "Une épidémie entraîne la fermeture des frontières et l'annulation massive des réservations.",
+      "tokens": -3
+    },
+    {
+      "id": "chal_2",
+      "title": "Catastrophe naturelle",
+      "description": "Un cyclone ou des inondations endommagent vos infrastructures et éloignent les touristes.",
+      "tokens": -2,
+      "extra": "passez votre prochain tour"
+    },
+    {
+      "id": "chal_3",
+      "title": "Fluctuation des taux de change",
+      "description": "La dévaluation de la monnaie locale rend la destination moins attractive pour les touristes internationaux.",
+      "tokens": -2,
+      "extra": "reculez de 1 case"
+    },
+    {
+      "id": "chal_4",
+      "title": "Instabilité sociale",
+      "description": "Des troubles sociaux ou grèves perturbent l'attractivité de la destination.",
+      "tokens": -2,
+      "extra": "payez 2 jetons pour des mesures de sécurité supplémentaires"
+    },
+    {
+      "id": "chal_5",
+      "title": "Pannes d'équipement",
+      "description": "Votre système de climatisation ou de production d'eau chaude tombe en panne en haute saison.",
+      "tokens": -2,
+      "extra": "payez 2 jetons pour les réparations d'urgence"
+    },
+    {
+      "id": "chal_6",
+      "title": "Problèmes de financement",
+      "description": "Votre demande de crédit pour expansion est rejetée par la banque.",
+      "tokens": -2
+    },
+    {
+      "id": "chal_7",
+      "title": "Concurrence déloyale",
+      "description": "L'arrivée d'une grande chaîne internationale pratiquant des prix cassés affecte votre clientèle.",
+      "tokens": -3
+    },
+    {
+      "id": "chal_8",
+      "title": "Problèmes de personnel",
+      "description": "Votre personnel clé démissionne en haute saison, affectant la qualité de service.",
+      "tokens": -2
+    },
+    {
+      "id": "chal_9",
+      "title": "Mauvaises critiques en ligne",
+      "description": "Des avis négatifs sur les plateformes de voyage nuisent à votre réputation.",
+      "tokens": -2,
+      "extra": "reculez d'une case"
+    },
+    {
+      "id": "chal_10",
+      "title": "Retards de paiement",
+      "description": "Un tour-opérateur important tarde à vous payer ses factures.",
+      "tokens": -2
+    }
+  ],
+  "financement": [
+    {
+      "id": "fin_1",
+      "title": "Tontine touristique",
+      "description": "Un système d'épargne rotative entre professionnels du tourisme local où chacun contribue pour financer à tour de rôle les projets de développement des membres.",
+      "tokens": 3
+    },
+    {
+      "id": "fin_2",
+      "title": "Microcrédit touristique",
+      "description": "Un petit prêt spécialement conçu pour les activités touristiques, adapté aux besoins des petits établissements avec des modalités de remboursement alignées sur la saisonnalité.",
+      "tokens": 4
+    },
+    {
+      "id": "fin_3",
+      "title": "Prêt bancaire hôtelier",
+      "description": "Un financement formel accordé par une banque pour les activités touristiques, couvrant des investissements importants comme la construction, la rénovation ou l'achat d'équipements.",
+      "tokens": 5
+    },
+    {
+      "id": "fin_4",
+      "title": "Subvention gouvernementale tourisme",
+      "description": "Financement non remboursable accordé dans le cadre de programmes de développement touristique, ciblant l'innovation, l'écotourisme ou les projets à fort impact social.",
+      "tokens": 4
+    },
+    {
+      "id": "fin_5",
+      "title": "Investisseur en tourisme",
+      "description": "Un partenaire financier spécialisé dans l'hôtellerie qui apporte du capital en échange d'une participation, généralement intéressé par des concepts innovants à fort potentiel.",
+      "tokens": 5
+    },
+    {
+      "id": "fin_6",
+      "title": "Financement participatif tourisme",
+      "description": "Financement où de nombreux contributeurs soutiennent votre projet touristique via des plateformes en ligne, souvent en échange de contreparties ou d'expériences.",
+      "tokens": 3
+    }
+  ],
+  "quiz": [
+    {
+      "id": "quiz_1",
+      "question": "Quelle stratégie permet d'optimiser le taux d'occupation d'un établissement touristique?",
+      "options": [
+        "Maintenir des prix fixes toute l'année",
+        "Le yield management (tarification dynamique)",
+        "Accepter uniquement les réservations de dernière minute"
+      ],
+      "correctAnswer": 1,
+      "category": "Aspects techniques hôteliers"
+    },
+    {
+      "id": "quiz_2",
+      "question": "Parmi ces systèmes, lequel est le plus économe en énergie pour un hôtel?",
+      "options": [
+        "La climatisation centralisée 24h/24",
+        "Les systèmes de gestion technique du bâtiment (GTB)",
+        "L'éclairage permanent des espaces communs"
+      ],
+      "correctAnswer": 1,
+      "category": "Aspects techniques hôteliers"
+    },
+    {
+      "id": "quiz_3",
+      "question": "Quelle approche est la plus efficace pour maintenir la qualité de service?",
+      "options": [
+        "Les contrôles qualité réguliers et la formation continue du personnel",
+        "Se fier uniquement aux retours clients",
+        "Copier les pratiques de la concurrence"
+      ],
+      "correctAnswer": 0,
+      "category": "Aspects techniques hôteliers"
+    },
+    {
+      "id": "quiz_4",
+      "question": "Quelle stratégie de distribution maximise les revenus d'un hôtel?",
+      "options": [
+        "Vendre exclusivement via les OTA (Online Travel Agencies)",
+        "Diversifier les canaux : site direct, OTA, tour-opérateurs",
+        "Ne vendre que par téléphone"
+      ],
+      "correctAnswer": 1,
+      "category": "Aspects techniques hôteliers"
+    },
+    {
+      "id": "quiz_5",
+      "question": "Quel est l'avantage principal des certifications qualité pour un établissement touristique?",
+      "options": [
+        "Elles sont obligatoires par la loi",
+        "Elles garantissent un niveau de service et rassurent les clients",
+        "Elles permettent d'augmenter automatiquement les prix"
+      ],
+      "correctAnswer": 1,
+      "category": "Aspects techniques hôteliers"
+    },
+    {
+      "id": "quiz_6",
+      "question": "Qu'est-ce qu'une chaîne de valeur touristique?",
+      "options": [
+        "Un réseau de transport public",
+        "L'ensemble des acteurs depuis l'attraction touristique jusqu'au client final",
+        "Une chaîne d'hôtels internationale"
+      ],
+      "correctAnswer": 1,
+      "category": "Gestion d'entreprise touristique"
+    },
+    {
+      "id": "quiz_7",
+      "question": "Comment calcule-t-on le RevPAR (Revenue Per Available Room)?",
+      "options": [
+        "Prix moyen × Taux d'occupation",
+        "Chiffre d'affaires + Nombre de chambres disponibles",
+        "Les deux réponses A et B sont correctes"
+      ],
+      "correctAnswer": 2,
+      "category": "Gestion d'entreprise touristique"
+    },
+    {
+      "id": "quiz_8",
+      "question": "Comment atténuer l'impact de la saisonnalité dans le tourisme?",
+      "options": [
+        "Fermer l'établissement en basse saison",
+        "Développer le tourisme d'affaires et événementiel",
+        "Augmenter drastiquement les prix en haute saison"
+      ],
+      "correctAnswer": 1,
+      "category": "Gestion d'entreprise touristique"
+    },
+    {
+      "id": "quiz_9",
+      "question": "Quel élément est crucial dans une stratégie marketing touristique?",
+      "options": [
+        "L'identité de marque et l'expérience client différenciante",
+        "Copier exactement ce que fait la concurrence",
+        "Se concentrer uniquement sur les prix bas"
+      ],
+      "correctAnswer": 0,
+      "category": "Gestion d'entreprise touristique"
+    },
+    {
+      "id": "quiz_10",
+      "question": "Quelle certification peut significativement valoriser un établissement touristique?",
+      "options": [
+        "L'auto-certification par l'établissement",
+        "Les labels qualité officiels ou écologiques reconnus",
+        "Les certifications créées par l'établissement lui-même"
+      ],
+      "correctAnswer": 1,
+      "category": "Gestion d'entreprise touristique"
+    },
+    {
+      "id": "quiz_11",
+      "question": "Comment les technologies mobiles transforment-elles l'expérience client?",
+      "options": [
+        "Par le check-in mobile, la conciergerie digitale et la personnalisation",
+        "Seulement pour prendre des photos",
+        "Uniquement pour les réservations"
+      ],
+      "correctAnswer": 0,
+      "category": "Innovation digitale"
+    },
+    {
+      "id": "quiz_12",
+      "question": "Quel usage de la réalité virtuelle est le plus pertinent pour le tourisme?",
+      "options": [
+        "Remplacer complètement les voyages",
+        "La promotion des destinations et la visite virtuelle préalable",
+        "Uniquement pour les jeux vidéo"
+      ],
+      "correctAnswer": 1,
+      "category": "Innovation digitale"
+    },
+    {
+      "id": "quiz_13",
+      "question": "Comment l'IA peut-elle améliorer l'expérience client en hôtellerie?",
+      "options": [
+        "En remplaçant complètement le personnel",
+        "Par les chatbots, la personnalisation et l'analyse prédictive",
+        "Seulement pour la comptabilité"
+      ],
+      "correctAnswer": 1,
+      "category": "Innovation digitale"
+    },
+    {
+      "id": "quiz_14",
+      "question": "Quel avantage principal offre l'analyse des données clients?",
+      "options": [
+        "Espionner les clients",
+        "Personnaliser l'offre et anticiper les besoins",
+        "Augmenter automatiquement les prix"
+      ],
+      "correctAnswer": 1,
+      "category": "Innovation digitale"
+    },
+    {
+      "id": "quiz_15",
+      "question": "Comment les plateformes comme Airbnb transforment-elles le secteur?",
+      "options": [
+        "En proposant des alternatives à l'hôtellerie traditionnelle",
+        "En remplaçant tous les hôtels",
+        "En se concentrant uniquement sur les prix"
+      ],
+      "correctAnswer": 0,
+      "category": "Innovation digitale"
+    },
+    {
+      "id": "quiz_16",
+      "question": "Quel principe fondamental guide l'écotourisme?",
+      "options": [
+        "Maximiser le nombre de visiteurs",
+        "Préserver l'environnement tout en sensibilisant les voyageurs",
+        "Réduire tous les coûts au minimum"
+      ],
+      "correctAnswer": 1,
+      "category": "Tourisme durable"
+    },
+    {
+      "id": "quiz_17",
+      "question": "Quel avantage le tourisme communautaire apporte-t-il aux destinations?",
+      "options": [
+        "Il complique la gestion touristique",
+        "Il implique les populations locales et redistribue équitablement les bénéfices",
+        "Il est uniquement décoratif"
+      ],
+      "correctAnswer": 1,
+      "category": "Tourisme durable"
+    },
+    {
+      "id": "quiz_18",
+      "question": "Pourquoi la gestion de la capacité de charge est-elle importante?",
+      "options": [
+        "Pour éviter la surfréquentation et préserver l'expérience",
+        "Pour augmenter toujours le nombre de visiteurs",
+        "Pour réduire les coûts de personnel"
+      ],
+      "correctAnswer": 0,
+      "category": "Tourisme durable"
+    },
+    {
+      "id": "quiz_19",
+      "question": "Comment les certifications durables aident-elles les établissements?",
+      "options": [
+        "Elles garantissent automatiquement plus de clients",
+        "Elles valorisent les pratiques responsables et attirent une clientèle consciente",
+        "Elles sont obligatoires partout"
+      ],
+      "correctAnswer": 1,
+      "category": "Tourisme durable"
+    },
+    {
+      "id": "quiz_20",
+      "question": "Comment appliquer l'économie circulaire dans le tourisme?",
+      "options": [
+        "En réduisant, réutilisant et recyclant les ressources",
+        "En utilisant uniquement des produits jetables",
+        "En ignorant complètement les déchets"
+      ],
+      "correctAnswer": 0,
+      "category": "Tourisme durable"
+    }
+  ],
+  "duel": [
+    {
+      "id": "duel_1",
+      "title": "Négociation avec un tour-opérateur",
+      "description": "Choisissez un adversaire. Vous êtes hôtelier, il est tour-opérateur. Négociez tarifs et conditions d'un contrat annuel en 2 minutes. Si accord équitable, gagnez chacun 2 jetons.",
+      "rewards": {
+        "success": 2,
+        "fail": 3
+      }
+    },
+    {
+      "id": "duel_2",
+      "title": "Gestion de crise",
+      "description": "Face à un scénario de crise choisi par les autres joueurs (annulations massives, panne générale, client difficile…), vous et votre adversaire proposez chacun une solution en 30 secondes. Les autres votent pour la plus efficace.",
+      "rewards": {
+        "success": 3,
+        "fail": 0
+      }
+    },
+    {
+      "id": "duel_3",
+      "title": "Partenariat touristique",
+      "description": "Invitez un joueur à collaborer. Élaborez ensemble un partenariat entre vos établissements (forfaits combinés, clientèle partagée...). Si les autres jugent le plan viable, gagnez chacun 2 jetons.",
+      "rewards": {
+        "success": 2,
+        "fail": 0
+      }
+    },
+    {
+      "id": "duel_4",
+      "title": "Présentation investisseur",
+      "description": "Un besoin d'investissement vous est communiqué. Vous et votre adversaire préparez un pitch pour convaincre des investisseurs en 1 minute. Les autres votent pour la présentation la plus convaincante.",
+      "rewards": {
+        "success": 3,
+        "fail": 1
+      }
+    }
+  ]
+}

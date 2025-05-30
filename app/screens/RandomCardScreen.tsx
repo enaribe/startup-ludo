@@ -4,22 +4,21 @@ import { Animated, Dimensions, Image, ImageBackground, StyleSheet, Text, Touchab
 const { width, height } = Dimensions.get('window');
 
 interface RandomCardScreenProps {
-  onStartGame: () => void;
+  onStartGame: (selectedEdition: string) => void;
 }
 
-// Liste des secteurs disponibles
-const sectors = [
-  'E-commerce platform',
-  'Agro industrie avec IA',
-  'Technologie mobile', 
-  'Énergie renouvelable',
-  'Healthcare digitale',
-  'Education en ligne'
+// Liste des éditions disponibles
+const editions = [
+  'Agri',
+  'Santé & Bien-être',
+  'Éducation',
+  'Tourisme & Hôtellerie',
+  'Industries Culturelles & Créatives'
 ];
 
 const RandomCardScreen: React.FC<RandomCardScreenProps> = ({ onStartGame }) => {
   const [isAnimating, setIsAnimating] = useState(false);
-  const [selectedSector, setSelectedSector] = useState<string | null>(null);
+  const [selectedEdition, setSelectedEdition] = useState<string | null>(null);
   const [showFinalCard, setShowFinalCard] = useState(false);
   const flipAnimation = useRef(new Animated.Value(0));
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -33,46 +32,42 @@ const RandomCardScreen: React.FC<RandomCardScreenProps> = ({ onStartGame }) => {
     };
   }, []);
 
-  // Fonction pour obtenir l'icône et les détails du secteur
-  const getSectorDetails = (sector: string) => {
+  // Fonction pour obtenir l'icône et les détails de l'édition
+  const getEditionDetails = (edition: string) => {
     const details: { [key: string]: { icon: string; description: string } } = {
-      'E-commerce platform': {
-        icon: '🛒',
-        description: 'Révolutionnez le commerce en ligne avec des solutions innovantes et des expériences client exceptionnelles.'
-      },
-      'Agro industrie avec IA': {
+      'Agri': {
         icon: '🌾',
-        description: 'Transformez l\'agriculture avec l\'intelligence artificielle pour des rendements optimaux et durables.'
+        description: 'Découvrez l\'univers de l\'agriculture moderne et de l\'innovation agro-alimentaire avec des défis réalistes et des opportunités inspirées du terrain sénégalais.'
       },
-      'Technologie mobile': {
-        icon: '📱',
-        description: 'Développez des applications mobiles de nouvelle génération qui changent la façon dont les gens interagissent.'
-      },
-      'Énergie renouvelable': {
-        icon: '⚡',
-        description: 'Créez l\'avenir énergétique avec des solutions vertes et des technologies révolutionnaires.'
-      },
-      'Healthcare digitale': {
+      'Santé & Bien-être': {
         icon: '⚕️',
-        description: 'Améliorer les soins de santé grâce à la technologie et à l\'innovation médicale.'
+        description: 'Explorez le secteur de la santé et du bien-être, des soins traditionnels aux innovations HealthTech, en passant par la télémédecine et la médecine préventive.'
       },
-      'Education en ligne': {
+      'Éducation': {
         icon: '🎓',
-        description: 'Transformer l\'apprentissage avec des plateformes éducatives interactives et personnalisées.'
+        description: 'Plongez dans l\'écosystème éducatif moderne, de l\'apprentissage numérique aux formations professionnelles, en passant par l\'innovation pédagogique.'
+      },
+      'Tourisme & Hôtellerie': {
+        icon: '🏨',
+        description: 'Découvrez les opportunités du secteur touristique et hôtelier, du tourisme culturel au développement durable, en passant par l\'hospitalité moderne.'
+      },
+      'Industries Culturelles & Créatives': {
+        icon: '🎨',
+        description: 'Explorez l\'univers créatif et culturel, des arts traditionnels aux nouvelles technologies créatives, en passant par l\'économie créative moderne.'
       }
     };
     
-    return details[sector] || { icon: '🔮', description: 'Secteur d\'innovation technologique' };
+    return details[edition] || { icon: '🔮', description: 'Édition d\'innovation entrepreneuriale' };
   };
 
   const handleCardPress = () => {
-    if (isAnimating || selectedSector) return;
+    if (isAnimating || selectedEdition) return;
     
     setIsAnimating(true);
     
-    // Sélectionne un secteur aléatoire
-    const randomSector = sectors[Math.floor(Math.random() * sectors.length)];
-    setSelectedSector(randomSector);
+    // Sélectionne une édition aléatoire
+    const randomEdition = editions[Math.floor(Math.random() * editions.length)];
+    setSelectedEdition(randomEdition);
     
     // Animation de retournement de carte
     Animated.sequence([
@@ -119,10 +114,10 @@ const RandomCardScreen: React.FC<RandomCardScreenProps> = ({ onStartGame }) => {
     outputRange: [0, 1, 1, 0],
   });
 
-  const sectorDetails = selectedSector ? getSectorDetails(selectedSector) : null;
+  const editionDetails = selectedEdition ? getEditionDetails(selectedEdition) : null;
 
   // Si on affiche la carte finale détaillée
-  if (showFinalCard && selectedSector && sectorDetails) {
+  if (showFinalCard && selectedEdition && editionDetails) {
     return (
       <ImageBackground 
         source={require('../../assets/images/bg.png')} 
@@ -134,35 +129,35 @@ const RandomCardScreen: React.FC<RandomCardScreenProps> = ({ onStartGame }) => {
           <View style={styles.radialPattern} />
         </View>
         
-        {/* Carte secteur révélée finale */}
+        {/* Carte édition révélée finale */}
         <View style={styles.finalCardContainer}>
           <View style={styles.finalSectorCard}>
             {/* En-tête de la carte */}
             <View style={styles.finalCardHeader}>
               <Text style={styles.finalCardHeaderText}>
-                Votre secteur d'entrepreneuriat
+                Votre édition de jeu
               </Text>
             </View>
             
             {/* Contenu principal de la carte */}
             <View style={styles.finalCardContent}>
-              {/* Icône du secteur */}
+              {/* Icône de l'édition */}
               <View style={styles.finalSectorIcon}>
-                <Text style={styles.finalIconText}>{sectorDetails.icon}</Text>
+                <Text style={styles.finalIconText}>{editionDetails.icon}</Text>
               </View>
               
-              {/* Titre du secteur */}
+              {/* Titre de l'édition */}
               <Text style={styles.finalSectorTitle}>
-                {selectedSector}
+                {selectedEdition}
               </Text>
               
               {/* Description */}
               <Text style={styles.finalSectorDescription}>
-                {sectorDetails.description}
+                {editionDetails.description}
               </Text>
               
               {/* Call-to-Action pour lancer le jeu */}
-              <TouchableOpacity style={styles.startGameButton} onPress={onStartGame}>
+              <TouchableOpacity style={styles.startGameButton} onPress={() => onStartGame(selectedEdition)}>
                 <View style={styles.startGameButtonInner}>
                   <Text style={styles.startGameButtonText}>COMMENCER LE JEU !</Text>
                 </View>
@@ -189,7 +184,7 @@ const RandomCardScreen: React.FC<RandomCardScreenProps> = ({ onStartGame }) => {
       {/* Instruction pour l'utilisateur */}
       <View style={styles.instructionContainer}>
         <Text style={styles.instructionText}>
-          {!selectedSector ? 'Touchez la carte pour découvrir votre secteur !' : 'Secteur révélé !'}
+          {!selectedEdition ? 'Touchez la carte pour découvrir votre édition !' : 'Édition révélée !'}
         </Text>
       </View>
       
@@ -198,7 +193,7 @@ const RandomCardScreen: React.FC<RandomCardScreenProps> = ({ onStartGame }) => {
         <TouchableOpacity 
           style={styles.cardTouchable} 
           onPress={handleCardPress}
-          disabled={isAnimating || selectedSector !== null}
+          disabled={isAnimating || selectedEdition !== null}
           activeOpacity={0.9}
         >
           {/* Face arrière de la carte */}
@@ -213,13 +208,13 @@ const RandomCardScreen: React.FC<RandomCardScreenProps> = ({ onStartGame }) => {
             ]}
           >
             <View style={styles.cardHeader}>
-              <Text style={styles.cardHeaderText}>Carte secteur</Text>
+              <Text style={styles.cardHeaderText}>Carte édition</Text>
             </View>
             <View style={styles.cardContent}>
               <View style={styles.mysteryIcon}>
                 <Text style={styles.mysteryIconText}>❓</Text>
               </View>
-              <Text style={styles.mysteryText}>Secteur mystère</Text>
+              <Text style={styles.mysteryText}>Édition mystère</Text>
               <Text style={styles.tapHint}>Touchez pour révéler</Text>
             </View>
           </Animated.View>
@@ -243,11 +238,11 @@ const RandomCardScreen: React.FC<RandomCardScreenProps> = ({ onStartGame }) => {
             />
             
             {/* Contenu simple en attente de la carte finale */}
-            {selectedSector && sectorDetails && (
+            {selectedEdition && editionDetails && (
               <View style={styles.cardContent}>
                 <View style={styles.sectorIcon}>
                   <Text style={styles.sectorIconText}>
-                    {sectorDetails.icon}
+                    {editionDetails.icon}
                   </Text>
                 </View>
                 <Text style={styles.loadingFinalText}>Préparation...</Text>
@@ -418,10 +413,10 @@ const styles = StyleSheet.create({
   },
   finalCardContainer: {
     position: 'absolute',
-    top: 185,
+    top: 180,
     left: 50,
     right: 50,
-    height: 475,
+    height: 480,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -494,17 +489,16 @@ const styles = StyleSheet.create({
   finalSectorDescription: {
     fontFamily: 'Albert Sans',
     fontWeight: '400',
-    fontSize: 16,
+    fontSize: 15,
     color: '#204395',
     textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 40,
+    lineHeight: 19,
+    marginBottom: 25,
     paddingHorizontal: 10,
   },
   startGameButton: {
     width: '100%',
-    height: 70,
-    marginTop: 20,
+    height: 55,
   },
   startGameButtonInner: {
     flex: 1,
@@ -523,7 +517,7 @@ const styles = StyleSheet.create({
   },
   startGameButtonText: {
     fontFamily: 'PoetsenOne',
-    fontSize: 20,
+    fontSize: 18,
     color: '#FFFFFF',
     textAlign: 'center',
     textShadowColor: 'rgba(0, 0, 0, 0.5)',

@@ -13,6 +13,7 @@ export default function Index() {
   const [appState, setAppState] = useState<AppState>('splash');
   const [selectedMode, setSelectedMode] = useState<GameMode>('simple');
   const [numberOfPlayers, setNumberOfPlayers] = useState<1 | 2 | 3 | 4>(1);
+  const [selectedEdition, setSelectedEdition] = useState<string>('Agri');
 
   const handleSplashFinish = () => {
     setAppState('menu');
@@ -40,8 +41,9 @@ export default function Index() {
     setAppState('randomCard');
   };
 
-  const handleStartFinalGame = () => {
-    // Lancer le jeu final directement depuis RandomCardScreen
+  const handleStartFinalGame = (edition: string) => {
+    // Sauvegarder l'édition sélectionnée et lancer le jeu final
+    setSelectedEdition(edition);
     setAppState('game');
   };
 
@@ -70,5 +72,5 @@ export default function Index() {
     return <RandomCardScreen onStartGame={handleStartFinalGame} />;
   }
 
-  return <GameScreen numberOfPlayers={numberOfPlayers} onResetGame={handleResetGame} />;
+  return <GameScreen numberOfPlayers={numberOfPlayers} selectedEdition={selectedEdition} onResetGame={handleResetGame} />;
 }

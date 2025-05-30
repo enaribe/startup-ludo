@@ -1,8 +1,461 @@
 {
-  "secteur": "Éducation",
-  "code": "education",
-  "quiz": [],
-  "duels": [],
-  "opportunites": [],
-  "challenges": []
-} 
+  "edition": "Éducation",
+  "opportunites": [
+    {
+      "id": "opp_1",
+      "title": "Rentrée scolaire exceptionnelle",
+      "description": "Le contexte favorable et les nouvelles réformes éducatives génèrent une forte demande pour vos services. Vos inscriptions dépassent vos prévisions de 50%.",
+      "tokens": 3
+    },
+    {
+      "id": "opp_2",
+      "title": "Adhésion à un réseau éducatif",
+      "description": "Vous rejoignez un consortium d'établissements ou une fédération qui renforce votre crédibilité et mutualise les ressources. Bénéficiez d'achats groupés et d'échanges pédagogiques.",
+      "tokens": 2
+    },
+    {
+      "id": "opp_3",
+      "title": "Agrément gouvernemental obtenu",
+      "description": "Votre établissement obtient la reconnaissance officielle et peut délivrer des diplômes certifiés. Accédez aux financements publics et renforcez votre attractivité.",
+      "tokens": 3
+    },
+    {
+      "id": "opp_4",
+      "title": "Partenariat avec une entreprise",
+      "description": "Un accord avec un employeur local garantit des stages et débouchés pour vos étudiants. Bénéficiez d'équipements sponsorisés et d'intervenants professionnels.",
+      "tokens": 3
+    },
+    {
+      "id": "opp_5",
+      "title": "Plateforme d'apprentissage numérique",
+      "description": "Vous installez un système de gestion pédagogique moderne avec cours en ligne. Augmentez votre capacité d'accueil et proposez des formations hybrides.",
+      "tokens": 2
+    },
+    {
+      "id": "opp_6",
+      "title": "Accès à des programmes éducatifs subventionnés",
+      "description": "Vous obtenez des financements pour développer des formations innovantes. Vos programmes s'enrichissent significativement dès le semestre suivant.",
+      "tokens": 3
+    },
+    {
+      "id": "opp_7",
+      "title": "Diversification des formations",
+      "description": "Vous proposez désormais formation initiale, continue et en alternance. Cette stratégie stabilise vos revenus et élargit votre public cible.",
+      "tokens": 2
+    },
+    {
+      "id": "opp_8",
+      "title": "Innovation pédagogique reconnue",
+      "description": "Vos méthodes d'enseignement novateurs attirent l'attention des médias et des experts. Votre réputation d'excellence pédagogique vous démarque.",
+      "tokens": 3
+    },
+    {
+      "id": "opp_9",
+      "title": "Équipements pédagogiques modernisés",
+      "description": "Vous investissez dans des laboratoires et outils numériques qui révolutionnent l'apprentissage. Cette modernisation améliore significativement les résultats des apprenants.",
+      "tokens": 3
+    },
+    {
+      "id": "opp_10",
+      "title": "Accès à des espaces collaboratifs",
+      "description": "Vous développez des espaces de co-working et d'incubation qui fonctionnent toute l'année. Générez des revenus complémentaires et créez un écosystème d'innovation.",
+      "tokens": 3
+    },
+    {
+      "id": "opp_11",
+      "title": "Programme de formation des formateurs",
+      "description": "Vous intégrez un programme qui forme vos enseignants aux pédagogies innovantes. Accédez à un réseau d'experts et des ressources pédagogiques exclusives.",
+      "tokens": 3
+    },
+    {
+      "id": "opp_12",
+      "title": "Programme de digitalisation éducative",
+      "description": "Vous bénéficiez d'une formation en technologies éducatives. Créez une solution EdTech innovante qui révolutionne l'apprentissage.",
+      "tokens": 2,
+      "extra": "avance d'une case"
+    },
+    {
+      "id": "opp_13",
+      "title": "Programme d'éducation inclusive",
+      "description": "Vous rejoignez un programme de développement de l'accessibilité éducative. Obtenez un appui pour accueillir des publics en difficulté et diversifier vos sources de financement.",
+      "tokens": 3
+    },
+    {
+      "id": "opp_14",
+      "title": "Programme d'entrepreneuriat étudiant",
+      "description": "Vous êtes sélectionné(e) pour développer l'esprit entrepreneurial. Accédez à des équipements d'incubation et des formations spécialisées.",
+      "tokens": 2
+    },
+    {
+      "id": "opp_15",
+      "title": "Programme de recherche appliquée",
+      "description": "Vous intégrez un cluster de recherche éducative. Bénéficiez d'un accompagnement pour développer l'innovation pédagogique et publier vos travaux.",
+      "tokens": 3
+    }
+  ],
+  "challenges": [
+    {
+      "id": "chal_1",
+      "title": "Crise sanitaire",
+      "description": "Une épidémie ferme votre établissement et oblige à passer en distanciel d'urgence sans préparation.",
+      "tokens": -3
+    },
+    {
+      "id": "chal_2",
+      "title": "Pénurie d'enseignants qualifiés",
+      "description": "Plusieurs formateurs clés quittent simultanément votre établissement, perturbant les cours.",
+      "tokens": -2,
+      "extra": "passez votre prochain tour"
+    },
+    {
+      "id": "chal_3",
+      "title": "Réforme éducative soudaine",
+      "description": "De nouveaux programmes officiels remettent en question vos formations existantes.",
+      "tokens": -2,
+      "extra": "reculez de 1 case"
+    },
+    {
+      "id": "chal_4",
+      "title": "Difficultés d'accès aux locaux",
+      "description": "Des problèmes de bail ou de conformité vous forcent à chercher de nouveaux espaces.",
+      "tokens": -2,
+      "extra": "payez 2 jetons pour résoudre la situation d'urgence"
+    },
+    {
+      "id": "chal_5",
+      "title": "Pannes technologiques",
+      "description": "Votre système informatique tombe en panne pendant les examens.",
+      "tokens": -2,
+      "extra": "payez 2 jetons pour les réparations et solutions de secours"
+    },
+    {
+      "id": "chal_6",
+      "title": "Problèmes de financement",
+      "description": "Votre demande de subvention est rejetée et les frais de scolarité ne suffisent plus.",
+      "tokens": -2
+    },
+    {
+      "id": "chal_7",
+      "title": "Concurrence déloyale",
+      "description": "Une grande école s'implante localement avec des tarifs agressifs et des promesses irréalistes.",
+      "tokens": -3
+    },
+    {
+      "id": "chal_8",
+      "title": "Mauvais résultats aux examens",
+      "description": "Le taux de réussite de vos étudiants chute, affectant votre réputation.",
+      "tokens": -2
+    },
+    {
+      "id": "chal_9",
+      "title": "Polémique sur les réseaux sociaux",
+      "description": "Des critiques virales remettent en question vos méthodes pédagogiques.",
+      "tokens": -2,
+      "extra": "reculez d'une case"
+    },
+    {
+      "id": "chal_10",
+      "title": "Retards de paiement institutionnels",
+      "description": "L'État ou les collectivités tardent à verser leurs subventions.",
+      "tokens": -2
+    }
+  ],
+  "financement": [
+    {
+      "id": "fin_1",
+      "title": "Cotisations d'association de parents",
+      "description": "Un système de financement participatif où les familles contribuent selon leurs moyens pour améliorer les conditions d'apprentissage et financer des projets éducatifs innovants.",
+      "tokens": 3
+    },
+    {
+      "id": "fin_2",
+      "title": "Microcrédit éducatif",
+      "description": "Un petit prêt spécialement conçu pour les projets éducatifs, adapté aux besoins des petites structures avec des modalités de remboursement alignées sur les rentrées scolaires.",
+      "tokens": 4
+    },
+    {
+      "id": "fin_3",
+      "title": "Prêt bancaire éducation",
+      "description": "Un financement formel accordé par une banque pour les activités éducatives, couvrant des investissements importants comme la construction, l'équipement ou l'expansion.",
+      "tokens": 5
+    },
+    {
+      "id": "fin_4",
+      "title": "Subvention gouvernementale éducation",
+      "description": "Financement non remboursable accordé dans le cadre de programmes de développement éducatif, ciblant l'innovation pédagogique, l'inclusion ou l'employabilité.",
+      "tokens": 4
+    },
+    {
+      "id": "fin_5",
+      "title": "Investisseur en EdTech",
+      "description": "Un partenaire financier spécialisé dans les technologies éducatives qui apporte du capital en échange d'une participation, intéressé par l'innovation pédagogique.",
+      "tokens": 5
+    },
+    {
+      "id": "fin_6",
+      "title": "Financement participatif éducatif",
+      "description": "Financement où de nombreux contributeurs soutiennent votre projet éducatif via des plateformes en ligne, souvent motivés par l'impact social et éducatif.",
+      "tokens": 3
+    }
+  ],
+  "quiz": [
+    {
+      "id": "quiz_1",
+      "question": "Quelle méthode favorise le mieux l'engagement des apprenants ?",
+      "options": [
+        "Le cours magistral traditionnel",
+        "La pédagogie par projet et l'apprentissage collaboratif",
+        "L'apprentissage exclusivement individuel"
+      ],
+      "correctAnswer": 1,
+      "category": "Pédagogie et méthodes d'enseignement"
+    },
+    {
+      "id": "quiz_2",
+      "question": "Comment adapter son enseignement à la diversité des apprenants ?",
+      "options": [
+        "Proposer le même contenu à tous",
+        "Varier les supports, rythmes et modalités d'apprentissage",
+        "Séparer les élèves par niveau uniquement"
+      ],
+      "correctAnswer": 1,
+      "category": "Pédagogie et méthodes d'enseignement"
+    },
+    {
+      "id": "quiz_3",
+      "question": "Quel est l'objectif principal de l'évaluation formative ?",
+      "options": [
+        "Classer les étudiants",
+        "Accompagner et réguler l'apprentissage en cours",
+        "Sanctionner les erreurs"
+      ],
+      "correctAnswer": 1,
+      "category": "Pédagogie et méthodes d'enseignement"
+    },
+    {
+      "id": "quiz_4",
+      "question": "Quel facteur influence le plus la motivation des apprenants ?",
+      "options": [
+        "La peur de l'échec uniquement",
+        "Le sentiment de compétence et d'autonomie",
+        "Les récompenses externes exclusivement"
+      ],
+      "correctAnswer": 1,
+      "category": "Pédagogie et méthodes d'enseignement"
+    },
+    {
+      "id": "quiz_5",
+      "question": "Comment traiter constructivement les erreurs des apprenants ?",
+      "options": [
+        "Les ignorer complètement",
+        "Les utiliser comme support d'apprentissage et de progression",
+        "Les sanctionner systématiquement"
+      ],
+      "correctAnswer": 1,
+      "category": "Pédagogie et méthodes d'enseignement"
+    },
+    {
+      "id": "quiz_6",
+      "question": "Qu'est-ce qu'une gouvernance participative dans l'éducation ?",
+      "options": [
+        "Un système de transport scolaire",
+        "L'implication de tous les acteurs dans les décisions pédagogiques",
+        "Une méthode d'enseignement uniquement"
+      ],
+      "correctAnswer": 1,
+      "category": "Gestion d'établissement éducatif"
+    },
+    {
+      "id": "quiz_7",
+      "question": "Comment mesurer efficacement la réussite d'un établissement ?",
+      "options": [
+        "Uniquement par les résultats aux examens",
+        "Par une approche multidimensionnelle : réussite, bien-être, insertion",
+        "Par le nombre d'inscriptions seulement"
+      ],
+      "correctAnswer": 1,
+      "category": "Gestion d'établissement éducatif"
+    },
+    {
+      "id": "quiz_8",
+      "question": "Comment motiver et fidéliser les enseignants ?",
+      "options": [
+        "Uniquement par le salaire",
+        "Par la formation continue, l'autonomie et la reconnaissance",
+        "En évitant toute forme d'évaluation"
+      ],
+      "correctAnswer": 1,
+      "category": "Gestion d'établissement éducatif"
+    },
+    {
+      "id": "quiz_9",
+      "question": "Quel est l'impact d'une bonne collaboration école-famille ?",
+      "options": [
+        "Elle complique la gestion",
+        "Elle améliore significativement la réussite des apprenants",
+        "Elle n'a aucun effet mesurable"
+      ],
+      "correctAnswer": 1,
+      "category": "Gestion d'établissement éducatif"
+    },
+    {
+      "id": "quiz_10",
+      "question": "Quels critères définissent un enseignement de qualité ?",
+      "options": [
+        "L'ancienneté des méthodes utilisées",
+        "L'adaptation aux besoins des apprenants et l'efficacité pédagogique",
+        "Le coût le plus bas possible"
+      ],
+      "correctAnswer": 1,
+      "category": "Gestion d'établissement éducatif"
+    },
+    {
+      "id": "quiz_11",
+      "question": "Comment les outils numériques peuvent-ils enrichir l'apprentissage ?",
+      "options": [
+        "En remplaçant complètement les enseignants",
+        "En personnalisant les parcours et en diversifiant les supports",
+        "En éliminant toute interaction humaine"
+      ],
+      "correctAnswer": 1,
+      "category": "Innovation et technologies éducatives"
+    },
+    {
+      "id": "quiz_12",
+      "question": "Quel est le principe de la classe inversée ?",
+      "options": [
+        "Les élèves enseignent au professeur",
+        "La théorie à la maison, la pratique en classe",
+        "Inverser l'ordre alphabétique des élèves"
+      ],
+      "correctAnswer": 1,
+      "category": "Innovation et technologies éducatives"
+    },
+    {
+      "id": "quiz_13",
+      "question": "Comment l'IA peut-elle soutenir l'apprentissage ?",
+      "options": [
+        "En remplaçant totalement l'enseignant",
+        "Par l'analyse des données d'apprentissage et la personnalisation",
+        "En rendant l'apprentissage plus difficile"
+      ],
+      "correctAnswer": 1,
+      "category": "Innovation et technologies éducatives"
+    },
+    {
+      "id": "quiz_14",
+      "question": "Quel avantage offrent ces technologies en éducation ?",
+      "options": [
+        "Elles coûtent moins cher que les méthodes traditionnelles",
+        "Elles permettent des expériences immersives et concrètes",
+        "Elles remplacent complètement les livres"
+      ],
+      "correctAnswer": 1,
+      "category": "Innovation et technologies éducatives"
+    },
+    {
+      "id": "quiz_15",
+      "question": "Qu'est-ce que l'apprentissage adaptatif ?",
+      "options": [
+        "S'adapter au mobilier de la classe",
+        "Ajuster automatiquement le contenu selon les performances de l'apprenant",
+        "Adapter les horaires de cours"
+      ],
+      "correctAnswer": 1,
+      "category": "Innovation et technologies éducatives"
+    },
+    {
+      "id": "quiz_16",
+      "question": "Quel principe guide l'éducation inclusive ?",
+      "options": [
+        "Séparer les élèves selon leurs difficultés",
+        "Permettre à tous les apprenants d'accéder à une éducation de qualité",
+        "Réserver l'école aux meilleurs élèves"
+      ],
+      "correctAnswer": 1,
+      "category": "Inclusion et équité éducative"
+    },
+    {
+      "id": "quiz_17",
+      "question": "Comment aider efficacement les apprenants en difficulté ?",
+      "options": [
+        "Les orienter immédiatement vers des classes spécialisées",
+        "Proposer un soutien personnalisé et des adaptations pédagogiques",
+        "Baisser les exigences pour tous"
+      ],
+      "correctAnswer": 1,
+      "category": "Inclusion et équité éducative"
+    },
+    {
+      "id": "quiz_18",
+      "question": "Quelle stratégie est la plus efficace contre le décrochage scolaire ?",
+      "options": [
+        "Augmenter les sanctions disciplinaires",
+        "Créer un climat scolaire positif et des pédagogies motivantes",
+        "Ignorer le problème"
+      ],
+      "correctAnswer": 1,
+      "category": "Inclusion et équité éducative"
+    },
+    {
+      "id": "quiz_19",
+      "question": "Comment l'école peut-elle réduire les inégalités sociales ?",
+      "options": [
+        "En traitant tous les élèves de manière identique",
+        "En compensant les handicaps socioculturels par un accompagnement différencié",
+        "En sélectionnant uniquement les élèves favorisés"
+      ],
+      "correctAnswer": 1,
+      "category": "Inclusion et équité éducative"
+    },
+    {
+      "id": "quiz_20",
+      "question": "Comment valoriser la diversité culturelle à l'école ?",
+      "options": [
+        "En imposant une culture unique",
+        "En intégrant les richesses culturelles dans les apprentissages",
+        "En évitant d'aborder les différences"
+      ],
+      "correctAnswer": 1,
+      "category": "Inclusion et équité éducative"
+    }
+  ],
+  "duel": [
+    {
+      "id": "duel_1",
+      "title": "Négociation avec les autorités éducatives",
+      "description": "Choisissez un adversaire. Vous êtes directeur d'établissement, il représente les autorités. Négociez les moyens et objectifs pour la rentrée en 2 minutes. Si accord équitable, gagnez chacun 2 jetons.",
+      "rewards": {
+        "success": 2,
+        "fail": 3
+      }
+    },
+    {
+      "id": "duel_2",
+      "title": "Gestion de crise pédagogique",
+      "description": "Face à un scénario de crise choisi par les autres joueurs (élève en difficulté, conflit parents-enseignants, baisse des résultats...), vous et votre adversaire proposez chacun une solution en 30 secondes. Les autres votent pour la plus pertinente.",
+      "rewards": {
+        "success": 3,
+        "fail": 0
+      }
+    },
+    {
+      "id": "duel_3",
+      "title": "Projet éducatif collaboratif",
+      "description": "Invitez un joueur à collaborer. Élaborez ensemble un projet pédagogique innovant (échange d'élèves, mutualisation de ressources...). Si les autres jugent le projet viable, gagnez chacun 2 jetons.",
+      "rewards": {
+        "success": 2,
+        "fail": 0
+      }
+    },
+    {
+      "id": "duel_4",
+      "title": "Présentation de projet innovant",
+      "description": "Un défi d'innovation pédagogique vous est soumis. Vous et votre adversaire préparez une présentation de solution innovante en 1 minute. Les autres votent pour la proposition la plus créative et réalisable.",
+      "rewards": {
+        "success": 3,
+        "fail": 1
+      }
+    }
+  ]
+}

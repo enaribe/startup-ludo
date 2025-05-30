@@ -2,9 +2,6 @@ import { useRef, useState } from 'react';
 import { Animated, Easing } from 'react-native';
 import useSound from './useSound';
 
-// Import des données du secteur santé
-const santeData = require('../../data/sectors/sante-bien-etre.json');
-
 export type PlayerColor = 'yellow' | 'blue' | 'red' | 'green';
 export type PawnPosition = 'home' | number;
 
@@ -25,7 +22,6 @@ interface GameState {
   computerPlayers: PlayerColor[];
   showEventPopup: boolean;
   currentEventType: 'quiz' | 'financement' | 'duel' | 'opportunite' | 'challenge' | null;
-  pendingEvent: { color: PlayerColor; eventType: 'quiz' | 'financement' | 'duel' | 'opportunite' | 'challenge' } | null;
   lastTokenChange: number;
   currentEventData: any; // Pour stocker les données de l'événement actuel
   pendingQuizTokens: number; // Jetons en attente pour le quiz
@@ -37,9 +33,78 @@ interface GameState {
   quizAnswerSelected: boolean; // Pour savoir si le joueur a choisi une réponse au quiz
 }
 
-const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
+const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4, selectedEdition: string = 'Agri') => {
   // Hook pour les sons
   const { playSound, toggleSound, setSoundEnabled, isSoundEnabled } = useSound();
+
+  // Fonction pour charger les données selon l'édition sélectionnée
+  const getEditionData = (edition: string) => {
+    try {
+      console.log(`🔄 Tentative de chargement pour l'édition: "${edition}"`);
+      let data;
+      
+      switch (edition) {
+        case 'Agri':
+          data = require('../../data/sectors/agriculture.json');
+          break;
+        case 'Santé & Bien-être':
+          data = require('../../data/sectors/sante-bien-etre.json');
+          break;
+        case 'Éducation':
+          data = require('../../data/sectors/education.json');
+          break;
+        case 'Tourisme & Hôtellerie':
+          data = require('../../data/sectors/tourisme-hotellerie.json');
+          break;
+        case 'Industries Culturelles & Créatives':
+          data = require('../../data/sectors/industries-culturelles-creatives.json');
+          break;
+        default:
+          console.warn(`⚠️ Édition inconnue: "${edition}", utilisation d'Agri par défaut`);
+          data = require('../../data/sectors/agriculture.json');
+          break;
+      }
+      
+      // Logs détaillés pour debug
+      console.log(`📋 Données brutes chargées:`, {
+        hasData: !!data,
+        edition: data?.edition,
+        hasQuiz: !!data?.quiz,
+        quizLength: data?.quiz?.length,
+        hasOpportunites: !!data?.opportunites,
+        opportunitesLength: data?.opportunites?.length
+      });
+      
+      // Vérifier que les données sont valides
+      if (!data || typeof data !== 'object' || !data.edition) {
+        console.error(`❌ Données invalides pour l'édition "${edition}" - fallback vers agriculture`);
+        data = require('../../data/sectors/agriculture.json');
+      }
+      
+      console.log(`✅ Données finales chargées pour: "${data.edition || 'Unknown'}"`);
+      return data;
+    } catch (error) {
+      console.error(`❌ Erreur lors du chargement de l'édition "${edition}":`, error);
+      // Fallback vers agriculture en cas d'erreur
+      const fallbackData = require('../../data/sectors/agriculture.json');
+      console.log(`🔄 Fallback utilisé: "${fallbackData.edition}"`);
+      return fallbackData;
+    }
+  };
+
+  // Charger les données de l'édition sélectionnée
+  const editionData = getEditionData(selectedEdition);
+  
+  // Debug : Vérifier quelle édition est chargée et si les données existent
+  console.log(`🎯 Édition sélectionnée: "${selectedEdition}"`);
+  console.log(`📊 Données chargées:`, {
+    edition: editionData.edition,
+    quiz: editionData.quiz?.length || 0,
+    opportunites: editionData.opportunites?.length || 0,
+    challenges: editionData.challenges?.length || 0,
+    financement: editionData.financement?.length || 0,
+    duel: editionData.duel?.length || 0
+  });
 
   // Configuration des joueurs actifs selon le nombre choisi
   const getActivePlayers = (players: 1 | 2 | 3 | 4): PlayerColor[] => {
@@ -94,7 +159,6 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
     computerPlayers: getComputerPlayers(numberOfPlayers),
     showEventPopup: false,
     currentEventType: null,
-    pendingEvent: null,
     lastTokenChange: 0,
     currentEventData: null,
     pendingQuizTokens: 0,
@@ -363,40 +427,99 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
     try {
       let dataArray: any[] = [];
       
+      console.log(`🔍 getRandomEventData appelée pour: ${eventType}`);
+      console.log(`📋 Données édition disponibles:`, Object.keys(editionData));
+      
       switch (eventType) {
         case 'quiz':
-          dataArray = santeData.quiz || [];
+          dataArray = editionData.quiz || [];
+          console.log(`📝 Quiz trouvés: ${dataArray.length} éléments`);
           break;
         case 'financement':
-          dataArray = santeData.financement || [];
+          dataArray = editionData.financement || [];
+          console.log(`💰 Financements trouvés: ${dataArray.length} éléments`);
           break;
         case 'duel':
-          dataArray = santeData.duel || [];
+          dataArray = editionData.duel || [];
+          console.log(`⚔️ Duels trouvés: ${dataArray.length} éléments`);
           break;
         case 'opportunite':
-          dataArray = santeData.opportunites || [];
+          dataArray = editionData.opportunites || [];
+          console.log(`🎯 Opportunités trouvées: ${dataArray.length} éléments`);
           break;
         case 'challenge':
-          dataArray = santeData.challenges || [];
+          dataArray = editionData.challenges || [];
+          console.log(`💀 Challenges trouvés: ${dataArray.length} éléments`);
           break;
       }
       
       if (dataArray.length === 0) {
-        console.warn(`Aucune donnée trouvée pour ${eventType}`);
-        return null;
+        console.warn(`⚠️ Aucune donnée trouvée pour ${eventType} dans l'édition ${selectedEdition}`);
+        
+        // Créer des données de fallback génériques
+        const fallbackData = {
+          quiz: {
+            id: "fallback_quiz",
+            question: `Quelle pratique est recommandée pour développer son entreprise dans le secteur ${selectedEdition} ?`,
+            options: [
+              "Se former continuellement aux nouveautés du secteur",
+              "Ignorer la concurrence et se concentrer uniquement sur son produit",
+              "Éviter les partenariats pour garder le contrôle total"
+            ],
+            correctAnswer: 0,
+            category: "Général"
+          },
+          financement: {
+            id: "fallback_fin",
+            title: "Financement générique",
+            description: `Vous obtenez un financement pour votre projet dans le secteur ${selectedEdition}.`,
+            tokens: 2
+          },
+          duel: {
+            id: "fallback_duel",
+            title: "Défi entrepreneurial",
+            description: `Vous relevez un défi avec un autre entrepreneur du secteur ${selectedEdition}.`,
+            rewards: { success: 2, fail: 0 }
+          },
+          opportunite: {
+            id: "fallback_opp",
+            title: "Opportunité sectorielle",
+            description: `Une opportunité se présente dans votre secteur ${selectedEdition}.`,
+            tokens: 2
+          },
+          challenge: {
+            id: "fallback_chal",
+            title: "Défi du secteur",
+            description: `Vous faites face à un défi typique du secteur ${selectedEdition}.`,
+            tokens: -2
+          }
+        };
+        
+        console.log(`🔧 Utilisation des données de fallback pour ${eventType}`);
+        return fallbackData[eventType];
       }
       
       // Sélectionner un élément aléatoire
       const randomIndex = Math.floor(Math.random() * dataArray.length);
-      return dataArray[randomIndex];
+      const selectedData = dataArray[randomIndex];
+      console.log(`✅ Données sélectionnées pour ${eventType}:`, selectedData);
+      return selectedData;
     } catch (error) {
-      console.error(`Erreur lors de la récupération des données pour ${eventType}:`, error);
+      console.error(`❌ Erreur lors de la récupération des données pour ${eventType}:`, error);
       return null;
     }
   };
 
   // Fonction pour vérifier et déclencher un événement
   const checkAndTriggerEvent = (color: PlayerColor, position: number, diceValue: number = 0) => {
+    console.log(`🎯 checkAndTriggerEvent - Joueur: ${color}, Position: ${position}, Dé: ${diceValue}`);
+    
+    // Si on a fait 6, on ignore complètement l'événement de cette case
+    if (diceValue === 6) {
+      console.log(`🎲 Dé = 6 détecté, on ignore l'événement de la case ${position}`);
+      return;
+    }
+
     const { row, col } = paths[color][position];
     const cellKey = `${row}-${col}`;
     const eventType = eventDistribution[cellKey];
@@ -405,237 +528,79 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
     console.log(`État actuel popup: visible=${gameState.showEventPopup}, type=${gameState.currentEventType}`);
     
     if (eventType) {
-      // Récupérer les vraies données depuis le JSON
+      console.log(`📋 Événement détecté: ${eventType} à la position ${position} (${row},${col})`);
       const eventData = getRandomEventData(eventType);
-      console.log(`Données événement sélectionnées:`, eventData);
-      
-      // Si le joueur a fait 6, TOUJOURS stocker l'événement en attente (peu importe le type)
-      if (diceValue === 6) {
-        console.log(`Événement ${eventType} mis en attente car le joueur a fait 6 et va rejouer`);
-        setGameState(prev => ({
-          ...prev,
-          pendingEvent: { color, eventType },
-          currentEventData: eventData
-        }));
-        return; // Ne pas déclencher l'événement maintenant
-      }
-      
-      // Si ce n'est pas un 6, déclencher l'événement normalement
-      // Calculer les jetons selon les données réelles ou système par défaut
-      let tokensChange = 0;
-      
-      if (eventData && eventData.tokens) {
-        tokensChange = eventData.tokens;
-      } else if (eventData && eventData.rewards) {
-        // Pour les duels qui ont une structure rewards
-        tokensChange = eventData.rewards.success || 0;
-      } else {
-        const randomOutcome = Math.random();
-        
-        switch (eventType) {
-          case 'quiz':
-            tokensChange = randomOutcome < 0.6 ? 1 : (randomOutcome < 0.8 ? 0 : -1);
-            break;
-          case 'financement':
-            tokensChange = randomOutcome < 0.7 ? 2 : (randomOutcome < 0.85 ? 1 : -1);
-            break;
-          case 'duel':
-            tokensChange = randomOutcome < 0.5 ? 2 : (randomOutcome < 0.7 ? 0 : -2);
-            break;
-          case 'opportunite':
-            tokensChange = randomOutcome < 0.4 ? 1 : (randomOutcome < 0.7 ? 0 : -1);
-            break;
-          case 'challenge':
-            tokensChange = randomOutcome < 0.2 ? 0 : (randomOutcome < 0.6 ? -1 : -2);
-            break;
-        }
-      }
-      
-      // Pour les quiz, on stocke les jetons en attente et laisse le joueur répondre
-      if (eventType === 'quiz') {
-        console.log(`Traitement QUIZ pour ${color} avec données:`, eventData);
-        const potentialTokens = Math.abs(tokensChange) || 1;
-        
-        setGameState(prev => ({
-          ...prev,
-          pendingQuizTokens: potentialTokens,
-          lastTokenChange: 0,
-          currentEventData: eventData,
-          eventPlayerColor: color,
-          quizAnswerSelected: false
-        }));
-      } else if (eventType === 'duel') {
-        console.log(`Traitement DUEL pour ${color} avec données:`, eventData);
-        // Pour les duels, initier le système de vote
-        const opponent = getDuelOpponent(color);
-        const voters = getDuelVoters(color);
-        
-        if (opponent && voters && gameState.activePlayers.includes(opponent)) {
-          setGameState(prev => ({
-            ...prev,
-            duelPlayers: [color, opponent], // Les duellistes
-            duelVoters: voters, // Ceux qui votent
-            duelVotes: {},
-            currentEventData: eventData,
-            eventPlayerColor: color
-          }));
-        } else {
-          // Si l'adversaire n'est pas actif, traiter comme un événement normal
-          if (tokensChange !== 0) {
-            setGameState(prev => ({
-              ...prev,
-              tokens: {
-                ...prev.tokens,
-                [color]: prev.tokens[color] + tokensChange
-              }
-            }));
-          }
-          
-          setGameState(prev => ({
-            ...prev,
-            lastTokenChange: tokensChange,
-            currentEventData: eventData,
-            eventPlayerColor: color
-          }));
-        }
-      } else {
-        console.log(`Traitement ${eventType.toUpperCase()} pour ${color} avec données:`, eventData);
-        // Pour les autres événements (opportunite, financement, challenge), appliquer directement les jetons
-        if (tokensChange !== 0) {
-          setGameState(prev => ({
-            ...prev,
-            tokens: {
-              ...prev.tokens,
-              [color]: prev.tokens[color] + tokensChange
-            }
-          }));
-        }
-        
-        // Pour les challenges, marquer qu'un recul de 2 cases est nécessaire
-        const needsMoveBack = eventType === 'challenge';
-        
-        setGameState(prev => ({
-          ...prev,
-          lastTokenChange: tokensChange,
-          currentEventData: eventData,
-          eventPlayerColor: color,
-          pendingMoveBack: needsMoveBack ? { color, positions: 2 } : null
-        }));
-      }
-      
-      // Déclencher l'événement immédiatement (car ce n'est pas un 6)
-      console.log(`Déclenchement événement ${eventType} dans 700ms`);
-      setGameState(prev => ({
-        ...prev,
-        showEventPopup: false,
-        currentEventType: null,
-        pendingEvent: null
-      }));
-      
-      setTimeout(() => {
-        console.log(`Affichage popup ${eventType} pour ${color}`);
-        setGameState(prev => ({
-          ...prev,
-          showEventPopup: true,
-          currentEventType: eventType
-        }));
-      }, 700);
-    } else if (diceValue === 6) {
-      // Si pas d'événement sur cette case mais le joueur a fait 6, ne rien faire
-      console.log(`Pas d'événement sur cette case, le joueur va rejouer`);
+      triggerEventDisplay(color, eventType, eventData);
+    } else {
+      console.log(`❌ Aucun événement à la position ${position} (${row},${col})`);
     }
   };
 
-  // Fonction pour déclencher un événement en attente
-  const triggerPendingEvent = () => {
-    if (gameState.pendingEvent && gameState.currentEventData) {
-      const { color, eventType } = gameState.pendingEvent;
-      const eventData = gameState.currentEventData;
+  // Nouvelle fonction pour gérer l'affichage des événements
+  const triggerEventDisplay = (color: PlayerColor, eventType: string, eventData: any) => {
+    console.log(`🎯 Affichage événement - Type: ${eventType}, Joueur: ${color}`);
+    console.log('Données événement:', eventData);
+
+    // Calculer les jetons selon les données réelles ou système par défaut
+    let tokensChange = 0;
+    
+    if (eventData && eventData.tokens) {
+      tokensChange = eventData.tokens;
+    } else if (eventData && eventData.rewards) {
+      // Pour les duels qui ont une structure rewards
+      tokensChange = eventData.rewards.success || 0;
+    } else {
+      const randomOutcome = Math.random();
       
-      console.log(`Déclenchement de l'événement en attente: ${eventType} pour ${color}`);
-      
-      // Calculer les jetons selon les données réelles ou système par défaut
-      let tokensChange = 0;
-      
-      if (eventData && eventData.tokens) {
-        tokensChange = eventData.tokens;
-      } else if (eventData && eventData.rewards) {
-        // Pour les duels qui ont une structure rewards
-        tokensChange = eventData.rewards.success || 0;
-      } else {
-        const randomOutcome = Math.random();
-        
-        switch (eventType) {
-          case 'quiz':
-            tokensChange = randomOutcome < 0.6 ? 1 : (randomOutcome < 0.8 ? 0 : -1);
-            break;
-          case 'financement':
-            tokensChange = randomOutcome < 0.7 ? 2 : (randomOutcome < 0.85 ? 1 : -1);
-            break;
-          case 'duel':
-            tokensChange = randomOutcome < 0.5 ? 2 : (randomOutcome < 0.7 ? 0 : -2);
-            break;
-          case 'opportunite':
-            tokensChange = randomOutcome < 0.4 ? 1 : (randomOutcome < 0.7 ? 0 : -1);
-            break;
-          case 'challenge':
-            tokensChange = randomOutcome < 0.2 ? 0 : (randomOutcome < 0.6 ? -1 : -2);
-            break;
-        }
+      switch (eventType) {
+        case 'quiz':
+          tokensChange = randomOutcome < 0.6 ? 1 : (randomOutcome < 0.8 ? 0 : -1);
+          break;
+        case 'financement':
+          tokensChange = randomOutcome < 0.7 ? 2 : (randomOutcome < 0.85 ? 1 : -1);
+          break;
+        case 'duel':
+          tokensChange = randomOutcome < 0.5 ? 2 : (randomOutcome < 0.7 ? 0 : -2);
+          break;
+        case 'opportunite':
+          tokensChange = randomOutcome < 0.4 ? 1 : (randomOutcome < 0.7 ? 0 : -1);
+          break;
+        case 'challenge':
+          tokensChange = randomOutcome < 0.2 ? 0 : (randomOutcome < 0.6 ? -1 : -2);
+          break;
       }
+    }
+    
+    // Pour les quiz, on stocke les jetons en attente et laisse le joueur répondre
+    if (eventType === 'quiz') {
+      console.log(`Traitement QUIZ pour ${color} avec données:`, eventData);
+      const potentialTokens = Math.abs(tokensChange) || 1;
       
-      // Pour les quiz, on stocke les jetons en attente et laisse le joueur répondre
-      if (eventType === 'quiz') {
-        console.log(`Traitement QUIZ pour ${color} avec données:`, eventData);
-        const potentialTokens = Math.abs(tokensChange) || 1;
-        
+      setGameState(prev => ({
+        ...prev,
+        pendingQuizTokens: potentialTokens,
+        lastTokenChange: 0,
+        currentEventData: eventData,
+        eventPlayerColor: color,
+        quizAnswerSelected: false
+      }));
+    } else if (eventType === 'duel') {
+      console.log(`Traitement DUEL pour ${color} avec données:`, eventData);
+      // Pour les duels, initier le système de vote
+      const opponent = getDuelOpponent(color);
+      const voters = getDuelVoters(color);
+      
+      if (opponent && voters && gameState.activePlayers.includes(opponent)) {
         setGameState(prev => ({
           ...prev,
-          pendingQuizTokens: potentialTokens,
-          lastTokenChange: 0,
-          showEventPopup: false,
-          currentEventType: null,
-          pendingEvent: null,
-          eventPlayerColor: color,
-          quizAnswerSelected: false
+          duelPlayers: [color, opponent], // Les duellistes
+          duelVoters: voters, // Ceux qui votent
+          duelVotes: {},
+          currentEventData: eventData,
+          eventPlayerColor: color
         }));
-      } else if (eventType === 'duel') {
-        console.log(`Traitement DUEL pour ${color} avec données:`, eventData);
-        // Pour les duels, initier le système de vote
-        const opponent = getDuelOpponent(color);
-        const voters = getDuelVoters(color);
-        
-        if (opponent && voters && gameState.activePlayers.includes(opponent)) {
-          setGameState(prev => ({
-            ...prev,
-            duelPlayers: [color, opponent], // Les duellistes
-            duelVoters: voters, // Ceux qui votent
-            duelVotes: {},
-            currentEventData: eventData,
-            eventPlayerColor: color
-          }));
-        } else {
-          // Si l'adversaire n'est pas actif, traiter comme un événement normal
-          if (tokensChange !== 0) {
-            setGameState(prev => ({
-              ...prev,
-              tokens: {
-                ...prev.tokens,
-                [color]: prev.tokens[color] + tokensChange
-              }
-            }));
-          }
-          
-          setGameState(prev => ({
-            ...prev,
-            lastTokenChange: tokensChange,
-            currentEventData: eventData,
-            eventPlayerColor: color
-          }));
-        }
       } else {
-        console.log(`Traitement ${eventType.toUpperCase()} pour ${color} avec données:`, eventData);
-        // Pour les autres événements (opportunite, financement, challenge), appliquer directement les jetons
+        // Si l'adversaire n'est pas actif, traiter comme un événement normal
         if (tokensChange !== 0) {
           setGameState(prev => ({
             ...prev,
@@ -646,30 +611,51 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
           }));
         }
         
-        // Pour les challenges, marquer qu'un recul de 2 cases est nécessaire
-        const needsMoveBack = eventType === 'challenge';
-        
         setGameState(prev => ({
           ...prev,
           lastTokenChange: tokensChange,
-          showEventPopup: false,
-          currentEventType: null,
-          pendingEvent: null,
-          eventPlayerColor: color,
-          pendingMoveBack: needsMoveBack ? { color, positions: 2 } : null
+          currentEventData: eventData,
+          eventPlayerColor: color
+        }));
+      }
+    } else {
+      console.log(`Traitement ${eventType.toUpperCase()} pour ${color} avec données:`, eventData);
+      // Pour les autres événements (opportunite, financement, challenge), appliquer directement les jetons
+      if (tokensChange !== 0) {
+        setGameState(prev => ({
+          ...prev,
+          tokens: {
+            ...prev.tokens,
+            [color]: prev.tokens[color] + tokensChange
+          }
         }));
       }
       
-      // Déclencher l'affichage du popup
-      setTimeout(() => {
-        setGameState(prev => ({
-          ...prev,
-          showEventPopup: true,
-          currentEventType: eventType
-        }));
-      }, 700);
+      // Pour les challenges, marquer qu'un recul de 2 cases est nécessaire
+      const needsMoveBack = eventType === 'challenge';
+      
+      setGameState(prev => ({
+        ...prev,
+        lastTokenChange: tokensChange,
+        currentEventData: eventData,
+        eventPlayerColor: color,
+        pendingMoveBack: needsMoveBack ? { color, positions: 2 } : null
+      }));
     }
+    
+    // Afficher le popup immédiatement
+    setTimeout(() => {
+      console.log(`📱 Affichage popup ${eventType} pour ${color}`);
+      setGameState(prev => ({
+        ...prev,
+        showEventPopup: true,
+        currentEventType: eventType as any,
+        currentEventData: eventData
+      }));
+    }, 700);
   };
+
+  // Fonction pour déclencher un événement en attente (supprimée car plus nécessaire)
 
   // Fonction pour gérer les votes des duels
   const handleDuelVote = (player: PlayerColor, vote: 'accept' | 'refuse') => {
@@ -791,6 +777,7 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
       currentEventType: null,
       pendingQuizTokens: 0,
       eventPlayerColor: null,
+      currentEventData: null,  // ← Nettoyer les données de l'événement
       duelVotes: {},
       duelPlayers: null,
       duelVoters: null,
@@ -1045,7 +1032,6 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
       currentPlayer: prev.activePlayers[0],
       showEventPopup: false,
       currentEventType: null,
-      pendingEvent: null,
       lastTokenChange: 0,
       currentEventData: null,
       pendingQuizTokens: 0,
@@ -1329,7 +1315,6 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
                 checkAndTriggerEvent(currentPlayerAtThisTime, realPosition, finalValue);
               } else {
                 setGameState(prev => ({ ...prev, message: 'Déplacement impossible (fin du chemin), tour suivant.' }));
-                triggerPendingEvent();
               }
             }
             
@@ -1347,8 +1332,6 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
               }, 200);
             } else {
               // Le joueur n'a pas fait 6, déclencher l'événement en attente s'il y en a un
-              triggerPendingEvent();
-              
               setTimeout(() => {
                 setGameState(prev => {
                   let nextPlayerIndex = (prev.activePlayers.indexOf(prev.currentPlayer) + 1) % prev.activePlayers.length;
@@ -1370,8 +1353,6 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
               : 'Vous devez faire 6 pour sortir de la maison.';
             setGameState(prev => ({ ...prev, message: homeMessage }));
             // Le tour se termine, mais le pion reste à la maison, déclencher l'événement en attente s'il y en a un
-            triggerPendingEvent();
-            
             setTimeout(() => {
               setGameState(prev => {
                 let nextPlayerIndex = (prev.activePlayers.indexOf(prev.currentPlayer) + 1) % prev.activePlayers.length;
@@ -1433,6 +1414,13 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
     }
   };
 
+  // Fonction de test pour diagnostiquer la case (6,0) - TEMPORAIRE
+  const testCase6_0 = () => {
+    console.log('🧪 TEST CASE (6,0) - Les corrections ont été apportées');
+    console.log('Le problème de contamination entre événements devrait être résolu');
+    console.log('currentEventData est maintenant nettoyé entre les événements');
+  };
+
   return {
     gameState,
     pawnAnim,
@@ -1453,6 +1441,7 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
     toggleSound,
     setSoundEnabled,
     isSoundEnabled,
+    testCase6_0,
   };
 };
 

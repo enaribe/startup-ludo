@@ -11,10 +11,11 @@ const BOARD_SIZE = 15;
 
 interface GameScreenProps {
   numberOfPlayers: 1 | 2 | 3 | 4;
+  selectedEdition: string;
   onResetGame: () => void;
 }
 
-const GameScreen: React.FC<GameScreenProps> = ({ numberOfPlayers, onResetGame }) => {
+const GameScreen: React.FC<GameScreenProps> = ({ numberOfPlayers, selectedEdition, onResetGame }) => {
   const { width, height } = useWindowDimensions();
   const boardMaxSize = Math.min(width, height) * 0.95;
   const cellSize = Math.floor(boardMaxSize / BOARD_SIZE);
@@ -33,7 +34,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ numberOfPlayers, onResetGame })
     getDuelOpponent,
     handleDuelVote,
     getDuelVoters,
-  } = useGameLogic(numberOfPlayers);
+  } = useGameLogic(numberOfPlayers, selectedEdition);
 
   // Debug: Log de l'état du popup
   useEffect(() => {
