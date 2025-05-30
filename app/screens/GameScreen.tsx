@@ -52,14 +52,24 @@ const GameScreen: React.FC<GameScreenProps> = ({ numberOfPlayers, onResetGame })
         !gameState.rolling && 
         !gameState.isAnimating && 
         !gameState.gameFinished &&
+        !gameState.showEventPopup && // Attendre que les popups se ferment
         gameState.diceValue === null) { // Seulement si le dé n'a pas encore été lancé
+      
       const timer = setTimeout(() => {
+        console.log('🎮 Déclenchement automatique du tour de l\'ordinateur');
         computerPlay(cellSize);
       }, 500); // Petit délai pour éviter les conflits
       
       return () => clearTimeout(timer);
     }
-  }, [gameState.currentPlayer, gameState.rolling, gameState.isAnimating, gameState.gameFinished, gameState.diceValue]);
+  }, [
+    gameState.currentPlayer, 
+    gameState.rolling, 
+    gameState.isAnimating, 
+    gameState.gameFinished, 
+    gameState.diceValue,
+    gameState.showEventPopup // Ajouter showEventPopup aux dépendances
+  ]);
 
   // Déplacement du pion (clic sur la case du pion)
   const handleCellPress = (cell: Cell) => {

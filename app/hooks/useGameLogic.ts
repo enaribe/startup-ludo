@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing } from 'react-native';
 import useSound from './useSound';
 
@@ -363,6 +363,9 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
     try {
       let dataArray: any[] = [];
       
+      console.log(`[DEBUG] getRandomEventData appelé avec eventType: ${eventType}`);
+      console.log(`[DEBUG] santeData structure:`, Object.keys(santeData));
+      
       switch (eventType) {
         case 'quiz':
           dataArray = santeData.quiz || [];
@@ -381,16 +384,23 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
           break;
       }
       
+      console.log(`[DEBUG] dataArray pour ${eventType}:`, dataArray?.length, 'éléments');
+      console.log(`[DEBUG] Premier élément:`, dataArray?.[0]);
+      
       if (dataArray.length === 0) {
-        console.warn(`Aucune donnée trouvée pour ${eventType}`);
+        console.warn(`[WARNING] Aucune donnée trouvée pour ${eventType}`);
+        console.warn(`[WARNING] santeData complet:`, santeData);
         return null;
       }
       
       // Sélectionner un élément aléatoire
       const randomIndex = Math.floor(Math.random() * dataArray.length);
-      return dataArray[randomIndex];
+      const selectedData = dataArray[randomIndex];
+      console.log(`[DEBUG] Élément sélectionné (index ${randomIndex}):`, selectedData);
+      return selectedData;
     } catch (error) {
-      console.error(`Erreur lors de la récupération des données pour ${eventType}:`, error);
+      console.error(`[ERROR] Erreur lors de la récupération des données pour ${eventType}:`, error);
+      console.error(`[ERROR] santeData:`, santeData);
       return null;
     }
   };
@@ -1006,15 +1016,101 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
     }
   };
 
+  // Fonction pour que l'ordinateur réponde automatiquement aux quiz
+  const handleComputerQuizResponse = () => {
+    if (!gameState.isComputerGame || !gameState.computerPlayers.includes(gameState.currentPlayer)) {
+      return;
+    }
+    
+    if (gameState.currentEventType === 'quiz' && gameState.currentEventData) {
+      // L'ordinateur a 70% de chance de donner la bonne réponse
+      const correctAnswer = gameState.currentEventData.correctAnswer;
+      const willAnswerCorrectly = Math.random() < 0.7;
+      
+      let selectedAnswer;
+      if (willAnswerCorrectly && correctAnswer !== undefined) {
+        selectedAnswer = correctAnswer;
+      } else {
+        // Réponse aléatoire parmi les options disponibles
+        const numOptions = gameState.currentEventData.options?.length || 3;
+        selectedAnswer = Math.floor(Math.random() * numOptions);
+      }
+      
+      console.log(`🤖 Ordinateur répond au quiz: option ${selectedAnswer} (correcte: ${correctAnswer})`);
+      
+      // Attendre un peu pour simuler la réflexion
+      setTimeout(() => {
+        handleQuizAnswer(selectedAnswer);
+      }, 1000 + Math.random() * 1500); // 1-2.5 secondes
+    }
+  };
+
+  // Fonction pour que l'ordinateur gère automatiquement les duels
+  const handleComputerDuelVote = () => {
+    if (!gameState.isComputerGame || !gameState.duelVoters || !gameState.duelPlayers) {
+      return;
+    }
+    
+    // Vérifier si l'ordinateur doit voter ET n'est pas impliqué dans le duel
+    const computerVoter = gameState.duelVoters.find(voter => 
+      gameState.computerPlayers.includes(voter)
+    );
+    
+    const computerIsDuelist = gameState.duelPlayers.some(player => 
+      gameState.computerPlayers.includes(player)
+    );
+    
+    // L'ordinateur ne vote que s'il est votant ET n'est pas duelliste
+    if (computerVoter && !computerIsDuelist && !gameState.duelVotes[computerVoter]) {
+      // L'ordinateur a 60% de chance d'accepter le duel
+      const willAccept = Math.random() < 0.6;
+      const vote = willAccept ? 'accept' : 'refuse';
+      
+      console.log(`🤖 Ordinateur (${computerVoter}) vote pour le duel: ${vote}`);
+      
+      // Attendre un peu pour simuler la réflexion
+      setTimeout(() => {
+        handleDuelVote(computerVoter, vote);
+      }, 800 + Math.random() * 1200); // 0.8-2 secondes
+    }
+  };
+
+  // Fonction pour que l'ordinateur gère automatiquement les autres événements
+  const handleComputerAutoEvent = () => {
+    if (!gameState.isComputerGame || !gameState.computerPlayers.includes(gameState.currentPlayer)) {
+      return;
+    }
+    
+    // Pour les événements automatiques (financement, opportunité, challenge)
+    // L'ordinateur ferme automatiquement le popup après l'avoir "lu"
+    if (gameState.showEventPopup && 
+        ['financement', 'opportunite', 'challenge'].includes(gameState.currentEventType || '')) {
+      
+      console.log(`🤖 Ordinateur gère l'événement: ${gameState.currentEventType}`);
+      
+      // Attendre un peu pour simuler la lecture
+      setTimeout(() => {
+        closeEventPopup();
+      }, 1500 + Math.random() * 1000); // 1.5-2.5 secondes
+    }
+  };
+
   // Fonction pour que l'ordinateur joue automatiquement
   const computerPlay = async (cellSize: number) => {
     if (!gameState.isComputerGame || !gameState.computerPlayers.includes(gameState.currentPlayer)) {
       return;
     }
 
-    // Attendre un peu pour simuler la réflexion de l'ordinateur (réduit pour plus de rapidité)
-    await wait(300 + Math.random() * 500); // Réduit de 1000-2500ms à 300-800ms
+    // Attendre que les popups se ferment et que les animations se terminent
+    if (gameState.showEventPopup || gameState.isAnimating || gameState.rolling) {
+      console.log(`🤖 Ordinateur attend (popup: ${gameState.showEventPopup}, animation: ${gameState.isAnimating}, rolling: ${gameState.rolling})`);
+      return;
+    }
+
+    // Attendre un peu pour simuler la réflexion de l'ordinateur
+    await wait(300 + Math.random() * 500); // 300-800ms
     
+    console.log(`🤖 Ordinateur lance le dé`);
     // L'ordinateur lance le dé automatiquement
     rollDice(cellSize);
   };
@@ -1433,6 +1529,108 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
     }
   };
 
+  // Fonction pour valider la cohérence entre cases et événements
+  const validateEventDistribution = () => {
+    console.log('🔍 [VALIDATION] Vérification de la cohérence des événements...');
+    
+    const problematicCases: string[] = [];
+    const eventCounts = { quiz: 0, financement: 0, duel: 0, opportunite: 0, challenge: 0 };
+    
+    // Vérifier chaque case avec événement
+    Object.entries(eventDistribution).forEach(([cellKey, eventType]) => {
+      const [row, col] = cellKey.split('-').map(Number);
+      
+      // Tester si on peut récupérer les données pour ce type d'événement
+      const testData = getRandomEventData(eventType);
+      
+      if (!testData) {
+        problematicCases.push(`Case (${row},${col}) : type '${eventType}' sans données disponibles`);
+      } else {
+        // Vérifier la structure des données selon le type
+        switch (eventType) {
+          case 'quiz':
+            if (!testData.question || !testData.options || testData.correctAnswer === undefined) {
+              problematicCases.push(`Case (${row},${col}) : quiz avec structure incorrecte`);
+            }
+            break;
+          case 'financement':
+          case 'opportunite':
+          case 'challenge':
+            if (!testData.title || !testData.description || testData.tokens === undefined) {
+              problematicCases.push(`Case (${row},${col}) : ${eventType} avec structure incorrecte`);
+            }
+            break;
+          case 'duel':
+            if (!testData.title || !testData.description || !testData.rewards) {
+              problematicCases.push(`Case (${row},${col}) : duel avec structure incorrecte`);
+            }
+            break;
+        }
+      }
+      
+      eventCounts[eventType]++;
+    });
+    
+    console.log('📊 [VALIDATION] Répartition des événements:', eventCounts);
+    
+    if (problematicCases.length > 0) {
+      console.error('❌ [VALIDATION] Cases problématiques détectées:');
+      problematicCases.forEach(problem => console.error('  -', problem));
+    } else {
+      console.log('✅ [VALIDATION] Tous les événements sont cohérents !');
+    }
+    
+    return problematicCases;
+  };
+
+  // Validation de la cohérence des événements au démarrage
+  useEffect(() => {
+    const problematicCases = validateEventDistribution();
+    if (problematicCases.length > 0) {
+      console.warn('⚠️ [WARNING] Des incohérences ont été détectées dans la distribution des événements');
+    }
+  }, []); // Exécution une seule fois au montage
+
+  // Gestion automatique des événements pour l'ordinateur
+  useEffect(() => {
+    if (gameState.isComputerGame && gameState.showEventPopup) {
+      const isComputerEvent = gameState.eventPlayerColor && 
+        gameState.computerPlayers.includes(gameState.eventPlayerColor);
+      
+      if (isComputerEvent) {
+        switch (gameState.currentEventType) {
+          case 'quiz':
+            handleComputerQuizResponse();
+            break;
+          case 'duel':
+            // Pour les duels, l'ordinateur ne fait rien s'il est duelliste
+            // Il attend juste que les autres votent
+            const computerIsDuelist = gameState.duelPlayers?.some(player => 
+              gameState.computerPlayers.includes(player)
+            );
+            if (!computerIsDuelist) {
+              handleComputerDuelVote();
+            } else {
+              console.log(`🤖 Ordinateur en duel, attend les votes des autres joueurs`);
+            }
+            break;
+          case 'financement':
+          case 'opportunite':
+          case 'challenge':
+            handleComputerAutoEvent();
+            break;
+        }
+      }
+    }
+  }, [gameState.showEventPopup, gameState.currentEventType, gameState.eventPlayerColor]);
+
+  // Gestion automatique des votes de duel pour l'ordinateur
+  useEffect(() => {
+    if (gameState.isComputerGame && gameState.duelVoters && gameState.showEventPopup) {
+      handleComputerDuelVote();
+    }
+  }, [gameState.duelVoters, gameState.duelVotes, gameState.showEventPopup]);
+
   return {
     gameState,
     pawnAnim,
@@ -1448,6 +1646,10 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4) => {
     getDuelOpponent,
     handleDuelVote,
     getDuelVoters,
+    // Nouvelles fonctions pour l'IA de l'ordinateur
+    handleComputerQuizResponse,
+    handleComputerDuelVote,
+    handleComputerAutoEvent,
     // Fonctions audio
     playSound,
     toggleSound,
