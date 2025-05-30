@@ -31,6 +31,16 @@ interface GameState {
   duelPlayers: [PlayerColor, PlayerColor] | null; // Les deux joueurs du duel en cours
   duelVoters: [PlayerColor, PlayerColor] | null; // Les deux joueurs qui votent pour le duel
   quizAnswerSelected: boolean; // Pour savoir si le joueur a choisi une réponse au quiz
+  usedCards: { // Tracker des cartes déjà utilisées dans cette partie
+    quiz: string[];
+    opportunites: string[];
+    challenges: string[];
+    financement: string[];
+    duel: string[];
+  };
+  showVictoryPopup: boolean; // Popup de victoire
+  winner: PlayerColor | null; // Le vainqueur de la partie
+  finalRanking: string; // Classement final de la partie
 }
 
 const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4, selectedEdition: string = 'Agri') => {
@@ -168,6 +178,16 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4, selectedEdition: strin
     duelPlayers: null,
     duelVoters: null,
     quizAnswerSelected: false,
+    usedCards: {
+      quiz: [],
+      opportunites: [],
+      challenges: [],
+      financement: [],
+      duel: [],
+    },
+    showVictoryPopup: false,
+    winner: null,
+    finalRanking: '',
   });
 
   // Animations des pions
@@ -425,36 +445,35 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4, selectedEdition: strin
   // Fonction pour sélectionner un élément aléatoire dans les données JSON
   const getRandomEventData = (eventType: 'quiz' | 'financement' | 'duel' | 'opportunite' | 'challenge') => {
     try {
-      let dataArray: any[] = [];
+      console.log(`🎯 Récupération données pour ${eventType}`);
       
-      console.log(`🔍 getRandomEventData appelée pour: ${eventType}`);
-      console.log(`📋 Données édition disponibles:`, Object.keys(editionData));
-      
+      // Récupérer les données selon le type d'événement
+      let dataArray;
       switch (eventType) {
         case 'quiz':
           dataArray = editionData.quiz || [];
-          console.log(`📝 Quiz trouvés: ${dataArray.length} éléments`);
           break;
         case 'financement':
           dataArray = editionData.financement || [];
-          console.log(`💰 Financements trouvés: ${dataArray.length} éléments`);
           break;
         case 'duel':
           dataArray = editionData.duel || [];
-          console.log(`⚔️ Duels trouvés: ${dataArray.length} éléments`);
           break;
         case 'opportunite':
           dataArray = editionData.opportunites || [];
-          console.log(`🎯 Opportunités trouvées: ${dataArray.length} éléments`);
           break;
         case 'challenge':
           dataArray = editionData.challenges || [];
-          console.log(`💀 Challenges trouvés: ${dataArray.length} éléments`);
           break;
+        default:
+          dataArray = [];
       }
-      
-      if (dataArray.length === 0) {
-        console.warn(`⚠️ Aucune donnée trouvée pour ${eventType} dans l'édition ${selectedEdition}`);
+
+      console.log(`📋 ${eventType}: ${dataArray.length} cartes disponibles au total`);
+
+      // Si aucune donnée disponible, utiliser le fallback
+      if (!dataArray || dataArray.length === 0) {
+        console.log(`⚠️ Aucune donnée pour ${eventType}, utilisation du fallback`);
         
         // Créer des données de fallback génériques
         const fallbackData = {
@@ -498,11 +517,48 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4, selectedEdition: strin
         console.log(`🔧 Utilisation des données de fallback pour ${eventType}`);
         return fallbackData[eventType];
       }
+
+      // Récupérer les cartes déjà utilisées pour ce type d'événement
+      const usedCardIds = gameState.usedCards[eventType === 'opportunite' ? 'opportunites' : eventType === 'challenge' ? 'challenges' : eventType] || [];
+      console.log(`📝 Cartes déjà utilisées pour ${eventType}:`, usedCardIds);
+
+      // Filtrer les cartes disponibles (non utilisées)
+      let availableCards = dataArray.filter((card: any) => !usedCardIds.includes(card.id));
+      console.log(`✅ Cartes disponibles pour ${eventType}: ${availableCards.length}/${dataArray.length}`);
+
+      // Si toutes les cartes ont été utilisées, remettre à zéro et utiliser toutes les cartes
+      if (availableCards.length === 0) {
+        console.log(`🔄 Toutes les cartes ${eventType} ont été utilisées, recyclage...`);
+        availableCards = [...dataArray];
+        
+        // Remettre à zéro la liste des cartes utilisées pour ce type
+        setGameState(prev => ({
+          ...prev,
+          usedCards: {
+            ...prev.usedCards,
+            [eventType === 'opportunite' ? 'opportunites' : eventType === 'challenge' ? 'challenges' : eventType]: []
+          }
+        }));
+      }
+
+      // Sélectionner une carte aléatoire parmi les disponibles
+      const randomIndex = Math.floor(Math.random() * availableCards.length);
+      const selectedData = availableCards[randomIndex];
       
-      // Sélectionner un élément aléatoire
-      const randomIndex = Math.floor(Math.random() * dataArray.length);
-      const selectedData = dataArray[randomIndex];
-      console.log(`✅ Données sélectionnées pour ${eventType}:`, selectedData);
+      console.log(`🎲 Carte sélectionnée pour ${eventType}:`, selectedData.id);
+
+      // Ajouter cette carte à la liste des cartes utilisées
+      setGameState(prev => ({
+        ...prev,
+        usedCards: {
+          ...prev.usedCards,
+          [eventType === 'opportunite' ? 'opportunites' : eventType === 'challenge' ? 'challenges' : eventType]: [
+            ...prev.usedCards[eventType === 'opportunite' ? 'opportunites' : eventType === 'challenge' ? 'challenges' : eventType],
+            selectedData.id
+          ]
+        }
+      }));
+
       return selectedData;
     } catch (error) {
       console.error(`❌ Erreur lors de la récupération des données pour ${eventType}:`, error);
@@ -1041,6 +1097,16 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4, selectedEdition: strin
       duelPlayers: null,
       duelVoters: null,
       quizAnswerSelected: false,
+      usedCards: {
+        quiz: [],
+        opportunites: [],
+        challenges: [],
+        financement: [],
+        duel: [],
+      },
+      showVictoryPopup: false,
+      winner: null,
+      finalRanking: '',
     }));
   };
 
@@ -1130,13 +1196,18 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4, selectedEdition: strin
                 
                 // Vérifie si le jeu est terminé
                 if (newFinishedPlayers.length === gameState.activePlayers.length - 1) {
-                  setGameState(prev => ({ ...prev, gameFinished: true }));
                   const lastPlayer = gameState.activePlayers.find(p => !newFinishedPlayers.includes(p));
-                  setTimeout(() => {
-                    const ranking = newFinishedPlayers.map((p, i) => `${i + 1}. ${p.toUpperCase()}`).join(', ');
-                    const finalRanking = lastPlayer ? `${ranking}, ${gameState.activePlayers.length}. ${lastPlayer.toUpperCase()}` : ranking;
-                    setGameState(prev => ({ ...prev, message: `Jeu terminé ! Classement final : ${finalRanking}` }));
-                  }, 1000);
+                  const ranking = newFinishedPlayers.map((p, i) => `${i + 1}. ${p.toUpperCase()}`).join(', ');
+                  const finalRanking = lastPlayer ? `${ranking}, ${gameState.activePlayers.length}. ${lastPlayer.toUpperCase()}` : ranking;
+                  const winner = newFinishedPlayers[0]; // Le premier joueur à terminer est le vainqueur
+                  
+                  setGameState(prev => ({ 
+                    ...prev, 
+                    gameFinished: true,
+                    showVictoryPopup: true,
+                    winner: winner,
+                    finalRanking: finalRanking
+                  }));
                   return;
                 }
                 
@@ -1224,13 +1295,18 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4, selectedEdition: strin
               
               // Vérifie si le jeu est terminé
               if (newFinishedPlayers.length === gameState.activePlayers.length - 1) {
-                setGameState(prev => ({ ...prev, gameFinished: true }));
                 const lastPlayer = gameState.activePlayers.find(p => !newFinishedPlayers.includes(p));
-                setTimeout(() => {
-                  const ranking = newFinishedPlayers.map((p, i) => `${i + 1}. ${p.toUpperCase()}`).join(', ');
-                  const finalRanking = lastPlayer ? `${ranking}, ${gameState.activePlayers.length}. ${lastPlayer.toUpperCase()}` : ranking;
-                  setGameState(prev => ({ ...prev, message: `Jeu terminé ! Classement final : ${finalRanking}` }));
-                }, 1000);
+                const ranking = newFinishedPlayers.map((p, i) => `${i + 1}. ${p.toUpperCase()}`).join(', ');
+                const finalRanking = lastPlayer ? `${ranking}, ${gameState.activePlayers.length}. ${lastPlayer.toUpperCase()}` : ranking;
+                const winner = newFinishedPlayers[0]; // Le premier joueur à terminer est le vainqueur
+                
+                setGameState(prev => ({ 
+                  ...prev, 
+                  gameFinished: true,
+                  showVictoryPopup: true,
+                  winner: winner,
+                  finalRanking: finalRanking
+                }));
                 return;
               }
               
@@ -1421,6 +1497,13 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4, selectedEdition: strin
     console.log('currentEventData est maintenant nettoyé entre les événements');
   };
 
+  const closeVictoryPopup = () => {
+    setGameState(prev => ({
+      ...prev,
+      showVictoryPopup: false
+    }));
+  };
+
   return {
     gameState,
     pawnAnim,
@@ -1442,6 +1525,7 @@ const useGameLogic = (numberOfPlayers: 1 | 2 | 3 | 4 = 4, selectedEdition: strin
     setSoundEnabled,
     isSoundEnabled,
     testCase6_0,
+    closeVictoryPopup,
   };
 };
 

@@ -5,6 +5,7 @@ import GameBoard, { Cell } from '../components/GameBoard';
 import GameHeader from '../components/GameHeader';
 import GameMessages from '../components/GameMessages';
 import PlayerCard from '../components/PlayerCard';
+import VictoryPopup from '../components/VictoryPopup';
 import useGameLogic from '../hooks/useGameLogic';
 
 const BOARD_SIZE = 15;
@@ -34,6 +35,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ numberOfPlayers, selectedEditio
     getDuelOpponent,
     handleDuelVote,
     getDuelVoters,
+    closeVictoryPopup,
   } = useGameLogic(numberOfPlayers, selectedEdition);
 
   // Debug: Log de l'état du popup
@@ -192,6 +194,14 @@ const GameScreen: React.FC<GameScreenProps> = ({ numberOfPlayers, selectedEditio
         duelVotes={gameState.duelVotes}
         onDuelVote={handleDuelVote}
         quizAnswerSelected={gameState.quizAnswerSelected}
+      />
+
+      <VictoryPopup
+        visible={gameState.showVictoryPopup}
+        winner={gameState.winner}
+        finalRanking={gameState.finalRanking}
+        isComputerGame={gameState.isComputerGame}
+        onClose={closeVictoryPopup}
       />
     </ImageBackground>
   );

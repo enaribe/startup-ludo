@@ -200,6 +200,7 @@ const RandomCardScreen: React.FC<RandomCardScreenProps> = ({ onStartGame }) => {
           <Animated.View 
             style={[
               styles.cardFace,
+
               styles.cardBack,
               {
                 transform: [{ rotateY: backInterpolate }],
