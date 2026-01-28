@@ -1,0 +1,1202 @@
+{
+  "edition": "Entrepreneuriat Général",
+  "evenements": [
+    {
+      "id": "evt_1",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Commande exceptionnelle",
+      "description": "Un client important vous passe une commande qui dépasse vos prévisions de 60%. Cette opportunité booste votre trésorerie et renforce votre crédibilité.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_2",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Partenariat stratégique",
+      "description": "Vous concluez un accord avec une entreprise complémentaire qui ouvre de nouveaux marchés et mutualise les ressources.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_3",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Prix d'innovation",
+      "description": "Votre entreprise remporte un prix prestigieux qui attire l'attention des médias et des investisseurs.",
+      "tokens": 4
+    },
+    {
+      "id": "evt_4",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Contrat public obtenu",
+      "description": "Vous décrochez un marché avec une institution publique, garantissant un revenu stable sur plusieurs années.",
+      "tokens": 4
+    },
+    {
+      "id": "evt_5",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Viral marketing",
+      "description": "Votre campagne de communication devient virale sur les réseaux sociaux, multipliant votre visibilité gratuitement.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_6",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Nouveau marché émergent",
+      "description": "Une évolution du marché crée une demande massive pour vos produits ou services dans une nouvelle région.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_7",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Recrutement d'un talent clé",
+      "description": "Un expert reconnu du secteur rejoint votre équipe, apportant son expertise et son réseau professionnel.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_8",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Certification qualité obtenue",
+      "description": "Votre entreprise obtient une certification internationale qui renforce votre position concurrentielle.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_9",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Brevet validé",
+      "description": "Votre innovation technologique est protégée par un brevet, vous donnant un avantage compétitif exclusif.",
+      "tokens": 4
+    },
+    {
+      "id": "evt_10",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Salon professionnel réussi",
+      "description": "Votre participation à un événement majeur génère des dizaines de contacts qualifiés et de nouveaux clients.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_11",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Optimisation des processus",
+      "description": "Une réorganisation interne augmente votre productivité de 40% sans coûts supplémentaires.",
+      "tokens": 2
+    },
+    {
+      "id": "evt_12",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Économies d'échelle",
+      "description": "Votre croissance vous permet de négocier de meilleurs tarifs avec vos fournisseurs.",
+      "tokens": 2
+    },
+    {
+      "id": "evt_13",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Client fidèle ambassadeur",
+      "description": "Un client satisfait recommande activement vos services, générant de nombreuses ventes.",
+      "tokens": 2
+    },
+    {
+      "id": "evt_14",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Levée de fonds réussie",
+      "description": "Vous convainquez des investisseurs qui injectent du capital pour accélérer votre développement.",
+      "tokens": 5
+    },
+    {
+      "id": "evt_15",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Exportation facilitée",
+      "description": "Un accord commercial bilatéral simplifie votre expansion internationale dans trois nouveaux pays.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_16",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Digitalisation réussie",
+      "description": "Votre transformation numérique ouvre de nouveaux canaux de vente et améliore l'expérience client.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_17",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Économie circulaire rentable",
+      "description": "Votre modèle de recyclage et réutilisation génère des revenus tout en réduisant vos coûts.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_18",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Franchise ou licence",
+      "description": "D'autres entrepreneurs souhaitent reproduire votre modèle et vous versent des redevances.",
+      "tokens": 4
+    },
+    {
+      "id": "evt_19",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Programme d'accélération",
+      "description": "Vous intégrez un incubateur prestigieux qui vous offre mentorat, réseau et financements.",
+      "tokens": 3,
+      "extra": "avancez de 2 cases"
+    },
+    {
+      "id": "evt_20",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Rachat d'un concurrent",
+      "description": "Vous acquérez une entreprise concurrente à un prix avantageux, consolidant votre position.",
+      "tokens": 5
+    },
+    {
+      "id": "evt_21",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Subvention régionale",
+      "description": "Vous obtenez une aide publique pour l'innovation qui finance 50% de votre projet de R&D.",
+      "tokens": 4
+    },
+    {
+      "id": "evt_22",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Article de presse favorable",
+      "description": "Un média influent publie un reportage élogieux sur votre entreprise et son impact.",
+      "tokens": 2
+    },
+    {
+      "id": "evt_23",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Automatisation productive",
+      "description": "L'installation de nouveaux équipements double votre capacité de production.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_24",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Diversification réussie",
+      "description": "Votre nouveau produit ou service complémentaire rencontre immédiatement son public.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_25",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Économie collaborative",
+      "description": "Vous créez un réseau de partenaires qui partagent locaux, équipements et compétences.",
+      "tokens": 2
+    },
+    {
+      "id": "evt_26",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Rupture de stock majeure",
+      "description": "Vos fournisseurs principaux ne peuvent plus livrer, bloquant votre production pendant des semaines.",
+      "tokens": -3
+    },
+    {
+      "id": "evt_27",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Client important impayé",
+      "description": "Un client majeur ne règle pas ses factures, mettant votre trésorerie en danger.",
+      "tokens": -3,
+      "extra": "payez 2 jetons pour engager des poursuites"
+    },
+    {
+      "id": "evt_28",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Panne d'équipement critique",
+      "description": "Votre machine principale tombe en panne et les réparations prendront plusieurs mois.",
+      "tokens": -2,
+      "extra": "payez 3 jetons pour une réparation d'urgence"
+    },
+    {
+      "id": "evt_29",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Départ d'associé clé",
+      "description": "Un cofondateur quitte l'entreprise de manière conflictuelle, créant des tensions.",
+      "tokens": -3,
+      "extra": "passez votre prochain tour"
+    },
+    {
+      "id": "evt_30",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Cyberattaque",
+      "description": "Vos systèmes informatiques sont piratés, compromettant données clients et opérations.",
+      "tokens": -3,
+      "extra": "payez 2 jetons pour la remise en état"
+    },
+    {
+      "id": "evt_31",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Nouvelle réglementation contraignante",
+      "description": "Une loi impose de nouvelles normes coûteuses que vous devez respecter rapidement.",
+      "tokens": -2
+    },
+    {
+      "id": "evt_32",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Concurrent agressif",
+      "description": "Un nouvel acteur arrive sur votre marché avec des prix cassés et un marketing agressif.",
+      "tokens": -3
+    },
+    {
+      "id": "evt_33",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Crise économique sectorielle",
+      "description": "Votre secteur d'activité entre en récession et la demande chute brutalement.",
+      "tokens": -4
+    },
+    {
+      "id": "evt_34",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Litige juridique",
+      "description": "Vous êtes poursuivi en justice par un concurrent ou un client mécontent.",
+      "tokens": -2,
+      "extra": "payez 3 jetons pour les frais d'avocat"
+    },
+    {
+      "id": "evt_35",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Problème de qualité produit",
+      "description": "Un défaut de fabrication nécessite le rappel de produits et nuit à votre réputation.",
+      "tokens": -3
+    },
+    {
+      "id": "evt_36",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Grève du personnel",
+      "description": "Vos employés cessent le travail pour réclamer de meilleures conditions.",
+      "tokens": -2,
+      "extra": "reculez d'une case"
+    },
+    {
+      "id": "evt_37",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Catastrophe naturelle",
+      "description": "Une inondation ou un incendie endommage vos locaux et votre stock.",
+      "tokens": -4,
+      "extra": "payez 2 jetons ou reculez de 2 cases"
+    },
+    {
+      "id": "evt_38",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Mauvaise publicité virale",
+      "description": "Une polémique sur les réseaux sociaux ternit l'image de votre entreprise.",
+      "tokens": -2,
+      "extra": "reculez d'une case"
+    },
+    {
+      "id": "evt_39",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Perte de certification",
+      "description": "Vous ne répondez plus aux critères d'une certification importante pour votre activité.",
+      "tokens": -2
+    },
+    {
+      "id": "evt_40",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Baisse soudaine de la demande",
+      "description": "Les tendances changent et vos produits ne correspondent plus aux attentes du marché.",
+      "tokens": -3
+    },
+    {
+      "id": "evt_41",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Augmentation des coûts de production",
+      "description": "Les prix des matières premières et de l'énergie explosent, réduisant vos marges.",
+      "tokens": -2
+    },
+    {
+      "id": "evt_42",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Contrôle fiscal",
+      "description": "L'administration fiscale audite vos comptes et réclame des régularisations.",
+      "tokens": -2,
+      "extra": "payez 2 jetons"
+    },
+    {
+      "id": "evt_43",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Faillite d'un partenaire",
+      "description": "Un partenaire commercial important fait faillite, vous laissant avec des créances.",
+      "tokens": -3
+    },
+    {
+      "id": "evt_44",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Obsolescence technologique",
+      "description": "Une nouvelle technologie rend votre produit ou processus obsolète.",
+      "tokens": -3
+    },
+    {
+      "id": "evt_45",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Conflit entre associés",
+      "description": "Des désaccords stratégiques paralysent la prise de décision dans l'entreprise.",
+      "tokens": -2,
+      "extra": "passez votre prochain tour"
+    }
+  ],
+  "financement": [
+    {
+      "id": "fin_1",
+      "title": "Épargne personnelle",
+      "description": "Votre capital initial provenant de vos économies ou de votre famille proche. C'est le financement le plus courant au démarrage, sans intérêts ni dilution.",
+      "tokens": 3
+    },
+    {
+      "id": "fin_2",
+      "title": "Love Money",
+      "description": "Financement apporté par vos proches (famille, amis) qui croient en votre projet. Relations de confiance mais attention aux risques relationnels.",
+      "tokens": 2
+    },
+    {
+      "id": "fin_3",
+      "title": "Microcrédit entrepreneurial",
+      "description": "Petit prêt adapté aux créateurs d'entreprise sans garanties importantes. Montants limités mais accessibles et accompagnement inclus.",
+      "tokens": 3
+    },
+    {
+      "id": "fin_4",
+      "title": "Prêt bancaire professionnel",
+      "description": "Financement classique des banques pour les investissements et le fonds de roulement. Nécessite un business plan solide et des garanties.",
+      "tokens": 4
+    },
+    {
+      "id": "fin_5",
+      "title": "Crédit-bail (leasing)",
+      "description": "Location avec option d'achat pour financer équipements et véhicules. Préserve votre trésorerie et offre de la flexibilité.",
+      "tokens": 3
+    },
+    {
+      "id": "fin_6",
+      "title": "Crowdfunding (financement participatif)",
+      "description": "Collecte de fonds auprès du grand public via des plateformes en ligne. Valide votre concept et crée une communauté de premiers clients.",
+      "tokens": 3
+    },
+    {
+      "id": "fin_7",
+      "title": "Business Angels",
+      "description": "Investisseurs individuels expérimentés qui apportent capital et conseils. Excellent pour les startups à fort potentiel recherchant mentorat.",
+      "tokens": 4
+    },
+    {
+      "id": "fin_8",
+      "title": "Capital-risque (Venture Capital)",
+      "description": "Fonds d'investissement professionnels pour les entreprises innovantes à forte croissance. Montants importants mais dilution significative.",
+      "tokens": 5
+    },
+    {
+      "id": "fin_9",
+      "title": "Subventions publiques",
+      "description": "Aides non remboursables de l'État, régions ou institutions pour soutenir la création et l'innovation. Processus souvent long mais sans remboursement.",
+      "tokens": 4
+    },
+    {
+      "id": "fin_10",
+      "title": "Prêt d'honneur",
+      "description": "Prêt à taux zéro accordé à l'entrepreneur personnellement, sans garantie. Renforce votre crédibilité auprès des banques.",
+      "tokens": 3
+    },
+    {
+      "id": "fin_11",
+      "title": "Affacturage (factoring)",
+      "description": "Cession de vos créances clients à un organisme pour obtenir de la trésorerie immédiate. Solution pour gérer les délais de paiement.",
+      "tokens": 3
+    },
+    {
+      "id": "fin_12",
+      "title": "Corporate Venture",
+      "description": "Investissement d'une grande entreprise dans votre startup. Apporte capital, expertise sectorielle et accès au marché.",
+      "tokens": 5
+    },
+    {
+      "id": "fin_13",
+      "title": "Obligation convertible",
+      "description": "Dette qui peut se transformer en capital selon des conditions définies. Compromis entre prêt et prise de participation.",
+      "tokens": 4
+    },
+    {
+      "id": "fin_14",
+      "title": "Financement par revenus (Revenue-based financing)",
+      "description": "Remboursement basé sur un pourcentage de vos revenus futurs. Alternative flexible au capital-risque sans dilution.",
+      "tokens": 4
+    },
+    {
+      "id": "fin_15",
+      "title": "Concours et prix d'entrepreneuriat",
+      "description": "Compétitions offrant dotations financières et visibilité. Excellent pour valider votre projet et développer votre réseau.",
+      "tokens": 2
+    }
+  ],
+  "quiz": [
+    {
+      "id": "quiz_1",
+      "question": "Qu'est-ce qu'un Business Model Canvas ?",
+      "options": [
+        "Un outil visuel pour décrire et concevoir son modèle économique",
+        "Un document comptable pour déclarer ses revenus",
+        "Un tableau de bord pour suivre les ventes mensuelles"
+      ],
+      "correctAnswer": 0,
+      "category": "Stratégie et Business Model"
+    },
+    {
+      "id": "quiz_2",
+      "question": "Quelle est la différence entre chiffre d'affaires et bénéfice ?",
+      "options": [
+        "Le CA est ce que vous vendez, le bénéfice ce qu'il reste après les charges",
+        "Le CA correspond aux encaissements, le bénéfice aux factures émises",
+        "Le CA est calculé annuellement, le bénéfice mensuellement"
+      ],
+      "correctAnswer": 0,
+      "category": "Finance et gestion"
+    },
+    {
+      "id": "quiz_3",
+      "question": "Qu'est-ce que le seuil de rentabilité ?",
+      "options": [
+        "Le montant d'investissement initial nécessaire pour démarrer",
+        "Le montant minimum à gagner pour couvrir toutes ses charges",
+        "Le prix de vente minimum pour être compétitif sur le marché"
+      ],
+      "correctAnswer": 1,
+      "category": "Finance et gestion"
+    },
+    {
+      "id": "quiz_4",
+      "question": "Pourquoi faire une étude de marché ?",
+      "options": [
+        "Pour comprendre les besoins clients, la concurrence et valider son projet",
+        "Pour obtenir un financement bancaire obligatoire",
+        "Pour déterminer uniquement le prix de vente optimal"
+      ],
+      "correctAnswer": 0,
+      "category": "Stratégie et Business Model"
+    },
+    {
+      "id": "quiz_5",
+      "question": "Qu'est-ce qu'un MVP (Minimum Viable Product) ?",
+      "options": [
+        "Une version basique du produit pour tester rapidement le marché",
+        "Le produit final avec toutes les fonctionnalités prévues",
+        "Un prototype non fonctionnel pour présenter aux investisseurs"
+      ],
+      "correctAnswer": 0,
+      "category": "Innovation et développement produit"
+    },
+    {
+      "id": "quiz_6",
+      "question": "Quelle est l'utilité d'un pitch entrepreneur ?",
+      "options": [
+        "Présenter son projet de manière concise et convaincante",
+        "Rédiger un business plan détaillé de 50 pages",
+        "Effectuer une présentation technique complète du produit"
+      ],
+      "correctAnswer": 0,
+      "category": "Communication et pitch"
+    },
+    {
+      "id": "quiz_7",
+      "question": "Qu'est-ce que le BFR (Besoin en Fonds de Roulement) ?",
+      "options": [
+        "Le capital nécessaire pour créer l'entreprise",
+        "L'argent nécessaire pour financer le décalage entre dépenses et encaissements",
+        "Le montant des investissements en équipements"
+      ],
+      "correctAnswer": 1,
+      "category": "Finance et gestion"
+    },
+    {
+      "id": "quiz_8",
+      "question": "Pourquoi protéger sa propriété intellectuelle ?",
+      "options": [
+        "Pour éviter que d'autres copient votre innovation et sécuriser votre avantage",
+        "Pour augmenter automatiquement la valeur de l'entreprise",
+        "Pour se conformer uniquement aux obligations fiscales"
+      ],
+      "correctAnswer": 0,
+      "category": "Juridique et propriété intellectuelle"
+    },
+    {
+      "id": "quiz_9",
+      "question": "Qu'est-ce qu'une proposition de valeur unique ?",
+      "options": [
+        "Le prix le plus bas du marché pour attirer les clients",
+        "Ce qui différencie votre offre et résout un problème client mieux que les autres",
+        "La description complète de tous les produits de l'entreprise"
+      ],
+      "correctAnswer": 1,
+      "category": "Stratégie et Business Model"
+    },
+    {
+      "id": "quiz_10",
+      "question": "Quelle erreur faut-il éviter au démarrage ?",
+      "options": [
+        "Dépenser tout son budget en marketing avant d'avoir validé le marché",
+        "Investir dans la recherche et développement du produit",
+        "Recruter une équipe compétente dès le début"
+      ],
+      "correctAnswer": 0,
+      "category": "Gestion des risques"
+    },
+    {
+      "id": "quiz_11",
+      "question": "Comment bien gérer sa trésorerie ?",
+      "options": [
+        "Prévoir les entrées et sorties, suivre régulièrement et anticiper les besoins",
+        "Investir immédiatement tous les revenus dans le développement",
+        "Se concentrer uniquement sur l'augmentation du chiffre d'affaires"
+      ],
+      "correctAnswer": 0,
+      "category": "Finance et gestion"
+    },
+    {
+      "id": "quiz_12",
+      "question": "Qu'est-ce que le bootstrapping ?",
+      "options": [
+        "Financer sa croissance uniquement avec ses revenus sans investisseurs externes",
+        "Lever des fonds auprès de plusieurs investisseurs simultanément",
+        "Utiliser uniquement des prêts bancaires pour financer l'activité"
+      ],
+      "correctAnswer": 0,
+      "category": "Finance et gestion"
+    },
+    {
+      "id": "quiz_13",
+      "question": "Pourquoi pivoter peut être nécessaire ?",
+      "options": [
+        "Pour changer complètement de secteur d'activité sans raison",
+        "Pour imiter directement les stratégies des concurrents",
+        "Pour adapter son modèle quand on découvre que le marché veut autre chose"
+      ],
+      "correctAnswer": 2,
+      "category": "Stratégie et Business Model"
+    },
+    {
+      "id": "quiz_14",
+      "question": "Qu'est-ce qu'un réseau professionnel apporte à l'entrepreneur ?",
+      "options": [
+        "Contacts, opportunités, conseils, clients potentiels et soutien",
+        "Uniquement des avantages financiers directs",
+        "Des garanties de succès commercial automatiques"
+      ],
+      "correctAnswer": 0,
+      "category": "Networking et relations"
+    },
+    {
+      "id": "quiz_15",
+      "question": "Comment fixer le prix de vente d'un produit ?",
+      "options": [
+        "En se basant uniquement sur les coûts de production",
+        "En copiant exactement les prix des concurrents",
+        "En tenant compte des coûts, de la valeur perçue et des prix du marché"
+      ],
+      "correctAnswer": 2,
+      "category": "Stratégie et Business Model"
+    },
+    {
+      "id": "quiz_16",
+      "question": "Qu'est-ce qu'une analyse SWOT ?",
+      "options": [
+        "L'analyse financière des revenus et dépenses",
+        "L'étude de la satisfaction client uniquement",
+        "L'étude des forces, faiblesses, opportunités et menaces de l'entreprise"
+      ],
+      "correctAnswer": 2,
+      "category": "Stratégie et Business Model"
+    },
+    {
+      "id": "quiz_17",
+      "question": "Pourquoi s'entourer d'une équipe complémentaire ?",
+      "options": [
+        "Pour réduire les coûts salariaux en recrutant moins",
+        "Pour avoir une équipe qui pense exactement comme vous",
+        "Pour combiner des compétences variées et compenser ses propres lacunes"
+      ],
+      "correctAnswer": 2,
+      "category": "Ressources humaines et management"
+    },
+    {
+      "id": "quiz_18",
+      "question": "Qu'est-ce que le marketing digital apporte à une entreprise ?",
+      "options": [
+        "Visibilité en ligne, ciblage précis, mesure des résultats et coûts maîtrisés",
+        "Uniquement une présence sur les réseaux sociaux",
+        "Des ventes garanties sans effort de suivi"
+      ],
+      "correctAnswer": 0,
+      "category": "Marketing et communication"
+    },
+    {
+      "id": "quiz_19",
+      "question": "Comment gérer l'échec en entrepreneuriat ?",
+      "options": [
+        "Ignorer complètement les erreurs et continuer comme avant",
+        "Changer immédiatement de secteur sans analyser les causes",
+        "Analyser les erreurs, apprendre et rebondir avec cette expérience"
+      ],
+      "correctAnswer": 2,
+      "category": "Mindset entrepreneurial"
+    },
+    {
+      "id": "quiz_20",
+      "question": "Qu'est-ce que la scalabilité d'un business model ?",
+      "options": [
+        "La capacité à augmenter les prix de vente régulièrement",
+        "Le nombre maximum de clients que l'entreprise peut servir",
+        "La possibilité de croître rapidement sans augmenter proportionnellement les coûts"
+      ],
+      "correctAnswer": 2,
+      "category": "Stratégie et Business Model"
+    },
+    {
+      "id": "quiz_21",
+      "question": "Pourquoi diversifier ses sources de revenus ?",
+      "options": [
+        "Pour simplifier la comptabilité et la gestion",
+        "Pour se concentrer sur un seul produit de qualité",
+        "Pour réduire les risques et stabiliser l'activité"
+      ],
+      "correctAnswer": 2,
+      "category": "Stratégie et Business Model"
+    },
+    {
+      "id": "quiz_22",
+      "question": "Comment mesurer la satisfaction client ?",
+      "options": [
+        "Uniquement par le nombre de commandes reçues",
+        "En se basant seulement sur les retours positifs",
+        "Enquêtes, NPS, avis en ligne, taux de rétention et feedback direct"
+      ],
+      "correctAnswer": 2,
+      "category": "Relation client"
+    },
+    {
+      "id": "quiz_23",
+      "question": "Qu'est-ce que l'économie circulaire pour une entreprise ?",
+      "options": [
+        "Vendre ses produits uniquement en circuit court",
+        "Réduire uniquement les coûts d'emballage",
+        "Minimiser les déchets en réutilisant, recyclant et optimisant les ressources"
+      ],
+      "correctAnswer": 2,
+      "category": "Développement durable"
+    },
+    {
+      "id": "quiz_24",
+      "question": "Comment protéger son entreprise des risques ?",
+      "options": [
+        "Éviter toute prise de décision importante",
+        "Investir uniquement dans les secteurs sans risques",
+        "Assurances, diversification, provisions et anticipation des crises"
+      ],
+      "correctAnswer": 2,
+      "category": "Gestion des risques"
+    },
+    {
+      "id": "quiz_25",
+      "question": "Qu'est-ce qu'un KPI (Key Performance Indicator) ?",
+      "options": [
+        "Un outil de gestion des stocks uniquement",
+        "Un indicateur financier obligatoire pour les banques",
+        "Un indicateur clé pour mesurer la performance d'un aspect de l'entreprise"
+      ],
+      "correctAnswer": 2,
+      "category": "Gestion et mesure"
+    },
+    {
+      "id": "quiz_26",
+      "question": "Pourquoi une charte graphique est importante ?",
+      "options": [
+        "Elle permet uniquement de choisir les couleurs du logo",
+        "Elle est nécessaire uniquement pour les grandes entreprises",
+        "Elle renforce l'identité de marque et la cohérence visuelle"
+      ],
+      "correctAnswer": 2,
+      "category": "Marketing et communication"
+    },
+    {
+      "id": "quiz_27",
+      "question": "Qu'est-ce que la veille concurrentielle ?",
+      "options": [
+        "Analyser uniquement les prix de vente des concurrents",
+        "Copier directement les produits des concurrents",
+        "Surveiller et analyser les actions des concurrents pour anticiper leurs stratégies"
+      ],
+      "correctAnswer": 2,
+      "category": "Stratégie et Business Model"
+    },
+    {
+      "id": "quiz_28",
+      "question": "Comment choisir le statut juridique de son entreprise ?",
+      "options": [
+        "En choisissant toujours le statut le plus simple",
+        "En se basant uniquement sur le montant du capital social",
+        "En fonction de ses besoins, de la fiscalité, de la responsabilité et du nombre d'associés"
+      ],
+      "correctAnswer": 2,
+      "category": "Juridique et création"
+    },
+    {
+      "id": "quiz_29",
+      "question": "Qu'est-ce que le lean startup ?",
+      "options": [
+        "Une méthode pour réduire les coûts salariaux",
+        "Une approche qui privilégie la qualité maximale dès le départ",
+        "Une méthodologie pour créer et développer rapidement avec un minimum de ressources"
+      ],
+      "correctAnswer": 2,
+      "category": "Innovation et développement produit"
+    },
+    {
+      "id": "quiz_30",
+      "question": "Pourquoi documenter ses processus est important ?",
+      "options": [
+        "Pour répondre uniquement aux obligations légales",
+        "Pour remplacer complètement la formation des employés",
+        "Pour standardiser, former et améliorer l'efficacité de l'entreprise"
+      ],
+      "correctAnswer": 2,
+      "category": "Ressources humaines et management"
+    }
+  ],
+  "newDuel": [
+    {
+      "id": "duel_1",
+      "title": "Pitch investisseur",
+      "questions": [
+        {
+          "question": "Pour un pitch investisseur réussi, quel élément est LE PLUS IMPORTANT ?",
+          "options": [
+            "Démontrer clairement la valeur unique, le marché et le potentiel de croissance",
+            "Présenter un business plan détaillé de 50 pages",
+            "Se concentrer uniquement sur les aspects techniques du produit"
+          ],
+          "points": [30, 10, 20]
+        },
+        {
+          "question": "Face aux questions difficiles des investisseurs, quelle stratégie est LA PLUS EFFICACE ?",
+          "options": [
+            "Répondre uniquement avec des données chiffrées sans contexte",
+            "Reconnaître les incertitudes, présenter des solutions et démontrer votre préparation",
+            "Promettre des résultats garantis sans prendre en compte les risques"
+          ],
+          "points": [20, 30, 10]
+        },
+        {
+          "question": "Pour convaincre un investisseur, quelle approche est LA PLUS PERSUASIVE ?",
+          "options": [
+            "Se concentrer uniquement sur le potentiel de marché sans parler de l'équipe",
+            "Mettre l'accent principalement sur les aspects financiers et les projections",
+            "Présenter des données vérifiables, une vision claire et une équipe solide"
+          ],
+          "points": [20, 10, 30]
+        }
+      ]
+    },
+    {
+      "id": "duel_2",
+      "title": "Négociation fournisseur",
+      "questions": [
+        {
+          "question": "Pour négocier de meilleures conditions avec un fournisseur, quelle approche est LA PLUS EFFICACE ?",
+          "options": [
+            "Préparer des alternatives, démontrer votre valeur comme client et proposer des compromis constructifs",
+            "Demander systématiquement les mêmes conditions que vos concurrents",
+            "Se concentrer uniquement sur la réduction des prix sans considérer d'autres avantages"
+          ],
+          "points": [30, 20, 10]
+        },
+        {
+          "question": "Face à un fournisseur réticent, quelle stratégie est LA PLUS CONSTRUCTIVE ?",
+          "options": [
+            "Comprendre ses contraintes, proposer des solutions win-win et construire une relation durable",
+            "Augmenter uniquement le volume de commande sans négocier d'autres aspects",
+            "Proposer uniquement des paiements différés sans contrepartie"
+          ],
+          "points": [30, 20, 10]
+        },
+        {
+          "question": "Pour réduire les coûts sans compromettre la qualité, quelle méthode est LA PLUS ADAPTÉE ?",
+          "options": [
+            "Réduire les quantités commandées pour diminuer les coûts unitaires",
+            "Négocier des volumes, des paiements anticipés ou des contrats long terme contre des avantages",
+            "Choisir systématiquement le fournisseur le moins cher sans vérifier la qualité"
+          ],
+          "points": [20, 30, 10]
+        }
+      ]
+    },
+    {
+      "id": "duel_3",
+      "title": "Gestion client mécontent",
+      "questions": [
+        {
+          "question": "Face à un client important qui menace de rompre le contrat, quelle réponse est LA PLUS EFFICACE ?",
+          "options": [
+            "Écouter activement ses préoccupations, comprendre les causes et proposer des solutions concrètes rapidement",
+            "Proposer immédiatement une réduction de prix sans analyser le problème",
+            "Demander au client de préciser ses attentes par écrit avant d'agir"
+          ],
+          "points": [30, 10, 20]
+        },
+        {
+          "question": "Pour gérer un conflit client, quelle approche est LA PLUS CONSTRUCTIVE ?",
+          "options": [
+            "Reconnaître les erreurs, clarifier les attentes et proposer une solution adaptée qui préserve la relation",
+            "Proposer uniquement une compensation financière sans comprendre les causes",
+            "Attendre que le client formule une demande précise avant de réagir"
+          ],
+          "points": [30, 10, 20]
+        },
+        {
+          "question": "Pour transformer un client mécontent en ambassadeur, quelle stratégie est LA PLUS ADAPTÉE ?",
+          "options": [
+            "Proposer uniquement une réduction tarifaire pour compenser le problème",
+            "Résoudre le problème rapidement, dépasser ses attentes et suivre pour s'assurer de sa satisfaction",
+            "Attendre que le client exprime clairement ses attentes avant d'intervenir"
+          ],
+          "points": [20, 30, 10]
+        }
+      ]
+    },
+    {
+      "id": "duel_4",
+      "title": "Concurrence directe",
+      "questions": [
+        {
+          "question": "Face à un concurrent qui lance une offensive commerciale, quelle stratégie est LA PLUS EFFICACE ?",
+          "options": [
+            "Renforcer votre proposition de valeur unique, communiquer vos différences et fidéliser vos clients existants",
+            "Réagir uniquement en ajustant vos prix pour rester compétitif",
+            "Lancer une campagne publicitaire agressive sans analyser votre positionnement"
+          ],
+          "points": [30, 20, 10]
+        },
+        {
+          "question": "Pour contrer une attaque concurrentielle, quelle approche est LA PLUS CONSTRUCTIVE ?",
+          "options": [
+            "Analyser la menace, identifier vos avantages compétitifs et adapter votre offre sans compromettre votre positionnement",
+            "Réduire immédiatement tous vos prix pour contrer l'offensive",
+            "Attendre de voir l'impact sur vos ventes avant de réagir"
+          ],
+          "points": [30, 10, 20]
+        },
+        {
+          "question": "Pour maintenir votre position face à la concurrence, quelle méthode est LA PLUS ADAPTÉE ?",
+          "options": [
+            "Se concentrer uniquement sur l'amélioration de votre produit sans surveiller le marché",
+            "Surveiller le marché, innover continuellement et créer de la valeur différenciante pour vos clients",
+            "Réagir uniquement lorsque vos concurrents lancent de nouveaux produits"
+          ],
+          "points": [20, 30, 10]
+        }
+      ]
+    },
+    {
+      "id": "duel_5",
+      "title": "Négociation partenariat stratégique",
+      "questions": [
+        {
+          "question": "Pour négocier un partenariat stratégique, quelle approche est LA PLUS EFFICACE ?",
+          "options": [
+            "Identifier les complémentarités, clarifier les attentes mutuelles et créer un accord win-win avec des objectifs mesurables",
+            "Se concentrer uniquement sur les aspects financiers du partenariat",
+            "Proposer un accord informel sans formaliser les engagements de chaque partie"
+          ],
+          "points": [30, 20, 10]
+        },
+        {
+          "question": "Face à un partenaire potentiel réticent, quelle stratégie est LA PLUS CONSTRUCTIVE ?",
+          "options": [
+            "Démontrer la valeur mutuelle, proposer un projet pilote et construire la confiance progressivement",
+            "Proposer uniquement des avantages financiers immédiats pour le convaincre",
+            "Attendre qu'il manifeste un intérêt plus clair avant de proposer un partenariat"
+          ],
+          "points": [30, 10, 20]
+        },
+        {
+          "question": "Pour garantir le succès d'un partenariat, quelle méthode est LA PLUS ADAPTÉE ?",
+          "options": [
+            "Se concentrer uniquement sur les objectifs à court terme sans vision long terme",
+            "Définir clairement les rôles, les responsabilités, les KPIs communs et établir une communication régulière",
+            "Laisser chaque partie gérer ses propres responsabilités sans coordination"
+          ],
+          "points": [20, 30, 10]
+        }
+      ]
+    },
+    {
+      "id": "duel_6",
+      "title": "Audit qualité et certification",
+      "questions": [
+        {
+          "question": "Pour réussir un audit qualité important, quelle préparation est LA PLUS EFFICACE ?",
+          "options": [
+            "Documenter vos processus, former votre équipe et effectuer un auto-audit préalable pour identifier les écarts",
+            "Se concentrer uniquement sur la préparation des documents sans former l'équipe",
+            "Attendre les questions de l'auditeur pour préparer les réponses"
+          ],
+          "points": [30, 20, 10]
+        },
+        {
+          "question": "Face à des non-conformités identifiées lors d'un audit, quelle approche est LA PLUS CONSTRUCTIVE ?",
+          "options": [
+            "Reconnaître les écarts, présenter un plan d'action correctif détaillé et démontrer votre engagement à améliorer",
+            "Contester uniquement les non-conformités majeures et accepter les mineures",
+            "Demander un délai supplémentaire sans proposer de plan d'action"
+          ],
+          "points": [30, 20, 10]
+        },
+        {
+          "question": "Pour maintenir une certification qualité, quelle stratégie est LA PLUS ADAPTÉE ?",
+          "options": [
+            "Se concentrer uniquement sur les indicateurs mesurables sans amélioration continue",
+            "Intégrer les exigences qualité dans vos processus quotidiens et établir un suivi continu des indicateurs",
+            "Réaliser des audits internes uniquement avant l'audit externe"
+          ],
+          "points": [20, 30, 10]
+        }
+      ]
+    },
+    {
+      "id": "duel_7",
+      "title": "Recrutement talent clé",
+      "questions": [
+        {
+          "question": "Pour recruter un expert reconnu dans votre secteur, quelle approche est LA PLUS EFFICACE ?",
+          "options": [
+            "Démontrer votre vision, offrir des opportunités de croissance et créer un environnement où il pourra avoir un impact significatif",
+            "Proposer uniquement un package de rémunération compétitif sans parler de la mission",
+            "Mettre l'accent principalement sur la stabilité de l'emploi et les avantages sociaux"
+          ],
+          "points": [30, 20, 10]
+        },
+        {
+          "question": "Face à un talent qui hésite entre votre entreprise et un concurrent, quelle stratégie est LA PLUS CONSTRUCTIVE ?",
+          "options": [
+            "Mettre en avant votre culture d'entreprise unique, vos projets passionnants et les opportunités d'apprentissage",
+            "Proposer uniquement une augmentation de salaire pour le convaincre",
+            "Comparer directement votre entreprise avec le concurrent en listant vos avantages"
+          ],
+          "points": [30, 10, 20]
+        },
+        {
+          "question": "Pour attirer et retenir les meilleurs talents, quelle méthode est LA PLUS ADAPTÉE ?",
+          "options": [
+            "Se concentrer uniquement sur les avantages matériels et la rémunération",
+            "Créer une culture attractive, offrir des opportunités de développement et reconnaître les contributions",
+            "Recruter uniquement lorsque vous avez un besoin urgent sans stratégie long terme"
+          ],
+          "points": [20, 30, 10]
+        }
+      ]
+    },
+    {
+      "id": "duel_8",
+      "title": "Lancement produit innovant",
+      "questions": [
+        {
+          "question": "Pour lancer un nouveau produit sur le marché, quelle stratégie est LA PLUS EFFICACE ?",
+          "options": [
+            "Valider le concept avec des clients cibles, préparer un plan marketing complet et choisir le bon moment de lancement",
+            "Se concentrer uniquement sur le développement technique sans validation marché",
+            "Lancer rapidement pour être le premier sur le marché sans préparation marketing"
+          ],
+          "points": [30, 20, 10]
+        },
+        {
+          "question": "Face aux premiers clients sceptiques, quelle approche est LA PLUS CONSTRUCTIVE ?",
+          "options": [
+            "Écouter leurs retours, adapter rapidement votre produit et démontrer la valeur réelle avec des cas d'usage concrets",
+            "Proposer uniquement des réductions de prix pour les convaincre",
+            "Attendre d'avoir plus de retours avant de modifier le produit"
+          ],
+          "points": [30, 10, 20]
+        },
+        {
+          "question": "Pour réussir un lancement produit, quelle méthode est LA PLUS ADAPTÉE ?",
+          "options": [
+            "Se concentrer uniquement sur la communication publicitaire sans préparation du support client",
+            "Créer de l'anticipation, mobiliser des ambassadeurs précoces et assurer un support client exemplaire dès le début",
+            "Lancer le produit en silence et attendre les retours naturels du marché"
+          ],
+          "points": [20, 30, 10]
+        }
+      ]
+    },
+    {
+      "id": "duel_9",
+      "title": "Gestion crise médiatique",
+      "questions": [
+        {
+          "question": "Face à une polémique éclatant autour de votre entreprise, quelle réponse est LA PLUS EFFICACE ?",
+          "options": [
+            "Réagir rapidement, être transparent, reconnaître les faits et communiquer vos actions correctives",
+            "Attendre que la polémique s'apaise naturellement avant de communiquer",
+            "Communiquer uniquement via un communiqué de presse formel sans interaction directe"
+          ],
+          "points": [30, 10, 20]
+        },
+        {
+          "question": "Pour gérer une communication de crise, quelle approche est LA PLUS CONSTRUCTIVE ?",
+          "options": [
+            "Assumer vos erreurs, présenter un plan d'action clair et rétablir la confiance par des actions concrètes",
+            "Communiquer uniquement sur les aspects positifs sans mentionner les problèmes",
+            "Attendre d'avoir toutes les informations avant de communiquer publiquement"
+          ],
+          "points": [30, 10, 20]
+        },
+        {
+          "question": "Pour restaurer votre réputation après une crise, quelle stratégie est LA PLUS ADAPTÉE ?",
+          "options": [
+            "Se concentrer uniquement sur la communication sans changements concrets",
+            "Implémenter des changements visibles, communiquer régulièrement sur vos progrès et reconstruire la confiance étape par étape",
+            "Attendre que l'attention médiatique se tourne vers d'autres sujets"
+          ],
+          "points": [20, 30, 10]
+        }
+      ]
+    },
+    {
+      "id": "duel_10",
+      "title": "Appel d'offres public",
+      "questions": [
+        {
+          "question": "Pour répondre à un appel d'offres public, quelle préparation est LA PLUS EFFICACE ?",
+          "options": [
+            "Analyser précisément les critères d'évaluation, préparer une offre complète et démontrer votre conformité technique et financière",
+            "Se concentrer uniquement sur le prix pour être compétitif",
+            "Adapter une offre générique existante sans personnalisation pour ce marché"
+          ],
+          "points": [30, 10, 20]
+        },
+        {
+          "question": "Face à des critères complexes dans un appel d'offres, quelle stratégie est LA PLUS CONSTRUCTIVE ?",
+          "options": [
+            "Respecter scrupuleusement tous les critères, structurer clairement votre réponse et mettre en avant vos avantages compétitifs",
+            "Prioriser uniquement les critères techniques sans considérer les aspects administratifs",
+            "Soumettre une réponse détaillée uniquement sur les aspects où vous êtes le plus fort"
+          ],
+          "points": [30, 20, 10]
+        },
+        {
+          "question": "Pour remporter un marché public, quelle méthode est LA PLUS ADAPTÉE ?",
+          "options": [
+            "Se concentrer uniquement sur la démonstration technique sans considérer les aspects financiers",
+            "Démontrer votre expertise, votre capacité de livraison et votre valeur ajoutée tout en restant compétitif",
+            "Proposer le prix le plus bas possible même si cela compromet la qualité"
+          ],
+          "points": [20, 30, 10]
+        }
+      ]
+    }
+  ],
+"idees": [
+  {
+    "id": "idee_1",
+    "title": "ServiceHub",
+    "description": "Créer une plateforme numérique qui connecte les entrepreneurs avec des services essentiels (comptabilité, marketing, conseil). Offrir un accès simplifié et tarifs groupés pour les petites entreprises.",
+    "domaine": "Tech & Services",
+    "difficulte": "Moyenne",
+    "duree": "8-12 mois",
+    "investissement": "30 000 - 60 000 €",
+    "ideation": {
+      "cible": "Entrepreneurs et PME",
+      "mission": "Simplifier l'accès aux services essentiels",
+      "secteur": "Entrepreneuriat Général"
+    },
+    "projet": {
+      "valorisationInitiale": 0
+    }
+  },
+  {
+    "id": "idee_2",
+    "title": "ArtisanLocal",
+    "description": "Développer une plateforme e-commerce mettant en valeur les produits locaux et artisanaux. Permettre aux artisans de vendre en ligne tout en gardant leur identité et leur histoire unique.",
+    "domaine": "E-commerce",
+    "difficulte": "Moyenne",
+    "duree": "6-10 mois",
+    "investissement": "25 000 - 50 000 €",
+    "ideation": {
+      "cible": "Consommateurs soucieux du local",
+      "mission": "Valoriser les produits locaux et artisanaux",
+      "secteur": "Industries Culturelles et Créatives"
+    },
+    "projet": {
+      "valorisationInitiale": 0
+    }
+  },
+  {
+    "id": "idee_3",
+    "title": "StartupLearn",
+    "description": "Créer une application mobile offrant des cours interactifs et des outils pratiques pour entrepreneurs. Modules sur gestion financière, marketing digital, levée de fonds et stratégie business.",
+    "domaine": "EdTech",
+    "difficulte": "Élevée",
+    "duree": "10-15 mois",
+    "investissement": "40 000 - 80 000 €",
+    "ideation": {
+      "cible": "Entrepreneurs en formation",
+      "mission": "Former et accompagner les entrepreneurs",
+      "secteur": "Éducation"
+    },
+    "projet": {
+      "valorisationInitiale": 0
+    }
+  },
+  {
+    "id": "idee_4",
+    "title": "InnovationLab",
+    "description": "Établir un espace de coworking qui combine bureaux partagés, espaces de réunion et programme d'accompagnement pour startups. Créer une communauté entrepreneuriale locale dynamique.",
+    "domaine": "Services aux entreprises",
+    "difficulte": "Moyenne",
+    "duree": "12-18 mois",
+    "investissement": "50 000 - 100 000 €",
+    "ideation": {
+      "cible": "Startups et entrepreneurs",
+      "mission": "Créer une communauté entrepreneuriale dynamique",
+      "secteur": "Santé et Bien-être"
+    },
+    "projet": {
+      "valorisationInitiale": 0
+    }
+  }
+]
+}

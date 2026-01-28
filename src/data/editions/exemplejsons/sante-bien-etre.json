@@ -1,0 +1,681 @@
+{
+  "edition": "Santé & Bien-être",
+  "evenements": [
+    {
+      "id": "evt_1",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Partenariat avec une mutuelle de santé",
+      "description": "Vous signez un accord avec une mutuelle locale qui recommande vos services à ses adhérents. Bénéficiez d'un flux régulier de patients et de tarifs préférentiels.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_2",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Certification qualité obtenue",
+      "description": "Votre établissement obtient une certification ISO ou HAS reconnue. Accédez à des remboursements optimisés et renforcez la confiance des patients.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_3",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Télémédecine développée",
+      "description": "Vous lancez une plateforme de téléconsultation performante. Élargissez votre patientèle au-delà des limites géographiques et optimisez votre temps.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_4",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Équipement médical innovant",
+      "description": "Vous investissez dans une technologie de pointe qui révolutionne vos diagnostics. Votre expertise s'étend et votre réputation grandit.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_5",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Formation spécialisée réussie",
+      "description": "Vous obtenez une spécialisation recherchée qui vous différencie sur le marché. Vos honoraires augmentent et votre carnet se remplit.",
+      "tokens": 2
+    },
+    {
+      "id": "evt_6",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Centre de bien-être intégré",
+      "description": "Vous créez un espace holistique combinant soins médicaux et bien-être (spa, nutrition, coaching). Diversifiez vos revenus.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_7",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Réseau de praticiens constitué",
+      "description": "Vous fédérez une équipe pluridisciplinaire qui permet une prise en charge complète. Bénéficiez de synergies et partagez les coûts.",
+      "tokens": 2
+    },
+    {
+      "id": "evt_8",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Application santé lancée",
+      "description": "Votre app de suivi santé séduit les utilisateurs avec ses fonctionnalités innovantes. Créez une nouvelle source de revenus récurrents.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_9",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Partenariat avec entreprises",
+      "description": "Vous signez des contrats de médecine du travail avec plusieurs entreprises locales. Sécurisez des revenus stables et prévisibles.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_10",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Centre de recherche clinique",
+      "description": "Vous participez à des essais cliniques rémunérés qui financent votre développement tout en faisant avancer la science.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_11",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Programme HealthTech Accelerator",
+      "description": "Vous intégrez un accélérateur spécialisé en technologies de santé. Accédez à un réseau d'experts et des financements.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_12",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Programme Digital Health",
+      "description": "Vous bénéficiez d'une formation en santé numérique. Développez une solution e-santé innovante.",
+      "tokens": 2,
+      "extra": "avance d'une case"
+    },
+    {
+      "id": "evt_13",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Programme Silver Economy",
+      "description": "Vous rejoignez un programme dédié à la santé des seniors. Obtenez un appui pour développer vos services gérontologiques.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_14",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Programme Wellness Innovation",
+      "description": "Vous êtes sélectionné(e) pour un programme d'innovation en bien-être. Accédez à des équipements et formations spécialisées.",
+      "tokens": 2
+    },
+    {
+      "id": "evt_15",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Programme MedTech Cluster",
+      "description": "Vous intégrez un cluster de technologies médicales. Bénéficiez d'un écosystème complet pour l'innovation en santé.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_16",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Épidémie locale",
+      "description": "Une épidémie impose des restrictions sanitaires strictes. Vos consultations diminuent drastiquement.",
+      "tokens": -3
+    },
+    {
+      "id": "evt_17",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Pénurie de médicaments",
+      "description": "Une rupture d'approvisionnement en médicaments essentiels perturbe vos traitements.",
+      "tokens": -2,
+      "extra": "passez votre prochain tour"
+    },
+    {
+      "id": "evt_18",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Changement de réglementation",
+      "description": "Une nouvelle loi modifie les conditions de remboursement de vos actes. Vos revenus chutent brutalement.",
+      "tokens": -2,
+      "extra": "reculez de 1 case"
+    },
+    {
+      "id": "evt_19",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Problème d'assurance responsabilité civile",
+      "description": "Votre assurance professionnelle est résiliée suite à un sinistre.",
+      "tokens": -2,
+      "extra": "payez 2 jetons pour trouver une nouvelle couverture"
+    },
+    {
+      "id": "evt_20",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Panne d'équipement critique",
+      "description": "Votre matériel médical principal tombe en panne en pleine activité.",
+      "tokens": -2,
+      "extra": "payez 2 jetons pour les réparations urgentes"
+    },
+    {
+      "id": "evt_21",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Refus de financement",
+      "description": "Votre demande de prêt pour agrandir votre cabinet est rejetée.",
+      "tokens": -2
+    },
+    {
+      "id": "evt_22",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Cyberattaque",
+      "description": "Un ransomware paralyse votre système informatique et compromet les données patients.",
+      "tokens": -3
+    },
+    {
+      "id": "evt_23",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Problème de stérilisation",
+      "description": "Un dysfonctionnement de vos équipements de stérilisation impose une fermeture temporaire.",
+      "tokens": -2
+    },
+    {
+      "id": "evt_24",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Inspection sanitaire négative",
+      "description": "Un contrôle révèle des non-conformités qui entachent votre réputation.",
+      "tokens": -2,
+      "extra": "reculez d'une case"
+    },
+    {
+      "id": "evt_25",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Retards de remboursement",
+      "description": "Les organismes payeurs accumulent les retards de paiement.",
+      "tokens": -2
+    }
+  ],
+  "financement": [
+    {
+      "id": "fin_1",
+      "title": "Tontine santé communautaire",
+      "description": "Un système d'épargne collective où chaque membre cotise pour constituer un fonds de santé rotatif, permettant de financer à tour de rôle les projets santé de chacun.",
+      "tokens": 3
+    },
+    {
+      "id": "fin_2",
+      "title": "Microcrédit médical",
+      "description": "Un petit prêt spécialement conçu pour les professionnels de santé, avec des modalités adaptées aux cycles de revenus médicaux et des taux préférentiels.",
+      "tokens": 4
+    },
+    {
+      "id": "fin_3",
+      "title": "Prêt bancaire santé",
+      "description": "Un financement bancaire dédié aux investissements médicaux: équipements, locaux, technologies, avec des garanties adaptées au secteur de la santé.",
+      "tokens": 5
+    },
+    {
+      "id": "fin_4",
+      "title": "Subvention publique ou fondation",
+      "description": "Financement non remboursable accordé par l'État ou une fondation de santé pour des projets d'intérêt public, innovation médicale ou accès aux soins.",
+      "tokens": 4
+    },
+    {
+      "id": "fin_5",
+      "title": "Investisseur HealthTech",
+      "description": "Un partenaire financier spécialisé en technologies de santé qui apporte du capital en échange d'une participation, intéressé par l'innovation médicale à fort potentiel.",
+      "tokens": 5
+    },
+    {
+      "id": "fin_6",
+      "title": "Financement participatif santé",
+      "description": "Financement collaboratif où de nombreux contributeurs soutiennent votre projet de santé via des plateformes dédiées ou des campagnes communautaires.",
+      "tokens": 3
+    }
+  ],
+  "quiz": [
+    {
+      "id": "quiz_1",
+      "question": "Quelle mesure est la plus efficace pour prévenir les infections nosocomiales?",
+      "options": [
+        "La ventilation intensive des locaux",
+        "L'hygiène des mains systématique",
+        "La désinfection quotidienne des sols"
+      ],
+      "correctAnswer": 1,
+      "category": "Aspects techniques médicaux"
+    },
+    {
+      "id": "quiz_2",
+      "question": "Quel est le principal avantage de la télémédecine pour les patients en zone rurale?",
+      "options": [
+        "Des consultations toujours moins chères",
+        "L'accès à des spécialistes distants",
+        "L'absence totale de déplacement"
+      ],
+      "correctAnswer": 1,
+      "category": "Aspects techniques médicaux"
+    },
+    {
+      "id": "quiz_3",
+      "question": "Quelle approche diagnostique est considérée comme la plus fiable?",
+      "options": [
+        "Le diagnostic basé sur l'expérience seule",
+        "L'utilisation exclusive des examens complémentaires",
+        "L'approche clinique combinée aux examens pertinents"
+      ],
+      "correctAnswer": 2,
+      "category": "Aspects techniques médicaux"
+    },
+    {
+      "id": "quiz_4",
+      "question": "Quelle stratégie de prévention a le meilleur rapport coût-efficacité?",
+      "options": [
+        "Les campagnes de vaccination",
+        "Les dépistages systématiques coûteux",
+        "Les traitements précoces uniquement"
+      ],
+      "correctAnswer": 0,
+      "category": "Aspects techniques médicaux"
+    },
+    {
+      "id": "quiz_5",
+      "question": "Quel est l'avantage principal des médicaments génériques?",
+      "options": [
+        "Ils sont toujours plus efficaces",
+        "Ils réduisent les coûts sans compromettre l'efficacité",
+        "Ils ont moins d'effets secondaires"
+      ],
+      "correctAnswer": 1,
+      "category": "Aspects techniques médicaux"
+    },
+    {
+      "id": "quiz_6",
+      "question": "Qu'est-ce qu'un parcours de soins coordonné?",
+      "options": [
+        "Un système de rendez-vous automatisé",
+        "L'organisation optimale de la prise en charge d'un patient",
+        "Un réseau de pharmacies partenaires"
+      ],
+      "correctAnswer": 1,
+      "category": "Gestion d'entreprise de santé"
+    },
+    {
+      "id": "quiz_7",
+      "question": "Comment améliorer la rentabilité d'un cabinet médical?",
+      "options": [
+        "Augmenter uniquement les tarifs",
+        "Optimiser l'organisation et diversifier l'offre",
+        "Réduire le temps de consultation par patient"
+      ],
+      "correctAnswer": 1,
+      "category": "Gestion d'entreprise de santé"
+    },
+    {
+      "id": "quiz_8",
+      "question": "Pourquoi la diversification des activités est-elle recommandée en santé?",
+      "options": [
+        "Pour maximiser les profits uniquement",
+        "Pour réduire les risques financiers et professionnels",
+        "Car la réglementation l'impose"
+      ],
+      "correctAnswer": 1,
+      "category": "Gestion d'entreprise de santé"
+    },
+    {
+      "id": "quiz_9",
+      "question": "Quel élément est crucial dans un business plan pour un projet de santé?",
+      "options": [
+        "Une analyse des besoins de santé du territoire",
+        "Des promesses de guérison garanties",
+        "L'utilisation de termes médicaux complexes"
+      ],
+      "correctAnswer": 0,
+      "category": "Gestion d'entreprise de santé"
+    },
+    {
+      "id": "quiz_10",
+      "question": "Quelle certification peut valoriser un établissement de santé?",
+      "options": [
+        "L'auto-certification interne",
+        "La certification HAS ou ISO",
+        "La certification de praticien local"
+      ],
+      "correctAnswer": 1,
+      "category": "Gestion d'entreprise de santé"
+    },
+    {
+      "id": "quiz_11",
+      "question": "Comment les objets connectés aident-ils les patients?",
+      "options": [
+        "Pour surveiller leurs paramètres de santé en continu",
+        "Seulement pour les divertir",
+        "Uniquement pour communiquer avec les médecins"
+      ],
+      "correctAnswer": 0,
+      "category": "Innovation digitale"
+    },
+    {
+      "id": "quiz_12",
+      "question": "Quel domaine médical bénéficie le plus de l'IA actuellement?",
+      "options": [
+        "La chirurgie robotique uniquement",
+        "L'imagerie médicale et le diagnostic",
+        "La prescription automatique de médicaments"
+      ],
+      "correctAnswer": 1,
+      "category": "Innovation digitale"
+    },
+    {
+      "id": "quiz_13",
+      "question": "Quel avantage principal offre le dossier médical numérique?",
+      "options": [
+        "Il fonctionne même sans internet",
+        "Il permet le partage sécurisé d'informations entre professionnels",
+        "Il est entièrement gratuit"
+      ],
+      "correctAnswer": 1,
+      "category": "Innovation digitale"
+    },
+    {
+      "id": "quiz_14",
+      "question": "Quelle innovation améliore l'observance thérapeutique des patients?",
+      "options": [
+        "Les rappels automatisés de prise de médicaments",
+        "Les consultations uniquement en ligne",
+        "L'autodiagnostic par application"
+      ],
+      "correctAnswer": 0,
+      "category": "Innovation digitale"
+    },
+    {
+      "id": "quiz_15",
+      "question": "Quel modèle permet aux patients d'accéder plus facilement aux soins?",
+      "options": [
+        "Les consultations exclusivement en présentiel",
+        "Les plateformes de prise de rendez-vous en ligne",
+        "L'orientation systématique vers les urgences"
+      ],
+      "correctAnswer": 1,
+      "category": "Innovation digitale"
+    },
+    {
+      "id": "quiz_16",
+      "question": "Quelle approche préventive est la plus efficace contre les maladies chroniques?",
+      "options": [
+        "La promotion des modes de vie sains",
+        "L'augmentation du nombre d'hôpitaux",
+        "La prescription préventive de médicaments"
+      ],
+      "correctAnswer": 0,
+      "category": "Santé publique et prévention"
+    },
+    {
+      "id": "quiz_17",
+      "question": "Quel bénéfice l'éducation thérapeutique apporte-t-elle aux patients chroniques?",
+      "options": [
+        "Elle complique leur prise en charge",
+        "Elle améliore leur autonomie et leur qualité de vie",
+        "Elle est uniquement informative"
+      ],
+      "correctAnswer": 1,
+      "category": "Santé publique et prévention"
+    },
+    {
+      "id": "quiz_18",
+      "question": "Pourquoi le dépistage précoce est-il crucial en santé publique?",
+      "options": [
+        "Il permet de traiter les maladies avant qu'elles ne s'aggravent",
+        "Il génère plus de revenus pour les praticiens",
+        "Il est moins coûteux que la prévention primaire"
+      ],
+      "correctAnswer": 0,
+      "category": "Santé publique et prévention"
+    },
+    {
+      "id": "quiz_19",
+      "question": "Comment les systèmes de surveillance épidémiologique protègent-ils la population?",
+      "options": [
+        "Ils prédisent exactement qui tombera malade",
+        "Ils garantissent des compensations automatiques",
+        "Ils détectent rapidement les menaces et orientent les mesures"
+      ],
+      "correctAnswer": 2,
+      "category": "Santé publique et prévention"
+    },
+    {
+      "id": "quiz_20",
+      "question": "Quel est le principe de l'assurance maladie universelle?",
+      "options": [
+        "Elle couvre automatiquement tous les soins sans limite",
+        "Elle garantit l'accès aux soins essentiels pour tous",
+        "Elle rembourse uniquement les établissements privés"
+      ],
+      "correctAnswer": 1,
+      "category": "Santé publique et prévention"
+    }
+  ],
+  "duel": [
+    {
+      "id": "duel_1",
+      "title": "Consultation partagée",
+      "description": "Choisissez un adversaire. L'un joue le patient, l'autre le praticien. Menez une consultation en 2 minutes sur un cas défini par les autres joueurs. Si vous parvenez à un diagnostic et traitement satisfaisants, gagnez chacun 2 jetons.",
+      "rewards": {
+        "success": 2,
+        "fail": 3
+      }
+    },
+    {
+      "id": "duel_2",
+      "title": "Gestion de crise sanitaire",
+      "description": "Face à un scénario de crise choisi par les autres joueurs (épidémie, pénurie, cyberattaque...), vous et votre adversaire proposez chacun une stratégie de gestion en 30 secondes. Les autres votent pour la plus efficace.",
+      "rewards": {
+        "success": 3,
+        "fail": 0
+      }
+    },
+    {
+      "id": "duel_3",
+      "title": "Partenariat thérapeutique",
+      "description": "Invitez un joueur à collaborer. Élaborez ensemble un protocole de soins partagés entre vos spécialités. Si les autres jugent le partenariat viable, gagnez chacun 2 jetons.",
+      "rewards": {
+        "success": 2,
+        "fail": 0
+      }
+    },
+    {
+      "id": "duel_4",
+      "title": "Projet d'investissement santé",
+      "description": "Un besoin d'équipement médical vous est communiqué. Vous et votre adversaire élaborez un plan de financement et le présentez en 1 minute. Les autres votent pour le plan le plus réaliste.",
+      "rewards": {
+        "success": 3,
+        "fail": 1
+      }
+    }
+  ],
+  "newDuel": [
+    {
+      "id": "duel_1",
+      "title": "Gestion de crise médicale",
+      "questions": [
+        {
+          "question": "Face à une urgence médicale dans votre établissement, quelle réponse est la PLUS EFFICACE ?",
+          "options": [
+            "Paniquer et attendre de l'aide extérieure",
+            "Évaluer rapidement, stabiliser la situation selon vos capacités et alerter les secours immédiatement",
+            "Tenter des interventions sans formation"
+          ],
+          "points": [10, 30, 10]
+        },
+        {
+          "question": "Pour gérer un conflit avec un patient insatisfait, quelle approche est la PLUS CONSTRUCTIVE ?",
+          "options": [
+            "Éviter tout dialogue et rejeter la faute",
+            "Écouter activement, clarifier les attentes et proposer une solution adaptée",
+            "Transférer systématiquement vers un collègue"
+          ],
+          "points": [10, 30, 20]
+        },
+        {
+          "question": "En cas de rupture de stock d'un médicament essentiel, quelle stratégie est la PLUS SÉCURISANTE ?",
+          "options": [
+            "Modifier la prescription sans consulter",
+            "Identifier une alternative thérapeutique adaptée après vérification des contre-indications",
+            "Annuler complètement le traitement"
+          ],
+          "points": [10, 30, 10]
+        }
+      ]
+    },
+    {
+      "id": "duel_2",
+      "title": "Financement d'un équipement médical",
+      "questions": [
+        {
+          "question": "Pour justifier l'achat d'un équipement médical coûteux, quel argument est LE PLUS CONVAINCANT auprès des investisseurs ?",
+          "options": [
+            "C'est le dernier modèle disponible",
+            "L'équipement améliore la qualité des soins, augmente la capacité et génère de la valeur mesurable",
+            "C'est le moins cher du marché"
+          ],
+          "points": [20, 30, 10]
+        },
+        {
+          "question": "Pour un investissement médical, quelle évaluation est la PLUS COMPLÈTE ?",
+          "options": [
+            "Seulement le prix d'achat",
+            "Prix d'achat, coûts d'installation, formation du personnel, maintenance et gains en efficacité",
+            "Uniquement les frais de financement"
+          ],
+          "points": [10, 30, 20]
+        },
+        {
+          "question": "Quelle stratégie de financement est la PLUS ADAPTÉE pour un petit établissement de santé ?",
+          "options": [
+            "Emprunter la somme totale sur 2 ans",
+            "Combiner subventions, financement participatif, microcrédit avec échéancier adapté aux flux de trésorerie",
+            "Compter uniquement sur les revenus futurs"
+          ],
+          "points": [10, 30, 10]
+        }
+      ]
+    },
+    {
+      "id": "duel_3",
+      "title": "Qualité des soins et sécurité",
+      "questions": [
+        {
+          "question": "Pour améliorer la QUALITÉ des soins, quel élément est LE PLUS CRUCIAL ?",
+          "options": [
+            "Avoir le plus grand nombre de patients",
+            "Former continuellement le personnel, suivre les protocoles et mettre en place des retours systématiques",
+            "Augmenter uniquement les tarifs"
+          ],
+          "points": [20, 30, 10]
+        },
+        {
+          "question": "Pour PREVENIR les erreurs médicales, quelle mesure est la PLUS EFFICACE ?",
+          "options": [
+            "Espérer que rien ne se passe mal",
+            "Instaurer des protocoles clairs, double vérification et une culture de communication ouverte et sans jugement",
+            "Blamer le personnel en cas d'erreur"
+          ],
+          "points": [10, 30, 20]
+        },
+        {
+          "question": "Quelle attitude vis-à-vis des RETARDS de paiement est la PLUS EQUILIBRÉE ?",
+          "options": [
+            "Refuser immédiatement tout patient avec retard de paiement",
+            "Analyser au cas par cas, proposer des modalités flexibles tout en protégeant la viabilité financière de l'établissement",
+            "Accepter tous les retards sans limite"
+          ],
+          "points": [20, 30, 10]
+        }
+      ]
+    },
+    {
+      "id": "duel_4",
+      "title": "Partnership santé-communauté",
+      "questions": [
+        {
+          "question": "Pour un établissement de santé, quel rôle la COMMUNauté locale peut-elle jouer ?",
+          "options": [
+            "Financer uniquement les équipements",
+            "Participer à la prévention, aux campagnes de santé et créer des liens de confiance",
+            "Rester complètement à l'écart"
+          ],
+          "points": [20, 30, 10]
+        },
+        {
+          "question": "Quelle forme de PARTENARIAT améliore LE MIEUX l'accès aux soins ?",
+          "options": [
+            "Rivaliser avec d'autres établissements de santé",
+            "Collaborer avec d'autres structures, pharmacies et professionnels pour coordonner les soins",
+            "Fonctionner complètement isolé"
+          ],
+          "points": [20, 30, 10]
+        },
+        {
+          "question": "Dans un partenariat santé-communauté, quel élément PERTURBE LE PLUS l'efficacité ?",
+          "options": [
+            "Avoir des objectifs communs de santé publique clairement définis",
+            "Manquer de coordination, avoir des attentes divergentes et des communications floues",
+            "Impliquer activement les différents acteurs"
+          ],
+          "points": [20, 10, 30]
+        }
+      ]
+    }
+  ],
+  "idees": [
+    {
+      "id": "idee_1",
+      "title": "Plateforme de télémédecine rurale",
+      "description": "Développer une plateforme de téléconsultation médicale spécialement conçue pour les zones rurales. Connecter les patients isolés avec des médecins spécialistes et améliorer l'accès aux soins.",
+      "domaine": "Santé digitale",
+      "difficulte": "Élevée",
+      "duree": "12-18 mois",
+      "investissement": "60 000 - 120 000 €"
+    },
+    {
+      "id": "idee_2",
+      "title": "Centre de bien-être holistique",
+      "description": "Créer un centre combinant médecine traditionnelle et moderne, proposant des soins de bien-être, nutrition, thérapies alternatives et médecine préventive dans un cadre apaisant.",
+      "domaine": "Médecine intégrative",
+      "difficulte": "Élevée",
+      "duree": "10-16 mois",
+      "investissement": "80 000 - 150 000 €"
+    },
+    {
+      "id": "idee_3",
+      "title": "Service de santé mobile pour entreprises",
+      "description": "Proposer des services de médecine du travail mobiles aux entreprises locales. Offrir des consultations sur site, dépistages préventifs et programmes de bien-être au travail.",
+      "domaine": "Médecine du travail",
+      "difficulte": "Moyenne",
+      "duree": "6-10 mois",
+      "investissement": "30 000 - 60 000 €"
+    },
+    {
+      "id": "idee_4",
+      "title": "Application de suivi santé personnalisé",
+      "description": "Développer une application mobile permettant aux patients de suivre leurs paramètres de santé, prendre leurs médicaments et communiquer avec leur équipe médicale.",
+      "domaine": "Santé connectée",
+      "difficulte": "Élevée",
+      "duree": "8-14 mois",
+      "investissement": "40 000 - 80 000 €"
+    }
+  ]
+}

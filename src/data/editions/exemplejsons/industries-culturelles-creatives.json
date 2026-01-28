@@ -1,0 +1,681 @@
+{
+  "edition": "Industries Culturelles & Créatives",
+  "evenements": [
+    {
+      "id": "evt_1",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Subvention culturelle obtenue",
+      "description": "Votre projet artistique obtient une subvention publique prestigieuse qui valide votre démarche créative. Bénéficiez d'une reconnaissance officielle et d'un financement conséquent.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_2",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Partenariat avec une plateforme de streaming",
+      "description": "Une grande plateforme numérique accepte de diffuser vos contenus. Accédez à une audience mondiale et à des revenus récurrents de droits d'auteur.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_3",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Collaboration avec un influenceur",
+      "description": "Un créateur de contenu populaire partage votre travail avec sa communauté. Votre notoriété explose et vos ventes décollent instantanément.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_4",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Résidence d'artiste internationale",
+      "description": "Vous êtes sélectionné(e) pour une résidence prestigieuse qui enrichit votre pratique artistique et élargit votre réseau professionnel international.",
+      "tokens": 2
+    },
+    {
+      "id": "evt_5",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Prix culturel remporté",
+      "description": "Votre création remporte un prix reconnu qui propulse votre carrière. Médiatisation garantie et nouvelles opportunités professionnelles.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_6",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Studio d'enregistrement équipé",
+      "description": "Vous accédez à un studio professionnel moderne qui démultiplie la qualité de vos productions. Attirez des artistes partenaires et clients exigeants.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_7",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Réseau de distribution constitué",
+      "description": "Vous créez un circuit de diffusion efficace reliant galeries, salles de spectacle et points de vente. Sécurisez vos débouchés commerciaux.",
+      "tokens": 2
+    },
+    {
+      "id": "evt_8",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Concept artistique viral",
+      "description": "Votre création devient un phénomène sur les réseaux sociaux, générant des millions de vues et interactions. Monétisez cette visibilité soudaine.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_9",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Équipement créatif de pointe",
+      "description": "Vous investissez dans des technologies créatives révolutionnaires (réalité virtuelle, IA créative, équipement audiovisuel). Révolutionnez votre processus artistique.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_10",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Espace culturel dédié",
+      "description": "Vous obtenez un lieu permanent pour vos créations : atelier, galerie, salle de spectacle ou studio. Développez votre identité artistique et accueillez le public.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_11",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Programme Creative Europe",
+      "description": "Vous intégrez le programme européen de soutien aux industries créatives. Accédez à des financements et collaborations internationales.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_12",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Programme Digital Creative Skills",
+      "description": "Vous bénéficiez d'une formation aux outils numériques créatifs. Maîtrisez les dernières technologies artistiques et créez du contenu innovant.",
+      "tokens": 2,
+      "extra": "avance d'une case"
+    },
+    {
+      "id": "evt_13",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Programme Cultural Heritage Innovation",
+      "description": "Vous rejoignez un programme de valorisation du patrimoine culturel par l'innovation. Obtenez un soutien pour moderniser les traditions artistiques.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_14",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Programme Creative Industries Accelerator",
+      "description": "Vous êtes sélectionné(e) pour un accélérateur spécialisé dans les entreprises créatives. Accédez à un mentorat d'experts et des financements dédiés.",
+      "tokens": 2
+    },
+    {
+      "id": "evt_15",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Programme Arts & Tech Cluster",
+      "description": "Vous intégrez un cluster alliant arts et technologies. Bénéficiez d'un écosystème complet pour l'innovation culturelle et artistique.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_16",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Piratage massif",
+      "description": "Vos créations sont massivement piratées sur internet, réduisant drastiquement vos revenus légitimes.",
+      "tokens": -3
+    },
+    {
+      "id": "evt_17",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Polémique sur les réseaux",
+      "description": "Une controverse sur votre travail artistique enflamme les réseaux sociaux et nuit à votre réputation.",
+      "tokens": -2,
+      "extra": "passez votre prochain tour"
+    },
+    {
+      "id": "evt_18",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Changement d'algorithme",
+      "description": "Les plateformes numériques modifient leurs algorithmes, réduisant drastiquement la visibilité de vos contenus.",
+      "tokens": -2,
+      "extra": "reculez de 1 case"
+    },
+    {
+      "id": "evt_19",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Problème de droits d'auteur",
+      "description": "Vous êtes accusé de plagiat ou de violation de droits, engendrant des frais juridiques importants.",
+      "tokens": -2,
+      "extra": "payez 2 jetons pour résoudre le litige"
+    },
+    {
+      "id": "evt_20",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Panne technique majeure",
+      "description": "Votre équipement créatif principal tombe en panne avant une échéance cruciale (concert, exposition, tournage).",
+      "tokens": -2,
+      "extra": "payez 2 jetons pour la réparation urgente"
+    },
+    {
+      "id": "evt_21",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Refus de subvention",
+      "description": "Votre demande de financement culturel est rejetée, compromettant votre projet artistique.",
+      "tokens": -2
+    },
+    {
+      "id": "evt_22",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Annulation d'événement",
+      "description": "Un festival ou événement majeur où vous deviez vous produire est annulé, privant votre projet de visibilité cruciale.",
+      "tokens": -3
+    },
+    {
+      "id": "evt_23",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Problème de licence",
+      "description": "Vos autorisations d'exploitation ou de diffusion expirent, interrompant temporairement votre activité.",
+      "tokens": -2
+    },
+    {
+      "id": "evt_24",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Critique négative influente",
+      "description": "Un critique respecté publie une critique destructrice qui impacte durablement votre réputation artistique.",
+      "tokens": -2,
+      "extra": "reculez d'une case"
+    },
+    {
+      "id": "evt_25",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Retards de paiement",
+      "description": "Un producteur ou diffuseur majeur accumule les retards de règlement de vos droits.",
+      "tokens": -2
+    }
+  ],
+  "financement": [
+    {
+      "id": "fin_1",
+      "title": "Financement participatif communautaire",
+      "description": "Une campagne de crowdfunding où votre communauté de fans contribue collectivement pour financer votre projet artistique en échange de contreparties créatives.",
+      "tokens": 3
+    },
+    {
+      "id": "fin_2",
+      "title": "Microcrédit créatif",
+      "description": "Un petit prêt spécialement conçu pour les entrepreneurs créatifs, avec des modalités adaptées aux revenus irréguliers des artistes et créateurs.",
+      "tokens": 4
+    },
+    {
+      "id": "fin_3",
+      "title": "Prêt bancaire culturel",
+      "description": "Un financement bancaire dédié aux investissements culturels : équipements créatifs, locaux artistiques, avec des garanties adaptées au secteur créatif.",
+      "tokens": 5
+    },
+    {
+      "id": "fin_4",
+      "title": "Subvention culturelle publique",
+      "description": "Financement non remboursable accordé par l'État, région ou collectivité pour des projets artistiques d'intérêt culturel, création contemporaine ou patrimoine.",
+      "tokens": 4
+    },
+    {
+      "id": "fin_5",
+      "title": "Investisseur CreativeTech",
+      "description": "Un partenaire financier spécialisé dans les industries créatives qui apporte du capital en échange d'une participation, intéressé par l'innovation culturelle rentable.",
+      "tokens": 5
+    },
+    {
+      "id": "fin_6",
+      "title": "Mécénat privé",
+      "description": "Soutien financier d'entreprises ou particuliers fortunés qui financent votre projet artistique par passion culturelle ou pour leur image de marque.",
+      "tokens": 3
+    }
+  ],
+  "quiz": [
+    {
+      "id": "quiz_1",
+      "question": "Quelle protection juridique est automatiquement accordée à une œuvre originale dès sa création?",
+      "options": [
+        "Le brevet artistique",
+        "Le droit d'auteur",
+        "La marque créative"
+      ],
+      "correctAnswer": 1,
+      "category": "Création et production artistique"
+    },
+    {
+      "id": "quiz_2",
+      "question": "Quelle étape est cruciale dans la pré-production d'un film?",
+      "options": [
+        "Le montage final",
+        "L'écriture du scénario et la planification",
+        "La promotion marketing"
+      ],
+      "correctAnswer": 1,
+      "category": "Création et production artistique"
+    },
+    {
+      "id": "quiz_3",
+      "question": "Qu'est-ce qui distingue un label indépendant d'une major?",
+      "options": [
+        "La taille et les moyens financiers",
+        "Le type de musique produite",
+        "La nationalité des artistes"
+      ],
+      "correctAnswer": 0,
+      "category": "Création et production artistique"
+    },
+    {
+      "id": "quiz_4",
+      "question": "Quelle stratégie maximise la visibilité d'un artiste plasticien?",
+      "options": [
+        "Exposer uniquement dans des galeries prestigieuses",
+        "Diversifier les lieux d'exposition et utiliser le digital",
+        "Se limiter aux ventes en ligne"
+      ],
+      "correctAnswer": 1,
+      "category": "Création et production artistique"
+    },
+    {
+      "id": "quiz_5",
+      "question": "Quel élément est essentiel pour le succès d'un spectacle?",
+      "options": [
+        "Un budget illimité",
+        "Une promotion efficace et un contenu de qualité",
+        "Une salle prestigieuse uniquement"
+      ],
+      "correctAnswer": 1,
+      "category": "Création et production artistique"
+    },
+    {
+      "id": "quiz_6",
+      "question": "Quel est le principe du modèle freemium dans les industries créatives?",
+      "options": [
+        "Tout est payant dès le départ",
+        "Contenu de base gratuit, options premium payantes",
+        "Uniquement de la publicité pour se financer"
+      ],
+      "correctAnswer": 1,
+      "category": "Économie créative"
+    },
+    {
+      "id": "quiz_7",
+      "question": "Comment un créateur peut-il diversifier ses revenus?",
+      "options": [
+        "Vendre uniquement l'œuvre originale",
+        "Exploiter les droits dérivés et créer des produits connexes",
+        "Se limiter à un seul canal de distribution"
+      ],
+      "correctAnswer": 1,
+      "category": "Économie créative"
+    },
+    {
+      "id": "quiz_8",
+      "question": "Pourquoi la diversification des activités est-elle recommandée pour les créateurs?",
+      "options": [
+        "Pour maximiser les profits uniquement",
+        "Pour réduire la dépendance à un seul revenu créatif",
+        "Car la loi l'impose aux artistes"
+      ],
+      "correctAnswer": 1,
+      "category": "Économie créative"
+    },
+    {
+      "id": "quiz_9",
+      "question": "Quel élément différencie un business plan créatif d'un plan traditionnel?",
+      "options": [
+        "L'intégration de la dimension artistique et culturelle",
+        "L'absence totale de projections financières",
+        "L'utilisation exclusive de termes artistiques"
+      ],
+      "correctAnswer": 0,
+      "category": "Économie créative"
+    },
+    {
+      "id": "quiz_10",
+      "question": "Quelle stratégie optimise la protection d'une création?",
+      "options": [
+        "L'auto-déclaration informelle",
+        "L'enregistrement officiel et la documentation",
+        "Le partage libre sans protection"
+      ],
+      "correctAnswer": 1,
+      "category": "Économie créative"
+    },
+    {
+      "id": "quiz_11",
+      "question": "Quel outil révolutionne actuellement la création artistique?",
+      "options": [
+        "L'intelligence artificielle générative",
+        "Les logiciels traditionnels uniquement",
+        "Les techniques manuelles exclusivement"
+      ],
+      "correctAnswer": 0,
+      "category": "Technologies créatives"
+    },
+    {
+      "id": "quiz_12",
+      "question": "Quel avantage principal offrent les plateformes numériques aux créateurs?",
+      "options": [
+        "Elles garantissent le succès automatique",
+        "Elles permettent un accès direct au public mondial",
+        "Elles remplacent totalement le talent"
+      ],
+      "correctAnswer": 1,
+      "category": "Technologies créatives"
+    },
+    {
+      "id": "quiz_13",
+      "question": "Comment la VR transforme-t-elle l'expérience culturelle?",
+      "options": [
+        "Elle la rend plus coûteuse uniquement",
+        "Elle crée des expériences immersives inédites",
+        "Elle remplace définitivement l'art traditionnel"
+      ],
+      "correctAnswer": 1,
+      "category": "Technologies créatives"
+    },
+    {
+      "id": "quiz_14",
+      "question": "Quelle innovation les NFT apportent-ils aux artistes?",
+      "options": [
+        "Une nouvelle forme de certification et monétisation digitale",
+        "La gratuité totale de l'art numérique",
+        "L'interdiction de la copie"
+      ],
+      "correctAnswer": 0,
+      "category": "Technologies créatives"
+    },
+    {
+      "id": "quiz_15",
+      "question": "Quel impact le streaming a-t-il sur les revenus des créateurs?",
+      "options": [
+        "Il augmente automatiquement tous les revenus",
+        "Il démocratise l'accès mais modifie la répartition des revenus",
+        "Il n'influence pas les modèles économiques"
+      ],
+      "correctAnswer": 1,
+      "category": "Technologies créatives"
+    },
+    {
+      "id": "quiz_16",
+      "question": "Quelle stratégie fidélise efficacement un public culturel?",
+      "options": [
+        "La régularité et la qualité de l'offre culturelle",
+        "L'augmentation constante des prix",
+        "La limitation de l'accès pour créer la rareté"
+      ],
+      "correctAnswer": 0,
+      "category": "Médiation culturelle et public"
+    },
+    {
+      "id": "quiz_17",
+      "question": "Quel rôle joue la médiation dans la réussite d'un projet culturel?",
+      "options": [
+        "Elle complique l'accès à la culture",
+        "Elle facilite la rencontre entre l'œuvre et le public",
+        "Elle est uniquement décorative"
+      ],
+      "correctAnswer": 1,
+      "category": "Médiation culturelle et public"
+    },
+    {
+      "id": "quiz_18",
+      "question": "Pourquoi l'accessibilité est-elle cruciale dans les projets culturels?",
+      "options": [
+        "Elle permet d'atteindre tous les publics potentiels",
+        "Elle génère automatiquement plus de revenus",
+        "Elle est moins importante que la qualité artistique"
+      ],
+      "correctAnswer": 0,
+      "category": "Médiation culturelle et public"
+    },
+    {
+      "id": "quiz_19",
+      "question": "Quelle approche marketing fonctionne le mieux pour la culture?",
+      "options": [
+        "Le marketing traditionnel agressif uniquement",
+        "Le storytelling authentique et l'engagement communautaire",
+        "L'absence totale de promotion"
+      ],
+      "correctAnswer": 1,
+      "category": "Médiation culturelle et public"
+    },
+    {
+      "id": "quiz_20",
+      "question": "Comment mesurer le succès d'un projet culturel?",
+      "options": [
+        "Uniquement par les revenus financiers",
+        "Par l'impact artistique, social et économique combiné",
+        "Par le nombre de likes sur les réseaux sociaux"
+      ],
+      "correctAnswer": 1,
+      "category": "Médiation culturelle et public"
+    }
+  ],
+  "duel": [
+    {
+      "id": "duel_1",
+      "title": "Pitch créatif",
+      "description": "Choisissez un adversaire. Vous devez pitcher vos projets artistiques respectifs devant un jury fictif en 2 minutes chacun. Si les autres joueurs jugent les deux projets complémentaires, vous gagnez chacun 2 jetons.",
+      "rewards": {
+        "success": 2,
+        "fail": 3
+      }
+    },
+    {
+      "id": "duel_2",
+      "title": "Gestion de crise créative",
+      "description": "Face à un scénario de crise choisi par les autres joueurs (polémique, annulation, piratage...), vous et votre adversaire proposez chacun une stratégie de communication en 30 secondes. Les autres votent pour la plus convaincante.",
+      "rewards": {
+        "success": 3,
+        "fail": 0
+      }
+    },
+    {
+      "id": "duel_3",
+      "title": "Collaboration artistique",
+      "description": "Invitez un joueur à collaborer. Imaginez ensemble un projet créatif croisant vos univers artistiques en 2 minutes. Si les autres jugent la collaboration enrichissante, gagnez chacun 2 jetons.",
+      "rewards": {
+        "success": 2,
+        "fail": 0
+      }
+    },
+    {
+      "id": "duel_4",
+      "title": "Recherche de mécénat",
+      "description": "Un projet culturel ambitieux nécessite un financement. Vous et votre adversaire présentez votre stratégie de recherche de mécénat en 1 minute. Les autres votent pour l'approche la plus persuasive.",
+      "rewards": {
+        "success": 3,
+        "fail": 1
+      }
+    }
+  ],
+  "newDuel": [
+    {
+      "id": "duel_1",
+      "title": "Production et gestion de projet créatif",
+      "questions": [
+        {
+          "question": "Pour un projet créatif, quelle gestion de budget est la PLUS EFFICACE ?",
+          "options": [
+            "Estimer au jugé sans détail",
+            "Identifier TOUS les coûts (mobilier, logistique, droits, taxes) et prévoir une marge pour imprévus",
+            "Compter uniquement sur les revenus futurs"
+          ],
+          "points": [10, 30, 10]
+        },
+        {
+          "question": "Face à un RETARD de paiement d'un producteur, quelle stratégie est la PLUS CONSTRUCTIVE ?",
+          "options": [
+            "Céder tous vos droits immédiatement",
+            "Négocier des échéanciers de paiement et clarifier les contrats dès le départ pour protéger vos intérêts",
+            "Annuler le projet"
+          ],
+          "points": [10, 30, 20]
+        },
+        {
+          "question": "Pour PROTEGER vos droits d'auteur, quelle démarche est la PLUS IMPORTANTE ?",
+          "options": [
+            "Espérer que personne ne copie",
+            "Documenter vos créations, déposer officiellement et utiliser des contrats clairs",
+            "Garder tout secret"
+          ],
+          "points": [10, 30, 10]
+        }
+      ]
+    },
+    {
+      "id": "duel_2",
+      "title": "Vente et distribution d'œuvres créatives",
+      "questions": [
+        {
+          "question": "Pour vendre vos créations culturelles, quelle stratégie est la PLUS EFFICACE ?",
+          "options": [
+            "Attendre que les clients viennent spontanément",
+            "Multiplier les canaux (exposition, vente directe, plateformes en ligne, réseaux sociaux) et créer une communauté",
+            "Se concentrer sur un seul canal"
+          ],
+          "points": [20, 30, 10]
+        },
+        {
+          "question": "Pour TARIFER vos créations artistiques équitablement, quel élément est LE PLUS IMPORTANT ?",
+          "options": [
+            "Choisir le prix le plus bas possible",
+            "Évaluer le temps de création, les matériaux, votre expertise et positionner à un prix qui valorise votre travail",
+            "Fixer un prix arbitraire"
+          ],
+          "points": [10, 30, 20]
+        },
+        {
+          "question": "Quel canal de distribution est le PLUS ADAPTÉ pour des créateurs indépendants ?",
+          "options": [
+            "Les grandes chaînes exclusivement",
+            "Mixer la vente directe (ateliers, marchés), plateformes spécialisées et partenariats ciblés",
+            "Vendre uniquement en ligne"
+          ],
+          "points": [20, 30, 10]
+        }
+      ]
+    },
+    {
+      "id": "duel_3",
+      "title": "Financement de projet culturel",
+      "questions": [
+        {
+          "question": "Pour financer un projet culturel, quelle source est la PLUS ADAPTÉE à une production indépendante ?",
+          "options": [
+            "Un prêt bancaire classique de grande envergure uniquement",
+            "Combiner financement participatif, mécénat, subvention et microcrédit adapté aux revenus irréguliers",
+            "Compter uniquement sur vos propres fonds"
+          ],
+          "points": [10, 30, 20]
+        },
+        {
+          "question": "Pour CONVAINCRE des investisseurs culturels, quel argument est LE PLUS PERCUTANT ?",
+          "options": [
+            "C'est une passion",
+            "Démontrer le potentiel commercial, l'impact culturel et présenter un plan viable et réaliste",
+            "Présenter uniquement les idées créatives"
+          ],
+          "points": [20, 30, 10]
+        },
+        {
+          "question": "Dans un projet culturel, quel budget est le PLUS NÉCESS AIRE à prévoir ?",
+          "options": [
+            "Seulement les matériaux créatifs",
+            "Matériaux, temps, lieu, communication, droits et une marge pour imprévus",
+            "Uniquement les frais de production"
+          ],
+          "points": [10, 30, 20]
+        }
+      ]
+    },
+    {
+      "id": "duel_4",
+      "title": "Partenariat et collaboration créative",
+      "questions": [
+        {
+          "question": "Dans une COLLABORATION artistique, quel élément est LE PLUS CRUCIAL pour éviter les conflits ?",
+          "options": [
+            "Improviser au fur et à mesure",
+            "Définir clairement dès le départ les rôles, la répartition des droits et la méthodologie de travail",
+            "Laisser le leader tout décider"
+          ],
+          "points": [10, 30, 20]
+        },
+        {
+          "question": "Pour UNE collaboration créative DURABLE, quelle approche est la PLUS EFFICACE ?",
+          "options": [
+            "Partager uniquement les bénéfices à la fin",
+            "Établir des objectifs communs, respecter l'autonomie créative de chacun et communiquer régulièrement",
+            "Négocier uniquement en cas de problème"
+          ],
+          "points": [10, 30, 20]
+        },
+        {
+          "question": "Quel partenaire est le PLUS BÉNÉFIQUE pour un créateur indépendant ?",
+          "options": [
+            "Un partenaire qui impose sa vision",
+            "Des partenaires complémentaires (techniques, marketing, distribution) qui enrichissent sans nuire à l'authenticité",
+            "Tout faire seul"
+          ],
+          "points": [20, 30, 10]
+        }
+      ]
+    }
+  ],
+  "idees": [
+    {
+      "id": "idee_1",
+      "title": "Studio de production audiovisuelle indépendant",
+      "description": "Créer un studio de production spécialisé dans le contenu audiovisuel local (documentaires, courts-métrages, publicités). Offrir des services de qualité professionnelle aux entreprises et institutions locales.",
+      "domaine": "Production audiovisuelle",
+      "difficulte": "Élevée",
+      "duree": "12-18 mois",
+      "investissement": "80 000 - 150 000 €"
+    },
+    {
+      "id": "idee_2",
+      "title": "Plateforme de musique en ligne pour artistes locaux",
+      "description": "Développer une plateforme de streaming dédiée aux artistes et musiciens locaux. Permettre la découverte de nouveaux talents et créer une communauté musicale régionale.",
+      "domaine": "Musique digitale",
+      "difficulte": "Élevée",
+      "duree": "10-16 mois",
+      "investissement": "50 000 - 100 000 €"
+    },
+    {
+      "id": "idee_3",
+      "title": "Centre d'art et galerie communautaire",
+      "description": "Établir un espace culturel polyvalent combinant galerie d'art, ateliers créatifs et événements culturels. Soutenir les artistes locaux et démocratiser l'accès à l'art.",
+      "domaine": "Arts visuels",
+      "difficulte": "Moyenne",
+      "duree": "8-12 mois",
+      "investissement": "35 000 - 70 000 €"
+    },
+    {
+      "id": "idee_4",
+      "title": "Agence de communication créative et branding",
+      "description": "Créer une agence spécialisée dans l'identité visuelle, le design graphique et la communication créative pour les entreprises locales. Offrir des services de branding et marketing digital innovants.",
+      "domaine": "Design et communication",
+      "difficulte": "Moyenne",
+      "duree": "6-10 mois",
+      "investissement": "20 000 - 40 000 €"
+    }
+  ]
+}

@@ -1,0 +1,681 @@
+{
+  "edition": "Agri",
+  "evenements": [
+    {
+      "id": "evt_1",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Saison des pluies favorable",
+      "description": "Les précipitations régulières et bien réparties ont favorisé vos cultures. Vos rendements dépassent les prévisions et la qualité est exceptionnelle.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_2",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Adhésion à une coopérative",
+      "description": "Vous rejoignez un groupement de producteurs qui renforce votre pouvoir de négociation. Bénéficiez d'achats groupés d'intrants et de ventes collectives.",
+      "tokens": 2
+    },
+    {
+      "id": "evt_3",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Certification biologique obtenue",
+      "description": "Votre production répond désormais aux standards biologiques reconnus. Accédez à des marchés premium et vendez à prix plus élevé.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_4",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Partenariat avec une entreprise de transformation",
+      "description": "Un accord avec un transformateur local sécurise vos débouchés pour toute la saison. Bénéficiez de prix stables et de conseils techniques gratuits.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_5",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Système d'irrigation efficace",
+      "description": "Vous installez un système d'irrigation goutte-à-goutte économe en eau. Produisez même en saison sèche et augmentez vos cycles annuels de culture.",
+      "tokens": 2
+    },
+    {
+      "id": "evt_6",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Accès à des semences améliorées",
+      "description": "Vous obtenez des variétés à haut rendement, résistantes aux maladies et adaptées à votre zone. Vos rendements augmentent de 40% dès la première saison.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_7",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Diversification des cultures",
+      "description": "Vous cultivez désormais trois espèces différentes sur votre exploitation. Cette stratégie réduit les risques climatiques et stabilise vos revenus.",
+      "tokens": 2
+    },
+    {
+      "id": "evt_8",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Emballage innovant",
+      "description": "Votre packaging écologique et attractif séduit les consommateurs urbains et renforce votre marque. Vos produits se démarquent sur les étals et attirent une nouvelle clientèle.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_9",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Équipement agricole modernisé",
+      "description": "Vous investissez dans des machines qui multiplient votre productivité par trois. Cette mécanisation réduit la pénibilité du travail et améliore la qualité de vos produits.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_10",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Accès à un entrepôt de stockage",
+      "description": "Vous obtenez un espace dans un entrepôt communautaire. Stockez votre production et attendez la période de soudure pour vendre à prix plus élevé.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_11",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Programme E4Y - Agro-industrie",
+      "description": "Vous intégrez le programme Employment for Youth qui vous forme aux chaînes de valeur agricoles. Accédez à un réseau régional et des financements.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_12",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Programme FORCE-N - Compétences numériques",
+      "description": "Vous bénéficiez d'une formation en compétences numériques appliquées à l'agriculture. Créez une solution AgriTech innovante.",
+      "tokens": 2,
+      "extra": "avance d'une case"
+    },
+    {
+      "id": "evt_13",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Programme Méliteji Wasu - Filière laitière",
+      "description": "Vous rejoignez un programme de développement de la chaîne de valeur laitière moderne. Obtenez un appui technique et financier pour votre mini-ferme.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_14",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Programme Weecap - Transformation de cajou",
+      "description": "Vous êtes sélectionné(e) pour le programme d'autonomisation dans la filière cajou. Accédez à des équipements et formations en transformation.",
+      "tokens": 2
+    },
+    {
+      "id": "evt_15",
+      "type": "evenement",
+      "sousType": "opportunite",
+      "title": "Programme RIZAO - Chaîne de valeur riz",
+      "description": "Vous intégrez un cluster rizième soutenu par RIZAO. Bénéficiez d'un accompagnement complet pour la production, transformation ou distribution.",
+      "tokens": 3
+    },
+    {
+      "id": "evt_16",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Sécheresse",
+      "description": "Une période prolongée sans pluie affecte vos cultures.",
+      "tokens": -3
+    },
+    {
+      "id": "evt_17",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Invasion de parasites",
+      "description": "Vos champs sont ravagés par des criquets pèlerins.",
+      "tokens": -2,
+      "extra": "passez votre prochain tour"
+    },
+    {
+      "id": "evt_18",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Fluctuation des prix du marché",
+      "description": "Le prix de vos produits chute en raison d'une surproduction.",
+      "tokens": -2,
+      "extra": "reculez de 1 case"
+    },
+    {
+      "id": "evt_19",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Difficultés d'accès à la terre",
+      "description": "Des problèmes fonciers retardent votre installation.",
+      "tokens": -2,
+      "extra": "payez 2 jetons pour résoudre le conflit"
+    },
+    {
+      "id": "evt_20",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Pannes d'équipement",
+      "description": "Votre matériel agricole tombe en panne au moment critique.",
+      "tokens": -2,
+      "extra": "payez 2 jetons pour les réparations"
+    },
+    {
+      "id": "evt_21",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Problèmes de financement",
+      "description": "Votre demande de crédit est rejetée par la banque.",
+      "tokens": -2
+    },
+    {
+      "id": "evt_22",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Intempéries violentes",
+      "description": "Une inondation soudaine endommage vos cultures et infrastructures.",
+      "tokens": -3
+    },
+    {
+      "id": "evt_23",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Problèmes de conservation",
+      "description": "Vos produits se détériorent rapidement après la récolte.",
+      "tokens": -2
+    },
+    {
+      "id": "evt_24",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Maladie des cultures",
+      "description": "Une maladie des plantes se propage dans vos champs.",
+      "tokens": -2,
+      "extra": "reculez d'une case"
+    },
+    {
+      "id": "evt_25",
+      "type": "evenement",
+      "sousType": "challenge",
+      "title": "Retards de paiement",
+      "description": "Un client important tarde à vous payer.",
+      "tokens": -2
+    }
+  ],
+  "financement": [
+    {
+      "id": "fin_1",
+      "title": "Tontine / Natt",
+      "description": "La tontine (appelée \"Natt\" en wolof) est un système d'épargne et de crédit rotatif traditionnel où chaque membre contribue régulièrement à un fonds commun qui est attribué à tour de rôle à chacun des participants.",
+      "tokens": 3
+    },
+    {
+      "id": "fin_2",
+      "title": "Microcrédit agricole",
+      "description": "Le microcrédit agricole est un petit prêt spécifiquement conçu pour les activités agricoles, adapté aux besoins des petits producteurs avec des modalités de remboursement alignées sur les cycles de production.",
+      "tokens": 4
+    },
+    {
+      "id": "fin_3",
+      "title": "Prêt bancaire agricole",
+      "description": "Un financement formel accordé par une banque spécifiquement pour les activités agricoles, couvrant des investissements plus importants comme l'achat d'équipements, l'aménagement de terrain ou l'expansion d'activités.",
+      "tokens": 5
+    },
+    {
+      "id": "fin_4",
+      "title": "Subvention gouvernementale ou d'ONG",
+      "description": "Financement non remboursable accordé par le gouvernement ou une organisation non gouvernementale dans le cadre d'un programme de développement agricole, ciblant souvent des projets innovants, écologiques ou à fort impact social.",
+      "tokens": 4
+    },
+    {
+      "id": "fin_5",
+      "title": "Investisseur en agribusiness",
+      "description": "Un partenaire financier (business angel, fonds d'investissement) qui apporte du capital en échange d'une part dans votre entreprise agricole, généralement intéressé par des modèles d'affaires innovants à fort potentiel de croissance.",
+      "tokens": 5
+    },
+    {
+      "id": "fin_6",
+      "title": "Financement participatif (Bayseddo)",
+      "description": "Financement participatif où de nombreux individus contribuent de petites sommes ou d'autres types de ressources (foncier, matériels, etc.) via des plateformes en ligne ou via des intermédiaires pour soutenir votre projet agricole.",
+      "tokens": 3
+    }
+  ],
+  "quiz": [
+    {
+      "id": "quiz_1",
+      "question": "Quelle pratique permet de préserver la fertilité des sols à long terme dans l'agriculture sénégalaise?",
+      "options": [
+        "La monoculture intensive",
+        "La rotation des cultures",
+        "L'utilisation exclusive d'engrais chimiques"
+      ],
+      "correctAnswer": 1,
+      "category": "Aspects techniques agricoles"
+    },
+    {
+      "id": "quiz_2",
+      "question": "Parmi ces systèmes d'irrigation, lequel est le plus économe en eau dans le contexte sénégalais?",
+      "options": [
+        "L'irrigation par aspersion",
+        "L'irrigation par submersion",
+        "L'irrigation goutte-à-goutte"
+      ],
+      "correctAnswer": 2,
+      "category": "Aspects techniques agricoles"
+    },
+    {
+      "id": "quiz_3",
+      "question": "Quelle approche est considérée comme la plus durable pour gérer les ravageurs dans les cultures au Sénégal?",
+      "options": [
+        "La lutte intégrée combinant plusieurs méthodes",
+        "L'utilisation massive et préventive de pesticides chimiques",
+        "L'élimination manuelle des insectes"
+      ],
+      "correctAnswer": 0,
+      "category": "Aspects techniques agricoles"
+    },
+    {
+      "id": "quiz_4",
+      "question": "Quelle méthode est la plus adaptée pour la conservation à long terme des céréales par les petits producteurs sénégalais?",
+      "options": [
+        "Le stockage en sacs traditionnels",
+        "L'utilisation de silos hermétiques",
+        "Le séchage au soleil sans protection"
+      ],
+      "correctAnswer": 1,
+      "category": "Aspects techniques agricoles"
+    },
+    {
+      "id": "quiz_5",
+      "question": "Quel est le principal avantage des semences certifiées pour un agriculteur sénégalais?",
+      "options": [
+        "Elles sont toujours importées et donc de meilleure qualité",
+        "Elles ne nécessitent aucun entretien particulier",
+        "Elles garantissent un taux de germination et des caractéristiques précises"
+      ],
+      "correctAnswer": 2,
+      "category": "Aspects techniques agricoles"
+    },
+    {
+      "id": "quiz_6",
+      "question": "Qu'est-ce qu'une chaîne de valeur agricole?",
+      "options": [
+        "Un système d'irrigation en cascade",
+        "L'ensemble des maillons allant de la production à la consommation finale",
+        "Une chaîne de supermarchés spécialisés dans les produits agricoles"
+      ],
+      "correctAnswer": 1,
+      "category": "Gestion d'entreprise agricole"
+    },
+    {
+      "id": "quiz_7",
+      "question": "Comment calcule-t-on correctement la marge brute d'une activité agricole?",
+      "options": [
+        "Prix de vente - Coûts des intrants",
+        "Prix de vente - Tous les coûts de production",
+        "Prix de vente × Quantité produite"
+      ],
+      "correctAnswer": 0,
+      "category": "Gestion d'entreprise agricole"
+    },
+    {
+      "id": "quiz_8",
+      "question": "Pourquoi la diversification des activités est-elle recommandée pour les entreprises agricoles au Sénégal?",
+      "options": [
+        "Uniquement pour maximiser les revenus",
+        "Pour réduire les risques et stabiliser les revenus",
+        "Car la loi l'exige pour les exploitations agricoles"
+      ],
+      "correctAnswer": 1,
+      "category": "Gestion d'entreprise agricole"
+    },
+    {
+      "id": "quiz_9",
+      "question": "Quel élément est indispensable dans un bon plan d'affaires pour un projet agricole?",
+      "options": [
+        "Une analyse détaillée des coûts et revenus sur plusieurs saisons",
+        "L'utilisation de termes techniques complexes",
+        "Une promesse de profits rapides et garantis"
+      ],
+      "correctAnswer": 0,
+      "category": "Gestion d'entreprise agricole"
+    },
+    {
+      "id": "quiz_10",
+      "question": "Quel type de certification peut significativement augmenter la valeur des produits agricoles sénégalais sur les marchés internationaux?",
+      "options": [
+        "L'auto-certification par le producteur",
+        "La certification biologique ou commerce équitable",
+        "La certification de producteur local"
+      ],
+      "correctAnswer": 1,
+      "category": "Gestion d'entreprise agricole"
+    },
+    {
+      "id": "quiz_11",
+      "question": "Comment les applications mobiles peuvent-elles aider les agriculteurs sénégalais?",
+      "options": [
+        "Pour accéder aux prévisions météorologiques et aux prix du marché",
+        "Seulement pour communiquer avec les acheteurs",
+        "Uniquement pour les divertir pendant les pauses"
+      ],
+      "correctAnswer": 0,
+      "category": "Innovation digitale"
+    },
+    {
+      "id": "quiz_12",
+      "question": "Parmi ces équipements, lequel représente une innovation particulièrement adaptée aux petits agriculteurs sénégalais?",
+      "options": [
+        "Les tracteurs industriels de grande puissance",
+        "Les charrues traditionnelles en bois",
+        "Les motoculteurs et équipements motorisés intermédiaires"
+      ],
+      "correctAnswer": 2,
+      "category": "Innovation digitale"
+    },
+    {
+      "id": "quiz_13",
+      "question": "Quel avantage principal offre l'énergie solaire pour les activités agricoles dans les zones rurales du Sénégal?",
+      "options": [
+        "Elle fonctionne uniquement pendant la saison sèche",
+        "Elle permet l'autonomie énergétique dans des zones sans électricité",
+        "Elle est entièrement gratuite sans investissement initial"
+      ],
+      "correctAnswer": 1,
+      "category": "Innovation digitale"
+    },
+    {
+      "id": "quiz_14",
+      "question": "Quelle innovation a récemment amélioré la conservation des produits périssables pour les petits producteurs sénégalais?",
+      "options": [
+        "Le séchage solaire amélioré",
+        "La congélation industrielle",
+        "L'emballage dans des sacs en plastique standard"
+      ],
+      "correctAnswer": 0,
+      "category": "Innovation digitale"
+    },
+    {
+      "id": "quiz_15",
+      "question": "Quel nouveau modèle de commercialisation permet aux agriculteurs sénégalais d'atteindre directement les consommateurs urbains?",
+      "options": [
+        "La vente exclusive aux grossistes traditionnels",
+        "Les plateformes de vente directe en ligne",
+        "L'exportation systématique vers l'Europe"
+      ],
+      "correctAnswer": 1,
+      "category": "Innovation digitale"
+    },
+    {
+      "id": "quiz_16",
+      "question": "Quelle technique permet aux agriculteurs sénégalais de mieux faire face à la variabilité croissante des précipitations?",
+      "options": [
+        "La collecte et le stockage des eaux de pluie",
+        "L'utilisation exclusive de cultures traditionnelles",
+        "L'abandon des terres pendant les périodes sèches"
+      ],
+      "correctAnswer": 0,
+      "category": "Résilience climatique"
+    },
+    {
+      "id": "quiz_17",
+      "question": "Quel avantage l'agroforesterie (association arbres-cultures) apporte-t-elle aux exploitations agricoles sénégalaises?",
+      "options": [
+        "Elle complique nécessairement le travail agricole",
+        "Elle améliore la fertilité des sols et crée un microclimat favorable",
+        "Elle est uniquement décorative"
+      ],
+      "correctAnswer": 1,
+      "category": "Résilience climatique"
+    },
+    {
+      "id": "quiz_18",
+      "question": "Pourquoi les variétés culturales à cycle court sont-elles de plus en plus importantes au Sénégal?",
+      "options": [
+        "Elles s'adaptent mieux à la saison des pluies raccourcie",
+        "Elles produisent toujours plus que les variétés traditionnelles",
+        "Elles sont moins chères à cultiver"
+      ],
+      "correctAnswer": 0,
+      "category": "Résilience climatique"
+    },
+    {
+      "id": "quiz_19",
+      "question": "Comment les systèmes d'alerte précoce aident-ils les agriculteurs sénégalais?",
+      "options": [
+        "Ils prédisent avec exactitude la production de chaque champ",
+        "Ils garantissent automatiquement des compensations financières",
+        "Ils préviennent des risques climatiques et conseillent sur les mesures à prendre"
+      ],
+      "correctAnswer": 2,
+      "category": "Résilience climatique"
+    },
+    {
+      "id": "quiz_20",
+      "question": "Quel est le principe de l'assurance agricole indicielle développée au Sénégal?",
+      "options": [
+        "Elle verse automatiquement des indemnités basées sur des indices météorologiques",
+        "Elle indemnise uniquement les grandes exploitations",
+        "Elle rembourse exactement les pertes constatées après expertise"
+      ],
+      "correctAnswer": 0,
+      "category": "Résilience climatique"
+    }
+  ],
+  "duel": [
+    {
+      "id": "duel_1",
+      "title": "Négociation commerciale",
+      "description": "Choisissez un adversaire. Vous êtes producteur, il est acheteur. Négociez prix et conditions en 2 minutes. Si vous parvenez à un accord jugé équitable par tous, gagnez chacun 2 jetons.",
+      "rewards": {
+        "success": 2,
+        "fail": 3
+      }
+    },
+    {
+      "id": "duel_2",
+      "title": "Résolution de crise",
+      "description": "Face à un scénario de crise choisi par les autres joueurs (ravageurs, panne de pompe, inondation...), vous et votre adversaire proposez chacun une solution en 30 secondes. Les autres votent pour la plus efficace et économique.",
+      "rewards": {
+        "success": 3,
+        "fail": 0
+      }
+    },
+    {
+      "id": "duel_3",
+      "title": "Collaboration stratégique",
+      "description": "Invitez un joueur à collaborer. Élaborez ensemble en 2 minutes un plan de partenariat entre vos entreprises. Si les autres jugent le plan viable et équilibré, gagnez chacun 2 jetons.",
+      "rewards": {
+        "success": 2,
+        "fail": 0
+      }
+    },
+    {
+      "id": "duel_4",
+      "title": "Plan de financement",
+      "description": "Un besoin d'investissement vous est communiqué par les autres joueurs. Vous et votre adversaire élaborez un plan de financement et le présentez en 1 minute. Les autres votent pour le plan le plus réaliste et pertinent.",
+      "rewards": {
+        "success": 3,
+        "fail": 1
+      }
+    }
+  ],
+  "newDuel": [
+    {
+      "id": "duel_1",
+      "title": "Négociation commerciale",
+      "questions": [
+        {
+          "question": "Une BONNE PROPOSITION DE VALEUR DOIT COMMUNIQUER QUOI en PRIORITÉ?",
+          "options": [
+            "L'histoire et la vision du fondateur",
+            "Les technologies utilisées et les fonctionnalités du produit",
+            "Les bénéfices concrets pour le client et la solution à son problème"
+          ],
+          "points": [10, 20, 30]
+        },
+        {
+          "question": "Quelle est la formule correcte pour calculer la MARGE sur un produit agricole ?",
+          "options": [
+            "Prix de vente - Coût de production",
+            "Chiffre d'affaires total - Frais généraux",
+            "Quantité vendue × Prix unitaire"
+          ],
+          "points": [30, 10, 20]
+        },
+        {
+          "question": "Dans une négociation commerciale, quel élément est le PLUS IMPORTANT pour établir la confiance ?",
+          "options": [
+            "Proposer le prix le plus bas possible",
+            "Montrer une compréhension authentique des besoins de l'acheteur",
+            "Insister sur vos propres contraintes financières"
+          ],
+          "points": [10, 30, 20]
+        }
+      ]
+    },
+    {
+      "id": "duel_2",
+      "title": "Résolution de crise",
+      "questions": [
+        {
+          "question": "Face à une invasion de ravageurs, quelle est la PREMIÈRE action à entreprendre ?",
+          "options": [
+            "Traiter immédiatement tous les champs avec des pesticides",
+            "Identifier précisément le ravageur et évaluer l'ampleur de l'infestation",
+            "Abandonner les cultures affectées et recommencer ailleurs"
+          ],
+          "points": [20, 30, 10]
+        },
+        {
+          "question": "Quelle approche de gestion de crise est la PLUS EFFICACE à long terme ?",
+          "options": [
+            "Réagir uniquement quand la crise survient",
+            "Mettre en place des stratégies préventives et un système de surveillance",
+            "Déléguer la gestion de crise à des tiers"
+          ],
+          "points": [10, 30, 20]
+        },
+        {
+          "question": "En cas de panne d'équipement critique, quelle solution est la plus COÛT-EFFICACE pour un petit producteur ?",
+          "options": [
+            "Acheter immédiatement un nouvel équipement neuf",
+            "Explorer les options de réparation, location ou mutualisation avec d'autres producteurs",
+            "Arrêter temporairement l'activité jusqu'à obtenir un financement"
+          ],
+          "points": [10, 30, 20]
+        }
+      ]
+    },
+    {
+      "id": "duel_3",
+      "title": "Collaboration stratégique",
+      "questions": [
+        {
+          "question": "Quel est l'AVANTAGE PRINCIPAL d'une collaboration entre producteurs agricoles ?",
+          "options": [
+            "Chaque producteur garde sa totale indépendance opérationnelle",
+            "Réduire les coûts par des achats groupés et accéder à de meilleurs marchés",
+            "Augmenter la concurrence entre les partenaires"
+          ],
+          "points": [20, 30, 10]
+        },
+        {
+          "question": "Pour qu'une collaboration stratégique SOIT DURABLE, quel élément est ESSENTIEL ?",
+          "options": [
+            "Avoir le même nombre d'employés",
+            "Clarifier les rôles, responsabilités et conditions de partage des bénéfices dès le départ",
+            "Collaborer avec le plus grand nombre de partenaires possible"
+          ],
+          "points": [10, 30, 20]
+        },
+        {
+          "question": "Quelle forme de PARTENARIAT est la PLUS ADAPTÉE pour des petits producteurs agricoles ?",
+          "options": [
+            "Formation d'une société anonyme complexe",
+            "Coopérative ou groupement d'intérêt économique avec réglementation claire",
+            "Partage informel sans accords écrits"
+          ],
+          "points": [10, 30, 20]
+        }
+      ]
+    },
+    {
+      "id": "duel_4",
+      "title": "Plan de financement",
+      "questions": [
+        {
+          "question": "Pour accéder à un financement bancaire, quel document est le PLUS IMPORTANT à présenter ?",
+          "options": [
+            "Une simple estimation verbale des revenus potentiels",
+            "Un plan d'affaires détaillé avec projections financières réalistes",
+            "Une promesse de garantie d'un proche"
+          ],
+          "points": [10, 30, 20]
+        },
+        {
+          "question": "Quelle source de financement est la PLUS ADAPTÉE pour un petit producteur débutant ?",
+          "options": [
+            "Un prêt bancaire classique de grande envergure",
+            "Microcrédit, tontine (Natt) ou financement participatif",
+            "Investissement direct d'un grand groupe international"
+          ],
+          "points": [20, 30, 10]
+        },
+        {
+          "question": "Dans un plan de financement, quel élément PERTURBE LE PLUS les investisseurs ?",
+          "options": [
+            "Avoir clairement identifié tous les coûts, y compris les imprévus",
+            "Sous-estimer les coûts réels et surévaluer les revenus potentiels",
+            "Présenter plusieurs scénarios possibles"
+          ],
+          "points": [20, 10, 30]
+        }
+      ]
+    }
+  ],
+  "idees": [
+    {
+      "id": "idee_1",
+      "title": "Plateforme AgriTech de vente directe",
+      "description": "Créer une plateforme numérique connectant directement les producteurs agricoles aux consommateurs urbains. Éliminer les intermédiaires, garantir des prix équitables et assurer la traçabilité des produits.",
+      "domaine": "AgriTech",
+      "difficulte": "Moyenne",
+      "duree": "8-12 mois",
+      "investissement": "25 000 - 50 000 €"
+    },
+    {
+      "id": "idee_2",
+      "title": "Centre de transformation agroalimentaire communautaire",
+      "description": "Établir une unité de transformation des produits agricoles locaux (conserves, jus, séchage) permettant aux petits producteurs de valoriser leurs récoltes et créer des emplois locaux.",
+      "domaine": "Transformation agroalimentaire",
+      "difficulte": "Élevée",
+      "duree": "12-18 mois",
+      "investissement": "60 000 - 120 000 €"
+    },
+    {
+      "id": "idee_3",
+      "title": "Service d'agriculture de précision avec drones",
+      "description": "Proposer des services de cartographie, surveillance des cultures et pulvérisation ciblée à l'aide de drones. Optimiser l'utilisation des intrants et améliorer les rendements agricoles.",
+      "domaine": "Agriculture de précision",
+      "difficulte": "Élevée",
+      "duree": "10-15 mois",
+      "investissement": "40 000 - 80 000 €"
+    },
+    {
+      "id": "idee_4",
+      "title": "Ferme pédagogique et écotourisme",
+      "description": "Développer une ferme qui combine production agricole durable, éducation environnementale et accueil touristique. Sensibiliser le public aux enjeux agricoles tout en diversifiant les revenus.",
+      "domaine": "Agritourisme",
+      "difficulte": "Moyenne",
+      "duree": "6-10 mois",
+      "investissement": "30 000 - 60 000 €"
+    }
+  ]
+}
