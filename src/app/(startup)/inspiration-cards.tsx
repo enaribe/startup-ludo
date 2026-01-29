@@ -104,7 +104,8 @@ function drawRandomCard<T extends { rarity: 'common' | 'rare' | 'legendary' }>(c
     }
   }
 
-  return weightedCards[Math.floor(Math.random() * weightedCards.length)];
+  const randomIndex = Math.floor(Math.random() * weightedCards.length);
+  return weightedCards[randomIndex] ?? cards[0]!;
 }
 
 export default function InspirationCardsScreen() {

@@ -34,7 +34,7 @@ export default function StartupConfirmationScreen() {
 
   const startupName = params.startupName || 'Nouvelle Startup';
   const sectorId = params.startupSector || 'tech';
-  const sectorInfo = SECTOR_INFO[sectorId] || SECTOR_INFO.tech;
+  const sectorInfo = SECTOR_INFO[sectorId] ?? SECTOR_INFO['tech']!;
 
   useEffect(() => {
     // Celebration haptic

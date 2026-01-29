@@ -11,10 +11,28 @@ export default function GameLayout() {
         gestureEnabled: false,
       }}
     >
+      {/* Mode Selection */}
       <Stack.Screen name="mode-selection" />
+
+      {/* Local Game Flow */}
       <Stack.Screen name="local-setup" />
-      <Stack.Screen name="online-setup" />
-      <Stack.Screen name="lobby/[roomId]" />
+
+      {/* Online Game Flow */}
+      <Stack.Screen name="online-hub" />
+      <Stack.Screen name="quick-match" />
+      <Stack.Screen name="create-room" />
+      <Stack.Screen name="join-room" />
+
+      {/* Game Preparation */}
+      <Stack.Screen
+        name="game-preparation"
+        options={{
+          gestureEnabled: false,
+          animation: 'fade',
+        }}
+      />
+
+      {/* Game Play */}
       <Stack.Screen
         name="play/[gameId]"
         options={{
@@ -22,6 +40,8 @@ export default function GameLayout() {
           animation: 'fade',
         }}
       />
+
+      {/* Results */}
       <Stack.Screen
         name="results/[gameId]"
         options={{

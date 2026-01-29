@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "767192713144",
+    "project_id": "startup-ludo-new",
+    "storage_bucket": "startup-ludo-new.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:767192713144:android:8a73914c9e2919c2c6714d",
+        "android_client_info": {
+          "package_name": "com.startupludo.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDPJqt08kkw2awPGvuu62dA9maVOU4WxgM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

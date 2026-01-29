@@ -30,6 +30,9 @@ export interface RoomConfig {
   maxPlayers: 2 | 3 | 4;
   hostId: string;
   hostName: string;
+  roomName?: string;
+  betAmount?: number;
+  isQuickMatch?: boolean;
 }
 
 export interface JoinRoomData {
@@ -156,11 +159,13 @@ export class MultiplayerSync {
 
     const player: RealtimePlayer = {
       id: data.odorId,
-      name: data.playerName,
+      displayName: data.playerName,
+      name: data.playerName, // Backward compat
       color: availableColor,
       isHost: false,
       isReady: false,
       isConnected: true,
+      joinedAt: Date.now(),
       lastSeen: Date.now(),
     };
 

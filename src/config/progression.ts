@@ -124,6 +124,9 @@ export const RANKS_MAP: Record<UserRank, RankInfo> = RANKS.reduce(
   {} as Record<UserRank, RankInfo>
 );
 
+// Rang par défaut (premier rang)
+export const DEFAULT_RANK = RANKS[0]!;
+
 // ===== CONFIGURATION DES NIVEAUX =====
 
 // Formule XP par niveau : 100 * niveau (niveau 1 = 100 XP, niveau 10 = 1000 XP)

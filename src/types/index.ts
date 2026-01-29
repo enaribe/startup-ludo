@@ -20,6 +20,7 @@ export interface Player {
   tokens: number;
   pawns: PawnState[]; // 1 à 4 pions par joueur (par défaut 1)
   startupId?: string;
+  startupName?: string;
 }
 
 // Ancien format (pour compatibilité)
@@ -138,6 +139,8 @@ export interface User {
 
 export interface UserProfile {
   userId: string;
+  displayName: string;
+  avatarUrl: string | null;
   rank: UserRank;
   xp: number;
   level: number;
@@ -146,6 +149,7 @@ export interface UserProfile {
   totalTokensEarned: number;
   achievements: string[];
   startups: Startup[];
+  createdAt: number;
 }
 
 export type UserRank =

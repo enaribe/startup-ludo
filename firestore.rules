@@ -1,0 +1,83 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isValidUser() {
+      return isAuthenticated() && 
+             request.resource.data.keys().hasAll(['email', 'displayName', 'createdAt']) &&
+             request.resource.data.email is string &&
+             request.resource.data.displayName is string;
+    }
+    
+    // Users collection
+    match /users/{userId} {
+      // Allow read if authenticated
+      allow read: if isAuthenticated();
+      
+      // Allow create only for own user document
+      allow create: if isOwner(userId) && isValidUser();
+      
+      // Allow update/delete only for own user document
+      allow update, delete: if isOwner(userId);
+      
+      // User's startups subcollection
+      match /startups/{startupId} {
+        allow read: if isAuthenticated();
+        allow write: if isOwner(userId);
+      }
+    }
+    
+    // User Stats collection
+    match /userStats/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId);
+    }
+    
+    // Editions collection (read-only for users)
+    match /editions/{editionId} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Only admins via Firebase Console
+    }
+    
+    // Leaderboards collection
+    match /leaderboards/{leaderboardId} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Updated by Cloud Functions only
+    }
+    
+    // Game Sessions collection
+    match /gameSessions/{sessionId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && 
+                      resource.data.players[request.auth.uid] != null;
+      allow delete: if isAuthenticated() && 
+                      resource.data.hostId == request.auth.uid;
+    }
+    
+    // Achievements collection
+    match /achievements/{achievementId} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Updated by Cloud Functions only
+    }
+    
+    // Reports collection
+    match /reports/{reportId} {
+      allow read: if isAuthenticated() && 
+                    (resource.data.reportedBy == request.auth.uid || 
+                     resource.data.userId == request.auth.uid);
+      allow create: if isAuthenticated();
+      allow update, delete: if false; // Only admins
+    }
+  }
+}

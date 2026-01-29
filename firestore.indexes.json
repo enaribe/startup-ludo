@@ -1,0 +1,89 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "userStats",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "xp",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "userStats",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "weeklyXP",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "userStats",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "monthlyXP",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "userStats",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "gamesWon",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "userStats",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "totalTokensEarned",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "xp",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "gamesWon",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "gameSessions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "playerIds",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

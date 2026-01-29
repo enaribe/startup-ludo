@@ -134,7 +134,7 @@ export default function LobbyScreen() {
   const playersForChat = useMemo(() => {
     const result: Record<string, { name: string; color: PlayerColor }> = {};
     playersList.forEach((p) => {
-      result[p.odorId] = { name: p.name, color: p.color };
+      result[p.odorId] = { name: p.displayName ?? p.name ?? 'Joueur', color: p.color };
     });
     return result;
   }, [playersList]);

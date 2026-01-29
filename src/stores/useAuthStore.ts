@@ -2,11 +2,26 @@ import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import type { User } from '@/types';
+import {
+  loginWithEmail,
+  registerWithEmail,
+  loginAsGuest as firebaseLoginAsGuest,
+  logout as firebaseLogout,
+  resetPassword as firebaseResetPassword,
+  subscribeToAuthState,
+  type AuthUser,
+} from '@/services/firebase';
+import {
+  createUserProfile,
+  getUserProfile,
+} from '@/services/firebase';
+import { useUserStore } from './useUserStore';
 
 interface AuthState {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  isInitialized: boolean;
   error: string | null;
 }
 
@@ -20,6 +35,7 @@ interface AuthActions {
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   clearError: () => void;
+  initializeAuth: () => () => void;
 }
 
 type AuthStore = AuthState & AuthActions;
@@ -28,8 +44,19 @@ const initialState: AuthState = {
   user: null,
   isLoading: false,
   isAuthenticated: false,
+  isInitialized: false,
   error: null,
 };
+
+// Convert AuthUser to our User type
+const mapAuthUserToUser = (authUser: AuthUser): User => ({
+  id: authUser.id,
+  email: authUser.email ?? '',
+  displayName: authUser.displayName ?? 'Joueur',
+  isGuest: authUser.isAnonymous,
+  createdAt: Date.now(),
+  lastLogin: Date.now(),
+});
 
 export const useAuthStore = create<AuthStore>()(
   subscribeWithSelector(
@@ -63,45 +90,102 @@ export const useAuthStore = create<AuthStore>()(
         });
       },
 
-      login: async (_email, _password) => {
+      initializeAuth: () => {
+        set((state) => {
+          state.isLoading = true;
+        });
+
+        // Subscribe to Firebase auth state changes
+        const unsubscribe = subscribeToAuthState(async (authUser) => {
+          if (authUser) {
+            // User is signed in
+            const user = mapAuthUserToUser(authUser);
+            set((state) => {
+              state.user = user;
+              state.isAuthenticated = true;
+              state.isLoading = false;
+              state.isInitialized = true;
+            });
+
+            // Load user profile from Firestore
+            try {
+              const profile = await getUserProfile(authUser.id);
+              if (profile) {
+                useUserStore.getState().setProfile(profile);
+              }
+            } catch (error) {
+              console.error('Failed to load user profile:', error);
+            }
+          } else {
+            // User is signed out
+            set((state) => {
+              state.user = null;
+              state.isAuthenticated = false;
+              state.isLoading = false;
+              state.isInitialized = true;
+            });
+            useUserStore.getState().reset();
+          }
+        });
+
+        return unsubscribe;
+      },
+
+      login: async (email, password) => {
         set((state) => {
           state.isLoading = true;
           state.error = null;
         });
 
         try {
-          // TODO: Implement Firebase Auth login
-          // const userCredential = await auth().signInWithEmailAndPassword(email, password);
-          // const user = userCredential.user;
-          // set((state) => {
-          //   state.user = { ... };
-          //   state.isAuthenticated = true;
-          // });
+          const authUser = await loginWithEmail(email, password);
+          const user = mapAuthUserToUser(authUser);
+
+          set((state) => {
+            state.user = user;
+            state.isAuthenticated = true;
+            state.isLoading = false;
+          });
+
+          // Load user profile
+          const profile = await getUserProfile(authUser.id);
+          if (profile) {
+            useUserStore.getState().setProfile(profile);
+          }
         } catch (error) {
           set((state) => {
             state.error = error instanceof Error ? error.message : 'Erreur de connexion';
-          });
-        } finally {
-          set((state) => {
             state.isLoading = false;
           });
         }
       },
 
-      register: async (_email, _password, _displayName) => {
+      register: async (email, password, displayName) => {
         set((state) => {
           state.isLoading = true;
           state.error = null;
         });
 
         try {
-          // TODO: Implement Firebase Auth registration
+          const authUser = await registerWithEmail(email, password, displayName);
+          const user = mapAuthUserToUser(authUser);
+
+          // Create user profile in Firestore
+          const profile = await createUserProfile(authUser.id, {
+            email: authUser.email,
+            displayName,
+          });
+
+          set((state) => {
+            state.user = user;
+            state.isAuthenticated = true;
+            state.isLoading = false;
+          });
+
+          useUserStore.getState().setProfile(profile);
         } catch (error) {
           set((state) => {
             state.error = error instanceof Error ? error.message : "Erreur d'inscription";
-          });
-        } finally {
-          set((state) => {
             state.isLoading = false;
           });
         }
@@ -114,26 +198,25 @@ export const useAuthStore = create<AuthStore>()(
         });
 
         try {
-          // TODO: Implement anonymous Firebase Auth
-          const guestUser: User = {
-            id: `guest_${Date.now()}`,
-            email: '',
+          const authUser = await firebaseLoginAsGuest();
+          const user = mapAuthUserToUser(authUser);
+
+          // Create guest profile in Firestore
+          const profile = await createUserProfile(authUser.id, {
+            email: null,
             displayName: 'Invité',
-            isGuest: true,
-            createdAt: Date.now(),
-            lastLogin: Date.now(),
-          };
+          });
 
           set((state) => {
-            state.user = guestUser;
+            state.user = user;
             state.isAuthenticated = true;
+            state.isLoading = false;
           });
+
+          useUserStore.getState().setProfile(profile);
         } catch (error) {
           set((state) => {
             state.error = error instanceof Error ? error.message : 'Erreur de connexion invité';
-          });
-        } finally {
-          set((state) => {
             state.isLoading = false;
           });
         }
@@ -145,39 +228,36 @@ export const useAuthStore = create<AuthStore>()(
         });
 
         try {
-          // TODO: Implement Firebase Auth logout
-          // await auth().signOut();
+          await firebaseLogout();
           set((state) => {
             state.user = null;
             state.isAuthenticated = false;
+            state.isLoading = false;
           });
+          useUserStore.getState().reset();
         } catch (error) {
           set((state) => {
             state.error = error instanceof Error ? error.message : 'Erreur de déconnexion';
-          });
-        } finally {
-          set((state) => {
             state.isLoading = false;
           });
         }
       },
 
-      resetPassword: async (_email) => {
+      resetPassword: async (email) => {
         set((state) => {
           state.isLoading = true;
           state.error = null;
         });
 
         try {
-          // TODO: Implement Firebase Auth password reset
-          // await auth().sendPasswordResetEmail(email);
+          await firebaseResetPassword(email);
+          set((state) => {
+            state.isLoading = false;
+          });
         } catch (error) {
           set((state) => {
             state.error =
               error instanceof Error ? error.message : 'Erreur de réinitialisation';
-          });
-        } finally {
-          set((state) => {
             state.isLoading = false;
           });
         }
