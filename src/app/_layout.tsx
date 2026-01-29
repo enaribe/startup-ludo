@@ -1,26 +1,27 @@
-import { useEffect, useCallback } from 'react';
-import { View } from 'react-native';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import * as SplashScreen from 'expo-splash-screen';
 import {
-  useFonts,
-  LuckiestGuy_400Regular,
+    LuckiestGuy_400Regular,
+    useFonts,
 } from '@expo-google-fonts/luckiest-guy';
 import {
-  OpenSans_400Regular,
-  OpenSans_500Medium,
-  OpenSans_600SemiBold,
-  OpenSans_700Bold,
+    OpenSans_400Regular,
+    OpenSans_500Medium,
+    OpenSans_600SemiBold,
+    OpenSans_700Bold,
 } from '@expo-google-fonts/open-sans';
 import { SpaceMono_400Regular } from '@expo-google-fonts/space-mono';
+import { Stack } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar';
+import { useCallback, useEffect, useRef } from 'react';
+import { View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import '../../global.css';
 
-import { COLORS } from '@/styles/colors';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
+import { COLORS } from '@/styles/colors';
+import { useAuthStore } from '@/stores/useAuthStore';
 
 // Keep splash screen visible while loading resources
 SplashScreen.preventAutoHideAsync();
@@ -38,6 +39,16 @@ export default function RootLayout() {
     OpenSans_700Bold,
     SpaceMono_400Regular,
   });
+
+  const authInitialized = useRef(false);
+
+  // Initialize auth listener on app start
+  useEffect(() => {
+    if (authInitialized.current) return;
+    authInitialized.current = true;
+    const unsubscribe = useAuthStore.getState().initializeAuth();
+    return () => unsubscribe();
+  }, []);
 
   const onLayoutRootView = useCallback(async () => {
     if (fontsLoaded || fontError) {

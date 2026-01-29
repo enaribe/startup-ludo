@@ -1,16 +1,22 @@
 import { useState, useCallback } from 'react';
-import { View, Text, ScrollView, Pressable, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, Pressable, RefreshControl, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 
-import { COLORS } from '@/styles/colors';
-import { SPACING } from '@/styles/spacing';
-import { FONTS, FONT_SIZES } from '@/styles/typography';
-import { EmptyState } from '@/components/common/EmptyState';
+import { FONTS } from '@/styles/typography';
 import { useUserStore } from '@/stores';
+import { PortfolioIcon } from '@/components/icons';
+import {
+  RadialBackground,
+  DynamicGradientBorder,
+  FilterChips,
+  Tag,
+  StatCard,
+  ScreenHeader,
+  FAB,
+} from '@/components/ui';
 
 const FILTERS = [
   { id: 'all', label: 'TOUT' },
@@ -21,6 +27,9 @@ const FILTERS = [
 ];
 
 const MAX_STARTUPS = 3;
+
+// Header height: safeArea + title(~36) + margin(20) + statsRow(~90) + paddingBottom(16)
+const HEADER_CONTENT_HEIGHT = 182;
 
 export default function PortfolioScreen() {
   const router = useRouter();
@@ -33,7 +42,6 @@ export default function PortfolioScreen() {
   const totalValorisation = startups.reduce((sum, s) => sum + s.tokensInvested, 0);
   const canAddStartup = startups.length < MAX_STARTUPS;
 
-  // Filtrer les startups
   const filteredStartups = startups.filter((s) => {
     if (activeFilter === 'all') return true;
     return s.sector.toLowerCase().includes(activeFilter.replace('tech', ''));
@@ -41,7 +49,6 @@ export default function PortfolioScreen() {
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    // Simuler un refresh
     setTimeout(() => setRefreshing(false), 1000);
   }, []);
 
@@ -51,67 +58,51 @@ export default function PortfolioScreen() {
     }
   };
 
-  const formatDate = (timestamp: number) => {
-    const date = new Date(timestamp);
-    return date.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
+  const formatValorisation = (value: number) => {
+    if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M€`;
+    if (value >= 1000) return `${(value / 1000).toFixed(0)}K€`;
+    return `${value}€`;
   };
 
-  return (
-    <View style={{ flex: 1, backgroundColor: '#0C243E' }}>
-      {/* Background Gradient */}
-      <LinearGradient
-        colors={['#194F8A', '#0C243E']}
-        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-      />
+  const headerTopPadding = insets.top + 10;
+  const headerHeight = headerTopPadding + HEADER_CONTENT_HEIGHT;
 
-      {/* Header Fixe */}
-      <View
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 10,
-          paddingTop: insets.top + SPACING[2],
-          paddingBottom: SPACING[3],
-          paddingHorizontal: SPACING[4],
-          backgroundColor: 'rgba(12, 36, 62, 0.85)',
-          borderBottomWidth: 1,
-          borderBottomColor: 'rgba(255, 188, 64, 0.1)',
-        }}
-      >
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <View>
-            <Text
-              style={{
-                fontFamily: FONTS.title,
-                fontSize: FONT_SIZES['2xl'],
-                color: COLORS.text,
-              }}
-            >
-              Portfolio
-            </Text>
-            <Text
-              style={{
-                fontFamily: FONTS.body,
-                fontSize: FONT_SIZES.sm,
-                color: COLORS.textSecondary,
-              }}
-            >
-              {startups.length}/{MAX_STARTUPS} entreprise{startups.length !== 1 ? 's' : ''}
-            </Text>
-          </View>
-        </View>
+  return (
+    <View style={styles.container}>
+      <RadialBackground />
+
+      {/* Fixed Header with background */}
+      <View style={[styles.fixedHeader, { paddingTop: headerTopPadding }]}>
+        <Animated.View entering={FadeInDown.duration(500)}>
+          <ScreenHeader
+            title="MON PORTFOLIO"
+            subtitle={`${startups.length} entreprise${startups.length !== 1 ? 's' : ''}`}
+            rightElement={
+              <Pressable style={styles.settingsBtn}>
+                <Ionicons name="settings-outline" size={22} color="rgba(255,255,255,0.6)" />
+              </Pressable>
+            }
+          />
+        </Animated.View>
+
+        <Animated.View entering={FadeInDown.delay(100).duration(500)} style={styles.statsRow}>
+          <StatCard
+            value={formatValorisation(totalValorisation || 3200000)}
+            label="Valorisation Totale"
+          />
+          <StatCard
+            value="+12%"
+            label="Croissance"
+            valueColor="#4CAF50"
+          />
+        </Animated.View>
       </View>
 
       <ScrollView
-        contentContainerStyle={{
-          paddingTop: insets.top + 80,
-          paddingBottom: SPACING[24],
-          paddingHorizontal: SPACING[4],
-        }}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingTop: headerHeight + 16, paddingBottom: 120 },
+        ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -122,313 +113,79 @@ export default function PortfolioScreen() {
           />
         }
       >
-        {/* Cartes Récap */}
-        <Animated.View
-          entering={FadeInDown.delay(100).duration(500)}
-          style={{ flexDirection: 'row', gap: SPACING[3], marginBottom: SPACING[4] }}
-        >
-          {/* Valorisation Totale */}
-          <View
-            style={{
-              flex: 1,
-              backgroundColor: 'rgba(255, 255, 255, 0.08)',
-              borderRadius: 16,
-              padding: SPACING[4],
-              borderWidth: 1,
-              borderColor: 'rgba(255, 188, 64, 0.1)',
-            }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: SPACING[2] }}>
-              <Ionicons name="diamond" size={18} color="#FFBC40" />
-              <Text
-                style={{
-                  fontFamily: FONTS.body,
-                  fontSize: FONT_SIZES.xs,
-                  color: COLORS.textSecondary,
-                  marginLeft: 6,
-                }}
-              >
-                Valorisation
-              </Text>
-            </View>
-            <Text
-              style={{
-                fontFamily: FONTS.title,
-                fontSize: FONT_SIZES['2xl'],
-                color: COLORS.text,
-              }}
-            >
-              {totalValorisation}
-            </Text>
-            <Text
-              style={{
-                fontFamily: FONTS.body,
-                fontSize: FONT_SIZES.xs,
-                color: COLORS.textSecondary,
-              }}
-            >
-              jetons totaux
-            </Text>
-          </View>
-
-          {/* Croissance */}
-          <View
-            style={{
-              flex: 1,
-              backgroundColor: 'rgba(255, 255, 255, 0.08)',
-              borderRadius: 16,
-              padding: SPACING[4],
-              borderWidth: 1,
-              borderColor: 'rgba(76, 175, 80, 0.2)',
-            }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: SPACING[2] }}>
-              <Ionicons name="trending-up" size={18} color="#4CAF50" />
-              <Text
-                style={{
-                  fontFamily: FONTS.body,
-                  fontSize: FONT_SIZES.xs,
-                  color: COLORS.textSecondary,
-                  marginLeft: 6,
-                }}
-              >
-                Croissance
-              </Text>
-            </View>
-            <Text
-              style={{
-                fontFamily: FONTS.title,
-                fontSize: FONT_SIZES['2xl'],
-                color: '#4CAF50',
-              }}
-            >
-              +{startups.length > 0 ? Math.floor(Math.random() * 30) + 5 : 0}%
-            </Text>
-            <Text
-              style={{
-                fontFamily: FONTS.body,
-                fontSize: FONT_SIZES.xs,
-                color: COLORS.textSecondary,
-              }}
-            >
-              ce mois
-            </Text>
-          </View>
-        </Animated.View>
-
-        {/* Filtres Horizontaux */}
+        {/* Filtres */}
         <Animated.View entering={FadeInDown.delay(200).duration(500)}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: SPACING[4], gap: SPACING[2] }}
-          >
-            {FILTERS.map((filter) => {
-              const isActive = activeFilter === filter.id;
-              return (
-                <Pressable
-                  key={filter.id}
-                  onPress={() => setActiveFilter(filter.id)}
-                  style={{
-                    paddingHorizontal: SPACING[4],
-                    paddingVertical: SPACING[2],
-                    borderRadius: 20,
-                    backgroundColor: isActive ? 'rgba(255, 188, 64, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                    borderWidth: 1,
-                    borderColor: isActive ? '#FFBC40' : 'rgba(255, 255, 255, 0.1)',
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontFamily: FONTS.bodySemiBold,
-                      fontSize: FONT_SIZES.xs,
-                      color: isActive ? '#FFBC40' : COLORS.textSecondary,
-                    }}
-                  >
-                    {filter.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+          <FilterChips
+            filters={FILTERS}
+            activeId={activeFilter}
+            onSelect={setActiveFilter}
+          />
         </Animated.View>
 
         {/* Liste des Startups */}
         {filteredStartups.length === 0 ? (
-          <Animated.View
-            entering={FadeInDown.delay(300).duration(500)}
-            style={{ flex: 1, justifyContent: 'center', paddingVertical: SPACING[8] }}
-          >
-            <EmptyState
-              icon="rocket-outline"
-              title="Aucune startup"
-              description={
-                activeFilter === 'all'
-                  ? 'Crée ta première startup en jouant et en gagnant des jetons !'
-                  : 'Aucune startup dans cette catégorie'
-              }
-              actionLabel={canAddStartup ? 'Créer une startup' : undefined}
-              onAction={canAddStartup ? handleCreateStartup : undefined}
-            />
+          <Animated.View entering={FadeInDown.delay(300).duration(500)} style={styles.emptyContainer}>
+            <PortfolioIcon color="rgba(255,255,255,0.2)" size={64} />
+            <Text style={styles.emptyTitle}>Aucune startup</Text>
+            <Text style={styles.emptyDesc}>
+              {activeFilter === 'all'
+                ? 'Crée ta première startup en jouant et en gagnant des jetons !'
+                : 'Aucune startup dans cette catégorie'}
+            </Text>
           </Animated.View>
         ) : (
-          <Animated.View
-            entering={FadeInDown.delay(300).duration(500)}
-            style={{ gap: SPACING[3] }}
-          >
+          <Animated.View entering={FadeInDown.delay(300).duration(500)} style={{ gap: 14 }}>
             {filteredStartups.map((startup, index) => (
               <Animated.View
                 key={startup.id}
                 entering={FadeInDown.delay(400 + index * 100).duration(500)}
               >
                 <Pressable>
-                  <LinearGradient
-                    colors={['#1F91D0', '#0C2643']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={{
-                      borderRadius: 16,
-                      padding: SPACING[4],
-                      borderWidth: 1,
-                      borderColor: 'rgba(31, 145, 208, 0.3)',
-                    }}
+                  <DynamicGradientBorder
+                    borderRadius={16}
+                    fill="rgba(0, 0, 0, 0.3)"
+                    style={{ width: '100%' }}
                   >
-                    {/* Header de la carte */}
-                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: SPACING[3] }}>
-                      <View
-                        style={{
-                          width: 48,
-                          height: 48,
-                          borderRadius: 12,
-                          backgroundColor: 'rgba(255, 188, 64, 0.2)',
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                          marginRight: SPACING[3],
-                        }}
-                      >
-                        <Ionicons name="business" size={24} color="#FFBC40" />
-                      </View>
-
-                      <View style={{ flex: 1 }}>
-                        <Text
-                          style={{
-                            fontFamily: FONTS.title,
-                            fontSize: FONT_SIZES.lg,
-                            color: COLORS.text,
-                            marginBottom: 2,
-                          }}
-                        >
-                          {startup.name}
-                        </Text>
-                        <Text
-                          style={{
-                            fontFamily: FONTS.body,
-                            fontSize: FONT_SIZES.sm,
-                            color: 'rgba(255, 255, 255, 0.7)',
-                          }}
-                          numberOfLines={2}
-                        >
-                          {startup.description || 'Startup innovante dans le secteur ' + startup.sector}
-                        </Text>
-                      </View>
-                    </View>
-
-                    {/* Tags */}
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: SPACING[2], marginBottom: SPACING[3] }}>
-                      <View
-                        style={{
-                          backgroundColor: 'rgba(255, 188, 64, 0.2)',
-                          paddingHorizontal: SPACING[2],
-                          paddingVertical: 4,
-                          borderRadius: 8,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            fontFamily: FONTS.bodySemiBold,
-                            fontSize: 10,
-                            color: '#FFBC40',
-                          }}
-                        >
-                          {startup.sector.toUpperCase()}
-                        </Text>
-                      </View>
-                      <View
-                        style={{
-                          backgroundColor: 'rgba(76, 175, 80, 0.2)',
-                          paddingHorizontal: SPACING[2],
-                          paddingVertical: 4,
-                          borderRadius: 8,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            fontFamily: FONTS.bodySemiBold,
-                            fontSize: 10,
-                            color: '#4CAF50',
-                          }}
-                        >
-                          NIVEAU {startup.level}
-                        </Text>
-                      </View>
-                    </View>
-
-                    {/* Footer: Date + Valorisation + Croissance */}
-                    <View
-                      style={{
-                        flexDirection: 'row',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        paddingTop: SPACING[3],
-                        borderTopWidth: 1,
-                        borderTopColor: 'rgba(255, 255, 255, 0.1)',
-                      }}
-                    >
-                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <Ionicons name="calendar-outline" size={14} color={COLORS.textSecondary} />
-                        <Text
-                          style={{
-                            fontFamily: FONTS.body,
-                            fontSize: FONT_SIZES.xs,
-                            color: COLORS.textSecondary,
-                            marginLeft: 4,
-                          }}
-                        >
-                          {formatDate(startup.createdAt)}
-                        </Text>
-                      </View>
-
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACING[3] }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                          <Ionicons name="diamond" size={14} color="#FFBC40" />
-                          <Text
-                            style={{
-                              fontFamily: FONTS.bodySemiBold,
-                              fontSize: FONT_SIZES.sm,
-                              color: '#FFBC40',
-                              marginLeft: 4,
-                            }}
-                          >
-                            {startup.tokensInvested}
-                          </Text>
+                    <View style={styles.startupCard}>
+                      {/* Header */}
+                      <View style={styles.startupHeader}>
+                        <View style={styles.startupIcon}>
+                          <PortfolioIcon color="#71808E" size={28} />
                         </View>
-
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                          <Ionicons name="trending-up" size={14} color="#4CAF50" />
-                          <Text
-                            style={{
-                              fontFamily: FONTS.bodySemiBold,
-                              fontSize: FONT_SIZES.sm,
-                              color: '#4CAF50',
-                              marginLeft: 4,
-                            }}
-                          >
-                            +{Math.floor(Math.random() * 20) + 5}%
+                        <View style={styles.startupInfo}>
+                          <Text style={styles.startupName}>{startup.name}</Text>
+                          <Text style={styles.startupDesc} numberOfLines={2}>
+                            {startup.description || `Startup innovante dans le secteur ${startup.sector}`}
                           </Text>
                         </View>
                       </View>
+
+                      {/* Tags */}
+                      <View style={styles.tagsRow}>
+                        <Tag label={startup.sector} />
+                        {startup.tags?.map((tag: string, i: number) => (
+                          <Tag key={i} label={tag} />
+                        ))}
+                        <Text style={styles.dateText}>
+                          Crée il y'a {Math.floor((Date.now() - startup.createdAt) / (1000 * 60 * 60 * 24 * 7))} semaine{Math.floor((Date.now() - startup.createdAt) / (1000 * 60 * 60 * 24 * 7)) !== 1 ? 's' : ''}
+                        </Text>
+                      </View>
+
+                      {/* Footer stats */}
+                      <View style={styles.startupFooter}>
+                        <View style={styles.footerStat}>
+                          <Text style={styles.footerStatValue}>
+                            {formatValorisation(startup.tokensInvested)}
+                          </Text>
+                          <Text style={styles.footerStatLabel}>Valorisation</Text>
+                        </View>
+                        <View style={styles.footerStat}>
+                          <Text style={styles.footerStatValueGreen}>+12%</Text>
+                          <Text style={styles.footerStatLabel}>Croissance</Text>
+                        </View>
+                      </View>
                     </View>
-                  </LinearGradient>
+                  </DynamicGradientBorder>
                 </Pressable>
               </Animated.View>
             ))}
@@ -438,36 +195,136 @@ export default function PortfolioScreen() {
 
       {/* Bouton Flottant + */}
       {canAddStartup && (
-        <Pressable
-          onPress={handleCreateStartup}
-          style={{
-            position: 'absolute',
-            bottom: insets.bottom + SPACING[4],
-            right: SPACING[4],
-            width: 60,
-            height: 60,
-            borderRadius: 30,
-            overflow: 'hidden',
-            shadowColor: '#FFBC40',
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.4,
-            shadowRadius: 8,
-            elevation: 8,
-          }}
-        >
-          <LinearGradient
-            colors={['#FFBC40', '#F5A623']}
-            style={{
-              width: '100%',
-              height: '100%',
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}
-          >
-            <Ionicons name="add" size={32} color="#0C243E" />
-          </LinearGradient>
-        </Pressable>
+        <FAB onPress={handleCreateStartup} bottom={insets.bottom + 100} />
       )}
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#0C243E',
+  },
+  fixedHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    paddingHorizontal: 18,
+    paddingBottom: 16,
+    backgroundColor: '#0A1929',
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+  },
+  scrollContent: {
+    paddingHorizontal: 18,
+  },
+  settingsBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  // Empty state
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  emptyTitle: {
+    fontFamily: FONTS.title,
+    fontSize: 20,
+    color: 'rgba(255,255,255,0.4)',
+    marginTop: 16,
+  },
+  emptyDesc: {
+    fontFamily: FONTS.body,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.3)',
+    textAlign: 'center',
+    marginTop: 8,
+    paddingHorizontal: 40,
+  },
+  // Startup card
+  startupCard: {
+    padding: 16,
+  },
+  startupHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  startupIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  startupInfo: {
+    flex: 1,
+  },
+  startupName: {
+    fontFamily: FONTS.title,
+    fontSize: 18,
+    color: '#FFBC40',
+    marginBottom: 4,
+  },
+  startupDesc: {
+    fontFamily: FONTS.body,
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.6)',
+    lineHeight: 18,
+  },
+  tagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 14,
+  },
+  dateText: {
+    fontFamily: FONTS.body,
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.35)',
+  },
+  startupFooter: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  footerStat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    gap: 8,
+  },
+  footerStatValue: {
+    fontFamily: FONTS.title,
+    fontSize: 14,
+    color: '#FFBC40',
+  },
+  footerStatValueGreen: {
+    fontFamily: FONTS.title,
+    fontSize: 14,
+    color: '#4CAF50',
+  },
+  footerStatLabel: {
+    fontFamily: FONTS.bodyMedium,
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.5)',
+  },
+});

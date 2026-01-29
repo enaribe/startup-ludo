@@ -18,11 +18,12 @@ import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { Button } from '@/components/ui/Button';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { LoadingScreen } from '@/components/common/LoadingScreen';
 
 export default function WelcomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { loginAsGuest, isAuthenticated, isLoading } = useAuthStore();
+  const { loginAsGuest, isAuthenticated, isInitialized } = useAuthStore();
   const [isGuestLoading, setIsGuestLoading] = useState(false);
 
   // Logo pulse animation
@@ -39,12 +40,12 @@ export default function WelcomeScreen() {
     );
   }, [logoScale]);
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated (wait for auth to be initialized first)
   useEffect(() => {
-    if (isAuthenticated && !isLoading) {
+    if (isInitialized && isAuthenticated) {
       router.replace('/(tabs)/home');
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [isAuthenticated, isInitialized, router]);
 
   const logoAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: logoScale.value }],
@@ -64,6 +65,11 @@ export default function WelcomeScreen() {
   const handleRegister = useCallback(() => {
     router.push('/(auth)/register');
   }, [router]);
+
+  // Show loading screen while auth is initializing (après tous les hooks)
+  if (!isInitialized) {
+    return <LoadingScreen message="Chargement..." />;
+  }
 
   return (
     <LinearGradient

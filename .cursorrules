@@ -1,0 +1,339 @@
+# Startup Ludo - Cursor Rules
+
+Tu es un expert React Native / Expo. Tu travailles sur **Startup Ludo**, un jeu de plateau mobile educatif sur l'entrepreneuriat inspire du Ludo (Petits Chevaux).
+
+## Contexte Projet
+
+- Jeu mobile React Native avec Expo SDK 54+
+- Theme dark exclusivement (background #0C243E)
+- Langue principale : francais
+- Cible : iOS et Android
+- Reference technique complete : `FICHE_TECHNIQUE.md` a la racine du projet
+
+---
+
+## Stack Technique
+
+| Categorie | Technologie |
+|-----------|-------------|
+| Framework | Expo ~54, React Native 0.81, React 19 |
+| Language | TypeScript strict (pas de `any`) |
+| Navigation | expo-router (file-based routing) |
+| State | Zustand 5 + Immer middleware |
+| Animations | react-native-reanimated 4, Lottie |
+| Listes | @shopify/flash-list 2 |
+| Backend | Firebase (Auth, Firestore, Realtime DB) |
+| Styling | StyleSheet.create + NativeWind/Tailwind |
+| SVG | react-native-svg 15 |
+| Audio | expo-audio |
+| Haptics | expo-haptics |
+| Validation | Zod |
+| Fonts | LuckiestGuy (titres), OpenSans (body), SpaceMono (mono) |
+
+---
+
+## Architecture du Projet
+
+```
+src/
+  app/                    # Expo Router (file-based routing)
+    _layout.tsx           # Root layout (fonts, providers)
+    index.tsx             # Splash screen
+    (auth)/               # Auth group (login, register, forgot-password)
+    (tabs)/               # Bottom tabs (home, portfolio, classement, profil)
+    (game)/               # Game flow (mode-selection, lobby, play, results)
+    (startup)/            # Startup creation flow
+  components/
+    ui/                   # Design system (Button, Card, Input, Modal, Avatar, etc.)
+      index.ts            # Barrel exports
+    game/                 # Game components (GameBoard, Dice, PlayerCard, etc.)
+      GameBoard/          # Board with BoardCell, Pawn, CenterZone, HomeZone
+      popups/             # QuizPopup, DuelPopup, FundingPopup, etc.
+    icons/                # Custom SVG tab icons (TabBarIcons.tsx)
+    common/               # LoadingScreen, ErrorBoundary, EmptyState
+  stores/                 # Zustand stores
+    useGameStore.ts       # Game state + logic (Immer + subscribeWithSelector)
+    useAuthStore.ts       # Auth state (Firebase Auth)
+    useUserStore.ts       # User profile + settings
+    useSettingsStore.ts   # App settings (sound, haptics, language)
+    index.ts              # Barrel exports
+  services/
+    firebase/             # Firebase init, auth, firestore, realtimeDb
+    game/                 # GameEngine, AIPlayer, EventManager
+    multiplayer/          # MultiplayerSync
+  hooks/                  # useHaptics, useMultiplayer, useSound
+  styles/                 # Design tokens
+    colors.ts             # COLORS (primary, background, players, events, status)
+    typography.ts         # FONTS, FONT_SIZES, TEXT_STYLES
+    spacing.ts            # SPACING, BORDER_RADIUS, SHADOWS, Z_INDEX
+  config/                 # boardConfig, achievements, progression
+  constants/              # animations, images, sounds
+  data/                   # Static game data, board-layout.json, editions/
+  i18n/                   # Internationalization (fr, en)
+  types/                  # TypeScript interfaces
+  utils/                  # Helpers, validators, constants
+```
+
+---
+
+## Design System
+
+### Couleurs Principales
+```
+Primary:     #FFBC40 (jaune dore - accent principal)
+Background:  #0C243E (bleu nuit - fond principal)
+Header BG:   #0A1929 (bleu tres fonce - headers fixes)
+Text:        #FFFFFF / rgba(255,255,255,0.7) / rgba(255,255,255,0.5)
+Success:     #4CAF50
+Error:       #F35145
+Info:        #1F91D0
+Card:        rgba(0,0,0,0.3) avec bordure rgba(255,255,255,0.1)
+```
+
+### Fonds de cartes / CTA (a respecter)
+- **Cartes et boutons type "Nouvelle partie"** : utiliser `fill="rgba(0, 0, 0, 0.35)"` dans GradientBorder / DynamicGradientBorder (fond sombre semi-transparent).
+- **A eviter** : fonds de cartes en blanc/gris semi-transparent (ex. `rgba(255,255,255,0.05)` ou `rgba(255,255,255,0.08)`) pour garder la coherence avec l’accueil et le theme dark.
+
+### Joueurs
+```
+Jaune: #FFBC40 | Bleu: #1F91D0 | Vert: #4CAF50 | Rouge: #F35145
+```
+
+### Typographie
+```
+Titres/Headings : LuckiestGuy_400Regular (FONTS.title)
+Body Regular    : OpenSans_400Regular    (FONTS.body)
+Body Medium     : OpenSans_500Medium     (FONTS.bodyMedium)
+Body SemiBold   : OpenSans_600SemiBold   (FONTS.bodySemiBold)
+Body Bold       : OpenSans_700Bold       (FONTS.bodyBold)
+Monospace       : SpaceMono_400Regular   (FONTS.mono)
+```
+
+### Spacing
+```
+Padding ecrans : paddingHorizontal: 18
+Gap cartes     : 12
+Border radius  : sm(4) md(8) lg(12) xl(16) 2xl(20) 3xl(24)
+```
+
+### Patterns UI Recurrents
+- **RadialBackground** : fond radial SVG (center #0F3A6B, edge #081A2A) sur tous les ecrans
+- **GradientBorder / DynamicGradientBorder** : bordure SVG gradient gris argente sur les cartes
+- **FixedHeader** : header fixe (position absolute, zIndex 10, bg #0A1929, borderBottomRadius 24). Ne pas ajouter de vue gradient ou lumiere a cote du header.
+- **StatCard** : carte stat avec DynamicGradientBorder, valeur + label
+- **FilterChips** : chips filtres horizontaux scrollables
+- **Tag** : petit badge arrondi
+- **ScreenHeader** : titre + subtitle + element droit
+- **FAB** : bouton flottant gradient jaune
+
+### Boutons CTA (GameButton)
+- **Composant** : `GameButton` de `@/components/ui` (variants `green` | `yellow`).
+- **Variant `green`** : bouton vert (#4CAF50), bordure blanche, texte blanc. Utiliser pour les actions secondaires type « Commencer » sur une carte (ex. carte Challenge accueil).
+- **Variant `yellow`** : bouton CTA principal (Suivant, Démarrer la partie, Commencer la partie, etc.). Style : dégradé jaune-orange (#FFDC64 → #F0B432), bordure blanche 2px, texte bleu foncé (#1E325A), Luckiest Guy, majuscules. Utiliser pour tous les boutons de validation / passage à l’étape suivante en bas d’écran.
+- **Usage** : `<GameButton variant="yellow" fullWidth title="SUIVANT" onPress={handleNext} />` ou avec `loading` / `disabled` si besoin. Éviter de recréer un bouton jaune custom : réutiliser GameButton variant yellow.
+
+---
+
+## Conventions de Code
+
+### Nommage
+- **Fichiers composants** : PascalCase (`GameBoard.tsx`, `StatCard.tsx`)
+- **Fichiers hooks** : camelCase avec `use` (`useSound.ts`, `useHaptics.ts`)
+- **Fichiers utils** : camelCase (`boardUtils.ts`, `constants.ts`)
+- **Constantes** : UPPER_SNAKE_CASE (`BOARD_SIZE`, `MAX_STARTUPS`)
+- **Interfaces/Types** : PascalCase (`PlayerProps`, `GameState`)
+- **Props events** : prefix `on` (`onPress`, `onChange`, `onClose`)
+- **Handlers** : prefix `handle` (`handlePress`, `handleCapture`)
+- **Booleans** : prefix `is/can/has` (`isAnimating`, `canRoll`, `hasEffect`)
+
+### Structure Composant
+```tsx
+import { memo, useCallback } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import { FONTS } from '@/styles/typography';
+
+interface MyComponentProps {
+  title: string;
+  onPress?: () => void;
+}
+
+export const MyComponent = memo(function MyComponent({
+  title,
+  onPress,
+}: MyComponentProps) {
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>{title}</Text>
+    </View>
+  );
+});
+
+const styles = StyleSheet.create({
+  container: { /* ... */ },
+  title: { fontFamily: FONTS.title, /* ... */ },
+});
+```
+
+### Regles Strictes
+
+1. **TypeScript strict** : jamais de `any`, toujours typer les props avec `interface`
+2. **Imports** : utiliser `@/` pour tous les imports internes (`@/components/ui`, `@/stores`, `@/styles/typography`)
+3. **Exports** : barrel exports via `index.ts` dans chaque dossier
+4. **Composants** : wrapper avec `memo()` quand le composant est pur et reutilisable
+5. **Styles** : `StyleSheet.create()` en bas du fichier, jamais de styles inline sauf dynamiques
+6. **Animations** : toujours `react-native-reanimated` (useSharedValue, useAnimatedStyle, withSpring, withTiming). Jamais l'Animated natif de RN
+7. **Entrees animations** : utiliser les entering/exiting de Reanimated (`FadeInDown`, `SlideInDown`, etc.)
+8. **Haptics** : `expo-haptics` avec `ImpactFeedbackStyle.Medium` pour les taps, `NotificationFeedbackType` pour feedback
+9. **Fonts** : toujours utiliser les constantes FONTS (`FONTS.title`, `FONTS.body`, etc.), jamais de string brute
+10. **Couleurs** : privilegier les constantes COLORS ou les valeurs hex directes du design system
+
+### Zustand Stores
+```tsx
+// Pattern standard
+import { create } from 'zustand';
+import { subscribeWithSelector } from 'zustand/middleware';
+import { immer } from 'zustand/middleware/immer';
+
+interface StoreState {
+  data: DataType | null;
+  isLoading: boolean;
+  // Actions
+  fetchData: () => Promise<void>;
+  reset: () => void;
+}
+
+export const useMyStore = create<StoreState>()(
+  subscribeWithSelector(
+    immer((set, get) => ({
+      data: null,
+      isLoading: false,
+      fetchData: async () => {
+        set((state) => { state.isLoading = true; });
+        // ...
+      },
+      reset: () => set(() => ({ data: null, isLoading: false })),
+    }))
+  )
+);
+
+// Selecteurs optimises (evite re-renders)
+export const useMyData = () => useMyStore((state) => state.data);
+```
+
+### Firebase
+- **Firestore** : donnees persistantes (profils, stats, leaderboard, editions)
+- **Realtime DB** : synchronisation temps reel du jeu (rooms, actions, presence)
+- **Cloud Functions** : logique serveur securisee (validation, matchmaking)
+- Toujours gerer les erreurs avec try/catch
+- Utiliser les messages d'erreur en francais via `getFirebaseErrorMessage()`
+- Donnees compactes dans Realtime DB (abreviations : `s` pour status, `t` pour turn, etc.)
+
+### Navigation (Expo Router)
+- Routes definies par les fichiers dans `src/app/`
+- Groupes avec parentheses : `(auth)`, `(tabs)`, `(game)`, `(startup)`
+- Routes dynamiques : `[roomId].tsx`, `[gameId].tsx`
+- Navigation : `router.push()`, `router.replace()`, `router.back()`
+- Typed routes activees
+
+---
+
+## Composants UI Disponibles
+
+Importer depuis `@/components/ui` :
+```tsx
+import {
+  Button,           // Bouton anime avec variants (primary, secondary, outline, ghost, danger)
+  GameButton,       // Bouton de jeu stylise
+  Card, CardHeader, CardContent, CardFooter,
+  Input,            // Champ de saisie
+  Modal,            // Modale
+  Avatar,           // Avatar avec initiales ou image
+  ProgressBar,      // Barre de progression
+  RadialBackground, // Fond radial SVG (a mettre sur tous les ecrans)
+  GradientBorder,   // Bordure gradient SVG (hauteur fixe)
+  DynamicGradientBorder, // Bordure gradient SVG (hauteur auto)
+  FilterChips,      // Chips filtres horizontaux
+  Tag,              // Badge/tag arrondi
+  StatCard,         // Carte statistique
+  ScreenHeader,     // Header d'ecran (titre + subtitle + element droit)
+  FAB,              // Floating Action Button
+} from '@/components/ui';
+```
+
+Icones custom depuis `@/components/icons` :
+```tsx
+import { AccueilIcon, PortfolioIcon, ClassementIcon, ProfilIcon } from '@/components/icons';
+```
+
+---
+
+## Pattern Ecran Standard
+
+```tsx
+export default function MyScreen() {
+  const insets = useSafeAreaInsets();
+
+  return (
+    <View style={styles.container}>
+      <RadialBackground />
+
+      {/* Header fixe (optionnel) */}
+      <View style={[styles.fixedHeader, { paddingTop: Math.max(10, insets.top * 0.5) }]}>
+        <ScreenHeader title="TITRE" subtitle="sous-titre" />
+        {/* StatCards ou autre contenu header */}
+      </View>
+
+      {/* Contenu scrollable */}
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, { paddingTop: headerHeight, paddingBottom: 120 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <Animated.View entering={FadeInDown.duration(500)}>
+          {/* Contenu */}
+        </Animated.View>
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#0C243E' },
+  fixedHeader: {
+    position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10,
+    paddingHorizontal: 18, paddingBottom: 16,
+    backgroundColor: '#0A1929',
+    borderBottomLeftRadius: 24, borderBottomRightRadius: 24,
+  },
+  scrollContent: { paddingHorizontal: 18 },
+});
+```
+
+---
+
+## Regles Importantes (FICHE_TECHNIQUE.md)
+
+1. **Toujours TypeScript strict** - Pas de `any`, pas d'assertions de type non necessaires
+2. **Animations sur le thread UI** - Utiliser Reanimated worklets ou `useNativeDriver: true`
+3. **Memoisation strategique** - `memo`, `useMemo`, `useCallback` uniquement ou necessaire
+4. **Firebase econome** - Realtime DB pour le jeu, Firestore pour persistence, batching des ecritures
+5. **Composants purs** - Eviter les side effects dans le render
+6. **Erreurs gerees** - Error boundaries, try/catch sur les appels Firebase
+7. **Tests critiques** - Stores, logique de jeu, helpers
+8. **Validation Zod** - Toutes les donnees entrantes (API, Firebase)
+9. **Performance 60 FPS** - Meme sur appareils anciens
+10. **Pas de styles inline** sauf pour les valeurs dynamiques (dimensions, positions calculees)
+
+---
+
+## Ce qu'il NE FAUT PAS faire
+
+- Ne pas utiliser `any` en TypeScript
+- Ne pas utiliser l'API `Animated` native de React Native (utiliser Reanimated)
+- Ne pas mettre de styles inline statiques (utiliser StyleSheet.create)
+- Ne pas utiliser de strings brutes pour les fonts (utiliser FONTS.xxx)
+- Ne pas oublier `memo()` sur les composants reutilisables
+- Ne pas oublier `RadialBackground` sur chaque ecran
+- Ne pas creer de fichiers en dehors de la structure existante
+- Ne pas utiliser `console.log` en production (utiliser __DEV__ guard)
+- Ne pas faire de side effects dans le render des composants
+- Ne pas utiliser de couleurs hors du design system sans justification

@@ -1,22 +1,76 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Tabs, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { Platform, View } from 'react-native';
+import { Platform, View, StyleSheet, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
 
-import { COLORS } from '@/styles/colors';
-import { FONTS, FONT_SIZES } from '@/styles/typography';
+import { FONTS } from '@/styles/typography';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { LoadingScreen } from '@/components/common/LoadingScreen';
+import { AccueilIcon, PortfolioIcon, ClassementIcon, ProfilIcon } from '@/components/icons';
 
-type TabIconName = 'home' | 'briefcase' | 'trophy' | 'person';
+// Composant wrapper pour animer les icônes du TabBar
+const AnimatedTabIcon = ({
+  children,
+  focused,
+}: {
+  children: React.ReactNode;
+  focused: boolean;
+}) => {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const translateYAnim = useRef(new Animated.Value(0)).current;
 
-const TAB_ICONS: Record<string, { focused: TabIconName; unfocused: `${TabIconName}-outline` }> = {
-  home: { focused: 'home', unfocused: 'home-outline' },
-  portfolio: { focused: 'briefcase', unfocused: 'briefcase-outline' },
-  classement: { focused: 'trophy', unfocused: 'trophy-outline' },
-  profil: { focused: 'person', unfocused: 'person-outline' },
+  useEffect(() => {
+    if (focused) {
+      Animated.parallel([
+        Animated.spring(scaleAnim, {
+          toValue: 1.2,
+          friction: 4,
+          tension: 250,
+          useNativeDriver: true,
+        }),
+        Animated.spring(translateYAnim, {
+          toValue: -3,
+          friction: 4,
+          tension: 250,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          friction: 4,
+          tension: 250,
+          useNativeDriver: true,
+        }),
+        Animated.spring(translateYAnim, {
+          toValue: 0,
+          friction: 4,
+          tension: 250,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [focused, scaleAnim, translateYAnim]);
+
+  return (
+    <Animated.View
+      style={{
+        transform: [{ scale: scaleAnim }, { translateY: translateYAnim }],
+      }}
+    >
+      {children}
+    </Animated.View>
+  );
 };
+
+// Haptic sur chaque tab press
+const hapticTabListeners = () => ({
+  tabPress: () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  },
+});
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
@@ -45,55 +99,89 @@ export default function TabsLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: COLORS.background,
-          borderTopColor: COLORS.border,
+          backgroundColor: '#0A1A2F',
           borderTopWidth: 1,
-          paddingTop: 8,
-          paddingBottom: Platform.OS === 'ios' ? insets.bottom : 8,
-          height: Platform.OS === 'ios' ? 80 + insets.bottom : 65,
+          borderTopColor: 'rgba(255, 255, 255, 0.05)',
+          paddingTop: 18,
+          paddingBottom: Platform.OS === 'ios' ? insets.bottom + 4 : 10,
+          height: Platform.OS === 'ios' ? 76 + insets.bottom : 76,
+          borderTopLeftRadius: 24,
+          borderTopRightRadius: 24,
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          elevation: 20,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -8 },
+          shadowOpacity: 0.3,
+          shadowRadius: 16,
         },
-        tabBarActiveTintColor: COLORS.primary,
-        tabBarInactiveTintColor: COLORS.textSecondary,
+        tabBarActiveTintColor: '#FFBC40',
+        tabBarInactiveTintColor: '#71808E',
+        tabBarItemStyle: {
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+        tabBarIconStyle: {
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
         tabBarLabelStyle: {
-          fontFamily: FONTS.bodySemiBold,
-          fontSize: FONT_SIZES.xs,
-          marginTop: 4,
+          fontFamily: FONTS.title,
+          fontSize: 9,
+          marginTop: 2,
         },
       }}
     >
       <Tabs.Screen
         name="home"
+        listeners={hapticTabListeners}
         options={{
-          title: 'Accueil',
-          tabBarIcon: ({ focused, color, size }) => (
-            <TabIcon name="home" focused={focused} color={color} size={size} />
+          title: 'ACCUEIL',
+          tabBarIcon: ({ color, focused }) => (
+            <AnimatedTabIcon focused={focused}>
+              <AccueilIcon color={color} size={26} />
+            </AnimatedTabIcon>
           ),
         }}
       />
       <Tabs.Screen
         name="portfolio"
+        listeners={hapticTabListeners}
         options={{
-          title: 'Portfolio',
-          tabBarIcon: ({ focused, color, size }) => (
-            <TabIcon name="portfolio" focused={focused} color={color} size={size} />
+          title: 'PORTFOLIO',
+          tabBarIcon: ({ color, focused }) => (
+            <AnimatedTabIcon focused={focused}>
+              <PortfolioIcon color={color} size={26} />
+            </AnimatedTabIcon>
           ),
         }}
       />
       <Tabs.Screen
         name="classement"
+        listeners={hapticTabListeners}
         options={{
-          title: 'Classement',
-          tabBarIcon: ({ focused, color, size }) => (
-            <TabIcon name="classement" focused={focused} color={color} size={size} />
+          title: 'CLASSEMENT',
+          tabBarIcon: ({ color, focused }) => (
+            <AnimatedTabIcon focused={focused}>
+              <View>
+                <ClassementIcon color={color} size={26} />
+                <View style={styles.notifDot} />
+              </View>
+            </AnimatedTabIcon>
           ),
         }}
       />
       <Tabs.Screen
         name="profil"
+        listeners={hapticTabListeners}
         options={{
-          title: 'Profil',
-          tabBarIcon: ({ focused, color, size }) => (
-            <TabIcon name="profil" focused={focused} color={color} size={size} />
+          title: 'PROFIL',
+          tabBarIcon: ({ color, focused }) => (
+            <AnimatedTabIcon focused={focused}>
+              <ProfilIcon color={color} size={26} />
+            </AnimatedTabIcon>
           ),
         }}
       />
@@ -101,36 +189,14 @@ export default function TabsLayout() {
   );
 }
 
-interface TabIconProps {
-  name: string;
-  focused: boolean;
-  color: string;
-  size: number;
-}
-
-function TabIcon({ name, focused, color, size }: TabIconProps) {
-  const icons = TAB_ICONS[name];
-  if (!icons) return null;
-
-  const iconName = focused ? icons.focused : icons.unfocused;
-
-  return (
-    <View style={{ position: 'relative' }}>
-      <Ionicons name={iconName} size={size} color={color} />
-      {focused && (
-        <View
-          style={{
-            position: 'absolute',
-            bottom: -8,
-            left: '50%',
-            marginLeft: -2,
-            width: 4,
-            height: 4,
-            borderRadius: 2,
-            backgroundColor: COLORS.primary,
-          }}
-        />
-      )}
-    </View>
-  );
-}
+const styles = StyleSheet.create({
+  notifDot: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#F35145',
+  }
+});

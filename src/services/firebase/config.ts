@@ -1,8 +1,16 @@
 // Firebase Configuration - SDK JavaScript
-import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
-import { getAuth, Auth, connectAuthEmulator } from 'firebase/auth';
-import { getFirestore, Firestore, connectFirestoreEmulator } from 'firebase/firestore';
-import { getDatabase, Database, connectDatabaseEmulator } from 'firebase/database';
+import { FirebaseApp, getApps, initializeApp } from 'firebase/app';
+import {
+  Auth,
+  connectAuthEmulator,
+  getAuth,
+  initializeAuth,
+} from 'firebase/auth';
+// @ts-expect-error - getReactNativePersistence is exported from this path
+import { getReactNativePersistence } from '@firebase/auth/dist/rn/index.js';
+import { Database, connectDatabaseEmulator, getDatabase } from 'firebase/database';
+import { Firestore, connectFirestoreEmulator, getFirestore } from 'firebase/firestore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Environment detection
 const IS_DEV = __DEV__;
@@ -45,12 +53,18 @@ const initializeFirebase = (): void => {
   if (getApps().length === 0) {
     app = initializeApp(firebaseConfig);
     firebaseLog('Firebase initialized');
+
+    // Initialize Auth with persistence for React Native
+    auth = initializeAuth(app, {
+      persistence: getReactNativePersistence(AsyncStorage),
+    });
+    firebaseLog('Auth initialized with AsyncStorage persistence');
   } else {
     app = getApps()[0]!;
+    auth = getAuth(app);
     firebaseLog('Firebase already initialized');
   }
 
-  auth = getAuth(app);
   firestore = getFirestore(app);
   database = getDatabase(app);
 
@@ -67,7 +81,7 @@ const initializeFirebase = (): void => {
 initializeFirebase();
 
 // Export Firebase services and utilities
-export { app, auth, firestore, database, firebaseLog };
+export { app, auth, database, firebaseLog, firestore };
 
 // ===== PATH CONSTANTS =====
 

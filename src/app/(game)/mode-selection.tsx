@@ -1,38 +1,61 @@
-/**
- * game-mode-selection - Sélection du mode de jeu
- *
- * Affiche les options Partie locale et Partie en ligne
- * avec gestion du mode Challenge (Agriculture, etc.)
- */
-
 import { useState } from 'react';
-import { View, Text, Pressable, Modal } from 'react-native';
+import { View, Text, Pressable, Modal, StyleSheet, Dimensions } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
+import Svg, { Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
 
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { useAuthStore, useUserStore } from '@/stores';
+import { DynamicGradientBorder } from '@/components/ui';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // Thèmes disponibles
 const THEMES = {
   classic: {
-    background: ['#194F8A', '#0C243E'] as [string, string],
+    background: ['#0F3A6B', '#081A2A'],
     accent: '#FFBC40',
-    cardBg: 'rgba(255, 255, 255, 0.08)',
-    cardBorder: 'rgba(255, 255, 255, 0.1)',
+    cardFill: 'rgba(0, 0, 0, 0.35)', // même fond que le bouton Nouvelle partie (accueil)
+    text: '#FFFFFF',
+    textSecondary: 'rgba(255, 255, 255, 0.6)',
   },
   agriculture: {
-    background: ['#F6E8CC', '#FBF8F0'] as [string, string],
+    background: ['#F6E8CC', '#FBF8F0'],
     accent: '#AC700C',
-    cardBg: '#FFFFFF',
-    cardBorder: '#E8E5DF',
+    cardFill: '#FFFFFF',
+    text: '#8B6A3C',
+    textSecondary: 'rgba(139, 106, 60, 0.7)',
   },
+};
+
+const Background = ({ isAgriMode }: { isAgriMode: boolean }) => {
+  if (isAgriMode) {
+    return (
+      <LinearGradient
+        colors={THEMES.agriculture.background}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+      />
+    );
+  }
+
+  return (
+    <Svg style={StyleSheet.absoluteFill} width={SCREEN_WIDTH} height={SCREEN_HEIGHT}>
+      <Defs>
+        <RadialGradient id="radialBg" cx="50%" cy="50%" r="80%">
+          <Stop offset="0%" stopColor="#0F3A6B" stopOpacity="1" />
+          <Stop offset="100%" stopColor="#081A2A" stopOpacity="1" />
+        </RadialGradient>
+      </Defs>
+      <Rect width="100%" height="100%" fill="url(#radialBg)" />
+    </Svg>
+  );
 };
 
 export default function GameModeSelectionScreen() {
@@ -86,94 +109,43 @@ export default function GameModeSelectionScreen() {
     router.push('/(startup)/inspiration-cards');
   };
 
+  const contentWidth = SCREEN_WIDTH - SPACING[4] * 2;
+
   return (
-    <View style={{ flex: 1, backgroundColor: isAgriMode ? '#F6E8CC' : '#0C243E' }}>
-      {/* Background */}
-      <LinearGradient
-        colors={theme.background}
-        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-      />
+    <View style={styles.container}>
+      <Background isAgriMode={isAgriMode} />
 
-      {/* Lumière animée SVG (mode classique seulement) */}
-      {!isAgriMode && (
-        <Animated.View
-          entering={FadeIn.delay(200).duration(1000)}
-          style={{
-            position: 'absolute',
-            top: -100,
-            left: '50%',
-            marginLeft: -150,
-            width: 300,
-            height: 300,
-            opacity: 0.3,
-          }}
-        >
-          <Svg width="300" height="300">
-            <Defs>
-              <RadialGradient id="lightGrad" cx="50%" cy="50%" r="50%">
-                <Stop offset="0%" stopColor="#FFBC40" stopOpacity="0.6" />
-                <Stop offset="100%" stopColor="#FFBC40" stopOpacity="0" />
-              </RadialGradient>
-            </Defs>
-            <Circle cx="150" cy="150" r="150" fill="url(#lightGrad)" />
-          </Svg>
-        </Animated.View>
-      )}
-
-      {/* Header */}
+      {/* Header avec Back Button intégré au style */}
       <View
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 10,
-          paddingTop: insets.top + SPACING[2],
-          paddingBottom: SPACING[3],
-          paddingHorizontal: SPACING[4],
-          backgroundColor: isAgriMode ? 'rgba(246, 232, 204, 0.9)' : 'rgba(12, 36, 62, 0.85)',
-          borderBottomWidth: 1,
-          borderBottomColor: isAgriMode ? '#E8E5DF' : 'rgba(255, 188, 64, 0.1)',
-          flexDirection: 'row',
-          alignItems: 'center',
-        }}
+        style={[
+          styles.headerContainer,
+          { 
+            paddingTop: insets.top + SPACING[2],
+            backgroundColor: isAgriMode ? 'rgba(246, 232, 204, 0.9)' : '#0A1929',
+            borderBottomWidth: isAgriMode ? 1 : 0,
+            borderBottomColor: '#E8E5DF',
+            borderBottomLeftRadius: isAgriMode ? 0 : 24,
+            borderBottomRightRadius: isAgriMode ? 0 : 24,
+          }
+        ]}
       >
-        <Pressable onPress={handleBack} hitSlop={8}>
-          <Ionicons
-            name="arrow-back"
-            size={24}
-            color={isAgriMode ? '#8B6A3C' : COLORS.text}
-          />
-        </Pressable>
-
-        <Text
-          style={{
-            flex: 1,
-            fontFamily: FONTS.title,
-            fontSize: FONT_SIZES.xl,
-            color: isAgriMode ? '#8B6A3C' : COLORS.text,
-            textAlign: 'center',
-          }}
-        >
-          {isAgriMode ? 'Challenge Agriculture' : 'Nouvelle partie'}
-        </Text>
-
-        <View style={{ width: 24 }} />
+        <View style={styles.headerContent}>
+          <Pressable onPress={handleBack} style={styles.backButton}>
+            <Ionicons
+              name="arrow-back"
+              size={24}
+              color={theme.text}
+            />
+          </Pressable>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>
+            {isAgriMode ? 'CHALLENGE AGRI' : 'NOUVELLE PARTIE'}
+          </Text>
+        </View>
       </View>
 
-      {/* Contenu */}
-      <View
-        style={{
-          flex: 1,
-          paddingTop: insets.top + 80,
-          paddingBottom: insets.bottom + SPACING[4],
-          paddingHorizontal: SPACING[4],
-          justifyContent: 'center',
-        }}
-      >
-        {/* Badge Mode de jeu (inactif) */}
+      <View style={[styles.contentContainer, { paddingTop: insets.top + 80 + SPACING[4] }]}>
+        
+        {/* Badge Mode de jeu */}
         <Animated.View
           entering={FadeInDown.delay(100).duration(500)}
           style={{
@@ -182,7 +154,9 @@ export default function GameModeSelectionScreen() {
             paddingHorizontal: SPACING[4],
             paddingVertical: SPACING[2],
             borderRadius: 20,
-            marginBottom: SPACING[8],
+            marginBottom: SPACING[6],
+            borderWidth: 1,
+            borderColor: isAgriMode ? 'rgba(172, 112, 12, 0.2)' : 'rgba(255, 188, 64, 0.3)',
           }}
         >
           <Text
@@ -192,334 +166,87 @@ export default function GameModeSelectionScreen() {
               color: theme.accent,
             }}
           >
-            MODE DE JEU
+            SÉLECTIONNE LE MODE DE JEU
           </Text>
         </Animated.View>
 
-        {/* Carte Partie Locale */}
+        {/* Option: Partie Locale */}
         <Animated.View entering={FadeInDown.delay(200).duration(500)}>
           <Pressable onPress={handleLocalGame}>
-            <View
-              style={{
-                backgroundColor: theme.cardBg,
-                borderRadius: 20,
-                padding: SPACING[5],
-                marginBottom: SPACING[4],
-                borderWidth: 1,
-                borderColor: theme.cardBorder,
-              }}
+            <DynamicGradientBorder
+              borderRadius={24}
+              fill={theme.cardFill}
+              boxWidth={contentWidth}
+              style={{ marginBottom: SPACING[4] }}
             >
-              <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-                {/* Icône */}
-                <View
-                  style={{
-                    width: 56,
-                    height: 56,
-                    borderRadius: 16,
-                    backgroundColor: isAgriMode ? '#FFF7E6' : 'rgba(255, 188, 64, 0.2)',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    marginRight: SPACING[4],
-                  }}
-                >
-                  <Ionicons name="people" size={28} color={theme.accent} />
+              <View style={styles.cardContent}>
+                <View style={[styles.iconBox, { backgroundColor: isAgriMode ? '#FFF7E6' : 'rgba(255, 188, 64, 0.15)' }]}>
+                  <Ionicons name="people" size={32} color={theme.accent} />
                 </View>
-
-                <View style={{ flex: 1 }}>
-                  {/* Tag */}
-                  <View
-                    style={{
-                      alignSelf: 'flex-start',
-                      backgroundColor: isAgriMode ? '#AC700C' : '#FFBC40',
-                      paddingHorizontal: SPACING[2],
-                      paddingVertical: 2,
-                      borderRadius: 6,
-                      marginBottom: SPACING[2],
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontFamily: FONTS.bodySemiBold,
-                        fontSize: 10,
-                        color: isAgriMode ? '#FFFFFF' : '#0C243E',
-                      }}
-                    >
-                      CLASSIQUE
-                    </Text>
-                  </View>
-
-                  {/* Titre */}
-                  <Text
-                    style={{
-                      fontFamily: FONTS.title,
-                      fontSize: FONT_SIZES.lg,
-                      color: isAgriMode ? '#8B6A3C' : COLORS.text,
-                      marginBottom: SPACING[1],
-                    }}
-                  >
-                    Partie locale
+                
+                <View style={styles.cardTextContainer}>
+                  <Text style={[styles.cardTitle, { color: theme.text }]}>Partie Locale</Text>
+                  <Text style={[styles.cardDescription, { color: theme.textSecondary }]}>
+                    Joue avec tes amis sur le même appareil, chacun son tour.
                   </Text>
-
-                  {/* Description */}
-                  <Text
-                    style={{
-                      fontFamily: FONTS.body,
-                      fontSize: FONT_SIZES.sm,
-                      color: isAgriMode ? '#8B6A3C' : COLORS.textSecondary,
-                      marginBottom: SPACING[3],
-                    }}
-                  >
-                    Joue avec tes amis sur le même appareil, chacun son tour
-                  </Text>
-
-                  {/* Badges */}
-                  <View style={{ flexDirection: 'row', gap: SPACING[2] }}>
-                    <View
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        backgroundColor: isAgriMode ? '#F6E8CC' : 'rgba(255, 255, 255, 0.1)',
-                        paddingHorizontal: SPACING[2],
-                        paddingVertical: 4,
-                        borderRadius: 8,
-                      }}
-                    >
-                      <Ionicons
-                        name="people-outline"
-                        size={14}
-                        color={isAgriMode ? '#8B6A3C' : COLORS.textSecondary}
-                      />
-                      <Text
-                        style={{
-                          fontFamily: FONTS.body,
-                          fontSize: FONT_SIZES.xs,
-                          color: isAgriMode ? '#8B6A3C' : COLORS.textSecondary,
-                          marginLeft: 4,
-                        }}
-                      >
-                        2-4 joueurs
-                      </Text>
-                    </View>
-
-                    <View
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        backgroundColor: isAgriMode ? '#F6E8CC' : 'rgba(255, 255, 255, 0.1)',
-                        paddingHorizontal: SPACING[2],
-                        paddingVertical: 4,
-                        borderRadius: 8,
-                      }}
-                    >
-                      <Ionicons
-                        name="lock-closed-outline"
-                        size={14}
-                        color={isAgriMode ? '#8B6A3C' : COLORS.textSecondary}
-                      />
-                      <Text
-                        style={{
-                          fontFamily: FONTS.body,
-                          fontSize: FONT_SIZES.xs,
-                          color: isAgriMode ? '#8B6A3C' : COLORS.textSecondary,
-                          marginLeft: 4,
-                        }}
-                      >
-                        Privé
-                      </Text>
+                  
+                  <View style={styles.tagsRow}>
+                    <View style={[styles.tag, { backgroundColor: isAgriMode ? '#F6E8CC' : 'rgba(255, 255, 255, 0.1)' }]}>
+                      <Ionicons name="people-outline" size={12} color={theme.textSecondary} />
+                      <Text style={[styles.tagText, { color: theme.textSecondary }]}>2-4 Joueurs</Text>
                     </View>
                   </View>
                 </View>
 
-                <Ionicons
-                  name="chevron-forward"
-                  size={24}
-                  color={isAgriMode ? '#8B6A3C' : COLORS.textSecondary}
-                />
+                <Ionicons name="chevron-forward" size={24} color={theme.textSecondary} />
               </View>
-            </View>
+            </DynamicGradientBorder>
           </Pressable>
         </Animated.View>
 
-        {/* Carte Partie en ligne */}
+        {/* Option: Partie en Ligne */}
         <Animated.View entering={FadeInDown.delay(300).duration(500)}>
           <Pressable onPress={handleOnlineGame}>
-            <View
-              style={{
-                backgroundColor: theme.cardBg,
-                borderRadius: 20,
-                padding: SPACING[5],
-                borderWidth: 1,
-                borderColor: isGuest ? 'rgba(255, 107, 107, 0.3)' : theme.cardBorder,
-                opacity: isGuest ? 0.8 : 1,
-                position: 'relative',
-                overflow: 'hidden',
-              }}
+            <DynamicGradientBorder
+              borderRadius={24}
+              fill={theme.cardFill}
+              boxWidth={contentWidth}
+              style={{ opacity: isGuest ? 0.8 : 1 }}
             >
-              {/* Overlay cadenas pour invités */}
-              {isGuest && (
-                <View
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    right: 0,
-                    backgroundColor: 'rgba(255, 107, 107, 0.9)',
-                    paddingHorizontal: SPACING[3],
-                    paddingVertical: SPACING[1],
-                    borderBottomLeftRadius: 12,
-                  }}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Ionicons name="lock-closed" size={12} color="#FFFFFF" />
-                    <Text
-                      style={{
-                        fontFamily: FONTS.bodySemiBold,
-                        fontSize: 10,
-                        color: '#FFFFFF',
-                        marginLeft: 4,
-                      }}
-                    >
-                      Crée un compte
-                    </Text>
-                  </View>
+              <View style={styles.cardContent}>
+                <View style={[styles.iconBox, { backgroundColor: isAgriMode ? '#FFF7E6' : 'rgba(31, 145, 208, 0.15)' }]}>
+                  <Ionicons name="globe" size={32} color={isAgriMode ? '#AC700C' : '#1F91D0'} />
                 </View>
-              )}
-
-              <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-                {/* Icône */}
-                <View
-                  style={{
-                    width: 56,
-                    height: 56,
-                    borderRadius: 16,
-                    backgroundColor: isAgriMode ? '#FFF7E6' : 'rgba(31, 145, 208, 0.2)',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    marginRight: SPACING[4],
-                  }}
-                >
-                  <Ionicons
-                    name="globe"
-                    size={28}
-                    color={isAgriMode ? '#AC700C' : '#1F91D0'}
-                  />
-                </View>
-
-                <View style={{ flex: 1 }}>
-                  {/* Tag */}
-                  <View
-                    style={{
-                      alignSelf: 'flex-start',
-                      backgroundColor: '#1F91D0',
-                      paddingHorizontal: SPACING[2],
-                      paddingVertical: 2,
-                      borderRadius: 6,
-                      marginBottom: SPACING[2],
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontFamily: FONTS.bodySemiBold,
-                        fontSize: 10,
-                        color: '#FFFFFF',
-                      }}
-                    >
-                      MULTIJOUEUR
-                    </Text>
-                  </View>
-
-                  {/* Titre */}
-                  <Text
-                    style={{
-                      fontFamily: FONTS.title,
-                      fontSize: FONT_SIZES.lg,
-                      color: isAgriMode ? '#8B6A3C' : COLORS.text,
-                      marginBottom: SPACING[1],
-                    }}
-                  >
-                    Partie en ligne
+                
+                <View style={styles.cardTextContainer}>
+                  <Text style={[styles.cardTitle, { color: theme.text }]}>Partie en Ligne</Text>
+                  <Text style={[styles.cardDescription, { color: theme.textSecondary }]}>
+                    Affronte des joueurs du monde entier en temps réel.
                   </Text>
-
-                  {/* Description */}
-                  <Text
-                    style={{
-                      fontFamily: FONTS.body,
-                      fontSize: FONT_SIZES.sm,
-                      color: isAgriMode ? '#8B6A3C' : COLORS.textSecondary,
-                      marginBottom: SPACING[3],
-                    }}
-                  >
-                    Affronte des joueurs du monde entier en temps réel
-                  </Text>
-
-                  {/* Badges */}
-                  <View style={{ flexDirection: 'row', gap: SPACING[2] }}>
-                    <View
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        backgroundColor: isAgriMode ? '#F6E8CC' : 'rgba(255, 255, 255, 0.1)',
-                        paddingHorizontal: SPACING[2],
-                        paddingVertical: 4,
-                        borderRadius: 8,
-                      }}
-                    >
-                      <Ionicons
-                        name="people-outline"
-                        size={14}
-                        color={isAgriMode ? '#8B6A3C' : COLORS.textSecondary}
-                      />
-                      <Text
-                        style={{
-                          fontFamily: FONTS.body,
-                          fontSize: FONT_SIZES.xs,
-                          color: isAgriMode ? '#8B6A3C' : COLORS.textSecondary,
-                          marginLeft: 4,
-                        }}
-                      >
-                        2-4 joueurs
-                      </Text>
+                  
+                  <View style={styles.tagsRow}>
+                    <View style={[styles.tag, { backgroundColor: isAgriMode ? '#F6E8CC' : 'rgba(255, 255, 255, 0.1)' }]}>
+                      <Ionicons name="trophy-outline" size={12} color={theme.textSecondary} />
+                      <Text style={[styles.tagText, { color: theme.textSecondary }]}>Classement</Text>
                     </View>
-
-                    <View
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        backgroundColor: isAgriMode ? '#F6E8CC' : 'rgba(255, 255, 255, 0.1)',
-                        paddingHorizontal: SPACING[2],
-                        paddingVertical: 4,
-                        borderRadius: 8,
-                      }}
-                    >
-                      <Ionicons
-                        name="trophy-outline"
-                        size={14}
-                        color={isAgriMode ? '#8B6A3C' : COLORS.textSecondary}
-                      />
-                      <Text
-                        style={{
-                          fontFamily: FONTS.body,
-                          fontSize: FONT_SIZES.xs,
-                          color: isAgriMode ? '#8B6A3C' : COLORS.textSecondary,
-                          marginLeft: 4,
-                        }}
-                      >
-                        Classement
-                      </Text>
-                    </View>
+                    {isGuest && (
+                      <View style={[styles.tag, { backgroundColor: 'rgba(255, 107, 107, 0.2)' }]}>
+                        <Ionicons name="lock-closed" size={12} color="#FF6B6B" />
+                        <Text style={[styles.tagText, { color: '#FF6B6B' }]}>Compte requis</Text>
+                      </View>
+                    )}
                   </View>
                 </View>
 
-                <Ionicons
-                  name="chevron-forward"
-                  size={24}
-                  color={isAgriMode ? '#8B6A3C' : COLORS.textSecondary}
-                />
+                <Ionicons name="chevron-forward" size={24} color={theme.textSecondary} />
               </View>
-            </View>
+            </DynamicGradientBorder>
           </Pressable>
         </Animated.View>
+
       </View>
 
+      {/* Popups (kept functional logic, styled slightly) */}
       {/* Popup - Pas de projet */}
       <Modal
         visible={showNoProjectPopup}
@@ -527,97 +254,20 @@ export default function GameModeSelectionScreen() {
         animationType="fade"
         onRequestClose={() => setShowNoProjectPopup(false)}
       >
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: 'rgba(0, 0, 0, 0.7)',
-            justifyContent: 'center',
-            alignItems: 'center',
-            padding: SPACING[4],
-          }}
-        >
-          <View
-            style={{
-              backgroundColor: '#0C243E',
-              borderRadius: 20,
-              padding: SPACING[6],
-              width: '100%',
-              maxWidth: 340,
-              alignItems: 'center',
-              borderWidth: 1,
-              borderColor: 'rgba(255, 188, 64, 0.2)',
-            }}
-          >
-            <View
-              style={{
-                width: 64,
-                height: 64,
-                borderRadius: 32,
-                backgroundColor: 'rgba(255, 188, 64, 0.2)',
-                justifyContent: 'center',
-                alignItems: 'center',
-                marginBottom: SPACING[4],
-              }}
-            >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalIconBox}>
               <Ionicons name="business-outline" size={32} color="#FFBC40" />
             </View>
-
-            <Text
-              style={{
-                fontFamily: FONTS.title,
-                fontSize: FONT_SIZES.xl,
-                color: COLORS.text,
-                textAlign: 'center',
-                marginBottom: SPACING[2],
-              }}
-            >
-              Aucun projet
-            </Text>
-
-            <Text
-              style={{
-                fontFamily: FONTS.body,
-                fontSize: FONT_SIZES.sm,
-                color: COLORS.textSecondary,
-                textAlign: 'center',
-                marginBottom: SPACING[5],
-              }}
-            >
+            <Text style={styles.modalTitle}>Aucun projet</Text>
+            <Text style={styles.modalText}>
               Tu dois créer une startup avant de jouer en ligne. Les jetons gagnés seront investis dans ton projet !
             </Text>
-
-            <Pressable
-              onPress={handleCreateStartup}
-              style={{
-                width: '100%',
-                backgroundColor: '#FFBC40',
-                paddingVertical: SPACING[3],
-                borderRadius: 12,
-                marginBottom: SPACING[3],
-              }}
-            >
-              <Text
-                style={{
-                  fontFamily: FONTS.bodySemiBold,
-                  fontSize: FONT_SIZES.md,
-                  color: '#0C243E',
-                  textAlign: 'center',
-                }}
-              >
-                Créer ma startup
-              </Text>
+            <Pressable onPress={handleCreateStartup} style={styles.modalPrimaryButton}>
+              <Text style={styles.modalPrimaryButtonText}>Créer ma startup</Text>
             </Pressable>
-
-            <Pressable onPress={() => setShowNoProjectPopup(false)}>
-              <Text
-                style={{
-                  fontFamily: FONTS.body,
-                  fontSize: FONT_SIZES.sm,
-                  color: COLORS.textSecondary,
-                }}
-              >
-                Annuler
-              </Text>
+            <Pressable onPress={() => setShowNoProjectPopup(false)} style={styles.modalSecondaryButton}>
+              <Text style={styles.modalSecondaryButtonText}>Annuler</Text>
             </Pressable>
           </View>
         </View>
@@ -630,101 +280,173 @@ export default function GameModeSelectionScreen() {
         animationType="fade"
         onRequestClose={() => setShowGuestPopup(false)}
       >
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: 'rgba(0, 0, 0, 0.7)',
-            justifyContent: 'center',
-            alignItems: 'center',
-            padding: SPACING[4],
-          }}
-        >
-          <View
-            style={{
-              backgroundColor: '#0C243E',
-              borderRadius: 20,
-              padding: SPACING[6],
-              width: '100%',
-              maxWidth: 340,
-              alignItems: 'center',
-              borderWidth: 1,
-              borderColor: 'rgba(255, 107, 107, 0.3)',
-            }}
-          >
-            <View
-              style={{
-                width: 64,
-                height: 64,
-                borderRadius: 32,
-                backgroundColor: 'rgba(255, 107, 107, 0.2)',
-                justifyContent: 'center',
-                alignItems: 'center',
-                marginBottom: SPACING[4],
-              }}
-            >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { borderColor: 'rgba(255, 107, 107, 0.3)' }]}>
+            <View style={[styles.modalIconBox, { backgroundColor: 'rgba(255, 107, 107, 0.2)' }]}>
               <Ionicons name="lock-closed" size={32} color="#FF6B6B" />
             </View>
-
-            <Text
-              style={{
-                fontFamily: FONTS.title,
-                fontSize: FONT_SIZES.xl,
-                color: COLORS.text,
-                textAlign: 'center',
-                marginBottom: SPACING[2],
-              }}
-            >
-              Compte requis
-            </Text>
-
-            <Text
-              style={{
-                fontFamily: FONTS.body,
-                fontSize: FONT_SIZES.sm,
-                color: COLORS.textSecondary,
-                textAlign: 'center',
-                marginBottom: SPACING[5],
-              }}
-            >
+            <Text style={styles.modalTitle}>Compte requis</Text>
+            <Text style={styles.modalText}>
               Crée un compte pour jouer en ligne et sauvegarder ta progression !
             </Text>
-
-            <Pressable
-              onPress={handleCreateAccount}
-              style={{
-                width: '100%',
-                backgroundColor: '#FFBC40',
-                paddingVertical: SPACING[3],
-                borderRadius: 12,
-                marginBottom: SPACING[3],
-              }}
-            >
-              <Text
-                style={{
-                  fontFamily: FONTS.bodySemiBold,
-                  fontSize: FONT_SIZES.md,
-                  color: '#0C243E',
-                  textAlign: 'center',
-                }}
-              >
-                Créer un compte
-              </Text>
+            <Pressable onPress={handleCreateAccount} style={styles.modalPrimaryButton}>
+              <Text style={styles.modalPrimaryButtonText}>Créer un compte</Text>
             </Pressable>
-
-            <Pressable onPress={() => setShowGuestPopup(false)}>
-              <Text
-                style={{
-                  fontFamily: FONTS.body,
-                  fontSize: FONT_SIZES.sm,
-                  color: COLORS.textSecondary,
-                }}
-              >
-                Annuler
-              </Text>
+            <Pressable onPress={() => setShowGuestPopup(false)} style={styles.modalSecondaryButton}>
+              <Text style={styles.modalSecondaryButtonText}>Annuler</Text>
             </Pressable>
           </View>
         </View>
       </Modal>
+
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  headerContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    paddingBottom: SPACING[4],
+    paddingHorizontal: SPACING[4],
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[4],
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  headerTitle: {
+    fontFamily: FONTS.title,
+    fontSize: 24,
+    color: '#FFFFFF',
+    textTransform: 'uppercase',
+  },
+  contentContainer: {
+    paddingHorizontal: SPACING[4],
+  },
+  cardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SPACING[4],
+  },
+  iconBox: {
+    width: 60,
+    height: 60,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: SPACING[4],
+  },
+  cardTextContainer: {
+    flex: 1,
+    marginRight: SPACING[2],
+  },
+  cardTitle: {
+    fontFamily: FONTS.title,
+    fontSize: 18,
+    marginBottom: 4,
+    textTransform: 'uppercase',
+  },
+  cardDescription: {
+    fontFamily: FONTS.body,
+    fontSize: 12,
+    marginBottom: 8,
+    lineHeight: 18,
+  },
+  tagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  tag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    gap: 4,
+  },
+  tagText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 10,
+  },
+  // Modals
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING[4],
+  },
+  modalContent: {
+    backgroundColor: '#0C243E',
+    borderRadius: 24,
+    padding: SPACING[6],
+    width: '100%',
+    maxWidth: 340,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 188, 64, 0.2)',
+  },
+  modalIconBox: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(255, 188, 64, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: SPACING[4],
+  },
+  modalTitle: {
+    fontFamily: FONTS.title,
+    fontSize: 22,
+    color: COLORS.text,
+    textAlign: 'center',
+    marginBottom: SPACING[2],
+    textTransform: 'uppercase',
+  },
+  modalText: {
+    fontFamily: FONTS.body,
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginBottom: SPACING[6],
+    lineHeight: 20,
+  },
+  modalPrimaryButton: {
+    width: '100%',
+    backgroundColor: '#FFBC40',
+    paddingVertical: 14,
+    borderRadius: 16,
+    marginBottom: SPACING[3],
+    alignItems: 'center',
+  },
+  modalPrimaryButtonText: {
+    fontFamily: FONTS.title,
+    fontSize: 16,
+    color: '#0C243E',
+    textTransform: 'uppercase',
+  },
+  modalSecondaryButton: {
+    paddingVertical: 8,
+  },
+  modalSecondaryButtonText: {
+    fontFamily: FONTS.body,
+    fontSize: 14,
+    color: COLORS.textSecondary,
+  },
+});

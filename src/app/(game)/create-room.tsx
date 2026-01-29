@@ -21,6 +21,7 @@ import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { useAuthStore } from '@/stores';
 import { useMultiplayer } from '@/hooks/useMultiplayer';
 import { Avatar } from '@/components/ui/Avatar';
+import { GameButton } from '@/components/ui';
 
 // Éditions disponibles
 const EDITIONS = [
@@ -502,21 +503,14 @@ export default function CreateRoomScreen() {
           backgroundColor: 'rgba(12, 36, 62, 0.95)',
         }}
       >
-        <Pressable
+        <GameButton
+          variant="yellow"
+          fullWidth
+          title={isLoading ? 'Chargement...' : 'Démarrer la partie'}
+          loading={isLoading}
+          disabled={playersList.length < 2}
           onPress={handleStartGame}
-          disabled={isLoading || playersList.length < 2}
-        >
-          <LinearGradient
-            colors={playersList.length >= 2 ? ['#FFBC40', '#F5A623'] : ['#666', '#444']}
-            style={styles.primaryButton}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-          >
-            <Text style={styles.primaryButtonText}>
-              {isLoading ? 'Chargement...' : 'Démarrer la partie'}
-            </Text>
-          </LinearGradient>
-        </Pressable>
+        />
         {playersList.length < 2 && (
           <Text style={styles.waitingText}>Minimum 2 joueurs requis</Text>
         )}

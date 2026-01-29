@@ -1,536 +1,371 @@
-import { View, Text, ScrollView, Pressable } from 'react-native';
+import { View, Text, ScrollView, Pressable, Dimensions, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
+import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { useAuthStore, useUserStore } from '@/stores';
+import { DynamicGradientBorder } from '@/components/ui';
 
-// Mock achievements
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+
+const RadialGradientBackground = () => (
+  <Svg style={StyleSheet.absoluteFill} width={screenWidth} height={screenHeight}>
+    <Defs>
+      <RadialGradient id="radialBg" cx="50%" cy="50%" r="80%">
+        <Stop offset="0%" stopColor="#0F3A6B" stopOpacity="1" />
+        <Stop offset="100%" stopColor="#081A2A" stopOpacity="1" />
+      </RadialGradient>
+    </Defs>
+    <Rect width="100%" height="100%" fill="url(#radialBg)" />
+  </Svg>
+);
+
+// Mock achievements based on image
 const ACHIEVEMENTS = [
-  { id: '1', icon: 'rocket', title: 'Première Partie', unlocked: true },
-  { id: '2', icon: 'trophy', title: 'Première Victoire', unlocked: true },
-  { id: '3', icon: 'business', title: 'Entrepreneur', unlocked: true },
-  { id: '4', icon: 'star', title: '10 Victoires', unlocked: false },
-  { id: '5', icon: 'diamond', title: 'Millionnaire', unlocked: false },
-  { id: '6', icon: 'flame', title: 'Série de 5', unlocked: false },
+  { id: '1', icon: 'rocket', title: 'PREMIÈRE STARTUP', unlocked: true },
+  { id: '2', icon: 'trophy', title: 'VAINQUEUR', unlocked: true },
+  { id: '3', icon: 'star', title: 'CRÉATEUR', unlocked: true },
+  { id: '4', icon: 'cash-outline', title: 'INVESTISSEUR', unlocked: false },
+  { id: '5', icon: 'business', title: 'EMPIRE', unlocked: false },
+  { id: '6', icon: 'ribbon-outline', title: 'LÉGENDE', unlocked: false },
 ];
 
-// Menu items
+// Menu items based on image
 const MENU_ITEMS = [
-  { id: 'settings', icon: 'settings-outline', title: 'Paramètres' },
-  { id: 'history', icon: 'time-outline', title: 'Historique des parties' },
-  { id: 'help', icon: 'help-circle-outline', title: 'Aide & FAQ' },
+  { id: 'stats', icon: 'stats-chart', title: 'STATISTIQUES DÉTAILLÉES' },
+  { id: 'community', icon: 'chatbubbles-outline', title: 'REJOINDRE LA COMMUNAUTÉ' },
+  { id: 'network', icon: 'people', title: 'RÉSEAU & AMIS' },
+  { id: 'settings', icon: 'settings', title: 'PARAMÈTRE' },
+  { id: 'help', icon: 'information-circle', title: 'AIDE & SUPPORT' },
 ];
 
 export default function ProfilScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { user, logout, isLoading } = useAuthStore();
+  const { user } = useAuthStore();
   const profile = useUserStore((state) => state.profile);
-  const rankInfo = useUserStore((state) => state.rankInfo);
   const levelProgress = useUserStore((state) => state.levelProgress);
 
-  const handleLogout = async () => {
-    await logout();
-    router.replace('/');
-  };
-
-  const handleEditProfile = () => {
-    // TODO: Implémenter l'édition du profil
-  };
+  // Progression XP
+  const currentXP = levelProgress?.currentXP ?? 8432;
+  const xpForNextLevel = levelProgress?.xpForNext ?? 15000;
+  const xpProgress = (currentXP / xpForNextLevel) * 100;
+  
+  // Nom affiché
+  const displayName = user?.displayName || profile?.displayName || 'VICTOR THIAM';
+  const displayRank = profile?.rank || 'Scale-up';
 
   const handleMenuPress = (itemId: string) => {
     switch (itemId) {
       case 'settings':
         router.push('/settings' as never);
         break;
-      case 'history':
-        router.push('/history' as never);
-        break;
-      case 'help':
-        router.push('/help' as never);
-        break;
+      // Add other routes as needed
     }
   };
 
-  const handleProgressionPress = () => {
-    // TODO: Naviguer vers page détaillée progression
-  };
-
-  // Progression XP
-  const currentXP = levelProgress?.currentXP ?? 0;
-  const xpForNextLevel = levelProgress?.xpForNext ?? 100;
-  const xpProgress = xpForNextLevel > 0 ? (currentXP / xpForNextLevel) * 100 : 0;
-  const currentLevel = levelProgress?.level ?? profile?.level ?? 1;
-
-  // Nom affiché
-  const displayName = user?.displayName || profile?.displayName || 'INVITÉ';
+  const contentWidth = screenWidth - SPACING[4] * 2;
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#0C243E' }}>
-      {/* Background Gradient */}
-      <LinearGradient
-        colors={['#194F8A', '#0C243E']}
-        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-      />
-
-      {/* Header Fixe avec bouton déconnexion */}
-      <View
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 10,
-          paddingTop: insets.top + SPACING[2],
-          paddingBottom: SPACING[3],
-          paddingHorizontal: SPACING[4],
-          backgroundColor: 'rgba(12, 36, 62, 0.85)',
-          borderBottomWidth: 1,
-          borderBottomColor: 'rgba(255, 188, 64, 0.1)',
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}
-      >
-        <Text
-          style={{
-            fontFamily: FONTS.title,
-            fontSize: FONT_SIZES['2xl'],
-            color: COLORS.text,
-          }}
-        >
-          Profil
-        </Text>
-
-        {/* Bouton Déconnexion */}
-        <Pressable
-          onPress={handleLogout}
-          disabled={isLoading}
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            paddingHorizontal: SPACING[3],
-            paddingVertical: SPACING[2],
-            backgroundColor: 'rgba(255, 107, 107, 0.15)',
-            borderRadius: 20,
-            borderWidth: 1,
-            borderColor: 'rgba(255, 107, 107, 0.3)',
-            opacity: isLoading ? 0.5 : 1,
-          }}
-        >
-          <Ionicons name="log-out-outline" size={16} color="#FF6B6B" />
-          <Text
-            style={{
-              fontFamily: FONTS.bodySemiBold,
-              fontSize: FONT_SIZES.xs,
-              color: '#FF6B6B',
-              marginLeft: 4,
-            }}
-          >
-            Déconnexion
-          </Text>
-        </Pressable>
-      </View>
+    <View style={styles.container}>
+      <RadialGradientBackground />
 
       <ScrollView
         contentContainerStyle={{
-          paddingTop: insets.top + 80,
           paddingBottom: SPACING[24],
-          paddingHorizontal: SPACING[4],
         }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Carte Profil Centrée */}
-        <Animated.View
-          entering={FadeInDown.delay(100).duration(500)}
-          style={{
-            alignItems: 'center',
-            backgroundColor: 'rgba(255, 255, 255, 0.08)',
-            borderRadius: 20,
-            padding: SPACING[6],
-            marginBottom: SPACING[5],
-            borderWidth: 1,
-            borderColor: 'rgba(255, 188, 64, 0.15)',
-          }}
-        >
-          {/* Avatar avec bouton édition */}
-          <View style={{ position: 'relative', marginBottom: SPACING[4] }}>
-            <View
-              style={{
-                width: 100,
-                height: 100,
-                borderRadius: 50,
-                backgroundColor: 'rgba(255, 188, 64, 0.2)',
-                justifyContent: 'center',
-                alignItems: 'center',
-                borderWidth: 3,
-                borderColor: '#FFBC40',
-              }}
-            >
-              <Text style={{ fontSize: 48 }}>
-                {rankInfo?.badge || '🎓'}
+        {/* HEADER SECTION WITH BACKGROUND */}
+        <View style={[styles.headerBackground, { paddingTop: insets.top + SPACING[2] }]}>
+          <Animated.View entering={FadeInDown.duration(500)} style={styles.headerContent}>
+            <Text style={styles.headerTitle}>PROFIL</Text>
+            
+            <View style={styles.avatarContainer}>
+              <View style={styles.avatarCircle}>
+                <Ionicons name="person" size={40} color="#CBD5E1" />
+              </View>
+            </View>
+
+            <Text style={styles.userName}>{displayName}</Text>
+
+            <View style={styles.followButtonsRow}>
+              <Pressable style={styles.followButton}>
+                <Ionicons name="person-add-outline" size={16} color="white" style={{ marginRight: 6 }} />
+                <Text style={styles.followButtonText}>Suiveurs</Text>
+              </Pressable>
+              
+              <Pressable style={[styles.followButton, styles.followButtonActive]}>
+                <Ionicons name="person" size={16} color="#FFBC40" style={{ marginRight: 6 }} />
+                <Text style={[styles.followButtonText, { color: '#FFBC40' }]}>25 SUIVIS</Text>
+              </Pressable>
+            </View>
+          </Animated.View>
+        </View>
+
+        <View style={{ paddingHorizontal: SPACING[4] }}>
+          {/* PROGRESSION SECTION */}
+        <Animated.View entering={FadeInDown.delay(100).duration(500)} style={styles.sectionContainer}>
+          <Text style={styles.sectionTitle}>PROGRESSION</Text>
+          
+          <DynamicGradientBorder
+            borderRadius={20}
+            fill="rgba(10, 25, 41, 0.6)"
+            boxWidth={contentWidth}
+          >
+            <View style={styles.cardContent}>
+              <Text style={styles.progressionSubtitle}>
+                {displayRank} - Prochain: Entreprise (25K XP)
               </Text>
-            </View>
-
-            {/* Bouton Édition (crayon) */}
-            <Pressable
-              onPress={handleEditProfile}
-              style={{
-                position: 'absolute',
-                bottom: 0,
-                right: 0,
-                width: 32,
-                height: 32,
-                borderRadius: 16,
-                backgroundColor: '#FFBC40',
-                justifyContent: 'center',
-                alignItems: 'center',
-                borderWidth: 2,
-                borderColor: '#0C243E',
-              }}
-            >
-              <Ionicons name="pencil" size={16} color="#0C243E" />
-            </Pressable>
-          </View>
-
-          {/* Nom en majuscules */}
-          <Text
-            style={{
-              fontFamily: FONTS.title,
-              fontSize: FONT_SIZES['2xl'],
-              color: COLORS.text,
-              textTransform: 'uppercase',
-              letterSpacing: 1,
-              marginBottom: SPACING[2],
-            }}
-          >
-            {displayName}
-          </Text>
-
-          {/* Badge Rang */}
-          <View
-            style={{
-              backgroundColor: `${rankInfo?.color || COLORS.primary}20`,
-              paddingHorizontal: SPACING[4],
-              paddingVertical: SPACING[1],
-              borderRadius: 12,
-              borderWidth: 1,
-              borderColor: `${rankInfo?.color || COLORS.primary}40`,
-            }}
-          >
-            <Text
-              style={{
-                fontFamily: FONTS.bodySemiBold,
-                fontSize: FONT_SIZES.sm,
-                color: rankInfo?.color || COLORS.primary,
-              }}
-            >
-              {rankInfo?.title || profile?.rank || 'Stagiaire'}
-            </Text>
-          </View>
-        </Animated.View>
-
-        {/* Section Progression (cliquable) */}
-        <Animated.View entering={FadeInDown.delay(200).duration(500)}>
-          <Pressable onPress={handleProgressionPress}>
-            <View
-              style={{
-                backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                borderRadius: 16,
-                padding: SPACING[4],
-                marginBottom: SPACING[5],
-                borderWidth: 1,
-                borderColor: 'rgba(255, 255, 255, 0.08)',
-              }}
-            >
-              <View
-                style={{
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: SPACING[3],
-                }}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Ionicons name="trending-up" size={20} color="#FFBC40" />
-                  <Text
-                    style={{
-                      fontFamily: FONTS.bodySemiBold,
-                      fontSize: FONT_SIZES.md,
-                      color: COLORS.text,
-                      marginLeft: SPACING[2],
-                    }}
-                  >
-                    Progression
-                  </Text>
-                </View>
-
-                <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
+              
+              <View style={styles.progressBarContainer}>
+                <View style={[styles.progressBarFill, { width: `${xpProgress}%` }]} />
               </View>
-
-              {/* Niveau et XP */}
-              <View
-                style={{
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: SPACING[2],
-                }}
-              >
-                <Text
-                  style={{
-                    fontFamily: FONTS.body,
-                    fontSize: FONT_SIZES.sm,
-                    color: COLORS.textSecondary,
-                  }}
-                >
-                  Niveau {currentLevel}
-                </Text>
-                <Text
-                  style={{
-                    fontFamily: FONTS.bodySemiBold,
-                    fontSize: FONT_SIZES.sm,
-                    color: '#FFBC40',
-                  }}
-                >
-                  {currentXP} / {xpForNextLevel} XP
-                </Text>
+              
+              <View style={styles.xpRow}>
+                <Text style={styles.xpText}>{currentXP.toLocaleString()} XP</Text>
+                <Text style={styles.xpText}>{(xpForNextLevel - currentXP).toLocaleString()} XP restants</Text>
               </View>
-
-              {/* Barre de progression */}
-              <ProgressBar progress={xpProgress} size="md" variant="default" />
             </View>
-          </Pressable>
+          </DynamicGradientBorder>
         </Animated.View>
 
-        {/* Grille Succès */}
-        <Animated.View entering={FadeInDown.delay(300).duration(500)}>
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: SPACING[3],
-            }}
+        {/* ACHIEVEMENTS SECTION */}
+        <Animated.View entering={FadeInDown.delay(200).duration(500)} style={styles.sectionContainer}>
+          <Text style={styles.sectionTitle}>ACHIEVEMENTS DÉBLOQUÉS</Text>
+          
+          <DynamicGradientBorder
+            borderRadius={20}
+            fill="rgba(10, 25, 41, 0.6)"
+            boxWidth={contentWidth}
           >
-            <Text
-              style={{
-                fontFamily: FONTS.bodySemiBold,
-                fontSize: FONT_SIZES.md,
-                color: COLORS.text,
-              }}
-            >
-              Succès
-            </Text>
-            <Text
-              style={{
-                fontFamily: FONTS.body,
-                fontSize: FONT_SIZES.sm,
-                color: COLORS.textSecondary,
-              }}
-            >
-              {ACHIEVEMENTS.filter((a) => a.unlocked).length}/{ACHIEVEMENTS.length}
-            </Text>
-          </View>
-
-          <View
-            style={{
-              flexDirection: 'row',
-              flexWrap: 'wrap',
-              gap: SPACING[3],
-              marginBottom: SPACING[5],
-            }}
-          >
-            {ACHIEVEMENTS.map((achievement, index) => (
-              <Animated.View
-                key={achievement.id}
-                entering={FadeInDown.delay(350 + index * 50).duration(400)}
-                style={{
-                  width: '30%',
-                  alignItems: 'center',
-                }}
-              >
-                <View
-                  style={{
-                    width: 56,
-                    height: 56,
-                    borderRadius: 16,
-                    backgroundColor: achievement.unlocked
-                      ? 'rgba(255, 188, 64, 0.2)'
-                      : 'rgba(255, 255, 255, 0.05)',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    borderWidth: 1,
-                    borderColor: achievement.unlocked
-                      ? 'rgba(255, 188, 64, 0.4)'
-                      : 'rgba(255, 255, 255, 0.1)',
-                    marginBottom: SPACING[1],
-                  }}
-                >
-                  <Ionicons
-                    name={achievement.icon as keyof typeof Ionicons.glyphMap}
-                    size={24}
-                    color={achievement.unlocked ? '#FFBC40' : 'rgba(255, 255, 255, 0.3)'}
-                  />
+            <View style={[styles.cardContent, styles.achievementsGrid]}>
+              {ACHIEVEMENTS.map((item) => (
+                <View key={item.id} style={styles.achievementItem}>
+                  <View style={[
+                    styles.achievementIconBox, 
+                    item.unlocked ? styles.achievementUnlocked : styles.achievementLocked
+                  ]}>
+                    <Ionicons 
+                      name={item.icon as any} 
+                      size={24} 
+                      color={item.unlocked ? '#FFBC40' : '#64748B'} 
+                    />
+                    <Text style={[
+                      styles.achievementText,
+                      item.unlocked ? { color: '#FFBC40' } : { color: '#64748B' }
+                    ]}>
+                      {item.title}
+                    </Text>
+                  </View>
                 </View>
-                <Text
-                  style={{
-                    fontFamily: FONTS.body,
-                    fontSize: 10,
-                    color: achievement.unlocked ? COLORS.text : COLORS.textSecondary,
-                    textAlign: 'center',
-                  }}
-                  numberOfLines={2}
-                >
-                  {achievement.title}
-                </Text>
-              </Animated.View>
-            ))}
-          </View>
+              ))}
+            </View>
+          </DynamicGradientBorder>
         </Animated.View>
 
-        {/* Menu Items */}
-        <Animated.View
-          entering={FadeInDown.delay(500).duration(500)}
-          style={{ gap: SPACING[2] }}
-        >
+        {/* MENU LIST */}
+        <View style={styles.menuContainer}>
           {MENU_ITEMS.map((item, index) => (
-            <Animated.View
-              key={item.id}
-              entering={FadeInDown.delay(550 + index * 50).duration(400)}
+            <Animated.View 
+              key={item.id} 
+              entering={FadeInDown.delay(300 + (index * 50)).duration(500)}
             >
-              <Pressable
-                onPress={() => handleMenuPress(item.id)}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                  borderRadius: 12,
-                  padding: SPACING[4],
-                  borderWidth: 1,
-                  borderColor: 'rgba(255, 255, 255, 0.08)',
-                }}
-              >
-                <View
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 10,
-                    backgroundColor: 'rgba(255, 188, 64, 0.15)',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    marginRight: SPACING[3],
-                  }}
+              <Pressable onPress={() => handleMenuPress(item.id)}>
+                <DynamicGradientBorder
+                  borderRadius={16}
+                  fill="rgba(10, 25, 41, 0.6)" // Darker fill
+                  boxWidth={contentWidth}
+                  style={{ marginBottom: 10 }}
                 >
-                  <Ionicons
-                    name={item.icon as keyof typeof Ionicons.glyphMap}
-                    size={20}
-                    color="#FFBC40"
-                  />
-                </View>
-
-                <Text
-                  style={{
-                    fontFamily: FONTS.body,
-                    fontSize: FONT_SIZES.md,
-                    color: COLORS.text,
-                    flex: 1,
-                  }}
-                >
-                  {item.title}
-                </Text>
-
-                <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
+                  <View style={styles.menuItemContent}>
+                    <View style={styles.menuItemLeft}>
+                      <Ionicons name={item.icon as any} size={20} color="white" />
+                      <Text style={styles.menuItemText}>{item.title}</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color="#FFBC40" />
+                  </View>
+                </DynamicGradientBorder>
               </Pressable>
             </Animated.View>
           ))}
-        </Animated.View>
+        </View>
 
-        {/* Stats rapides en bas */}
-        <Animated.View
-          entering={FadeInDown.delay(700).duration(500)}
-          style={{
-            flexDirection: 'row',
-            justifyContent: 'space-around',
-            marginTop: SPACING[6],
-            paddingTop: SPACING[4],
-            borderTopWidth: 1,
-            borderTopColor: 'rgba(255, 255, 255, 0.1)',
-          }}
-        >
-          <View style={{ alignItems: 'center' }}>
-            <Text
-              style={{
-                fontFamily: FONTS.title,
-                fontSize: FONT_SIZES.xl,
-                color: '#FFBC40',
-              }}
-            >
-              {profile?.gamesPlayed ?? 0}
-            </Text>
-            <Text
-              style={{
-                fontFamily: FONTS.body,
-                fontSize: FONT_SIZES.xs,
-                color: COLORS.textSecondary,
-              }}
-            >
-              Parties
-            </Text>
-          </View>
-
-          <View style={{ alignItems: 'center' }}>
-            <Text
-              style={{
-                fontFamily: FONTS.title,
-                fontSize: FONT_SIZES.xl,
-                color: '#4CAF50',
-              }}
-            >
-              {profile?.gamesWon ?? 0}
-            </Text>
-            <Text
-              style={{
-                fontFamily: FONTS.body,
-                fontSize: FONT_SIZES.xs,
-                color: COLORS.textSecondary,
-              }}
-            >
-              Victoires
-            </Text>
-          </View>
-
-          <View style={{ alignItems: 'center' }}>
-            <Text
-              style={{
-                fontFamily: FONTS.title,
-                fontSize: FONT_SIZES.xl,
-                color: '#1F91D0',
-              }}
-            >
-              {profile?.totalTokensEarned ?? 0}
-            </Text>
-            <Text
-              style={{
-                fontFamily: FONTS.body,
-                fontSize: FONT_SIZES.xs,
-                color: COLORS.textSecondary,
-              }}
-            >
-              Jetons
-            </Text>
-          </View>
-        </Animated.View>
+        </View>
       </ScrollView>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#0C243E',
+  },
+  headerBackground: {
+    backgroundColor: '#0A1929', // Darker blue for header
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+    marginBottom: 24,
+    paddingBottom: 32,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+    borderTopWidth: 0,
+  },
+  headerContent: {
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontFamily: FONTS.title,
+    fontSize: 20,
+    color: 'white',
+    marginBottom: 20,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  avatarContainer: {
+    marginBottom: 10,
+  },
+  avatarCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#1E293B',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  userName: {
+    fontFamily: FONTS.title,
+    fontSize: 24,
+    color: 'white',
+    marginBottom: 20,
+    textTransform: 'uppercase',
+  },
+  followButtonsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  followButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(15, 23, 42, 0.5)',
+  },
+  followButtonActive: {
+    borderColor: 'rgba(255, 188, 64, 0.3)',
+    backgroundColor: 'rgba(255, 188, 64, 0.1)',
+  },
+  followButtonText: {
+    fontFamily: FONTS.body,
+    fontSize: 14,
+    color: 'white',
+    fontWeight: '600',
+  },
+  sectionContainer: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontFamily: FONTS.title,
+    fontSize: 18,
+    color: 'white',
+    marginBottom: 12,
+    textTransform: 'uppercase',
+  },
+  cardContent: {
+    padding: 16,
+  },
+  progressionSubtitle: {
+    fontFamily: FONTS.body,
+    fontSize: 14,
+    color: '#FFBC40',
+    marginBottom: 10,
+  },
+  progressBarContainer: {
+    height: 8,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 4,
+    marginBottom: 8,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: '#FFBC40',
+    borderRadius: 4,
+  },
+  xpRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  xpText: {
+    fontFamily: FONTS.body,
+    fontSize: 12,
+    color: '#94A3B8',
+  },
+  achievementsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    justifyContent: 'space-between',
+  },
+  achievementItem: {
+    width: '30%', // Approx 3 columns
+    aspectRatio: 1,
+  },
+  achievementIconBox: {
+    flex: 1,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    padding: 4,
+  },
+  achievementUnlocked: {
+    borderColor: '#FFBC40',
+    backgroundColor: 'rgba(255, 188, 64, 0.1)',
+  },
+  achievementLocked: {
+    borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(15, 23, 42, 0.5)',
+  },
+  achievementText: {
+    fontFamily: FONTS.title,
+    fontSize: 9,
+    marginTop: 6,
+    textAlign: 'center',
+    textTransform: 'uppercase',
+  },
+  menuContainer: {
+    gap: 0,
+  },
+  menuItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    height: 60,
+  },
+  menuItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  menuItemText: {
+    fontFamily: FONTS.title,
+    fontSize: 14,
+    color: 'white',
+    textTransform: 'uppercase',
+  },
+});
