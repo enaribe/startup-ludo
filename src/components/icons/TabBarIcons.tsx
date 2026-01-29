@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import Svg, { Defs, FeBlend, FeColorMatrix, FeFlood, FeGaussianBlur, FeOffset, Filter, G, Path } from 'react-native-svg';
 
 interface IconProps {
@@ -6,7 +7,7 @@ interface IconProps {
 }
 
 // Icône LUDO pour l'onglet Accueil (logo avec les 4 carrés L-U-D-O)
-export const AccueilIcon = ({ color = '#71808E', size = 24 }: IconProps) => (
+export const AccueilIcon = memo(function AccueilIcon({ color = '#71808E', size = 24 }: IconProps) { return (
   <Svg width={size} height={size} viewBox="0 0 35 35" fill="none">
     {/* Carré L */}
     <Path
@@ -72,10 +73,10 @@ export const AccueilIcon = ({ color = '#71808E', size = 24 }: IconProps) => (
       />
     </G>
   </Svg>
-);
+); });
 
 // Icône fusée pour l'onglet Portfolio
-export const PortfolioIcon = ({ color = '#71808E', size = 24 }: IconProps) => (
+export const PortfolioIcon = memo(function PortfolioIcon({ color = '#71808E', size = 24 }: IconProps) { return (
   <Svg width={size} height={size} viewBox="0 0 26 35" fill="none">
     <Path
       d="M20.2621 21.6274C21.1591 15.0408 20.3998 6.5439 13.0592 0.5C12.9808 0.554588 3.21196 7.35311 5.60087 21.7818C4.82944 22.9714 1.29317 28.6453 0.813477 34.2703L2.14842 34.2786L7.82816 29.4259L8.0146 29.8835L18.1877 29.9726C18.1877 29.9726 18.3069 29.6693 18.4968 29.1221L24.3719 34.4845L25.7015 34.5C24.8536 29.8621 22.9966 25.4675 20.2621 21.6274ZM13.15 13.7674C12.6039 13.7793 12.0666 13.6285 11.6064 13.3342C11.1463 13.0399 10.784 12.6154 10.5657 12.1146C10.3475 11.6139 10.283 11.0595 10.3805 10.5219C10.478 9.98432 10.7331 9.48782 11.1134 9.0955C11.4937 8.70318 11.982 8.43276 12.5163 8.3186C13.0505 8.20444 13.6066 8.2517 14.1138 8.45437C14.6211 8.65704 15.0566 9.00597 15.365 9.45682C15.6734 9.90766 15.8407 10.4401 15.8458 10.9864C15.8528 11.346 15.7888 11.7035 15.6574 12.0383C15.5259 12.3732 15.3297 12.6788 15.0799 12.9376C14.8301 13.1965 14.5317 13.4035 14.2018 13.5468C13.8719 13.6901 13.517 13.7669 13.1573 13.7727L13.15 13.7674Z"
@@ -86,10 +87,10 @@ export const PortfolioIcon = ({ color = '#71808E', size = 24 }: IconProps) => (
       fill={color}
     />
   </Svg>
-);
+); });
 
 // Icône trophée pour l'onglet Classement
-export const ClassementIcon = ({ color = '#71808E', size = 24 }: IconProps) => (
+export const ClassementIcon = memo(function ClassementIcon({ color = '#71808E', size = 24 }: IconProps) { return (
   <Svg width={size} height={size} viewBox="0 0 61 58" fill="none">
     <Defs>
       <Filter
@@ -135,10 +136,10 @@ export const ClassementIcon = ({ color = '#71808E', size = 24 }: IconProps) => (
       />
     </G>
   </Svg>
-);
+); });
 
 // Icône profil utilisateur pour l'onglet Profil
-export const ProfilIcon = ({ color = '#71808E', size = 24 }: IconProps) => (
+export const ProfilIcon = memo(function ProfilIcon({ color = '#71808E', size = 24 }: IconProps) { return (
   <Svg width={size} height={size} viewBox="0 0 30 35" fill="none">
     <Path
       d="M14.7573 17.5C19.4517 17.5 23.2573 13.6944 23.2573 9C23.2573 4.30558 19.4517 0.5 14.7573 0.5C10.0629 0.5 6.25732 4.30558 6.25732 9C6.25732 13.6944 10.0629 17.5 14.7573 17.5Z"
@@ -149,4 +150,4 @@ export const ProfilIcon = ({ color = '#71808E', size = 24 }: IconProps) => (
       fill={color}
     />
   </Svg>
-);
+); });

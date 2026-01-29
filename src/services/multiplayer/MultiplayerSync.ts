@@ -7,7 +7,7 @@
  * Structure RTDB:
  * rooms/{roomId}/
  *   ├── info (RealtimeRoom)
- *   ├── players/{odorId} (RealtimePlayer)
+ *   ├── players/{playerId} (RealtimePlayer)
  *   ├── state (RealtimeGameState)
  *   ├── positions/{playerId} (PawnState[])
  *   ├── tokens/{playerId} (number)
@@ -36,7 +36,7 @@ export interface RoomConfig {
 }
 
 export interface JoinRoomData {
-  odorId: string;
+  playerId: string;
   playerName: string;
 }
 
@@ -93,7 +93,7 @@ function generateRoomCode(): string {
 
 export class MultiplayerSync {
   private roomId: string | null = null;
-  private odorId: string | null = null;
+  private playerId: string | null = null;
   private listeners: Map<string, () => void> = new Map();
   private eventCallbacks: Set<EventCallback> = new Set();
   private isConnected = false;
@@ -134,7 +134,7 @@ export class MultiplayerSync {
     void config; // Utilisation temporaire pour éviter erreur TS
 
     this.roomId = roomId;
-    this.odorId = config.hostId;
+    this.playerId = config.hostId;
     this.isConnected = true;
 
     // Simuler le succès
@@ -158,7 +158,7 @@ export class MultiplayerSync {
     const availableColor = PLAYER_COLORS[1]!; // Simuler: bleu
 
     const player: RealtimePlayer = {
-      id: data.odorId,
+      id: data.playerId,
       displayName: data.playerName,
       name: data.playerName, // Backward compat
       color: availableColor,
@@ -170,10 +170,10 @@ export class MultiplayerSync {
     };
 
     // TODO: Écrire le joueur dans Firebase
-    // await database().ref(`rooms/${roomId}/players/${data.odorId}`).set(player);
+    // await database().ref(`rooms/${roomId}/players/${data.playerId}`).set(player);
 
     this.roomId = roomId;
-    this.odorId = data.odorId;
+    this.playerId = data.playerId;
     this.isConnected = true;
 
     // Émettre l'événement
@@ -192,24 +192,24 @@ export class MultiplayerSync {
    * Quitte la room actuelle
    */
   async leaveRoom(): Promise<void> {
-    if (!this.roomId || !this.odorId) return;
+    if (!this.roomId || !this.playerId) return;
 
     // TODO: Supprimer le joueur de Firebase
-    // await database().ref(`rooms/${this.roomId}/players/${this.odorId}`).remove();
+    // await database().ref(`rooms/${this.roomId}/players/${this.playerId}`).remove();
 
     // Nettoyer les listeners
     this.cleanup();
 
     this.emit({
       type: 'player_left',
-      data: { odorId: this.odorId },
+      data: { playerId: this.playerId },
       timestamp: Date.now(),
     });
 
     console.log('[MultiplayerSync] Left room');
 
     this.roomId = null;
-    this.odorId = null;
+    this.playerId = null;
     this.isConnected = false;
   }
 
@@ -217,14 +217,14 @@ export class MultiplayerSync {
    * Marquer le joueur comme prêt
    */
   async setReady(ready: boolean): Promise<void> {
-    if (!this.roomId || !this.odorId) return;
+    if (!this.roomId || !this.playerId) return;
 
     // TODO: Mettre à jour dans Firebase
-    // await database().ref(`rooms/${this.roomId}/players/${this.odorId}/isReady`).set(ready);
+    // await database().ref(`rooms/${this.roomId}/players/${this.playerId}/isReady`).set(ready);
 
     this.emit({
       type: 'player_ready',
-      data: { odorId: this.odorId, ready },
+      data: { playerId: this.playerId, ready },
       timestamp: Date.now(),
     });
 
@@ -332,11 +332,11 @@ export class MultiplayerSync {
    * Envoie un emoji dans le chat
    */
   async sendEmoji(emoji: string): Promise<void> {
-    if (!this.roomId || !this.odorId) return;
+    if (!this.roomId || !this.playerId) return;
 
     const message: ChatMessage = {
       id: `msg_${Date.now()}`,
-      playerId: this.odorId,
+      playerId: this.playerId,
       emoji,
       timestamp: Date.now(),
     };
@@ -452,10 +452,10 @@ export class MultiplayerSync {
    * Configure la gestion de présence (déconnexion automatique)
    */
   setupPresence(): void {
-    if (!this.roomId || !this.odorId) return;
+    if (!this.roomId || !this.playerId) return;
 
     // TODO: Configurer onDisconnect
-    // const presenceRef = database().ref(`rooms/${this.roomId}/players/${this.odorId}`);
+    // const presenceRef = database().ref(`rooms/${this.roomId}/players/${this.playerId}`);
     // presenceRef.onDisconnect().update({ isConnected: false, lastSeen: database.ServerValue.TIMESTAMP });
 
     // Mettre à jour la présence périodiquement
@@ -524,7 +524,7 @@ export class MultiplayerSync {
   }
 
   getPlayerId(): string | null {
-    return this.odorId;
+    return this.playerId;
   }
 
   getIsConnected(): boolean {

@@ -4,6 +4,7 @@ import {
   Text,
   ActivityIndicator,
   StyleSheet,
+  type GestureResponderEvent,
   type PressableProps,
   type ViewStyle,
   type TextStyle,
@@ -64,7 +65,7 @@ export const GameButton = memo(function GameButton({
   }, [scale]);
 
   const handlePress = useCallback(
-    (event: any) => {
+    (event: GestureResponderEvent) => {
       runOnJS(triggerHaptic)();
       onPress?.(event);
     },

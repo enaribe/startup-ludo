@@ -13,6 +13,7 @@ interface AvatarProps {
   size?: AvatarSize;
   playerColor?: PlayerColor;
   showBorder?: boolean;
+  borderColor?: string;
   style?: ViewStyle;
 }
 
@@ -68,11 +69,12 @@ export const Avatar = memo(function Avatar({
   size = 'md',
   playerColor,
   showBorder = false,
+  borderColor: borderColorProp,
   style,
 }: AvatarProps) {
   const dimension = SIZE_MAP[size];
   const fontSize = FONT_SIZE_MAP[size];
-  const borderColor = playerColor ? COLORS.players[playerColor] : COLORS.primary;
+  const borderColor = borderColorProp ?? (playerColor ? COLORS.players[playerColor] : COLORS.primary);
   const backgroundColor = playerColor
     ? COLORS.players[playerColor]
     : getColorFromName(name);

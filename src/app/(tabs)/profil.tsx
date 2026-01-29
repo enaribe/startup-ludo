@@ -3,46 +3,31 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 
-import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
-import { FONTS, FONT_SIZES } from '@/styles/typography';
-import { ProgressBar } from '@/components/ui/ProgressBar';
+import { FONTS } from '@/styles/typography';
 import { useAuthStore, useUserStore } from '@/stores';
-import { DynamicGradientBorder } from '@/components/ui';
+import { RadialBackground, DynamicGradientBorder } from '@/components/ui';
 
-const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
-
-const RadialGradientBackground = () => (
-  <Svg style={StyleSheet.absoluteFill} width={screenWidth} height={screenHeight}>
-    <Defs>
-      <RadialGradient id="radialBg" cx="50%" cy="50%" r="80%">
-        <Stop offset="0%" stopColor="#0F3A6B" stopOpacity="1" />
-        <Stop offset="100%" stopColor="#081A2A" stopOpacity="1" />
-      </RadialGradient>
-    </Defs>
-    <Rect width="100%" height="100%" fill="url(#radialBg)" />
-  </Svg>
-);
+const { width: screenWidth } = Dimensions.get('window');
 
 // Mock achievements based on image
 const ACHIEVEMENTS = [
-  { id: '1', icon: 'rocket', title: 'PREMIÈRE STARTUP', unlocked: true },
-  { id: '2', icon: 'trophy', title: 'VAINQUEUR', unlocked: true },
-  { id: '3', icon: 'star', title: 'CRÉATEUR', unlocked: true },
-  { id: '4', icon: 'cash-outline', title: 'INVESTISSEUR', unlocked: false },
-  { id: '5', icon: 'business', title: 'EMPIRE', unlocked: false },
-  { id: '6', icon: 'ribbon-outline', title: 'LÉGENDE', unlocked: false },
+  { id: '1', icon: 'rocket' as const, title: 'PREMIÈRE STARTUP', unlocked: true },
+  { id: '2', icon: 'trophy' as const, title: 'VAINQUEUR', unlocked: true },
+  { id: '3', icon: 'star' as const, title: 'CRÉATEUR', unlocked: true },
+  { id: '4', icon: 'cash-outline' as const, title: 'INVESTISSEUR', unlocked: false },
+  { id: '5', icon: 'business' as const, title: 'EMPIRE', unlocked: false },
+  { id: '6', icon: 'ribbon-outline' as const, title: 'LÉGENDE', unlocked: false },
 ];
 
 // Menu items based on image
 const MENU_ITEMS = [
-  { id: 'stats', icon: 'stats-chart', title: 'STATISTIQUES DÉTAILLÉES' },
-  { id: 'community', icon: 'chatbubbles-outline', title: 'REJOINDRE LA COMMUNAUTÉ' },
-  { id: 'network', icon: 'people', title: 'RÉSEAU & AMIS' },
-  { id: 'settings', icon: 'settings', title: 'PARAMÈTRE' },
-  { id: 'help', icon: 'information-circle', title: 'AIDE & SUPPORT' },
+  { id: 'stats', icon: 'stats-chart' as const, title: 'STATISTIQUES DÉTAILLÉES' },
+  { id: 'community', icon: 'chatbubbles-outline' as const, title: 'REJOINDRE LA COMMUNAUTÉ' },
+  { id: 'network', icon: 'people' as const, title: 'RÉSEAU & AMIS' },
+  { id: 'settings', icon: 'settings' as const, title: 'PARAMÈTRE' },
+  { id: 'help', icon: 'information-circle' as const, title: 'AIDE & SUPPORT' },
 ];
 
 export default function ProfilScreen() {
@@ -74,7 +59,7 @@ export default function ProfilScreen() {
 
   return (
     <View style={styles.container}>
-      <RadialGradientBackground />
+      <RadialBackground />
 
       <ScrollView
         contentContainerStyle={{
@@ -153,7 +138,7 @@ export default function ProfilScreen() {
                     item.unlocked ? styles.achievementUnlocked : styles.achievementLocked
                   ]}>
                     <Ionicons 
-                      name={item.icon as any} 
+                      name={item.icon}
                       size={24} 
                       color={item.unlocked ? '#FFBC40' : '#64748B'} 
                     />
@@ -186,7 +171,7 @@ export default function ProfilScreen() {
                 >
                   <View style={styles.menuItemContent}>
                     <View style={styles.menuItemLeft}>
-                      <Ionicons name={item.icon as any} size={20} color="white" />
+                      <Ionicons name={item.icon} size={20} color="white" />
                       <Text style={styles.menuItemText}>{item.title}</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={20} color="#FFBC40" />

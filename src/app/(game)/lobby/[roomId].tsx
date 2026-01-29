@@ -51,9 +51,9 @@ export default function LobbyScreen() {
 
   // Convertir players en array pour l'affichage
   const playersList = useMemo(() => {
-    return Object.entries(players).map(([odorId, player]) => ({
+    return Object.entries(players).map(([playerId, player]) => ({
       ...player,
-      odorId,
+      playerId,
     }));
   }, [players]);
 
@@ -134,7 +134,7 @@ export default function LobbyScreen() {
   const playersForChat = useMemo(() => {
     const result: Record<string, { name: string; color: PlayerColor }> = {};
     playersList.forEach((p) => {
-      result[p.odorId] = { name: p.displayName ?? p.name ?? 'Joueur', color: p.color };
+      result[p.playerId] = { name: p.displayName ?? p.name ?? 'Joueur', color: p.color };
     });
     return result;
   }, [playersList]);
@@ -211,7 +211,7 @@ export default function LobbyScreen() {
             ) : (
               playersList.map((player, index) => (
                 <Animated.View
-                  key={player.odorId}
+                  key={player.playerId}
                   entering={FadeIn.delay(400 + index * 100).duration(300)}
                 >
                   <Card variant="default" padding={4} style={styles.playerCard}>

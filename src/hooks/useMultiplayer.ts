@@ -156,7 +156,7 @@ export function useMultiplayer(userId: string | null): UseMultiplayerReturn {
 
       try {
         const result = await multiplayerSync.joinRoom(code, {
-          odorId: userId,
+          playerId: userId,
           playerName,
         });
 

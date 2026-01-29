@@ -45,9 +45,9 @@ export default function JoinRoomScreen() {
 
   // Convertir players en liste
   const playersList = useMemo(() => {
-    return Object.entries(players).map(([odorId, player]) => ({
+    return Object.entries(players).map(([playerId, player]) => ({
       ...player,
-      odorId,
+      playerId,
     }));
   }, [players]);
 
@@ -325,7 +325,7 @@ export default function JoinRoomScreen() {
           <View style={{ gap: SPACING[3] }}>
             {playersList.map((player, index) => (
               <Animated.View
-                key={player.odorId}
+                key={player.playerId}
                 entering={FadeIn.delay(300 + index * 100).duration(300)}
               >
                 <View style={styles.playerCard}>

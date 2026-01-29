@@ -1,6 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { memo, useEffect } from 'react';
 import { Dimensions, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
@@ -11,30 +11,16 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
 
-import { Avatar, GameButton } from '@/components/ui';
+import { Avatar, DynamicGradientBorder, GameButton, GradientBorder, RadialBackground } from '@/components/ui';
 import { formatXP, getLevelFromXP, getRankFromXP, getRankProgress } from '@/config/progression';
 import { useAuthStore, useUserStore } from '@/stores';
 import { FONTS } from '@/styles/typography';
 
-const { width, height } = Dimensions.get('window');
-
-// Composant pour le gradient radial SVG
-const RadialGradientBackground = () => (
-  <Svg style={StyleSheet.absoluteFill} width={width} height={height}>
-    <Defs>
-      <RadialGradient id="radialGradient" cx="50%" cy="50%" r="80%">
-        <Stop offset="0%" stopColor="#0F3A6B" stopOpacity="1" />
-        <Stop offset="100%" stopColor="#081A2A" stopOpacity="1" />
-      </RadialGradient>
-    </Defs>
-    <Rect width="100%" height="100%" fill="url(#radialGradient)" />
-  </Svg>
-);
+const { width } = Dimensions.get('window');
 
 // Rayons tournants sous le logo
-const SpinningRays = () => {
+const SpinningRays = memo(function SpinningRays() {
   const rotation = useSharedValue(0);
   useEffect(() => {
     rotation.value = withRepeat(
@@ -55,122 +41,10 @@ const SpinningRays = () => {
       />
     </Animated.View>
   );
-};
-
-// Bordure gradient style eau
-interface GradientBorderProps {
-  children: React.ReactNode;
-  style?: object;
-  boxHeight: number;
-  boxWidth?: number;
-  borderRadius?: number;
-  fill?: string;
-}
-
-const GradientBorder = ({
-  children,
-  style,
-  boxHeight,
-  boxWidth = width - 36,
-  borderRadius = 20,
-  fill = 'transparent'
-}: GradientBorderProps) => {
-  const borderWidth = 1;
-  const gradientId = `waterGradient_${Math.random().toString(36).substr(2, 9)}`;
-
-  return (
-    <View style={[{ position: 'relative', height: boxHeight, borderRadius, overflow: 'hidden' }, style]}>
-      <Svg
-        width={boxWidth}
-        height={boxHeight}
-        style={{ position: 'absolute', top: 0, left: 0 }}
-      >
-        <Defs>
-          <LinearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
-            <Stop offset="0%" stopColor="#9A9A9A" stopOpacity="0.3" />
-            <Stop offset="25%" stopColor="#707070" stopOpacity="0.2" />
-            <Stop offset="50%" stopColor="#B0B0B0" stopOpacity="0.35" />
-            <Stop offset="75%" stopColor="#606060" stopOpacity="0.2" />
-            <Stop offset="100%" stopColor="#9A9A9A" stopOpacity="0.3" />
-          </LinearGradient>
-        </Defs>
-        <Rect
-          x={borderWidth / 2}
-          y={borderWidth / 2}
-          width={boxWidth - borderWidth}
-          height={boxHeight - borderWidth}
-          rx={borderRadius}
-          ry={borderRadius}
-          fill={fill}
-          stroke={`url(#${gradientId})`}
-          strokeWidth={borderWidth}
-        />
-      </Svg>
-      {children}
-    </View>
-  );
-};
-
-// Bordure gradient dynamique (hauteur auto)
-interface DynamicGradientBorderProps {
-  children: React.ReactNode;
-  style?: object;
-  boxWidth?: number;
-  borderRadius?: number;
-  fill?: string;
-}
-
-const DynamicGradientBorder = ({
-  children,
-  style,
-  boxWidth = width - 36,
-  borderRadius = 20,
-  fill = 'transparent'
-}: DynamicGradientBorderProps) => {
-  const [boxHeight, setBoxHeight] = useState(0);
-  const borderWidth = 1;
-  const gradientId = `waterGradient_${Math.random().toString(36).substr(2, 9)}`;
-
-  return (
-    <View
-      style={[{ position: 'relative', borderRadius, overflow: 'hidden' }, style]}
-      onLayout={(e) => setBoxHeight(e.nativeEvent.layout.height)}
-    >
-      {boxHeight > 0 && (
-        <Svg
-          width={boxWidth}
-          height={boxHeight}
-          style={{ position: 'absolute', top: 0, left: 0 }}
-        >
-          <Defs>
-            <LinearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
-              <Stop offset="0%" stopColor="#9A9A9A" stopOpacity="0.3" />
-              <Stop offset="25%" stopColor="#707070" stopOpacity="0.2" />
-              <Stop offset="50%" stopColor="#B0B0B0" stopOpacity="0.35" />
-              <Stop offset="75%" stopColor="#606060" stopOpacity="0.2" />
-              <Stop offset="100%" stopColor="#9A9A9A" stopOpacity="0.3" />
-            </LinearGradient>
-          </Defs>
-          <Rect
-            x={borderWidth / 2}
-            y={borderWidth / 2}
-            width={boxWidth - borderWidth}
-            height={boxHeight - borderWidth}
-            rx={borderRadius}
-            ry={borderRadius}
-            fill={fill}
-            stroke={`url(#${gradientId})`}
-            strokeWidth={borderWidth}
-          />
-        </Svg>
-      )}
-      {children}
-    </View>
-  );
-};
+});
 
 // Composant pour l'icône LUDO personnalisée du Tab Bar
-const LudoIcon = ({ active }: { active?: boolean }) => (
+const LudoIcon = memo(function LudoIcon({ active }: { active?: boolean }) { return (
   <View style={styles.ludoIconContainer}>
     <View style={styles.ludoRow}>
       <View style={[styles.ludoSquare, { backgroundColor: '#FFBC40' }]}>
@@ -189,7 +63,7 @@ const LudoIcon = ({ active }: { active?: boolean }) => (
       </View>
     </View>
   </View>
-);
+); });
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -220,7 +94,7 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       {/* Background Radial Gradient SVG */}
-      <RadialGradientBackground />
+      <RadialBackground />
 
       {/* Header Fixe */}
       <View style={[styles.fixedHeader, { paddingTop: headerTopPadding }]}>

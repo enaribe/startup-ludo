@@ -1,34 +1,19 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, memo } from 'react';
 import { View, Text, ScrollView, Pressable, RefreshControl, Dimensions, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
+import { Ionicons } from '@expo/vector-icons';
 
-import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
-import { Avatar } from '@/components/ui/Avatar';
-import { ScreenHeader, DynamicGradientBorder } from '@/components/ui';
+import { Avatar, RadialBackground, ScreenHeader, DynamicGradientBorder } from '@/components/ui';
 import { EmptyState } from '@/components/common/EmptyState';
 
 // Hauteur approximative du header fixe (safe area + titre + padding)
 const HEADER_CONTENT_HEIGHT = 82;
 
-const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
-
-const RadialGradientBackground = () => (
-  <Svg style={StyleSheet.absoluteFill} width={screenWidth} height={screenHeight}>
-    <Defs>
-      <RadialGradient id="radialBg" cx="50%" cy="50%" r="80%">
-        <Stop offset="0%" stopColor="#0F3A6B" stopOpacity="1" />
-        <Stop offset="100%" stopColor="#081A2A" stopOpacity="1" />
-      </RadialGradient>
-    </Defs>
-    <Rect width="100%" height="100%" fill="url(#radialBg)" />
-  </Svg>
-);
+const { width: screenWidth } = Dimensions.get('window');
 
 // Filtres disponibles
 const FILTERS = [
@@ -83,7 +68,7 @@ export default function ClassementScreen() {
 
   return (
     <View style={styles.container}>
-      <RadialGradientBackground />
+      <RadialBackground />
 
       {/* Header fixe (design system: FixedHeader + ScreenHeader) */}
       <View style={[styles.fixedHeader, { paddingTop: headerTopPadding }]}>
@@ -259,7 +244,7 @@ interface PodiumItemProps {
   isFirst?: boolean;
 }
 
-function PodiumItem({ rank, item, height, isFirst = false }: PodiumItemProps) {
+const PodiumItem = memo(function PodiumItem({ rank, item, height, isFirst = false }: PodiumItemProps) {
   return (
     <View style={{ alignItems: 'center', flex: 1, marginBottom: 0 }}>
       {/* Avatar */}
@@ -334,7 +319,7 @@ function PodiumItem({ rank, item, height, isFirst = false }: PodiumItemProps) {
       </LinearGradient>
     </View>
   );
-}
+});
 
 interface RankingItemProps {
   rank: number;
@@ -342,7 +327,7 @@ interface RankingItemProps {
   isLast?: boolean;
 }
 
-function RankingItem({ rank, item, isLast }: RankingItemProps) {
+const RankingItem = memo(function RankingItem({ rank, item, isLast }: RankingItemProps) {
   const isUser = item.isUser;
 
   return (
@@ -427,7 +412,7 @@ function RankingItem({ rank, item, isLast }: RankingItemProps) {
       </Text>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: {
