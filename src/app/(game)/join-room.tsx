@@ -1,26 +1,27 @@
 /**
  * join-room - Rejoindre un salon
  *
- * Phase 1: Saisie du code (8 caractères)
- * Phase 2: Salle d'attente avec liste joueurs, bouton Prêt
+ * Phase 1: Saisie du code (8 caracteres)
+ * Phase 2: Salle d'attente avec liste joueurs, bouton Pret
  */
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { View, Text, Pressable, ScrollView, TextInput, Alert } from 'react-native';
+import { View, Text, Pressable, ScrollView, TextInput, Alert, Dimensions, StyleSheet } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
-import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { useAuthStore } from '@/stores';
 import { useMultiplayer } from '@/hooks/useMultiplayer';
 import { Avatar } from '@/components/ui/Avatar';
-import { LoadingIndicator } from '@/components/common';
+import { RadialBackground, DynamicGradientBorder, GameButton } from '@/components/ui';
+
+const { width: screenWidth } = Dimensions.get('window');
+const contentWidth = screenWidth - SPACING[4] * 2;
 
 export default function JoinRoomScreen() {
   const router = useRouter();
@@ -38,12 +39,21 @@ export default function JoinRoomScreen() {
   } = useMultiplayer(user?.id ?? null);
 
   const [code, setCode] = useState('');
-  const [playerName, setPlayerName] = useState(user?.displayName ?? 'Joueur');
+  const [playerName] = useState(user?.displayName ?? 'Joueur');
   const [hasJoined, setHasJoined] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [joiningRoom, setJoiningRoom] = useState(false);
+  const [joinedRoomCode, setJoinedRoomCode] = useState('');
+  const [showLobby, setShowLobby] = useState(false);
 
-  // Convertir players en liste
+  // Helper function to format room code
+  const formatRoomCode = (codeStr: string) => {
+    if (codeStr.length >= 8) {
+      return `${codeStr.slice(0, 4)}-${codeStr.slice(4, 8)}`;
+    }
+    return codeStr;
+  };
+
   const playersList = useMemo(() => {
     return Object.entries(players).map(([playerId, player]) => ({
       ...player,
@@ -51,7 +61,7 @@ export default function JoinRoomScreen() {
     }));
   }, [players]);
 
-  // Écouter le démarrage de la partie
+  // Listen for game start
   useEffect(() => {
     if (room?.status === 'playing' && room.gameId) {
       router.replace({
@@ -62,10 +72,28 @@ export default function JoinRoomScreen() {
   }, [room?.status, room?.gameId, room?.id, router]);
 
   const handleBack = useCallback(async () => {
-    if (hasJoined) {
+    if (showLobby) {
+      // In lobby: confirm leave
       Alert.alert(
         'Quitter le salon',
-        'Es-tu sûr de vouloir quitter ?',
+        'Es-tu sur de vouloir quitter ?',
+        [
+          { text: 'Annuler', style: 'cancel' },
+          {
+            text: 'Quitter',
+            style: 'destructive',
+            onPress: async () => {
+              await leaveRoom();
+              router.back();
+            },
+          },
+        ]
+      );
+    } else if (hasJoined) {
+      // In confirmation: go back (leave room)
+      Alert.alert(
+        'Quitter le salon',
+        'Es-tu sur de vouloir quitter ?',
         [
           { text: 'Annuler', style: 'cancel' },
           {
@@ -74,6 +102,7 @@ export default function JoinRoomScreen() {
             onPress: async () => {
               await leaveRoom();
               setHasJoined(false);
+              setJoinedRoomCode('');
               setCode('');
             },
           },
@@ -82,30 +111,45 @@ export default function JoinRoomScreen() {
     } else {
       router.back();
     }
-  }, [hasJoined, leaveRoom, router]);
+  }, [showLobby, hasJoined, leaveRoom, router]);
 
   const handleJoinRoom = useCallback(async () => {
-    if (!code.trim() || code.length < 6) {
+    const cleanCode = code.replace(/-/g, '').trim().toUpperCase();
+    if (!cleanCode || cleanCode.length < 6) {
       Alert.alert('Code invalide', 'Veuillez entrer un code valide');
       return;
     }
 
     if (!user) {
-      Alert.alert('Erreur', 'Vous devez être connecté');
+      Alert.alert('Erreur', 'Vous devez etre connecte');
       return;
     }
 
     setJoiningRoom(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    const result = await joinRoom(code.toUpperCase(), playerName);
+    try {
+      const result = await joinRoom(cleanCode, playerName);
 
-    setJoiningRoom(false);
+      setJoiningRoom(false);
 
-    if (result) {
-      setHasJoined(true);
+      if (result) {
+        setJoinedRoomCode(formatRoomCode(cleanCode));
+        setHasJoined(true);
+      } else {
+        Alert.alert('Erreur', 'Impossible de rejoindre le salon. Verifie le code et reessaye.');
+      }
+    } catch (error) {
+      setJoiningRoom(false);
+      const message = error instanceof Error ? error.message : 'Erreur inconnue';
+      Alert.alert('Erreur', message);
     }
   }, [code, user, playerName, joinRoom]);
+
+  const handleContinueToLobby = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setShowLobby(true);
+  }, []);
 
   const handleToggleReady = useCallback(async () => {
     const newReady = !isReady;
@@ -114,381 +158,421 @@ export default function JoinRoomScreen() {
     await setReady(newReady);
   }, [isReady, setReady]);
 
-  // Mode saisie du code
+  // Code entry phase
   if (!hasJoined) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#0C243E' }}>
-        <LinearGradient
-          colors={['#194F8A', '#0C243E']}
-          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-          start={{ x: 0.5, y: 0 }}
-          end={{ x: 0.5, y: 1 }}
-        />
+      <View style={styles.container}>
+        <RadialBackground />
 
-        {/* Header */}
-        <View
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            zIndex: 10,
-            paddingTop: insets.top + SPACING[2],
-            paddingBottom: SPACING[3],
-            paddingHorizontal: SPACING[4],
-            backgroundColor: 'rgba(12, 36, 62, 0.85)',
-            borderBottomWidth: 1,
-            borderBottomColor: 'rgba(255, 188, 64, 0.1)',
-            flexDirection: 'row',
-            alignItems: 'center',
-          }}
-        >
+        {/* Fixed Header avec bouton retour */}
+        <View style={[styles.header, { paddingTop: insets.top + SPACING[2] }]}>
           <Pressable onPress={handleBack} hitSlop={8}>
-            <Ionicons name="arrow-back" size={24} color={COLORS.text} />
+            <Ionicons name="arrow-back" size={24} color="white" />
           </Pressable>
-          <Text
-            style={{
-              flex: 1,
-              fontFamily: FONTS.title,
-              fontSize: FONT_SIZES.xl,
-              color: COLORS.text,
-              textAlign: 'center',
-            }}
-          >
-            Rejoindre un salon
-          </Text>
-          <View style={{ width: 24 }} />
+          <View style={{ flex: 1 }} />
         </View>
 
-        <View
-          style={{
-            flex: 1,
-            paddingTop: insets.top + 80,
-            paddingBottom: insets.bottom + SPACING[4],
+        <ScrollView
+          contentContainerStyle={{
+            paddingTop: insets.top + 60,
+            paddingBottom: insets.bottom + 120,
             paddingHorizontal: SPACING[4],
-            justifyContent: 'center',
           }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
-          <Animated.View
-            entering={FadeInDown.delay(100).duration(500)}
-            style={{
-              backgroundColor: 'rgba(255, 255, 255, 0.08)',
-              borderRadius: 24,
-              padding: SPACING[6],
-              borderWidth: 1,
-              borderColor: 'rgba(255, 255, 255, 0.1)',
-            }}
-          >
-            {/* Icône */}
-            <View
-              style={{
-                width: 80,
-                height: 80,
-                borderRadius: 40,
-                backgroundColor: 'rgba(31, 145, 208, 0.2)',
-                justifyContent: 'center',
-                alignItems: 'center',
-                alignSelf: 'center',
-                marginBottom: SPACING[5],
-              }}
-            >
-              <Ionicons name="enter" size={40} color="#1F91D0" />
-            </View>
+          {/* Titre centré */}
+          <Animated.View entering={FadeInDown.delay(100).duration(500)}>
+            <Text style={styles.configTitle}>REJOINDRE UN SALON</Text>
+          </Animated.View>
 
-            {/* Pseudo */}
-            <Text style={styles.label}>Ton pseudo</Text>
-            <View style={styles.inputContainer}>
-              <TextInput
-                value={playerName}
-                onChangeText={setPlayerName}
-                placeholder="Ton pseudo"
-                placeholderTextColor="rgba(255,255,255,0.4)"
-                style={styles.input}
-                maxLength={20}
-              />
-            </View>
-
-            {/* Code */}
-            <Text style={[styles.label, { marginTop: SPACING[4] }]}>Code du salon</Text>
-            <View style={styles.inputContainer}>
-              <TextInput
-                value={code}
-                onChangeText={(text) => setCode(text.toUpperCase())}
-                placeholder="XXXXXXXX"
-                placeholderTextColor="rgba(255,255,255,0.4)"
-                style={[styles.input, { textAlign: 'center', letterSpacing: 4, fontSize: 24 }]}
-                autoCapitalize="characters"
-                maxLength={8}
-              />
-            </View>
-
-            {/* Bouton rejoindre */}
-            <Pressable
-              onPress={handleJoinRoom}
-              disabled={joiningRoom || !code.trim() || !playerName.trim()}
+          {/* Carte centrale avec configuration */}
+          <Animated.View entering={FadeInDown.delay(200).duration(500)}>
+            <DynamicGradientBorder
+              borderRadius={24}
+              fill="rgba(0, 0, 0, 0.35)"
+              boxWidth={contentWidth}
               style={{ marginTop: SPACING[5] }}
             >
-              <LinearGradient
-                colors={
-                  code.trim() && playerName.trim()
-                    ? ['#FFBC40', '#F5A623']
-                    : ['#666', '#444']
-                }
-                style={styles.primaryButton}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-              >
-                {joiningRoom ? (
-                  <LoadingIndicator size="small" color="#0C243E" />
-                ) : (
-                  <Text style={styles.primaryButtonText}>Rejoindre</Text>
-                )}
-              </LinearGradient>
-            </Pressable>
+              <View style={styles.configCard}>
+                {/* Code du Salon */}
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>Code du Salon</Text>
+                  <DynamicGradientBorder
+                    borderRadius={14}
+                    fill="rgba(0, 0, 0, 0.35)"
+                    style={styles.inputBorderWrapper}
+                  >
+                    <View style={styles.inputInner}>
+                      <TextInput
+                        value={code}
+                        onChangeText={(text) => {
+                          const cleaned = text.replace(/-/g, '').toUpperCase();
+                          if (cleaned.length <= 8) {
+                            setCode(cleaned.length > 4 ? `${cleaned.slice(0, 4)}-${cleaned.slice(4)}` : cleaned);
+                          }
+                        }}
+                        placeholder="UPM7-T94Z"
+                        placeholderTextColor="rgba(255,255,255,0.3)"
+                        style={styles.configInput}
+                        autoCapitalize="characters"
+                        maxLength={9}
+                      />
+                    </View>
+                  </DynamicGradientBorder>
+                </View>
+              </View>
+            </DynamicGradientBorder>
           </Animated.View>
+        </ScrollView>
+
+        {/* Bottom button */}
+        <View style={[styles.bottomBar, { paddingBottom: insets.bottom + SPACING[4] }]}>
+          <GameButton
+            variant="yellow"
+            fullWidth
+            title={joiningRoom ? 'CONNEXION...' : 'REJOINDRE'}
+            loading={joiningRoom}
+            disabled={!code.replace(/-/g, '').trim() || code.replace(/-/g, '').length < 6}
+            onPress={handleJoinRoom}
+          />
         </View>
       </View>
     );
   }
 
-  // Mode salle d'attente
-  return (
-    <View style={{ flex: 1, backgroundColor: '#0C243E' }}>
-      <LinearGradient
-        colors={['#194F8A', '#0C243E']}
-        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-      />
+  // Confirmation (après avoir rejoint, avant lobby)
+  if (hasJoined && joinedRoomCode && !showLobby) {
+    return (
+      <View style={styles.container}>
+        <RadialBackground />
 
-      {/* Header */}
-      <View
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 10,
-          paddingTop: insets.top + SPACING[2],
-          paddingBottom: SPACING[3],
-          paddingHorizontal: SPACING[4],
-          backgroundColor: 'rgba(12, 36, 62, 0.85)',
-          borderBottomWidth: 1,
-          borderBottomColor: 'rgba(255, 188, 64, 0.1)',
-          flexDirection: 'row',
-          alignItems: 'center',
-        }}
-      >
-        <Pressable onPress={handleBack} hitSlop={8}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.text} />
-        </Pressable>
-        <Text
-          style={{
-            flex: 1,
-            fontFamily: FONTS.title,
-            fontSize: FONT_SIZES.xl,
-            color: COLORS.text,
-            textAlign: 'center',
+        {/* Fixed Header avec bouton retour */}
+        <View style={[styles.header, { paddingTop: insets.top + SPACING[2] }]}>
+          <Pressable onPress={handleBack} hitSlop={8}>
+            <Ionicons name="arrow-back" size={24} color="white" />
+          </Pressable>
+          <View style={{ flex: 1 }} />
+        </View>
+
+        <ScrollView
+          contentContainerStyle={{
+            paddingTop: insets.top + 60,
+            paddingBottom: insets.bottom + 120,
+            paddingHorizontal: SPACING[4],
+            alignItems: 'center',
           }}
+          showsVerticalScrollIndicator={false}
         >
-          Salle d'attente
-        </Text>
+          {/* Carte de confirmation */}
+          <Animated.View entering={FadeInDown.delay(100).duration(500)}>
+            <DynamicGradientBorder
+              borderRadius={24}
+              fill="rgba(0, 0, 0, 0.35)"
+              boxWidth={contentWidth}
+            >
+              <View style={styles.confirmationCard}>
+                {/* Icône globe */}
+                <View style={styles.globeIconContainer}>
+                  <Ionicons name="globe" size={48} color="#FFFFFF" />
+                </View>
+
+                {/* Message de confirmation */}
+                <Text style={styles.confirmationTitle}>
+                  SALON REJOINT !
+                </Text>
+
+                {/* Code */}
+                <DynamicGradientBorder
+                  borderRadius={14}
+                  fill="rgba(0, 0, 0, 0.35)"
+                  style={styles.codeBoxWrapper}
+                >
+                  <View style={styles.codeBox}>
+                    <Text style={styles.codeLabelText}>Code:</Text>
+                    <Text style={styles.codeValue}>{joinedRoomCode}</Text>
+                  </View>
+                </DynamicGradientBorder>
+              </View>
+            </DynamicGradientBorder>
+          </Animated.View>
+        </ScrollView>
+
+        {/* Bottom button - Continue to lobby */}
+        <View style={[styles.bottomBar, { paddingBottom: insets.bottom + SPACING[4] }]}>
+          <GameButton
+            variant="green"
+            fullWidth
+            title="CONTINUER"
+            onPress={handleContinueToLobby}
+          />
+        </View>
+      </View>
+    );
+  }
+
+  // Waiting room phase
+  return (
+    <View style={styles.container}>
+      <RadialBackground />
+
+      {/* Fixed Header */}
+      <View style={[styles.header, { paddingTop: insets.top + SPACING[2] }]}>
+        <Pressable onPress={handleBack} hitSlop={8}>
+          <Ionicons name="arrow-back" size={24} color="white" />
+        </Pressable>
+        <Text style={styles.headerTitle}>SALLE D'ATTENTE</Text>
         <View style={{ width: 24 }} />
       </View>
 
       <ScrollView
         contentContainerStyle={{
           paddingTop: insets.top + 80,
-          paddingBottom: insets.bottom + 100,
+          paddingBottom: insets.bottom + 120,
           paddingHorizontal: SPACING[4],
         }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Info salon */}
+        {/* Room info */}
         <Animated.View entering={FadeInDown.delay(100).duration(500)}>
-          <View style={styles.infoCard}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Ionicons name="game-controller" size={20} color="#FFBC40" />
-              <Text style={styles.infoTitle}>{room?.code || code}</Text>
+          <DynamicGradientBorder
+            borderRadius={16}
+            fill="rgba(10, 25, 41, 0.6)"
+            boxWidth={contentWidth}
+          >
+            <View style={styles.roomInfo}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Ionicons name="game-controller" size={20} color="#FFBC40" />
+                <Text style={styles.roomCode}>
+                  {room?.code ? formatRoomCode(room.code) : joinedRoomCode || code}
+                </Text>
+              </View>
+              <Text style={styles.roomDetails}>
+                {room?.edition || 'Classic'} - {room?.maxPlayers || 4} joueurs max
+              </Text>
             </View>
-            <Text style={styles.infoSubtitle}>
-              {room?.edition || 'Classic'} • {room?.maxPlayers || 4} joueurs max
-            </Text>
-          </View>
+          </DynamicGradientBorder>
         </Animated.View>
 
-        {/* Liste des joueurs */}
-        <Animated.View entering={FadeInDown.delay(200).duration(500)}>
-          <Text style={styles.sectionTitle}>
-            Joueurs ({playersList.length}/{room?.maxPlayers || 4})
+        {/* Players list */}
+        <Animated.View entering={FadeInDown.delay(200).duration(500)} style={{ marginTop: SPACING[5] }}>
+          <Text style={styles.playersLabel}>
+            JOUEURS ({playersList.length}/{room?.maxPlayers || 4})
           </Text>
+
           <View style={{ gap: SPACING[3] }}>
             {playersList.map((player, index) => (
               <Animated.View
                 key={player.playerId}
                 entering={FadeIn.delay(300 + index * 100).duration(300)}
               >
-                <View style={styles.playerCard}>
-                  <Avatar
-                    name={player.displayName ?? player.name ?? 'Joueur'}
-                    playerColor={player.color}
-                    size="md"
-                  />
-                  <View style={{ flex: 1, marginLeft: SPACING[3] }}>
-                    <Text style={styles.playerName}>
-                      {player.displayName ?? player.name}
-                    </Text>
-                    {player.isHost && (
-                      <View style={styles.hostBadge}>
-                        <Ionicons name="star" size={10} color="#FFBC40" />
-                        <Text style={styles.hostText}>Hôte</Text>
-                      </View>
-                    )}
-                  </View>
-                  <View
-                    style={[
+                <DynamicGradientBorder
+                  borderRadius={16}
+                  fill={player.isHost ? 'rgba(255, 188, 64, 0.08)' : 'rgba(10, 25, 41, 0.6)'}
+                  boxWidth={contentWidth}
+                >
+                  <View style={styles.playerCard}>
+                    <Avatar
+                      name={player.displayName ?? player.name ?? 'Joueur'}
+                      playerColor={player.color}
+                      size="md"
+                    />
+                    <View style={{ flex: 1, marginLeft: SPACING[3] }}>
+                      <Text style={styles.playerName}>
+                        {player.displayName ?? player.name}
+                      </Text>
+                      {player.isHost && (
+                        <View style={styles.hostBadge}>
+                          <Ionicons name="star" size={10} color="#FFBC40" />
+                          <Text style={styles.hostText}>Hote</Text>
+                        </View>
+                      )}
+                    </View>
+                    <View style={[
                       styles.readyBadge,
                       (player.isReady || player.isHost) && styles.readyBadgeActive,
-                    ]}
-                  >
-                    <Ionicons
-                      name={player.isReady || player.isHost ? 'checkmark' : 'time'}
-                      size={14}
-                      color={player.isReady || player.isHost ? '#4CAF50' : COLORS.textSecondary}
-                    />
-                    <Text
-                      style={[
+                    ]}>
+                      <Ionicons
+                        name={player.isReady || player.isHost ? 'checkmark' : 'time'}
+                        size={14}
+                        color={player.isReady || player.isHost ? '#4CAF50' : 'rgba(255,255,255,0.5)'}
+                      />
+                      <Text style={[
                         styles.readyText,
                         (player.isReady || player.isHost) && styles.readyTextActive,
-                      ]}
-                    >
-                      {player.isHost ? 'Hôte' : player.isReady ? 'Prêt' : 'En attente'}
-                    </Text>
+                      ]}>
+                        {player.isHost ? 'Hote' : player.isReady ? 'Pret' : 'En attente'}
+                      </Text>
+                    </View>
                   </View>
-                </View>
+                </DynamicGradientBorder>
               </Animated.View>
             ))}
           </View>
         </Animated.View>
       </ScrollView>
 
-      {/* Bouton Prêt */}
-      <View
-        style={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          paddingHorizontal: SPACING[4],
-          paddingBottom: insets.bottom + SPACING[4],
-          paddingTop: SPACING[3],
-          backgroundColor: 'rgba(12, 36, 62, 0.95)',
-        }}
-      >
-        <Pressable onPress={handleToggleReady} disabled={isLoading}>
-          <View
-            style={[
-              styles.readyButton,
-              isReady && styles.readyButtonActive,
-            ]}
-          >
-            <Ionicons
-              name={isReady ? 'close' : 'checkmark'}
-              size={20}
-              color={isReady ? '#FF6B6B' : '#4CAF50'}
-            />
-            <Text
-              style={[
-                styles.readyButtonText,
-                isReady && styles.readyButtonTextActive,
-              ]}
-            >
-              {isReady ? 'Annuler' : 'Je suis prêt !'}
-            </Text>
-          </View>
-        </Pressable>
+      {/* Bottom - Ready button */}
+      <View style={[styles.bottomBar, { paddingBottom: insets.bottom + SPACING[4] }]}>
+        <GameButton
+          variant={isReady ? 'blue' : 'green'}
+          fullWidth
+          title={isReady ? 'ANNULER' : 'JE SUIS PRET !'}
+          loading={isLoading}
+          onPress={handleToggleReady}
+        />
         <Text style={styles.waitingText}>
-          En attente que l'hôte lance la partie...
+          En attente que l'hote lance la partie...
         </Text>
       </View>
     </View>
   );
 }
 
-const styles = {
-  label: {
-    fontFamily: FONTS.bodySemiBold,
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#0C243E',
+  },
+  header: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    paddingBottom: SPACING[3],
+    paddingHorizontal: SPACING[4],
+    backgroundColor: '#0A1929',
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerTitle: {
+    fontFamily: FONTS.title,
+    fontSize: 20,
+    color: 'white',
+    letterSpacing: 0.5,
+  },
+  configTitle: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES.xl,
+    color: '#FFFFFF',
+    textAlign: 'center',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  configCard: {
+    padding: SPACING[5],
+    gap: SPACING[5],
+  },
+  fieldGroup: {
+    gap: SPACING[2],
+  },
+  fieldLabel: {
+    fontFamily: FONTS.body,
     fontSize: FONT_SIZES.sm,
-    color: COLORS.textSecondary,
-    marginBottom: SPACING[2],
-  } as const,
-  inputContainer: {
+    color: 'rgba(255, 255, 255, 0.7)',
+  },
+  inputBorderWrapper: {
+    width: '100%',
+    overflow: 'hidden',
+  },
+  inputInner: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  configInput: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.md,
+    color: '#FFFFFF',
+    letterSpacing: 2,
+  },
+  confirmationCard: {
+    padding: SPACING[6],
+    alignItems: 'center',
+    gap: SPACING[5],
+  },
+  globeIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-  } as const,
-  input: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  confirmationTitle: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES.lg,
+    color: '#FFBC40',
+    textAlign: 'center',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  codeBoxWrapper: {
+    width: '100%',
+    minWidth: 280,
+    alignSelf: 'stretch',
+    marginHorizontal: -SPACING[4],
+    overflow: 'hidden',
+  },
+  codeBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: SPACING[2],
+  },
+  codeLabelText: {
     fontFamily: FONTS.body,
     fontSize: FONT_SIZES.md,
-    color: COLORS.text,
-    padding: SPACING[4],
-  } as const,
-  primaryButton: {
-    paddingVertical: SPACING[4],
-    borderRadius: 16,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-    minHeight: 56,
+    color: '#4CAF50',
   },
-  primaryButtonText: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: FONT_SIZES.md,
-    color: '#0C243E',
-  } as const,
-  infoCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 16,
+  codeValue: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES.lg,
+    color: '#4CAF50',
+    letterSpacing: 2,
+  },
+  roomInfo: {
     padding: SPACING[4],
-    marginBottom: SPACING[5],
-    borderWidth: 1,
-    borderColor: 'rgba(255, 188, 64, 0.2)',
-  } as const,
-  infoTitle: {
+    minWidth: 280,
+    alignSelf: 'stretch',
+    marginHorizontal: -SPACING[4],
+  },
+  roomCode: {
     fontFamily: FONTS.title,
     fontSize: FONT_SIZES.xl,
     color: '#FFBC40',
     marginLeft: SPACING[2],
-  } as const,
-  infoSubtitle: {
+  },
+  roomDetails: {
     fontFamily: FONTS.body,
     fontSize: FONT_SIZES.sm,
-    color: COLORS.textSecondary,
+    color: 'rgba(255, 255, 255, 0.5)',
     marginTop: SPACING[1],
-  } as const,
-  sectionTitle: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: FONT_SIZES.md,
-    color: COLORS.text,
+  },
+  playersLabel: {
+    fontFamily: FONTS.title,
+    fontSize: 16,
+    color: 'white',
     marginBottom: SPACING[3],
-  } as const,
+  },
   playerCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 16,
-    padding: SPACING[4],
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SPACING[3],
   },
   playerName: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: FONT_SIZES.md,
-    color: COLORS.text,
-  } as const,
+    fontFamily: FONTS.title,
+    fontSize: 15,
+    color: 'white',
+  },
   hostBadge: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 2,
     marginTop: 2,
   },
@@ -496,55 +580,40 @@ const styles = {
     fontFamily: FONTS.body,
     fontSize: FONT_SIZES.xs,
     color: '#FFBC40',
-  } as const,
+  },
   readyBadge: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: SPACING[1],
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     paddingHorizontal: SPACING[3],
     paddingVertical: SPACING[1],
     borderRadius: 12,
   },
   readyBadgeActive: {
     backgroundColor: 'rgba(76, 175, 80, 0.2)',
-  } as const,
+  },
   readyText: {
     fontFamily: FONTS.body,
     fontSize: FONT_SIZES.xs,
-    color: COLORS.textSecondary,
-  } as const,
+    color: 'rgba(255, 255, 255, 0.5)',
+  },
   readyTextActive: {
     color: '#4CAF50',
-  } as const,
-  readyButton: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-    gap: SPACING[2],
-    paddingVertical: SPACING[4],
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: '#4CAF50',
-    backgroundColor: 'rgba(76, 175, 80, 0.15)',
   },
-  readyButtonActive: {
-    borderColor: '#FF6B6B',
-    backgroundColor: 'rgba(255, 107, 107, 0.15)',
-  } as const,
-  readyButtonText: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: FONT_SIZES.md,
-    color: '#4CAF50',
-  } as const,
-  readyButtonTextActive: {
-    color: '#FF6B6B',
-  } as const,
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: SPACING[4],
+    paddingTop: SPACING[3],
+  },
   waitingText: {
     fontFamily: FONTS.body,
     fontSize: FONT_SIZES.sm,
-    color: COLORS.textSecondary,
-    textAlign: 'center' as const,
-    marginTop: SPACING[3],
+    color: 'rgba(255, 255, 255, 0.5)',
+    textAlign: 'center',
+    marginTop: SPACING[2],
   },
-};
+});

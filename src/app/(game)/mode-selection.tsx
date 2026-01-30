@@ -1,17 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { View, Text, Pressable, Modal, StyleSheet, Dimensions } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeOut, SlideInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import Svg, { Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
 
-import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
-import { useAuthStore, useUserStore } from '@/stores';
-import { DynamicGradientBorder } from '@/components/ui';
+import { useAuthStore, useUserStore, useSettingsStore } from '@/stores';
+import { DynamicGradientBorder, GameButton } from '@/components/ui';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -69,9 +69,22 @@ export default function GameModeSelectionScreen() {
   const theme = isAgriMode ? THEMES.agriculture : THEMES.classic;
   const isGuest = user?.isGuest || !user;
   const hasProject = (profile?.startups?.length ?? 0) > 0;
+  const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
 
   const [showNoProjectPopup, setShowNoProjectPopup] = useState(false);
   const [showGuestPopup, setShowGuestPopup] = useState(false);
+
+  useEffect(() => {
+    if (showGuestPopup && hapticsEnabled) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  }, [showGuestPopup, hapticsEnabled]);
+
+  useEffect(() => {
+    if (showNoProjectPopup && hapticsEnabled) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  }, [showNoProjectPopup, hapticsEnabled]);
 
   const handleBack = () => {
     router.back();
@@ -100,13 +113,23 @@ export default function GameModeSelectionScreen() {
   };
 
   const handleCreateAccount = () => {
+    if (hapticsEnabled) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setShowGuestPopup(false);
     router.push('/(auth)/register');
   };
 
+  const handleCloseGuestPopup = () => {
+    setShowGuestPopup(false);
+  };
+
   const handleCreateStartup = () => {
+    if (hapticsEnabled) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setShowNoProjectPopup(false);
     router.push('/(startup)/ideation');
+  };
+
+  const handleCloseNoProjectPopup = () => {
+    setShowNoProjectPopup(false);
   };
 
   const contentWidth = SCREEN_WIDTH - SPACING[4] * 2;
@@ -246,56 +269,113 @@ export default function GameModeSelectionScreen() {
 
       </View>
 
-      {/* Popups (kept functional logic, styled slightly) */}
-      {/* Popup - Pas de projet */}
+      {/* Popup - Aucun projet (design system) */}
       <Modal
         visible={showNoProjectPopup}
         transparent
         animationType="fade"
-        onRequestClose={() => setShowNoProjectPopup(false)}
+        onRequestClose={handleCloseNoProjectPopup}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalIconBox}>
-              <Ionicons name="business-outline" size={32} color="#FFBC40" />
-            </View>
-            <Text style={styles.modalTitle}>Aucun projet</Text>
-            <Text style={styles.modalText}>
-              Tu dois créer une startup avant de jouer en ligne. Les jetons gagnés seront investis dans ton projet !
-            </Text>
-            <Pressable onPress={handleCreateStartup} style={styles.modalPrimaryButton}>
-              <Text style={styles.modalPrimaryButtonText}>Créer ma startup</Text>
-            </Pressable>
-            <Pressable onPress={() => setShowNoProjectPopup(false)} style={styles.modalSecondaryButton}>
-              <Text style={styles.modalSecondaryButtonText}>Annuler</Text>
-            </Pressable>
-          </View>
+        <View style={styles.popupOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={handleCloseNoProjectPopup} />
+          <Animated.View
+            entering={SlideInUp.duration(100).springify().damping(32)}
+            exiting={FadeOut.duration(100)}
+            style={styles.popupWrapper}
+          >
+            <DynamicGradientBorder
+              borderRadius={24}
+              fill="#0D2744"
+              style={styles.popupCardBorder}
+            >
+              <View style={styles.popupInner}>
+                <View style={styles.popupHeaderRow}>
+                  <View style={styles.popupHeaderLeft}>
+                    <View style={[styles.popupIconBox, styles.popupIconBoxYellow]}>
+                      <Ionicons name="business-outline" size={18} color="#FFBC40" />
+                    </View>
+                    <Text style={styles.popupTitle}>Aucun projet</Text>
+                  </View>
+                  <Pressable onPress={handleCloseNoProjectPopup} hitSlop={12} style={styles.popupCloseBtn}>
+                    <Ionicons name="close" size={22} color="rgba(255,255,255,0.6)" />
+                  </Pressable>
+                </View>
+                <View style={styles.popupDivider} />
+                <Text style={styles.popupSubtitle}>
+                  Tu dois créer une startup avant de jouer en ligne. Les jetons gagnés seront investis dans ton projet !
+                </Text>
+                <GameButton
+                  variant="yellow"
+                  fullWidth
+                  title="Créer ma startup"
+                  onPress={handleCreateStartup}
+                  style={styles.popupPrimaryBtn}
+                />
+                <GameButton
+                  variant="blue"
+                  fullWidth
+                  title="Annuler"
+                  onPress={handleCloseNoProjectPopup}
+                  style={styles.popupSecondaryBtn}
+                />
+              </View>
+            </DynamicGradientBorder>
+          </Animated.View>
         </View>
       </Modal>
 
-      {/* Popup - Restriction invité */}
+      {/* Popup - Compte requis (design system) */}
       <Modal
         visible={showGuestPopup}
         transparent
         animationType="fade"
-        onRequestClose={() => setShowGuestPopup(false)}
+        onRequestClose={handleCloseGuestPopup}
       >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { borderColor: 'rgba(255, 107, 107, 0.3)' }]}>
-            <View style={[styles.modalIconBox, { backgroundColor: 'rgba(255, 107, 107, 0.2)' }]}>
-              <Ionicons name="lock-closed" size={32} color="#FF6B6B" />
-            </View>
-            <Text style={styles.modalTitle}>Compte requis</Text>
-            <Text style={styles.modalText}>
-              Crée un compte pour jouer en ligne et sauvegarder ta progression !
-            </Text>
-            <Pressable onPress={handleCreateAccount} style={styles.modalPrimaryButton}>
-              <Text style={styles.modalPrimaryButtonText}>Créer un compte</Text>
-            </Pressable>
-            <Pressable onPress={() => setShowGuestPopup(false)} style={styles.modalSecondaryButton}>
-              <Text style={styles.modalSecondaryButtonText}>Annuler</Text>
-            </Pressable>
-          </View>
+        <View style={styles.popupOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={handleCloseGuestPopup} />
+          <Animated.View
+            entering={SlideInUp.duration(100).springify().damping(32)}
+            exiting={FadeOut.duration(100)}
+            style={styles.popupWrapper}
+          >
+            <DynamicGradientBorder
+              borderRadius={24}
+              fill="#0D2744"
+              style={styles.popupCardBorder}
+            >
+              <View style={styles.popupInner}>
+                <View style={styles.popupHeaderRow}>
+                  <View style={styles.popupHeaderLeft}>
+                    <View style={styles.popupIconBox}>
+                      <Ionicons name="lock-closed" size={18} color="#FF6B6B" />
+                    </View>
+                    <Text style={styles.popupTitle}>Compte requis</Text>
+                  </View>
+                  <Pressable onPress={handleCloseGuestPopup} hitSlop={12} style={styles.popupCloseBtn}>
+                    <Ionicons name="close" size={22} color="rgba(255,255,255,0.6)" />
+                  </Pressable>
+                </View>
+                <View style={styles.popupDivider} />
+                <Text style={styles.popupSubtitle}>
+                  Crée un compte pour jouer en ligne et sauvegarder ta progression !
+                </Text>
+                <GameButton
+                  variant="yellow"
+                  fullWidth
+                  title="Créer un compte"
+                  onPress={handleCreateAccount}
+                  style={styles.popupPrimaryBtn}
+                />
+                <GameButton
+                  variant="blue"
+                  fullWidth
+                  title="Annuler"
+                  onPress={handleCloseGuestPopup}
+                  style={styles.popupSecondaryBtn}
+                />
+              </View>
+            </DynamicGradientBorder>
+          </Animated.View>
         </View>
       </Modal>
 
@@ -384,69 +464,78 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.bodySemiBold,
     fontSize: 10,
   },
-  // Modals
-  modalOverlay: {
+  // Modal "Aucun projet" (conservé tel quel pour l’instant)
+  // Popups (design system)
+  popupOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: SPACING[4],
+    paddingHorizontal: 18,
   },
-  modalContent: {
-    backgroundColor: '#0C243E',
-    borderRadius: 24,
-    padding: SPACING[6],
+  popupWrapper: {
     width: '100%',
     maxWidth: 340,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 188, 64, 0.2)',
   },
-  modalIconBox: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: 'rgba(255, 188, 64, 0.2)',
+  popupCardBorder: {
+    width: '100%',
+    overflow: 'hidden',
+  },
+  popupInner: {
+    padding: SPACING[5],
+  },
+  popupHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 0,
+  },
+  popupHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  popupIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 107, 107, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: SPACING[4],
   },
-  modalTitle: {
-    fontFamily: FONTS.title,
-    fontSize: 22,
-    color: COLORS.text,
-    textAlign: 'center',
-    marginBottom: SPACING[2],
-    textTransform: 'uppercase',
+  popupIconBoxYellow: {
+    backgroundColor: 'rgba(255, 188, 64, 0.2)',
   },
-  modalText: {
-    fontFamily: FONTS.body,
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    textAlign: 'center',
-    marginBottom: SPACING[6],
-    lineHeight: 20,
-  },
-  modalPrimaryButton: {
-    width: '100%',
-    backgroundColor: '#FFBC40',
-    paddingVertical: 14,
-    borderRadius: 16,
-    marginBottom: SPACING[3],
-    alignItems: 'center',
-  },
-  modalPrimaryButtonText: {
+  popupTitle: {
     fontFamily: FONTS.title,
     fontSize: 16,
-    color: '#0C243E',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
-  modalSecondaryButton: {
-    paddingVertical: 8,
+  popupCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  modalSecondaryButtonText: {
+  popupDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    marginVertical: SPACING[4],
+  },
+  popupSubtitle: {
     fontFamily: FONTS.body,
     fontSize: 14,
-    color: COLORS.textSecondary,
+    color: 'rgba(255, 255, 255, 0.7)',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: SPACING[5],
   },
+  popupPrimaryBtn: {
+    marginBottom: SPACING[3],
+  },
+  popupSecondaryBtn: {},
 });

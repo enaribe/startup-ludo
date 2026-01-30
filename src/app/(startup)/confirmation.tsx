@@ -11,7 +11,8 @@ import { PortfolioIcon } from '@/components/icons';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
-import { useUserStore, useSettingsStore } from '@/stores';
+import { useUserStore, useSettingsStore, useAuthStore } from '@/stores';
+import { addStartup as firestoreAddStartup } from '@/services/firebase/firestore';
 import type { Startup, TargetCard, MissionCard } from '@/types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -54,6 +55,7 @@ export default function StartupConfirmationScreen() {
   const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
   const addStartup = useUserStore((state) => state.addStartup);
   const addXP = useUserStore((state) => state.addXP);
+  const userId = useAuthStore((state) => state.user?.id);
 
   const params = useLocalSearchParams<{
     startupName?: string;
@@ -107,7 +109,16 @@ export default function StartupConfirmationScreen() {
       tokensInvested: 0,
       level: 1,
     };
+
+    // Save locally (Zustand store)
     addStartup(newStartup);
+
+    // Save to Firestore (fire-and-forget, only if authenticated)
+    if (userId) {
+      firestoreAddStartup(userId, newStartup).catch((err) => {
+        console.warn('[Firestore] Failed to save startup:', err);
+      });
+    }
 
     // Award XP for creating a startup
     addXP(200);

@@ -87,13 +87,12 @@ export default function PortfolioScreen() {
 
         <Animated.View entering={FadeInDown.delay(100).duration(500)} style={styles.statsRow}>
           <StatCard
-            value={formatValorisation(totalValorisation || 3200000)}
+            value={formatValorisation(totalValorisation)}
             label="Valorisation Totale"
           />
           <StatCard
-            value="+12%"
-            label="Croissance"
-            valueColor="#4CAF50"
+            value={`${startups.length} / ${MAX_STARTUPS}`}
+            label="Entreprises"
           />
         </Animated.View>
       </View>
@@ -163,9 +162,6 @@ export default function PortfolioScreen() {
                       {/* Tags */}
                       <View style={styles.tagsRow}>
                         <Tag label={startup.sector} />
-                        {startup.tags?.map((tag: string, i: number) => (
-                          <Tag key={i} label={tag} />
-                        ))}
                         <Text style={styles.dateText}>
                           Crée il y'a {Math.floor((Date.now() - startup.createdAt) / (1000 * 60 * 60 * 24 * 7))} semaine{Math.floor((Date.now() - startup.createdAt) / (1000 * 60 * 60 * 24 * 7)) !== 1 ? 's' : ''}
                         </Text>
@@ -180,8 +176,8 @@ export default function PortfolioScreen() {
                           <Text style={styles.footerStatLabel}>Valorisation</Text>
                         </View>
                         <View style={styles.footerStat}>
-                          <Text style={styles.footerStatValueGreen}>+12%</Text>
-                          <Text style={styles.footerStatLabel}>Croissance</Text>
+                          <Text style={styles.footerStatValueGreen}>Niv. {startup.level}</Text>
+                          <Text style={styles.footerStatLabel}>Niveau</Text>
                         </View>
                       </View>
                     </View>

@@ -1,29 +1,30 @@
 /**
  * LobbyScreen - Salle d'attente multijoueur
  *
- * Affiche les joueurs connectés, leur statut "prêt",
- * et permet à l'hôte de lancer la partie.
+ * Affiche les joueurs connectes, leur statut "pret",
+ * et permet a l'hote de lancer la partie.
  */
 
-import { useState, useCallback, useMemo } from 'react';
-import { View, Text, Pressable, Alert, Share, ScrollView, StyleSheet } from 'react-native';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { View, Text, Pressable, Alert, Share, ScrollView, Dimensions, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { FadeInDown, FadeInUp, FadeIn } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 
-import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
-import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useMultiplayer } from '@/hooks/useMultiplayer';
 import { EmojiChat } from '@/components/game/EmojiChat';
+import { Avatar } from '@/components/ui/Avatar';
+import { RadialBackground, DynamicGradientBorder, GameButton } from '@/components/ui';
 import type { PlayerColor } from '@/types';
+
+const { width: screenWidth } = Dimensions.get('window');
+const contentWidth = screenWidth - SPACING[4] * 2;
 
 export default function LobbyScreen() {
   const { roomId, code, isHost } = useLocalSearchParams<{
@@ -49,7 +50,16 @@ export default function LobbyScreen() {
   const [isReady, setIsReady] = useState(false);
   const isHostPlayer = isHost === 'true';
 
-  // Convertir players en array pour l'affichage
+  // Listen for game start (non-host players)
+  useEffect(() => {
+    if (room?.status === 'playing' && room.gameId) {
+      router.replace({
+        pathname: '/(game)/play/[gameId]',
+        params: { gameId: room.gameId, mode: 'online', roomId: roomId ?? '' },
+      });
+    }
+  }, [room?.status, room?.gameId, roomId, router]);
+
   const playersList = useMemo(() => {
     return Object.entries(players).map(([playerId, player]) => ({
       ...player,
@@ -57,13 +67,11 @@ export default function LobbyScreen() {
     }));
   }, [players]);
 
-  // Vérifier si tous les joueurs sont prêts
   const allReady = useMemo(() => {
     if (playersList.length < 2) return false;
     return playersList.every((p) => p.isReady || p.isHost);
   }, [playersList]);
 
-  // Gérer le statut prêt
   const handleToggleReady = useCallback(async () => {
     const newReady = !isReady;
     setIsReady(newReady);
@@ -71,16 +79,14 @@ export default function LobbyScreen() {
     await setReady(newReady);
   }, [isReady, setReady]);
 
-  // Copier le code
   const handleCopyCode = useCallback(async () => {
     if (code) {
       await Clipboard.setStringAsync(code);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('Copié !', 'Le code a été copié dans le presse-papiers');
+      Alert.alert('Copie !', 'Le code a ete copie');
     }
   }, [code]);
 
-  // Partager le code
   const handleShareCode = useCallback(async () => {
     if (code) {
       try {
@@ -88,16 +94,15 @@ export default function LobbyScreen() {
           message: `Rejoins ma partie Startup Ludo avec le code: ${code}`,
         });
       } catch {
-        // Partage annulé
+        // Share cancelled
       }
     }
   }, [code]);
 
-  // Quitter la room
   const handleLeave = useCallback(async () => {
     Alert.alert(
       'Quitter la salle',
-      'Es-tu sûr de vouloir quitter la salle ?',
+      'Es-tu sur de vouloir quitter la salle ?',
       [
         { text: 'Annuler', style: 'cancel' },
         {
@@ -105,17 +110,16 @@ export default function LobbyScreen() {
           style: 'destructive',
           onPress: async () => {
             await leaveRoom();
-            router.replace('/(game)/online-setup');
+            router.replace('/(game)/online-hub');
           },
         },
       ]
     );
   }, [leaveRoom, router]);
 
-  // Lancer la partie (hôte uniquement)
   const handleStartGame = useCallback(async () => {
     if (!allReady) {
-      Alert.alert('Attention', 'Tous les joueurs doivent être prêts');
+      Alert.alert('Attention', 'Tous les joueurs doivent etre prets');
       return;
     }
 
@@ -130,7 +134,6 @@ export default function LobbyScreen() {
     }
   }, [allReady, startGame, router, roomId]);
 
-  // Convertir les players pour EmojiChat
   const playersForChat = useMemo(() => {
     const result: Record<string, { name: string; color: PlayerColor }> = {};
     playersList.forEach((p) => {
@@ -139,344 +142,311 @@ export default function LobbyScreen() {
     return result;
   }, [playersList]);
 
-  // Obtenir la couleur du joueur
-  const getPlayerColorHex = (color: PlayerColor): string => {
-    return COLORS.players[color] ?? COLORS.primary;
-  };
-
   return (
-    <LinearGradient
-      colors={COLORS.backgroundGradient}
-      style={{ flex: 1 }}
-      start={{ x: 0.5, y: 0 }}
-      end={{ x: 0.5, y: 1 }}
-    >
-      <View
-        style={{
-          flex: 1,
-          paddingTop: insets.top + SPACING[4],
-          paddingBottom: insets.bottom + SPACING[4],
+    <View style={styles.container}>
+      <RadialBackground />
+
+      {/* Fixed Header */}
+      <View style={[styles.header, { paddingTop: insets.top + SPACING[2] }]}>
+        <Pressable onPress={handleLeave} hitSlop={8}>
+          <Ionicons name="arrow-back" size={24} color="white" />
+        </Pressable>
+        <Text style={styles.headerTitle}>SALLE D'ATTENTE</Text>
+        <View style={{ width: 24 }} />
+      </View>
+
+      <ScrollView
+        contentContainerStyle={{
+          paddingTop: insets.top + 80,
+          paddingBottom: insets.bottom + 120,
+          paddingHorizontal: SPACING[4],
         }}
+        showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <Animated.View
-          entering={FadeInDown.delay(100).duration(500)}
-          style={styles.header}
-        >
-          <Pressable onPress={handleLeave} hitSlop={8}>
-            <Ionicons name="arrow-back" size={24} color={COLORS.text} />
-          </Pressable>
-
-          <Text style={styles.title}>Salle d'attente</Text>
-
-          <View style={{ width: 24 }} />
-        </Animated.View>
-
-        {/* Code de la salle */}
-        <Animated.View
-          entering={FadeInDown.delay(200).duration(500)}
-          style={styles.codeSection}
-        >
-          <Card variant="elevated" padding={4}>
-            <Text style={styles.codeLabel}>Code de la salle</Text>
-            <View style={styles.codeRow}>
+        {/* Room Code */}
+        <Animated.View entering={FadeInDown.delay(100).duration(500)}>
+          <DynamicGradientBorder
+            borderRadius={20}
+            fill="rgba(10, 25, 41, 0.6)"
+            boxWidth={contentWidth}
+          >
+            <View style={styles.codeSection}>
+              <Text style={styles.codeLabel}>CODE DE LA SALLE</Text>
               <Text style={styles.codeText}>{code}</Text>
               <View style={styles.codeActions}>
-                <Pressable onPress={handleCopyCode} style={styles.codeButton}>
-                  <Ionicons name="copy-outline" size={20} color={COLORS.primary} />
+                <Pressable onPress={handleCopyCode} style={styles.codeAction}>
+                  <Ionicons name="copy-outline" size={18} color="#FFBC40" />
+                  <Text style={styles.codeActionText}>Copier</Text>
                 </Pressable>
-                <Pressable onPress={handleShareCode} style={styles.codeButton}>
-                  <Ionicons name="share-outline" size={20} color={COLORS.primary} />
+                <Pressable onPress={handleShareCode} style={styles.codeAction}>
+                  <Ionicons name="share-outline" size={18} color="#FFBC40" />
+                  <Text style={styles.codeActionText}>Partager</Text>
                 </Pressable>
               </View>
             </View>
-          </Card>
+          </DynamicGradientBorder>
         </Animated.View>
 
-        {/* Liste des joueurs */}
-        <ScrollView
-          style={styles.playersScrollView}
-          contentContainerStyle={styles.playersContent}
-          showsVerticalScrollIndicator={false}
-        >
-          <Animated.View entering={FadeInDown.delay(300).duration(500)}>
-            <Text style={styles.sectionTitle}>
-              Joueurs ({playersList.length}/{room?.maxPlayers ?? 4})
-            </Text>
+        {/* Players list */}
+        <Animated.View entering={FadeInDown.delay(200).duration(500)} style={{ marginTop: SPACING[5] }}>
+          <Text style={styles.playersLabel}>
+            JOUEURS ({playersList.length}/{room?.maxPlayers ?? 4})
+          </Text>
 
+          <View style={{ gap: SPACING[3] }}>
             {playersList.length === 0 ? (
-              <Card variant="default" padding={4}>
-                <Text style={styles.emptyText}>En attente de joueurs...</Text>
-              </Card>
+              <DynamicGradientBorder
+                borderRadius={16}
+                fill="rgba(10, 25, 41, 0.6)"
+                boxWidth={contentWidth}
+              >
+                <View style={styles.emptyPlayers}>
+                  <Ionicons name="hourglass-outline" size={24} color="rgba(255,255,255,0.3)" />
+                  <Text style={styles.emptyText}>En attente de joueurs...</Text>
+                </View>
+              </DynamicGradientBorder>
             ) : (
               playersList.map((player, index) => (
                 <Animated.View
                   key={player.playerId}
-                  entering={FadeIn.delay(400 + index * 100).duration(300)}
+                  entering={FadeIn.delay(300 + index * 100).duration(300)}
                 >
-                  <Card variant="default" padding={4} style={styles.playerCard}>
-                    <View style={styles.playerRow}>
-                      {/* Indicateur de couleur */}
-                      <View
-                        style={[
-                          styles.colorIndicator,
-                          { backgroundColor: getPlayerColorHex(player.color) },
-                        ]}
+                  <DynamicGradientBorder
+                    borderRadius={16}
+                    fill={player.isHost ? 'rgba(255, 188, 64, 0.08)' : 'rgba(10, 25, 41, 0.6)'}
+                    boxWidth={contentWidth}
+                  >
+                    <View style={styles.playerCard}>
+                      <Avatar
+                        name={player.displayName ?? player.name ?? 'Joueur'}
+                        playerColor={player.color}
+                        size="md"
                       />
-
-                      {/* Info joueur */}
-                      <View style={styles.playerInfo}>
-                        <View style={styles.playerNameRow}>
-                          <Text style={styles.playerName}>{player.name}</Text>
+                      <View style={{ flex: 1, marginLeft: SPACING[3] }}>
+                        <Text style={styles.playerName}>
+                          {player.displayName ?? player.name ?? 'Joueur'}
+                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACING[1] }}>
                           {player.isHost && (
                             <View style={styles.hostBadge}>
-                              <Ionicons name="star" size={12} color={COLORS.warning} />
-                              <Text style={styles.hostText}>Hôte</Text>
+                              <Ionicons name="star" size={10} color="#FFBC40" />
+                              <Text style={styles.hostText}>Hote</Text>
                             </View>
                           )}
+                          <Text style={styles.connectionStatus}>
+                            {player.isConnected ? 'Connecte' : 'Deconnecte'}
+                          </Text>
                         </View>
-                        <Text style={styles.playerStatus}>
-                          {player.isConnected ? 'Connecté' : 'Déconnecté'}
-                        </Text>
                       </View>
 
-                      {/* Statut prêt */}
-                      <View
-                        style={[
-                          styles.readyBadge,
-                          player.isReady || player.isHost
-                            ? styles.readyBadgeActive
-                            : styles.readyBadgeInactive,
-                        ]}
-                      >
+                      <View style={[
+                        styles.readyBadge,
+                        (player.isReady || player.isHost) && styles.readyBadgeActive,
+                      ]}>
                         <Ionicons
                           name={player.isReady || player.isHost ? 'checkmark' : 'time'}
-                          size={16}
-                          color={
-                            player.isReady || player.isHost
-                              ? COLORS.success
-                              : COLORS.textSecondary
-                          }
+                          size={14}
+                          color={player.isReady || player.isHost ? '#4CAF50' : 'rgba(255,255,255,0.5)'}
                         />
-                        <Text
-                          style={[
-                            styles.readyText,
-                            player.isReady || player.isHost
-                              ? styles.readyTextActive
-                              : styles.readyTextInactive,
-                          ]}
-                        >
-                          {player.isHost ? 'Hôte' : player.isReady ? 'Prêt' : 'En attente'}
+                        <Text style={[
+                          styles.readyText,
+                          (player.isReady || player.isHost) && styles.readyTextActive,
+                        ]}>
+                          {player.isHost ? 'Hote' : player.isReady ? 'Pret' : 'En attente'}
                         </Text>
                       </View>
                     </View>
-                  </Card>
+                  </DynamicGradientBorder>
                 </Animated.View>
               ))
             )}
-          </Animated.View>
-        </ScrollView>
-
-        {/* Actions */}
-        <Animated.View
-          entering={FadeInUp.delay(500).duration(500)}
-          style={styles.actions}
-        >
-          {isHostPlayer ? (
-            <Button
-              title="Lancer la partie"
-              variant="primary"
-              fullWidth
-              loading={isLoading}
-              disabled={!allReady || playersList.length < 2}
-              onPress={handleStartGame}
-              leftIcon={<Ionicons name="play" size={20} color={COLORS.white} />}
-            />
-          ) : (
-            <Button
-              title={isReady ? 'Annuler' : 'Je suis prêt !'}
-              variant={isReady ? 'outline' : 'primary'}
-              fullWidth
-              loading={isLoading}
-              onPress={handleToggleReady}
-              leftIcon={
-                <Ionicons
-                  name={isReady ? 'close' : 'checkmark'}
-                  size={20}
-                  color={isReady ? COLORS.primary : COLORS.white}
-                />
-              }
-            />
-          )}
-
-          {!allReady && playersList.length >= 2 && (
-            <Text style={styles.waitingText}>
-              En attente que tous les joueurs soient prêts...
-            </Text>
-          )}
-
-          {playersList.length < 2 && (
-            <Text style={styles.waitingText}>
-              Minimum 2 joueurs requis pour commencer
-            </Text>
-          )}
+          </View>
         </Animated.View>
+      </ScrollView>
 
-        {/* Chat Emojis */}
-        <EmojiChat
-          messages={chatMessages}
-          players={playersForChat}
-          onSendEmoji={sendEmoji}
-          disabled={isLoading}
-        />
+      {/* Bottom actions */}
+      <View style={[styles.bottomBar, { paddingBottom: insets.bottom + SPACING[4] }]}>
+        {isHostPlayer ? (
+          <GameButton
+            variant="yellow"
+            fullWidth
+            title={isLoading ? 'CHARGEMENT...' : 'LANCER LA PARTIE'}
+            loading={isLoading}
+            disabled={!allReady || playersList.length < 2}
+            onPress={handleStartGame}
+          />
+        ) : (
+          <GameButton
+            variant={isReady ? 'blue' : 'green'}
+            fullWidth
+            title={isReady ? 'ANNULER' : 'JE SUIS PRET !'}
+            loading={isLoading}
+            onPress={handleToggleReady}
+          />
+        )}
+
+        {!allReady && playersList.length >= 2 && (
+          <Text style={styles.waitingText}>
+            En attente que tous les joueurs soient prets...
+          </Text>
+        )}
+
+        {playersList.length < 2 && (
+          <Text style={styles.waitingText}>
+            Minimum 2 joueurs requis pour commencer
+          </Text>
+        )}
       </View>
-    </LinearGradient>
+
+      {/* Emoji Chat */}
+      <EmojiChat
+        messages={chatMessages}
+        players={playersForChat}
+        onSendEmoji={sendEmoji}
+        disabled={isLoading}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#0C243E',
+  },
   header: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    paddingBottom: SPACING[3],
+    paddingHorizontal: SPACING[4],
+    backgroundColor: '#0A1929',
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SPACING[4],
-    marginBottom: SPACING[4],
   },
-  title: {
+  headerTitle: {
     fontFamily: FONTS.title,
-    fontSize: FONT_SIZES.xl,
-    color: COLORS.text,
+    fontSize: 20,
+    color: 'white',
+    letterSpacing: 0.5,
   },
   codeSection: {
-    paddingHorizontal: SPACING[4],
-    marginBottom: SPACING[4],
+    alignItems: 'center',
+    padding: SPACING[5],
+    minWidth: 280,
+    alignSelf: 'stretch',
+    marginHorizontal: -SPACING[4],
   },
   codeLabel: {
     fontFamily: FONTS.body,
     fontSize: FONT_SIZES.sm,
-    color: COLORS.textSecondary,
+    color: 'rgba(255, 255, 255, 0.5)',
     marginBottom: SPACING[2],
-  },
-  codeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
   },
   codeText: {
     fontFamily: FONTS.title,
-    fontSize: FONT_SIZES['2xl'],
-    color: COLORS.primary,
+    fontSize: 32,
+    color: '#FFBC40',
     letterSpacing: 4,
   },
   codeActions: {
     flexDirection: 'row',
-    gap: SPACING[2],
+    gap: SPACING[3],
+    marginTop: SPACING[3],
   },
-  codeButton: {
-    padding: SPACING[2],
-    backgroundColor: COLORS.primaryLight,
-    borderRadius: 8,
-  },
-  playersScrollView: {
-    flex: 1,
-  },
-  playersContent: {
+  codeAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 188, 64, 0.15)',
     paddingHorizontal: SPACING[4],
-    paddingBottom: SPACING[4],
+    paddingVertical: SPACING[2],
+    borderRadius: 20,
+    gap: SPACING[1],
   },
-  sectionTitle: {
+  codeActionText: {
     fontFamily: FONTS.bodySemiBold,
-    fontSize: FONT_SIZES.md,
-    color: COLORS.text,
+    fontSize: FONT_SIZES.sm,
+    color: '#FFBC40',
+  },
+  playersLabel: {
+    fontFamily: FONTS.title,
+    fontSize: 16,
+    color: 'white',
     marginBottom: SPACING[3],
+  },
+  emptyPlayers: {
+    alignItems: 'center',
+    padding: SPACING[5],
+    gap: SPACING[2],
   },
   emptyText: {
     fontFamily: FONTS.body,
     fontSize: FONT_SIZES.sm,
-    color: COLORS.textSecondary,
-    textAlign: 'center',
+    color: 'rgba(255, 255, 255, 0.4)',
   },
   playerCard: {
-    marginBottom: SPACING[3],
-  },
-  playerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  colorIndicator: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: SPACING[3],
-  },
-  playerInfo: {
-    flex: 1,
-  },
-  playerNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING[2],
+    padding: SPACING[3],
   },
   playerName: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: FONT_SIZES.md,
-    color: COLORS.text,
+    fontFamily: FONTS.title,
+    fontSize: 15,
+    color: 'white',
   },
   hostBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
-    backgroundColor: COLORS.warningLight,
-    paddingHorizontal: SPACING[2],
-    paddingVertical: 2,
-    borderRadius: 4,
   },
   hostText: {
     fontFamily: FONTS.body,
     fontSize: FONT_SIZES.xs,
-    color: COLORS.warning,
+    color: '#FFBC40',
   },
-  playerStatus: {
+  connectionStatus: {
     fontFamily: FONTS.body,
     fontSize: FONT_SIZES.xs,
-    color: COLORS.textSecondary,
-    marginTop: 2,
+    color: 'rgba(255, 255, 255, 0.4)',
   },
   readyBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING[1],
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     paddingHorizontal: SPACING[3],
     paddingVertical: SPACING[1],
     borderRadius: 12,
   },
   readyBadgeActive: {
-    backgroundColor: COLORS.successLight,
-  },
-  readyBadgeInactive: {
-    backgroundColor: COLORS.surfaceVariant,
+    backgroundColor: 'rgba(76, 175, 80, 0.2)',
   },
   readyText: {
     fontFamily: FONTS.body,
     fontSize: FONT_SIZES.xs,
+    color: 'rgba(255, 255, 255, 0.5)',
   },
   readyTextActive: {
-    color: COLORS.success,
+    color: '#4CAF50',
   },
-  readyTextInactive: {
-    color: COLORS.textSecondary,
-  },
-  actions: {
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     paddingHorizontal: SPACING[4],
-    paddingTop: SPACING[4],
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
+    paddingTop: SPACING[3],
   },
   waitingText: {
     fontFamily: FONTS.body,
     fontSize: FONT_SIZES.sm,
-    color: COLORS.textSecondary,
+    color: 'rgba(255, 255, 255, 0.5)',
     textAlign: 'center',
-    marginTop: SPACING[3],
+    marginTop: SPACING[2],
   },
 });

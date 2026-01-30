@@ -36,9 +36,9 @@ import * as Haptics from 'expo-haptics';
 import { RadialBackground, DynamicGradientBorder, GameButton } from '@/components/ui';
 import { FONTS } from '@/styles/typography';
 import { useSettingsStore } from '@/stores';
+import { generateStartupIdeas } from '@/services/ai';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const AI_GENERATION_DURATION_MS = 3500;
 
 type GeneratedIdea = { id: string; title: string; description: string };
 
@@ -422,7 +422,7 @@ export default function CreationMethodScreen() {
 
   /* ── AI flow ── */
 
-  const handleAI = useCallback(() => {
+  const handleAI = useCallback(async () => {
     if (hapticsEnabled) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
@@ -432,19 +432,46 @@ export default function CreationMethodScreen() {
     setGeneratedIdeas([]);
     setSelectedIdeaIndex(null);
 
-    aiTimerRef.current = setTimeout(() => {
-      aiTimerRef.current = null;
+    // Minimum loading time for UX (2s)
+    const minDelay = new Promise<void>((resolve) => {
+      aiTimerRef.current = setTimeout(() => {
+        aiTimerRef.current = null;
+        resolve();
+      }, 2000);
+    });
+
+    try {
+      // Fire both in parallel: API call + minimum UX delay
+      const [aiIdeas] = await Promise.all([
+        generateStartupIdeas(
+          params.targetCardTitle,
+          params.missionCardTitle,
+          params.sectorTitle
+        ),
+        minDelay,
+      ]);
+
+      // Use AI result, or fallback to mock if null
+      const ideas = aiIdeas ?? getMockIdeas(
+        params.targetCardTitle,
+        params.missionCardTitle,
+        params.sectorTitle
+      );
+      setGeneratedIdeas(ideas);
+    } catch {
+      // Fallback to mock ideas on any error
       const ideas = getMockIdeas(
         params.targetCardTitle,
         params.missionCardTitle,
         params.sectorTitle
       );
       setGeneratedIdeas(ideas);
+    } finally {
       setIsGenerating(false);
       if (hapticsEnabled) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
-    }, AI_GENERATION_DURATION_MS);
+    }
   }, [params.targetCardTitle, params.missionCardTitle, params.sectorTitle, hapticsEnabled]);
 
   const handleSelectIdea = useCallback((index: number) => {

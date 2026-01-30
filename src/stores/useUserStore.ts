@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import type { UserProfile, Startup } from '@/types';
+import { getUserProfile } from '@/services/firebase/firestore';
 import {
   getRankFromXP,
   getLevelFromXP,
@@ -80,17 +81,17 @@ export const useUserStore = create<UserStore>()(
         get().refreshProgressionInfo();
       },
 
-      loadProfile: async (_userId) => {
+      loadProfile: async (userId) => {
         set((state) => {
           state.isLoading = true;
           state.error = null;
         });
 
         try {
-          // TODO: Implement Firestore profile loading
-          // const doc = await firestore().collection('users').doc(userId).get();
-          // const profile = doc.data() as UserProfile;
-          // set((state) => { state.profile = profile; });
+          const profile = await getUserProfile(userId);
+          if (profile) {
+            get().setProfile(profile);
+          }
         } catch (error) {
           set((state) => {
             state.error =

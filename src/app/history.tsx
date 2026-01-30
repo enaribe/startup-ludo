@@ -1,4 +1,5 @@
-import { View, Text, Pressable, ScrollView } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, Text, Pressable, ScrollView, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -9,6 +10,8 @@ import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { Card } from '@/components/ui/Card';
+import { useAuthStore } from '@/stores';
+import { getGameHistory, type GameSession } from '@/services/firebase/firestore';
 
 // Type pour une partie enregistrée
 interface GameHistory {
@@ -22,59 +25,20 @@ interface GameHistory {
   duration: number; // en minutes
 }
 
-// Données mock pour l'historique
-const MOCK_HISTORY: GameHistory[] = [
-  {
-    id: 'g1',
-    date: Date.now() - 1000 * 60 * 30, // 30 min ago
-    mode: 'solo',
-    result: 'win',
-    tokensEarned: 45,
-    xpEarned: 120,
-    players: 2,
-    duration: 15,
-  },
-  {
-    id: 'g2',
-    date: Date.now() - 1000 * 60 * 60 * 3, // 3 hours ago
-    mode: 'local',
-    result: 'loss',
-    tokensEarned: 12,
-    xpEarned: 40,
-    players: 3,
-    duration: 22,
-  },
-  {
-    id: 'g3',
-    date: Date.now() - 1000 * 60 * 60 * 24, // 1 day ago
-    mode: 'solo',
-    result: 'win',
-    tokensEarned: 38,
-    xpEarned: 95,
-    players: 2,
-    duration: 18,
-  },
-  {
-    id: 'g4',
-    date: Date.now() - 1000 * 60 * 60 * 24 * 2, // 2 days ago
-    mode: 'online',
-    result: 'win',
-    tokensEarned: 52,
-    xpEarned: 150,
-    players: 4,
-    duration: 28,
-  },
-  {
-    id: 'g5',
-    date: Date.now() - 1000 * 60 * 60 * 24 * 3, // 3 days ago
-    mode: 'local',
-    result: 'loss',
-    tokensEarned: 8,
-    xpEarned: 25,
-    players: 2,
-    duration: 12,
-  },
-];
+function mapSessionToHistory(session: GameSession, userId: string): GameHistory {
+  const isWin = session.winnerId === userId;
+  const userScore = session.finalScores[userId] ?? 0;
+  return {
+    id: session.id,
+    date: session.createdAt,
+    mode: session.mode,
+    result: isWin ? 'win' : 'loss',
+    tokensEarned: userScore,
+    xpEarned: isWin ? 50 : 10,
+    players: session.playerIds.length,
+    duration: session.duration,
+  };
+}
 
 function formatDate(timestamp: number): string {
   const now = Date.now();
@@ -328,16 +292,36 @@ function GameHistoryCard({ game, index }: GameHistoryCardProps) {
 export default function HistoryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const userId = useAuthStore((state) => state.user?.id);
+  const [history, setHistory] = useState<GameHistory[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
+    getGameHistory(userId, 20)
+      .then((sessions) => {
+        const mapped = sessions.map((s) => mapSessionToHistory(s, userId));
+        setHistory(mapped);
+      })
+      .catch((err) => {
+        console.warn('[History] Failed to fetch:', err);
+        setHistory([]);
+      })
+      .finally(() => setLoading(false));
+  }, [userId]);
 
   const handleBack = () => {
     router.back();
   };
 
   // Calculate stats
-  const totalGames = MOCK_HISTORY.length;
-  const wins = MOCK_HISTORY.filter((g) => g.result === 'win').length;
+  const totalGames = history.length;
+  const wins = history.filter((g) => g.result === 'win').length;
   const winRate = totalGames > 0 ? Math.round((wins / totalGames) * 100) : 0;
-  const totalTokens = MOCK_HISTORY.reduce((sum, g) => sum + g.tokensEarned, 0);
+  const totalTokens = history.reduce((sum, g) => sum + g.tokensEarned, 0);
 
   return (
     <LinearGradient
@@ -467,8 +451,12 @@ export default function HistoryScreen() {
         </Animated.View>
 
         {/* History List */}
-        {MOCK_HISTORY.length > 0 ? (
-          MOCK_HISTORY.map((game, index) => (
+        {loading ? (
+          <View style={{ alignItems: 'center', paddingVertical: SPACING[8] }}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+          </View>
+        ) : history.length > 0 ? (
+          history.map((game, index) => (
             <GameHistoryCard key={game.id} game={game} index={index} />
           ))
         ) : (

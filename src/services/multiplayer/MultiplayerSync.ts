@@ -6,15 +6,30 @@
  *
  * Structure RTDB:
  * rooms/{roomId}/
- *   ├── info (RealtimeRoom)
+ *   ├── (room data: id, code, hostId, status, etc.)
  *   ├── players/{playerId} (RealtimePlayer)
  *   ├── state (RealtimeGameState)
- *   ├── positions/{playerId} (PawnState[])
- *   ├── tokens/{playerId} (number)
  *   ├── actions/{actionId} (RealtimeAction)
  *   └── chat/{messageId} (ChatMessage)
  */
 
+import {
+  ref,
+  set,
+  get,
+  update,
+  remove,
+  push,
+  onValue,
+  onDisconnect,
+  type Unsubscribe,
+} from 'firebase/database';
+import {
+  database,
+  firebaseLog,
+  getFirebaseErrorMessage,
+  REALTIME_PATHS,
+} from '@/services/firebase/config';
 import type { PlayerColor, PawnState } from '@/types';
 import type {
   RealtimeRoom,
@@ -94,98 +109,158 @@ function generateRoomCode(): string {
 export class MultiplayerSync {
   private roomId: string | null = null;
   private playerId: string | null = null;
-  private listeners: Map<string, () => void> = new Map();
+  private listeners: Map<string, Unsubscribe | (() => void)> = new Map();
   private eventCallbacks: Set<EventCallback> = new Set();
   private isConnected = false;
 
-  // Note: Ces méthodes seront implémentées avec Firebase
-  // Pour l'instant, elles simulent le comportement
-
   /**
-   * Crée une nouvelle room
+   * Crée une nouvelle room dans Firebase RTDB
    */
   async createRoom(config: RoomConfig): Promise<{ roomId: string; code: string }> {
-    const code = generateRoomCode();
-    const roomId = `room_${Date.now()}_${code}`;
+    try {
+      firebaseLog('Creating room', { hostId: config.hostId, hostName: config.hostName });
 
-    // Room et player data préparées pour Firebase
-    // TODO: Écrire dans Firebase RTDB
-    // const room: RealtimeRoom = {
-    //   id: roomId,
-    //   code,
-    //   hostId: config.hostId,
-    //   status: 'waiting',
-    //   edition: config.edition,
-    //   maxPlayers: config.maxPlayers,
-    //   createdAt: Date.now(),
-    //   updatedAt: Date.now(),
-    // };
-    // const hostPlayer: RealtimePlayer = {
-    //   id: config.hostId,
-    //   name: config.hostName,
-    //   color: 'yellow',
-    //   isHost: true,
-    //   isReady: false,
-    //   isConnected: true,
-    //   lastSeen: Date.now(),
-    // };
-    // await database().ref(`rooms/${roomId}/info`).set(room);
-    // await database().ref(`rooms/${roomId}/players/${config.hostId}`).set(hostPlayer);
-    void config; // Utilisation temporaire pour éviter erreur TS
+      const roomsRef = ref(database, REALTIME_PATHS.rooms);
+      const newRoomRef = push(roomsRef);
+      const roomId = newRoomRef.key!;
+      const code = generateRoomCode();
 
-    this.roomId = roomId;
-    this.playerId = config.hostId;
-    this.isConnected = true;
+      const roomData: RealtimeRoom = {
+        id: roomId,
+        code,
+        hostId: config.hostId,
+        status: 'waiting',
+        edition: config.edition,
+        maxPlayers: config.maxPlayers,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        gameSettings: {
+          maxPlayers: config.maxPlayers,
+          maxTurns: 30,
+          tokenGoal: 1000,
+        },
+      };
 
-    // Simuler le succès
-    console.log('[MultiplayerSync] Room created:', { roomId, code });
+      const hostPlayer: RealtimePlayer = {
+        id: config.hostId,
+        displayName: config.hostName,
+        name: config.hostName,
+        color: 'yellow',
+        isHost: true,
+        isReady: false,
+        isConnected: true,
+        joinedAt: Date.now(),
+        lastSeen: Date.now(),
+      };
 
-    return { roomId, code };
+      // Write room + host player to Firebase
+      await set(ref(database, REALTIME_PATHS.room(roomId)), roomData);
+      await set(ref(database, REALTIME_PATHS.roomPlayer(roomId, config.hostId)), hostPlayer);
+
+      this.roomId = roomId;
+      this.playerId = config.hostId;
+      this.isConnected = true;
+
+      firebaseLog('Room created successfully', { roomId, code });
+
+      return { roomId, code };
+    } catch (error) {
+      firebaseLog('Failed to create room', error);
+      throw new Error(getFirebaseErrorMessage(error));
+    }
   }
 
   /**
    * Rejoint une room existante par code
    */
   async joinRoom(code: string, data: JoinRoomData): Promise<{ roomId: string; color: PlayerColor }> {
-    // TODO: Chercher la room par code dans Firebase
-    // const snapshot = await database().ref('rooms').orderByChild('code').equalTo(code).once('value');
+    try {
+      firebaseLog('Joining room by code', { code, playerId: data.playerId });
 
-    // Simuler la recherche
-    const roomId = `room_simulated_${code}`;
+      // Search for the room by code
+      const roomsRef = ref(database, REALTIME_PATHS.rooms);
+      const snapshot = await get(roomsRef);
 
-    // Trouver une couleur disponible
-    // TODO: Lire les joueurs existants pour déterminer les couleurs prises
-    const availableColor = PLAYER_COLORS[1]!; // Simuler: bleu
+      if (!snapshot.exists()) {
+        throw new Error('Aucun salon trouvé avec ce code');
+      }
 
-    const player: RealtimePlayer = {
-      id: data.playerId,
-      displayName: data.playerName,
-      name: data.playerName, // Backward compat
-      color: availableColor,
-      isHost: false,
-      isReady: false,
-      isConnected: true,
-      joinedAt: Date.now(),
-      lastSeen: Date.now(),
-    };
+      let matchedRoom: RealtimeRoom | null = null;
+      let matchedRoomId: string | null = null;
 
-    // TODO: Écrire le joueur dans Firebase
-    // await database().ref(`rooms/${roomId}/players/${data.playerId}`).set(player);
+      snapshot.forEach((childSnapshot) => {
+        const roomData = childSnapshot.val() as RealtimeRoom;
+        if (roomData.code === code.toUpperCase()) {
+          matchedRoom = roomData;
+          matchedRoomId = childSnapshot.key;
+        }
+      });
 
-    this.roomId = roomId;
-    this.playerId = data.playerId;
-    this.isConnected = true;
+      if (!matchedRoom || !matchedRoomId) {
+        throw new Error('Aucun salon trouvé avec ce code');
+      }
 
-    // Émettre l'événement
-    this.emit({
-      type: 'player_joined',
-      data: player,
-      timestamp: Date.now(),
-    });
+      // Re-assign to local const to satisfy TS narrowing
+      const foundRoom: RealtimeRoom = matchedRoom;
+      const foundRoomId: string = matchedRoomId;
 
-    console.log('[MultiplayerSync] Joined room:', { roomId, color: availableColor });
+      if (foundRoom.status !== 'waiting') {
+        throw new Error('Ce salon n\'est plus disponible');
+      }
 
-    return { roomId, color: availableColor };
+      // Get existing players to determine available color
+      const playersRef = ref(database, REALTIME_PATHS.roomPlayers(foundRoomId));
+      const playersSnap = await get(playersRef);
+
+      const usedColors = new Set<string>();
+      if (playersSnap.exists()) {
+        playersSnap.forEach((child) => {
+          const player = child.val() as RealtimePlayer;
+          usedColors.add(player.color);
+        });
+
+        // Check max players
+        const maxPlayers = foundRoom.maxPlayers ?? foundRoom.gameSettings?.maxPlayers ?? 4;
+        if (playersSnap.size >= maxPlayers) {
+          throw new Error('Ce salon est plein');
+        }
+      }
+
+      const availableColor = PLAYER_COLORS.find((c) => !usedColors.has(c)) ?? 'yellow';
+
+      const playerData: RealtimePlayer = {
+        id: data.playerId,
+        displayName: data.playerName,
+        name: data.playerName,
+        color: availableColor,
+        isHost: false,
+        isReady: false,
+        isConnected: true,
+        joinedAt: Date.now(),
+        lastSeen: Date.now(),
+      };
+
+      // Write player to Firebase
+      await set(ref(database, REALTIME_PATHS.roomPlayer(foundRoomId, data.playerId)), playerData);
+
+      this.roomId = foundRoomId;
+      this.playerId = data.playerId;
+      this.isConnected = true;
+
+      // Emit event
+      this.emit({
+        type: 'player_joined',
+        data: playerData,
+        timestamp: Date.now(),
+      });
+
+      firebaseLog('Joined room successfully', { roomId: foundRoomId, color: availableColor });
+
+      return { roomId: foundRoomId, color: availableColor };
+    } catch (error) {
+      firebaseLog('Failed to join room', error);
+      throw new Error(error instanceof Error ? error.message : getFirebaseErrorMessage(error));
+    }
   }
 
   /**
@@ -194,23 +269,40 @@ export class MultiplayerSync {
   async leaveRoom(): Promise<void> {
     if (!this.roomId || !this.playerId) return;
 
-    // TODO: Supprimer le joueur de Firebase
-    // await database().ref(`rooms/${this.roomId}/players/${this.playerId}`).remove();
+    try {
+      firebaseLog('Leaving room', { roomId: this.roomId, playerId: this.playerId });
 
-    // Nettoyer les listeners
-    this.cleanup();
+      // Remove player from Firebase
+      await remove(ref(database, REALTIME_PATHS.roomPlayer(this.roomId, this.playerId)));
 
-    this.emit({
-      type: 'player_left',
-      data: { playerId: this.playerId },
-      timestamp: Date.now(),
-    });
+      // Check if room is now empty
+      const playersRef = ref(database, REALTIME_PATHS.roomPlayers(this.roomId));
+      const playersSnap = await get(playersRef);
 
-    console.log('[MultiplayerSync] Left room');
+      if (!playersSnap.exists() || playersSnap.size === 0) {
+        // Delete empty room
+        await remove(ref(database, REALTIME_PATHS.room(this.roomId)));
+        firebaseLog('Room deleted (empty)');
+      }
 
-    this.roomId = null;
-    this.playerId = null;
-    this.isConnected = false;
+      // Cleanup
+      this.cleanup();
+
+      this.emit({
+        type: 'player_left',
+        data: { playerId: this.playerId },
+        timestamp: Date.now(),
+      });
+
+      firebaseLog('Left room successfully');
+
+      this.roomId = null;
+      this.playerId = null;
+      this.isConnected = false;
+    } catch (error) {
+      firebaseLog('Failed to leave room', error);
+      throw new Error(getFirebaseErrorMessage(error));
+    }
   }
 
   /**
@@ -219,16 +311,24 @@ export class MultiplayerSync {
   async setReady(ready: boolean): Promise<void> {
     if (!this.roomId || !this.playerId) return;
 
-    // TODO: Mettre à jour dans Firebase
-    // await database().ref(`rooms/${this.roomId}/players/${this.playerId}/isReady`).set(ready);
+    try {
+      firebaseLog('Setting player ready', { roomId: this.roomId, playerId: this.playerId, ready });
 
-    this.emit({
-      type: 'player_ready',
-      data: { playerId: this.playerId, ready },
-      timestamp: Date.now(),
-    });
+      await update(ref(database, REALTIME_PATHS.roomPlayer(this.roomId, this.playerId)), {
+        isReady: ready,
+      });
 
-    console.log('[MultiplayerSync] Set ready:', ready);
+      this.emit({
+        type: 'player_ready',
+        data: { playerId: this.playerId, ready },
+        timestamp: Date.now(),
+      });
+
+      firebaseLog('Player ready status updated');
+    } catch (error) {
+      firebaseLog('Failed to set player ready', error);
+      throw new Error(getFirebaseErrorMessage(error));
+    }
   }
 
   /**
@@ -237,30 +337,60 @@ export class MultiplayerSync {
   async startGame(): Promise<string> {
     if (!this.roomId) throw new Error('Not in a room');
 
-    const gameId = `game_${this.roomId}_${Date.now()}`;
+    try {
+      firebaseLog('Starting game', { roomId: this.roomId });
 
-    // TODO: Mettre à jour Firebase
-    // const initialState: RealtimeGameState = {
-    //   currentPlayerIndex: 0,
-    //   currentTurn: 1,
-    //   diceValue: null,
-    //   diceRolled: false,
-    //   phase: 'rolling',
-    //   updatedAt: Date.now(),
-    // };
-    // await database().ref(`rooms/${this.roomId}/info/status`).set('playing');
-    // await database().ref(`rooms/${this.roomId}/info/gameId`).set(gameId);
-    // await database().ref(`rooms/${this.roomId}/state`).set(initialState);
+      const gameId = `game_${this.roomId}_${Date.now()}`;
 
-    this.emit({
-      type: 'game_started',
-      data: { gameId },
-      timestamp: Date.now(),
-    });
+      // Get all player IDs
+      const playersRef = ref(database, REALTIME_PATHS.roomPlayers(this.roomId));
+      const playersSnap = await get(playersRef);
 
-    console.log('[MultiplayerSync] Game started:', gameId);
+      const playerIds: string[] = [];
+      const positions: Record<string, number> = {};
+      const tokens: Record<string, number> = {};
 
-    return gameId;
+      if (playersSnap.exists()) {
+        playersSnap.forEach((child) => {
+          const player = child.val() as RealtimePlayer;
+          playerIds.push(player.id);
+          positions[player.id] = -1; // Start position
+          tokens[player.id] = 0;
+        });
+      }
+
+      // Initialize game state
+      const initialState: RealtimeGameState = {
+        s: 'playing',
+        t: 0,
+        d: null,
+        p: positions,
+        j: tokens,
+      };
+
+      // Update room status + set game ID
+      await update(ref(database, REALTIME_PATHS.room(this.roomId)), {
+        status: 'playing',
+        gameId,
+        updatedAt: Date.now(),
+      });
+
+      // Set initial game state
+      await set(ref(database, REALTIME_PATHS.roomState(this.roomId)), initialState);
+
+      this.emit({
+        type: 'game_started',
+        data: { gameId },
+        timestamp: Date.now(),
+      });
+
+      firebaseLog('Game started', { gameId, playerCount: playerIds.length });
+
+      return gameId;
+    } catch (error) {
+      firebaseLog('Failed to start game', error);
+      throw new Error(getFirebaseErrorMessage(error));
+    }
   }
 
   /**
@@ -269,16 +399,20 @@ export class MultiplayerSync {
   async sendAction(action: Omit<RealtimeAction, 'id' | 'timestamp'>): Promise<void> {
     if (!this.roomId) return;
 
-    const fullAction: RealtimeAction = {
-      ...action,
-      id: `action_${Date.now()}`,
-      timestamp: Date.now(),
-    };
+    try {
+      const actionsRef = ref(database, REALTIME_PATHS.roomActions(this.roomId));
+      const newActionRef = push(actionsRef);
 
-    // TODO: Push dans Firebase (utilise push() pour ID auto)
-    // await database().ref(`rooms/${this.roomId}/actions`).push(fullAction);
+      await set(newActionRef, {
+        ...action,
+        ts: Date.now(),
+      });
 
-    console.log('[MultiplayerSync] Action sent:', fullAction);
+      firebaseLog('Action sent', { type: action.t });
+    } catch (error) {
+      firebaseLog('Failed to send action', error);
+      throw new Error(getFirebaseErrorMessage(error));
+    }
   }
 
   /**
@@ -287,21 +421,20 @@ export class MultiplayerSync {
   async updateGameState(state: Partial<RealtimeGameState>): Promise<void> {
     if (!this.roomId) return;
 
-    const update = {
-      ...state,
-      updatedAt: Date.now(),
-    };
+    try {
+      await update(ref(database, REALTIME_PATHS.roomState(this.roomId)), state);
 
-    // TODO: Mettre à jour Firebase
-    // await database().ref(`rooms/${this.roomId}/state`).update(update);
+      this.emit({
+        type: 'state_updated',
+        data: state,
+        timestamp: Date.now(),
+      });
 
-    this.emit({
-      type: 'state_updated',
-      data: update,
-      timestamp: Date.now(),
-    });
-
-    console.log('[MultiplayerSync] State updated:', update);
+      firebaseLog('Game state updated');
+    } catch (error) {
+      firebaseLog('Failed to update game state', error);
+      throw new Error(getFirebaseErrorMessage(error));
+    }
   }
 
   /**
@@ -310,10 +443,13 @@ export class MultiplayerSync {
   async updatePositions(playerId: string, pawns: PawnState[]): Promise<void> {
     if (!this.roomId) return;
 
-    // TODO: Mettre à jour Firebase
-    // await database().ref(`rooms/${this.roomId}/positions/${playerId}`).set(pawns);
-
-    console.log('[MultiplayerSync] Positions updated:', { playerId, pawns });
+    try {
+      await set(ref(database, `${REALTIME_PATHS.room(this.roomId)}/positions/${playerId}`), pawns);
+      firebaseLog('Positions updated', { playerId });
+    } catch (error) {
+      firebaseLog('Failed to update positions', error);
+      throw new Error(getFirebaseErrorMessage(error));
+    }
   }
 
   /**
@@ -322,10 +458,13 @@ export class MultiplayerSync {
   async updateTokens(playerId: string, tokens: number): Promise<void> {
     if (!this.roomId) return;
 
-    // TODO: Mettre à jour Firebase
-    // await database().ref(`rooms/${this.roomId}/tokens/${playerId}`).set(tokens);
-
-    console.log('[MultiplayerSync] Tokens updated:', { playerId, tokens });
+    try {
+      await set(ref(database, `${REALTIME_PATHS.room(this.roomId)}/tokens/${playerId}`), tokens);
+      firebaseLog('Tokens updated', { playerId, tokens });
+    } catch (error) {
+      firebaseLog('Failed to update tokens', error);
+      throw new Error(getFirebaseErrorMessage(error));
+    }
   }
 
   /**
@@ -334,23 +473,34 @@ export class MultiplayerSync {
   async sendEmoji(emoji: string): Promise<void> {
     if (!this.roomId || !this.playerId) return;
 
-    const message: ChatMessage = {
-      id: `msg_${Date.now()}`,
-      playerId: this.playerId,
-      emoji,
-      timestamp: Date.now(),
-    };
+    try {
+      const chatRef = ref(database, REALTIME_PATHS.roomChat(this.roomId));
+      const newMessageRef = push(chatRef);
 
-    // TODO: Push dans Firebase
-    // await database().ref(`rooms/${this.roomId}/chat`).push(message);
+      const message = {
+        userId: this.playerId,
+        emoji,
+        timestamp: Date.now(),
+      };
 
-    this.emit({
-      type: 'chat_message',
-      data: message,
-      timestamp: Date.now(),
-    });
+      await set(newMessageRef, message);
 
-    console.log('[MultiplayerSync] Emoji sent:', emoji);
+      this.emit({
+        type: 'chat_message',
+        data: {
+          id: newMessageRef.key ?? `msg_${Date.now()}`,
+          playerId: this.playerId,
+          emoji,
+          timestamp: Date.now(),
+        } satisfies ChatMessage,
+        timestamp: Date.now(),
+      });
+
+      firebaseLog('Emoji sent', { emoji });
+    } catch (error) {
+      firebaseLog('Failed to send emoji', error);
+      throw new Error(getFirebaseErrorMessage(error));
+    }
   }
 
   // ===== SUBSCRIPTIONS =====
@@ -358,18 +508,24 @@ export class MultiplayerSync {
   /**
    * S'abonne aux changements de la room
    */
-  subscribeToRoom(_callback: (room: RealtimeRoom | null) => void): () => void {
+  subscribeToRoom(callback: (room: RealtimeRoom | null) => void): () => void {
     if (!this.roomId) return () => {};
 
-    // TODO: Écouter Firebase
-    // const ref = database().ref(`rooms/${this.roomId}/info`);
-    // const unsubscribe = ref.on('value', snapshot => _callback(snapshot.val()));
-    // this.listeners.set('room', () => ref.off('value', unsubscribe));
+    const roomRef = ref(database, REALTIME_PATHS.room(this.roomId));
 
-    const key = `room_${Date.now()}`;
-    this.listeners.set(key, () => {});
+    const unsubscribe = onValue(roomRef, (snapshot) => {
+      if (snapshot.exists()) {
+        callback(snapshot.val() as RealtimeRoom);
+      } else {
+        callback(null);
+      }
+    });
+
+    const key = `room_${this.roomId}`;
+    this.listeners.set(key, unsubscribe);
 
     return () => {
+      unsubscribe();
       this.listeners.delete(key);
     };
   }
@@ -377,17 +533,28 @@ export class MultiplayerSync {
   /**
    * S'abonne aux joueurs
    */
-  subscribeToPlayers(_callback: (players: Record<string, RealtimePlayer>) => void): () => void {
+  subscribeToPlayers(callback: (players: Record<string, RealtimePlayer>) => void): () => void {
     if (!this.roomId) return () => {};
 
-    // TODO: Écouter Firebase
-    // const ref = database().ref(`rooms/${this.roomId}/players`);
-    // const unsubscribe = ref.on('value', snapshot => _callback(snapshot.val() || {}));
+    const playersRef = ref(database, REALTIME_PATHS.roomPlayers(this.roomId));
 
-    const key = `players_${Date.now()}`;
-    this.listeners.set(key, () => {});
+    const unsubscribe = onValue(playersRef, (snapshot) => {
+      const players: Record<string, RealtimePlayer> = {};
+      if (snapshot.exists()) {
+        snapshot.forEach((child) => {
+          const player = child.val() as RealtimePlayer;
+          const key = child.key ?? player.id;
+          players[key] = player;
+        });
+      }
+      callback(players);
+    });
+
+    const key = `players_${this.roomId}`;
+    this.listeners.set(key, unsubscribe);
 
     return () => {
+      unsubscribe();
       this.listeners.delete(key);
     };
   }
@@ -395,17 +562,24 @@ export class MultiplayerSync {
   /**
    * S'abonne à l'état du jeu
    */
-  subscribeToGameState(_callback: (state: RealtimeGameState | null) => void): () => void {
+  subscribeToGameState(callback: (state: RealtimeGameState | null) => void): () => void {
     if (!this.roomId) return () => {};
 
-    // TODO: Écouter Firebase
-    // const ref = database().ref(`rooms/${this.roomId}/state`);
-    // const unsubscribe = ref.on('value', snapshot => _callback(snapshot.val()));
+    const stateRef = ref(database, REALTIME_PATHS.roomState(this.roomId));
 
-    const key = `state_${Date.now()}`;
-    this.listeners.set(key, () => {});
+    const unsubscribe = onValue(stateRef, (snapshot) => {
+      if (snapshot.exists()) {
+        callback(snapshot.val() as RealtimeGameState);
+      } else {
+        callback(null);
+      }
+    });
+
+    const key = `state_${this.roomId}`;
+    this.listeners.set(key, unsubscribe);
 
     return () => {
+      unsubscribe();
       this.listeners.delete(key);
     };
   }
@@ -413,17 +587,36 @@ export class MultiplayerSync {
   /**
    * S'abonne aux actions (nouvelles uniquement)
    */
-  subscribeToActions(_callback: (action: RealtimeAction) => void): () => void {
+  subscribeToActions(callback: (action: RealtimeAction) => void): () => void {
     if (!this.roomId) return () => {};
 
-    // TODO: Écouter Firebase avec startAt(Date.now()) pour nouvelles actions seulement
-    // const ref = database().ref(`rooms/${this.roomId}/actions`).orderByChild('timestamp').startAt(Date.now());
-    // const unsubscribe = ref.on('child_added', snapshot => _callback(snapshot.val()));
+    const actionsRef = ref(database, REALTIME_PATHS.roomActions(this.roomId));
+    let isInitialLoad = true;
 
-    const key = `actions_${Date.now()}`;
-    this.listeners.set(key, () => {});
+    const unsubscribe = onValue(actionsRef, (snapshot) => {
+      if (isInitialLoad) {
+        isInitialLoad = false;
+        return;
+      }
+
+      if (snapshot.exists()) {
+        const actions: RealtimeAction[] = [];
+        snapshot.forEach((child) => {
+          actions.push(child.val() as RealtimeAction);
+        });
+
+        const latestAction = actions[actions.length - 1];
+        if (latestAction) {
+          callback(latestAction);
+        }
+      }
+    });
+
+    const key = `actions_${this.roomId}`;
+    this.listeners.set(key, unsubscribe);
 
     return () => {
+      unsubscribe();
       this.listeners.delete(key);
     };
   }
@@ -431,17 +624,42 @@ export class MultiplayerSync {
   /**
    * S'abonne au chat
    */
-  subscribeToChat(_callback: (message: ChatMessage) => void): () => void {
+  subscribeToChat(callback: (message: ChatMessage) => void): () => void {
     if (!this.roomId) return () => {};
 
-    // TODO: Écouter Firebase
-    // const ref = database().ref(`rooms/${this.roomId}/chat`);
-    // const unsubscribe = ref.on('child_added', snapshot => _callback(snapshot.val()));
+    const chatRef = ref(database, REALTIME_PATHS.roomChat(this.roomId));
+    let isInitialLoad = true;
 
-    const key = `chat_${Date.now()}`;
-    this.listeners.set(key, () => {});
+    const unsubscribe = onValue(chatRef, (snapshot) => {
+      if (isInitialLoad) {
+        isInitialLoad = false;
+        return;
+      }
+
+      if (snapshot.exists()) {
+        const messages: ChatMessage[] = [];
+        snapshot.forEach((child) => {
+          const val = child.val();
+          messages.push({
+            id: child.key ?? `msg_${Date.now()}`,
+            playerId: val.userId ?? val.playerId,
+            emoji: val.emoji,
+            timestamp: val.timestamp,
+          });
+        });
+
+        const latestMessage = messages[messages.length - 1];
+        if (latestMessage) {
+          callback(latestMessage);
+        }
+      }
+    });
+
+    const key = `chat_${this.roomId}`;
+    this.listeners.set(key, unsubscribe);
 
     return () => {
+      unsubscribe();
       this.listeners.delete(key);
     };
   }
@@ -454,29 +672,54 @@ export class MultiplayerSync {
   setupPresence(): void {
     if (!this.roomId || !this.playerId) return;
 
-    // TODO: Configurer onDisconnect
-    // const presenceRef = database().ref(`rooms/${this.roomId}/players/${this.playerId}`);
-    // presenceRef.onDisconnect().update({ isConnected: false, lastSeen: database.ServerValue.TIMESTAMP });
+    try {
+      const playerRef = ref(database, REALTIME_PATHS.roomPlayer(this.roomId, this.playerId));
 
-    // Mettre à jour la présence périodiquement
-    // setInterval(() => {
-    //   presenceRef.update({ lastSeen: Date.now() });
-    // }, 30000);
+      // When disconnected, mark as not connected
+      onDisconnect(playerRef).update({
+        isConnected: false,
+        lastSeen: Date.now(),
+      });
 
-    console.log('[MultiplayerSync] Presence setup');
+      // Also set user-level presence
+      const presenceRef = ref(database, REALTIME_PATHS.userPresence(this.playerId));
+      set(presenceRef, {
+        online: true,
+        lastSeen: Date.now(),
+        currentRoom: this.roomId,
+      });
+
+      onDisconnect(presenceRef).set({
+        online: false,
+        lastSeen: Date.now(),
+        currentRoom: null,
+      });
+
+      firebaseLog('Presence setup complete');
+    } catch (error) {
+      firebaseLog('Failed to setup presence', error);
+    }
   }
 
   /**
    * Vérifie si un joueur est connecté
    */
-  async checkPlayerConnection(_playerId: string): Promise<boolean> {
+  async checkPlayerConnection(playerId: string): Promise<boolean> {
     if (!this.roomId) return false;
 
-    // TODO: Lire depuis Firebase
-    // const snapshot = await database().ref(`rooms/${this.roomId}/players/${_playerId}/isConnected`).once('value');
-    // return snapshot.val() === true;
+    try {
+      const playerRef = ref(database, REALTIME_PATHS.roomPlayer(this.roomId, playerId));
+      const snapshot = await get(playerRef);
 
-    return true; // Simulé
+      if (snapshot.exists()) {
+        const player = snapshot.val() as RealtimePlayer;
+        return player.isConnected ?? false;
+      }
+
+      return false;
+    } catch {
+      return false;
+    }
   }
 
   // ===== EVENT SYSTEM =====
@@ -511,7 +754,7 @@ export class MultiplayerSync {
       try {
         unsubscribe();
       } catch {
-        // Ignorer les erreurs de cleanup
+        // Ignore cleanup errors
       }
     });
     this.listeners.clear();

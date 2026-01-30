@@ -1,4 +1,4 @@
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { memo, useEffect } from 'react';
 import { Dimensions, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -12,7 +12,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Avatar, DynamicGradientBorder, GameButton, GradientBorder, RadialBackground } from '@/components/ui';
+import { Avatar, DynamicGradientBorder, GradientBorder, RadialBackground } from '@/components/ui';
 import { formatXP, getLevelFromXP, getRankFromXP, getRankProgress } from '@/config/progression';
 import { useAuthStore, useUserStore } from '@/stores';
 import { FONTS } from '@/styles/typography';
@@ -43,28 +43,6 @@ const SpinningRays = memo(function SpinningRays() {
   );
 });
 
-// Composant pour l'icône LUDO personnalisée du Tab Bar
-const LudoIcon = memo(function LudoIcon({ active }: { active?: boolean }) { return (
-  <View style={styles.ludoIconContainer}>
-    <View style={styles.ludoRow}>
-      <View style={[styles.ludoSquare, { backgroundColor: '#FFBC40' }]}>
-        <Text style={styles.ludoText}>L</Text>
-      </View>
-      <View style={[styles.ludoSquare, { backgroundColor: '#1F91D0' }]}>
-        <Text style={styles.ludoText}>U</Text>
-      </View>
-    </View>
-    <View style={styles.ludoRow}>
-      <View style={[styles.ludoSquare, { backgroundColor: '#F35145' }]}>
-        <Text style={styles.ludoText}>D</Text>
-      </View>
-      <View style={[styles.ludoSquare, { backgroundColor: '#4CAF50' }]}>
-        <Text style={styles.ludoText}>O</Text>
-      </View>
-    </View>
-  </View>
-); });
-
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -79,9 +57,9 @@ export default function HomeScreen() {
 
   // Stats du portfolio
   const startupsCount = profile?.startups?.length ?? 0;
-  const portfolioValue = profile?.startups?.reduce((sum, s) => sum + s.tokensInvested, 0) ?? 3.2;
+  const portfolioValue = profile?.startups?.reduce((sum, s) => sum + s.tokensInvested, 0) ?? 0;
 
-  const displayName = user?.displayName || profile?.displayName || 'Abdoulaye Birane';
+  const displayName = user?.displayName || profile?.displayName || 'Joueur';
 
   const handlePlay = () => {
     router.push('/(game)/mode-selection');
@@ -194,73 +172,22 @@ export default function HomeScreen() {
         {/* Challenge Section */}
         <View style={styles.challengeHeader}>
           <Text style={styles.challengeHeaderTitle}>CHALLENGE A LA UNE</Text>
-          <View style={styles.challengeNav}>
-            <Pressable style={styles.challengeNavBtn}>
-              <Ionicons name="chevron-back" size={16} color="rgba(255, 255, 255, 0.4)" />
-            </Pressable>
-            <Pressable style={[styles.challengeNavBtn, styles.challengeNavBtnActive]}>
-              <Ionicons name="chevron-forward" size={16} color="#FFBC40" />
-            </Pressable>
-          </View>
         </View>
 
         <Animated.View entering={FadeInDown.delay(600).duration(500)} style={styles.challengeCardWrapper}>
           <DynamicGradientBorder borderRadius={16} fill="rgba(0, 0, 0, 0.35)">
             <View style={styles.challengeCardContent}>
-              {/* Top row : Image + Badge & Title */}
-              <View style={styles.challengeTopRow}>
-                <View style={styles.challengeImageContainer}>
-                  <MaterialCommunityIcons name="leaf" size={28} color="#FFBC40" />
-                  <Text style={styles.challengeImageLabel}>AGRIBUSINESS</Text>
-                </View>
-                <View style={styles.challengeMeta}>
-                  <View style={styles.categoryBadge}>
-                    <Text style={styles.categoryBadgeText}>Agri</Text>
-                  </View>
-                  <Text style={styles.challengeNameText}>AGRITECH REVOLUTION</Text>
-                </View>
+              <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+                <Ionicons name="trophy-outline" size={40} color="rgba(255, 255, 255, 0.2)" />
+                <Text style={[styles.challengeNameText, { marginTop: 12, opacity: 0.5 }]}>
+                  BIENTOT DISPONIBLE
+                </Text>
+                <Text style={[styles.challengeDescText, { textAlign: 'center', marginTop: 6 }]}>
+                  Les challenges hebdomadaires arrivent bientot !
+                </Text>
               </View>
-
-              {/* Description */}
-              <Text style={styles.challengeDescText}>
-                Transforme l'agriculture avec des solutions innovantes et durables
-              </Text>
-
-              {/* Stats row avec bordure gradient (largeur = contenu carte) */}
-              <GradientBorder
-                boxHeight={42}
-                boxWidth={width - 36 - 28}
-                borderRadius={21}
-                fill="transparent"
-                style={styles.challengeStatsWrapper}
-              >
-                <View style={styles.challengeStatsRow}>
-                  <View style={styles.challengeStat}>
-                    <View style={styles.statWithIcon}>
-                      <Ionicons name="star" size={14} color="#FFBC40" style={{ marginRight: 4 }} />
-                      <Text style={styles.challengeStatText}>2,500 XP</Text>
-                    </View>
-                  </View>
-                  <View style={styles.challengeStatDivider} />
-                  <View style={styles.challengeStat}>
-                    <View style={styles.statWithIcon}>
-                      <Ionicons name="people" size={14} color="#FFBC40" style={{ marginRight: 4 }} />
-                      <Text style={styles.challengeStatText}>1.2K participants</Text>
-                    </View>
-                  </View>
-                </View>
-              </GradientBorder>
-
-              <GameButton title="commencer" />
             </View>
           </DynamicGradientBorder>
-          {/* Indicateurs d'index sous la carte */}
-          <View style={styles.pagination}>
-            <View style={[styles.dot, styles.dotActive]} />
-            <View style={styles.dot} />
-            <View style={styles.dot} />
-            <View style={styles.dot} />
-          </View>
         </Animated.View>
       </ScrollView>
     </View>

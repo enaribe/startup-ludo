@@ -1,35 +1,28 @@
 /**
- * create-room - Créer un salon
+ * create-room - Creer un salon
  *
- * Phase 1: Formulaire de configuration (nom, joueurs, édition, mise)
- * Phase 2: Salle d'attente avec code, liste joueurs, bouton démarrer
+ * Phase 1: Formulaire de configuration (nom, joueurs, edition, mise)
+ * Phase 2: Salle d'attente avec code, liste joueurs, bouton demarrer
  */
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { View, Text, Pressable, ScrollView, TextInput, Share, Alert } from 'react-native';
+import { View, Text, Pressable, ScrollView, TextInput, Share, Alert, Dimensions, StyleSheet } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 
-import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { useAuthStore } from '@/stores';
 import { useMultiplayer } from '@/hooks/useMultiplayer';
 import { Avatar } from '@/components/ui/Avatar';
-import { GameButton } from '@/components/ui';
+import { RadialBackground, DynamicGradientBorder, GameButton } from '@/components/ui';
 
-// Éditions disponibles
-const EDITIONS = [
-  { id: 'classic', name: 'Classic', icon: 'rocket', color: '#FFBC40' },
-  { id: 'agriculture', name: 'Agriculture', icon: 'leaf', color: '#4CAF50' },
-  { id: 'education', name: 'Éducation', icon: 'school', color: '#1F91D0' },
-  { id: 'sante', name: 'Santé', icon: 'medkit', color: '#FF6B6B' },
-];
+const { width: screenWidth } = Dimensions.get('window');
+const contentWidth = screenWidth - SPACING[4] * 2;
 
 export default function CreateRoomScreen() {
   const router = useRouter();
@@ -44,27 +37,36 @@ export default function CreateRoomScreen() {
 
   const user = useAuthStore((state) => state.user);
   const {
+    room,
     players,
     isLoading,
     createRoom,
+    leaveRoom,
     startGame,
   } = useMultiplayer(user?.id ?? null);
 
-  // Déterminer si on est en mode création ou salle d'attente
   const isWaitingRoom = !!params.roomId;
   const isQuickMatch = params.quickMatch === 'true';
+  const [showLobby, setShowLobby] = useState(isWaitingRoom);
 
-  // États formulaire
-  const [roomName, setRoomName] = useState('Ma partie');
-  const [maxPlayers, setMaxPlayers] = useState<2 | 3 | 4>(4);
-  const [selectedEdition, setSelectedEdition] = useState(params.challenge || 'classic');
-  const [betAmount, setBetAmount] = useState(250);
+  // Helper function to format room code
+  const formatRoomCode = (code: string) => {
+    if (code.length >= 8) {
+      return `${code.slice(0, 4)}-${code.slice(4, 8)}`;
+    }
+    return code;
+  };
 
-  // États salle d'attente
-  const [roomCode, setRoomCode] = useState(params.code || '');
+  // Form states
+  const [roomName, setRoomName] = useState('');
+  const [maxPlayers, setMaxPlayers] = useState<string>('4');
+  const [selectedEdition] = useState(params.challenge || 'classic');
+  const [betAmount] = useState(250);
+
+  // Waiting room states
+  const [roomCode, setRoomCode] = useState(params.code ? formatRoomCode(params.code) : '');
   const [currentRoomId, setCurrentRoomId] = useState(params.roomId || '');
 
-  // Convertir players en liste
   const playersList = useMemo(() => {
     return Object.entries(players).map(([playerId, player]) => ({
       ...player,
@@ -72,13 +74,22 @@ export default function CreateRoomScreen() {
     }));
   }, [players]);
 
-  // Vérifier si tous prêts
   const allReady = useMemo(() => {
     if (playersList.length < 2) return false;
     return playersList.every((p) => p.isReady || p.isHost);
   }, [playersList]);
 
-  // Auto-démarrage en mode quick match
+  // Listen for game start (room status change to 'playing')
+  useEffect(() => {
+    if (room?.status === 'playing' && room.gameId) {
+      router.replace({
+        pathname: '/(game)/game-preparation',
+        params: { gameId: room.gameId, roomId: currentRoomId, mode: 'online' },
+      });
+    }
+  }, [room?.status, room?.gameId, currentRoomId, router]);
+
+  // Auto-start for quick match
   useEffect(() => {
     if (isQuickMatch && playersList.length >= 2 && allReady) {
       const timer = setTimeout(() => {
@@ -89,13 +100,61 @@ export default function CreateRoomScreen() {
     return undefined;
   }, [isQuickMatch, playersList.length, allReady]);
 
-  const handleBack = () => {
-    router.back();
-  };
+  const handleBack = useCallback(() => {
+    if (showLobby) {
+      // In lobby: confirm leave
+      Alert.alert(
+        'Quitter le salon',
+        'Es-tu sur de vouloir quitter ?',
+        [
+          { text: 'Annuler', style: 'cancel' },
+          {
+            text: 'Quitter',
+            style: 'destructive',
+            onPress: async () => {
+              await leaveRoom();
+              router.back();
+            },
+          },
+        ]
+      );
+    } else if (roomCode) {
+      // In confirmation: go back to config (leave room too)
+      Alert.alert(
+        'Annuler',
+        'Cela supprimera le salon cree.',
+        [
+          { text: 'Non', style: 'cancel' },
+          {
+            text: 'Oui',
+            style: 'destructive',
+            onPress: async () => {
+              await leaveRoom();
+              setRoomCode('');
+              setCurrentRoomId('');
+            },
+          },
+        ]
+      );
+    } else {
+      router.back();
+    }
+  }, [showLobby, roomCode, leaveRoom, router]);
 
   const handleCreateRoom = useCallback(async () => {
     if (!user) {
-      Alert.alert('Erreur', 'Vous devez être connecté');
+      Alert.alert('Erreur', 'Vous devez etre connecte');
+      return;
+    }
+
+    const playersCount = parseInt(maxPlayers, 10);
+    if (isNaN(playersCount) || playersCount < 2 || playersCount > 4) {
+      Alert.alert('Erreur', 'Le nombre de joueurs doit être entre 2 et 4');
+      return;
+    }
+
+    if (!roomName.trim()) {
+      Alert.alert('Erreur', 'Veuillez entrer un nom de salon');
       return;
     }
 
@@ -103,41 +162,43 @@ export default function CreateRoomScreen() {
 
     const result = await createRoom({
       edition: selectedEdition,
-      maxPlayers,
-      hostName: user.displayName ?? 'Hôte',
-      roomName,
+      maxPlayers: playersCount as 2 | 3 | 4,
+      hostName: user.displayName ?? 'Hote',
+      roomName: roomName.trim(),
       betAmount,
     });
 
     if (result) {
-      setRoomCode(result.code);
+      setRoomCode(formatRoomCode(result.code));
       setCurrentRoomId(result.roomId);
     }
   }, [user, selectedEdition, maxPlayers, roomName, betAmount, createRoom]);
 
   const handleCopyCode = useCallback(async () => {
     if (roomCode) {
-      await Clipboard.setStringAsync(roomCode);
+      const codeWithoutDash = roomCode.replace('-', '');
+      await Clipboard.setStringAsync(codeWithoutDash);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('Copié !', 'Le code a été copié');
+      Alert.alert('Copie !', 'Le code a ete copie');
     }
   }, [roomCode]);
 
   const handleShareCode = useCallback(async () => {
     if (roomCode) {
       try {
+        const codeWithoutDash = roomCode.replace('-', '');
         await Share.share({
-          message: `Rejoins ma partie Startup Ludo ! Code: ${roomCode}`,
+          message: `Rejoins ma partie Startup Ludo ! Code: ${codeWithoutDash}`,
         });
       } catch {
-        // Partage annulé
+        // Share cancelled
       }
     }
   }, [roomCode]);
 
   const handleStartGame = useCallback(async () => {
     if (!allReady && playersList.length >= 2) {
-      Alert.alert('Attention', 'Tous les joueurs doivent être prêts');
+      Alert.alert('Attention', 'Tous les joueurs doivent etre prets');
       return;
     }
 
@@ -157,332 +218,319 @@ export default function CreateRoomScreen() {
     }
   }, [allReady, playersList.length, startGame, router, currentRoomId]);
 
-  // Mode formulaire de configuration
-  if (!isWaitingRoom && !roomCode) {
-    return (
-      <View style={{ flex: 1, backgroundColor: '#0C243E' }}>
-        <LinearGradient
-          colors={['#194F8A', '#0C243E']}
-          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-          start={{ x: 0.5, y: 0 }}
-          end={{ x: 0.5, y: 1 }}
-        />
+  const handleContinueToLobby = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setShowLobby(true);
+  }, []);
 
-        {/* Header */}
-        <View
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            zIndex: 10,
-            paddingTop: insets.top + SPACING[2],
-            paddingBottom: SPACING[3],
-            paddingHorizontal: SPACING[4],
-            backgroundColor: 'rgba(12, 36, 62, 0.85)',
-            borderBottomWidth: 1,
-            borderBottomColor: 'rgba(255, 188, 64, 0.1)',
-            flexDirection: 'row',
-            alignItems: 'center',
-          }}
-        >
+  // Configuration form
+  if (!showLobby && !roomCode) {
+    return (
+      <View style={styles.container}>
+        <RadialBackground />
+
+        {/* Fixed Header avec bouton retour */}
+        <View style={[styles.header, { paddingTop: insets.top + SPACING[2] }]}>
           <Pressable onPress={handleBack} hitSlop={8}>
-            <Ionicons name="arrow-back" size={24} color={COLORS.text} />
+            <Ionicons name="arrow-back" size={24} color="white" />
           </Pressable>
-          <Text
-            style={{
-              flex: 1,
-              fontFamily: FONTS.title,
-              fontSize: FONT_SIZES.xl,
-              color: COLORS.text,
-              textAlign: 'center',
-            }}
-          >
-            Configuration du salon
-          </Text>
-          <View style={{ width: 24 }} />
+          <View style={{ flex: 1 }} />
         </View>
 
         <ScrollView
           contentContainerStyle={{
-            paddingTop: insets.top + 80,
-            paddingBottom: insets.bottom + 100,
+            paddingTop: insets.top + 60,
+            paddingBottom: insets.bottom + 120,
             paddingHorizontal: SPACING[4],
           }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Nom du salon */}
+          {/* Titre centré */}
           <Animated.View entering={FadeInDown.delay(100).duration(500)}>
-            <Text style={styles.label}>Nom du salon</Text>
-            <View style={styles.inputContainer}>
-              <TextInput
-                value={roomName}
-                onChangeText={setRoomName}
-                placeholder="Ma partie"
-                placeholderTextColor="rgba(255,255,255,0.4)"
-                style={styles.input}
-              />
-            </View>
+            <Text style={styles.configTitle}>CONFIGURATION DU SALON</Text>
           </Animated.View>
 
-          {/* Nombre de joueurs */}
+          {/* Carte centrale avec configuration */}
           <Animated.View entering={FadeInDown.delay(200).duration(500)}>
-            <Text style={styles.label}>Nombre de joueurs</Text>
-            <View style={{ flexDirection: 'row', gap: SPACING[2] }}>
-              {[2, 3, 4].map((count) => (
-                <Pressable
-                  key={count}
-                  style={{ flex: 1 }}
-                  onPress={() => setMaxPlayers(count as 2 | 3 | 4)}
-                >
-                  <View
-                    style={[
-                      styles.optionCard,
-                      maxPlayers === count && styles.optionCardSelected,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.optionText,
-                        maxPlayers === count && styles.optionTextSelected,
-                      ]}
-                    >
-                      {count}
-                    </Text>
-                  </View>
-                </Pressable>
-              ))}
-            </View>
-          </Animated.View>
-
-          {/* Édition */}
-          <Animated.View entering={FadeInDown.delay(300).duration(500)}>
-            <Text style={styles.label}>Édition</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: SPACING[3] }}
+            <DynamicGradientBorder
+              borderRadius={24}
+              fill="rgba(0, 0, 0, 0.35)"
+              boxWidth={contentWidth}
+              style={{ marginTop: SPACING[5] }}
             >
-              {EDITIONS.map((edition) => {
-                const isSelected = selectedEdition === edition.id;
-                return (
-                  <Pressable key={edition.id} onPress={() => setSelectedEdition(edition.id)}>
-                    <View
-                      style={[
-                        styles.editionCard,
-                        isSelected && { borderColor: edition.color },
-                      ]}
-                    >
-                      <View
-                        style={[
-                          styles.editionIcon,
-                          { backgroundColor: `${edition.color}20` },
-                        ]}
-                      >
-                        <Ionicons
-                          name={edition.icon as keyof typeof Ionicons.glyphMap}
-                          size={24}
-                          color={edition.color}
-                        />
-                      </View>
-                      <Text style={[styles.editionName, isSelected && { color: edition.color }]}>
-                        {edition.name}
-                      </Text>
-                    </View>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          </Animated.View>
-
-          {/* Mise */}
-          <Animated.View entering={FadeInDown.delay(400).duration(500)}>
-            <Text style={styles.label}>Mise (jetons)</Text>
-            <View style={{ flexDirection: 'row', gap: SPACING[2] }}>
-              {[100, 250, 500, 1000].map((amount) => (
-                <Pressable
-                  key={amount}
-                  style={{ flex: 1 }}
-                  onPress={() => setBetAmount(amount)}
-                >
-                  <View
-                    style={[
-                      styles.optionCard,
-                      betAmount === amount && styles.optionCardSelected,
-                    ]}
+              <View style={styles.configCard}>
+                {/* Nom du Salon */}
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>Nom du Salon</Text>
+                  <DynamicGradientBorder
+                    borderRadius={14}
+                    fill="rgba(0, 0, 0, 0.35)"
+                    style={styles.inputBorderWrapper}
                   >
-                    <Text
-                      style={[
-                        styles.optionText,
-                        { fontSize: 14 },
-                        betAmount === amount && styles.optionTextSelected,
-                      ]}
-                    >
-                      {amount}
-                    </Text>
-                  </View>
-                </Pressable>
-              ))}
-            </View>
+                    <View style={styles.inputInner}>
+                      <TextInput
+                        value={roomName}
+                        onChangeText={setRoomName}
+                        placeholder="Ex. Salon de Abdoulaye"
+                        placeholderTextColor="rgba(255,255,255,0.3)"
+                        style={styles.configInput}
+                        autoCapitalize="words"
+                      />
+                    </View>
+                  </DynamicGradientBorder>
+                </View>
+
+                {/* Nombre de joueur */}
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>Nombre de joueur</Text>
+                  <DynamicGradientBorder
+                    borderRadius={14}
+                    fill="rgba(0, 0, 0, 0.35)"
+                    style={styles.inputBorderWrapper}
+                  >
+                    <View style={styles.inputInner}>
+                      <TextInput
+                        value={maxPlayers}
+                        onChangeText={setMaxPlayers}
+                        placeholder="2-4"
+                        placeholderTextColor="rgba(255,255,255,0.3)"
+                        style={styles.configInput}
+                        keyboardType="number-pad"
+                        maxLength={1}
+                      />
+                    </View>
+                  </DynamicGradientBorder>
+                </View>
+              </View>
+            </DynamicGradientBorder>
           </Animated.View>
         </ScrollView>
 
-        {/* Bouton créer */}
-        <View
-          style={{
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            paddingHorizontal: SPACING[4],
-            paddingBottom: insets.bottom + SPACING[4],
-            paddingTop: SPACING[3],
-            backgroundColor: 'rgba(12, 36, 62, 0.95)',
-          }}
-        >
-          <Pressable onPress={handleCreateRoom} disabled={isLoading}>
-            <LinearGradient
-              colors={['#FFBC40', '#F5A623']}
-              style={styles.primaryButton}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-            >
-              <Text style={styles.primaryButtonText}>
-                {isLoading ? 'Création...' : 'Créer le salon'}
-              </Text>
-            </LinearGradient>
-          </Pressable>
+        {/* Bottom button */}
+        <View style={[styles.bottomBar, { paddingBottom: insets.bottom + SPACING[4] }]}>
+          <GameButton
+            variant="yellow"
+            fullWidth
+            title={isLoading ? 'CREATION...' : 'CREER LE SALON'}
+            loading={isLoading}
+            onPress={handleCreateRoom}
+            disabled={!roomName.trim() || !maxPlayers}
+          />
         </View>
       </View>
     );
   }
 
-  // Mode salle d'attente
-  return (
-    <View style={{ flex: 1, backgroundColor: '#0C243E' }}>
-      <LinearGradient
-        colors={['#194F8A', '#0C243E']}
-        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-      />
+  // Confirmation (après création, avant lobby)
+  if (roomCode && !showLobby) {
+    return (
+      <View style={styles.container}>
+        <RadialBackground />
 
-      {/* Header */}
-      <View
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 10,
-          paddingTop: insets.top + SPACING[2],
-          paddingBottom: SPACING[3],
-          paddingHorizontal: SPACING[4],
-          backgroundColor: 'rgba(12, 36, 62, 0.85)',
-          borderBottomWidth: 1,
-          borderBottomColor: 'rgba(255, 188, 64, 0.1)',
-          flexDirection: 'row',
-          alignItems: 'center',
-        }}
-      >
-        <Pressable onPress={handleBack} hitSlop={8}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.text} />
-        </Pressable>
-        <Text
-          style={{
-            flex: 1,
-            fontFamily: FONTS.title,
-            fontSize: FONT_SIZES.xl,
-            color: COLORS.text,
-            textAlign: 'center',
+        {/* Fixed Header avec bouton retour */}
+        <View style={[styles.header, { paddingTop: insets.top + SPACING[2] }]}>
+          <Pressable onPress={handleBack} hitSlop={8}>
+            <Ionicons name="arrow-back" size={24} color="white" />
+          </Pressable>
+          <View style={{ flex: 1 }} />
+        </View>
+
+        <ScrollView
+          contentContainerStyle={{
+            paddingTop: insets.top + 60,
+            paddingBottom: insets.bottom + 120,
+            paddingHorizontal: SPACING[4],
+            alignItems: 'center',
           }}
+          showsVerticalScrollIndicator={false}
         >
-          {roomName || 'Salon'}
-        </Text>
+          {/* Carte de confirmation */}
+          <Animated.View entering={FadeInDown.delay(100).duration(500)}>
+            <DynamicGradientBorder
+              borderRadius={24}
+              fill="rgba(0, 0, 0, 0.35)"
+              boxWidth={contentWidth}
+            >
+              <View style={styles.confirmationCard}>
+                {/* Icône globe */}
+                <View style={styles.globeIconContainer}>
+                  <Ionicons name="globe" size={48} color="#FFFFFF" />
+                </View>
+
+                {/* Message de confirmation */}
+                <Text style={styles.confirmationTitle}>
+                  SALON '{roomName.toUpperCase()}' CRÉÉ !
+                </Text>
+
+                {/* Code */}
+                <DynamicGradientBorder
+                  borderRadius={14}
+                  fill="rgba(0, 0, 0, 0.35)"
+                  style={styles.codeBoxWrapper}
+                >
+                  <View style={styles.codeBox}>
+                    <Text style={styles.codeLabelText}>Code:</Text>
+                    <Text style={styles.codeValue}>{roomCode}</Text>
+                  </View>
+                </DynamicGradientBorder>
+
+                {/* Boutons Copier et Partager */}
+                <View style={styles.confirmationActions}>
+                  <Pressable onPress={handleCopyCode} style={styles.confirmationButton}>
+                    <DynamicGradientBorder
+                      borderRadius={14}
+                      fill="rgba(0, 0, 0, 0.35)"
+                      style={styles.actionButtonBorder}
+                    >
+                      <View style={styles.actionButtonInner}>
+                        <Ionicons name="copy-outline" size={18} color="#FFFFFF" />
+                        <Text style={styles.actionButtonText}>Copier</Text>
+                      </View>
+                    </DynamicGradientBorder>
+                  </Pressable>
+
+                  <Pressable onPress={handleShareCode} style={styles.confirmationButton}>
+                    <DynamicGradientBorder
+                      borderRadius={14}
+                      fill="rgba(0, 0, 0, 0.35)"
+                      style={styles.actionButtonBorder}
+                    >
+                      <View style={styles.actionButtonInner}>
+                        <Ionicons name="share-outline" size={18} color="#FFFFFF" />
+                        <Text style={styles.actionButtonText}>Partager</Text>
+                      </View>
+                    </DynamicGradientBorder>
+                  </Pressable>
+                </View>
+              </View>
+            </DynamicGradientBorder>
+          </Animated.View>
+        </ScrollView>
+
+        {/* Bottom button - Continue to lobby */}
+        <View style={[styles.bottomBar, { paddingBottom: insets.bottom + SPACING[4] }]}>
+          <GameButton
+            variant="green"
+            fullWidth
+            title="CONTINUER"
+            onPress={handleContinueToLobby}
+          />
+        </View>
+      </View>
+    );
+  }
+
+  // Waiting room (lobby avec joueurs)
+  return (
+    <View style={styles.container}>
+      <RadialBackground />
+
+      {/* Fixed Header */}
+      <View style={[styles.header, { paddingTop: insets.top + SPACING[2] }]}>
+        <Pressable onPress={handleBack} hitSlop={8}>
+          <Ionicons name="arrow-back" size={24} color="white" />
+        </Pressable>
+        <Text style={styles.headerTitle}>{roomName || 'SALON'}</Text>
         <View style={{ width: 24 }} />
       </View>
 
       <ScrollView
         contentContainerStyle={{
           paddingTop: insets.top + 80,
-          paddingBottom: insets.bottom + 100,
+          paddingBottom: insets.bottom + 120,
           paddingHorizontal: SPACING[4],
         }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Code du salon */}
+        {/* Room Code */}
         <Animated.View entering={FadeInDown.delay(100).duration(500)}>
-          <View style={styles.codeCard}>
-            <Text style={styles.codeLabel}>Code du salon</Text>
-            <Text style={styles.codeText}>{roomCode}</Text>
-            <View style={{ flexDirection: 'row', gap: SPACING[3], marginTop: SPACING[3] }}>
-              <Pressable onPress={handleCopyCode} style={styles.codeAction}>
-                <Ionicons name="copy-outline" size={20} color="#FFBC40" />
-                <Text style={styles.codeActionText}>Copier</Text>
-              </Pressable>
-              <Pressable onPress={handleShareCode} style={styles.codeAction}>
-                <Ionicons name="share-outline" size={20} color="#FFBC40" />
-                <Text style={styles.codeActionText}>Partager</Text>
-              </Pressable>
+          <DynamicGradientBorder
+            borderRadius={20}
+            fill="rgba(10, 25, 41, 0.6)"
+            boxWidth={contentWidth}
+          >
+            <View style={styles.codeSection}>
+              <Text style={styles.codeLabel}>CODE DU SALON</Text>
+              <Text style={styles.codeText}>{roomCode}</Text>
+              <View style={styles.codeActions}>
+                <Pressable onPress={handleCopyCode} style={styles.codeAction}>
+                  <Ionicons name="copy-outline" size={18} color="#FFBC40" />
+                  <Text style={styles.codeActionText}>Copier</Text>
+                </Pressable>
+                <Pressable onPress={handleShareCode} style={styles.codeAction}>
+                  <Ionicons name="share-outline" size={18} color="#FFBC40" />
+                  <Text style={styles.codeActionText}>Partager</Text>
+                </Pressable>
+              </View>
             </View>
-          </View>
+          </DynamicGradientBorder>
         </Animated.View>
 
-        {/* Liste des joueurs */}
-        <Animated.View entering={FadeInDown.delay(200).duration(500)}>
-          <Text style={styles.label}>
-            Joueurs ({playersList.length}/{maxPlayers})
+        {/* Players list */}
+        <Animated.View entering={FadeInDown.delay(200).duration(500)} style={{ marginTop: SPACING[5] }}>
+          <Text style={styles.playersLabel}>
+            JOUEURS ({playersList.length}/{maxPlayers})
           </Text>
+
           <View style={{ gap: SPACING[3] }}>
             {playersList.length === 0 ? (
-              <View style={styles.emptyPlayers}>
-                <Text style={styles.emptyText}>En attente de joueurs...</Text>
-              </View>
+              <DynamicGradientBorder
+                borderRadius={16}
+                fill="rgba(10, 25, 41, 0.6)"
+                boxWidth={contentWidth}
+              >
+                <View style={styles.emptyPlayers}>
+                  <Ionicons name="hourglass-outline" size={24} color="rgba(255,255,255,0.3)" />
+                  <Text style={styles.emptyText}>En attente de joueurs...</Text>
+                </View>
+              </DynamicGradientBorder>
             ) : (
               playersList.map((player, index) => (
                 <Animated.View
                   key={player.playerId}
                   entering={FadeIn.delay(300 + index * 100).duration(300)}
                 >
-                  <View style={styles.playerCard}>
-                    <Avatar
-                      name={player.displayName ?? player.name ?? 'Joueur'}
-                      playerColor={player.color}
-                      size="md"
-                    />
-                    <View style={{ flex: 1, marginLeft: SPACING[3] }}>
-                      <Text style={styles.playerName}>
-                        {player.displayName ?? player.name}
-                      </Text>
-                      {player.isHost && (
-                        <View style={styles.hostBadge}>
-                          <Ionicons name="star" size={10} color="#FFBC40" />
-                          <Text style={styles.hostText}>Hôte</Text>
-                        </View>
-                      )}
-                    </View>
-                    <View
-                      style={[
+                  <DynamicGradientBorder
+                    borderRadius={16}
+                    fill={player.isHost ? 'rgba(255, 188, 64, 0.08)' : 'rgba(10, 25, 41, 0.6)'}
+                    boxWidth={contentWidth}
+                  >
+                    <View style={styles.playerCard}>
+                      <Avatar
+                        name={player.displayName ?? player.name ?? 'Joueur'}
+                        playerColor={player.color}
+                        size="md"
+                      />
+                      <View style={{ flex: 1, marginLeft: SPACING[3] }}>
+                        <Text style={styles.playerName}>
+                          {player.displayName ?? player.name}
+                        </Text>
+                        {player.isHost && (
+                          <View style={styles.hostBadge}>
+                            <Ionicons name="star" size={10} color="#FFBC40" />
+                            <Text style={styles.hostText}>Hote</Text>
+                          </View>
+                        )}
+                      </View>
+                      <View style={[
                         styles.readyBadge,
                         (player.isReady || player.isHost) && styles.readyBadgeActive,
-                      ]}
-                    >
-                      <Ionicons
-                        name={player.isReady || player.isHost ? 'checkmark' : 'time'}
-                        size={14}
-                        color={player.isReady || player.isHost ? '#4CAF50' : COLORS.textSecondary}
-                      />
-                      <Text
-                        style={[
+                      ]}>
+                        <Ionicons
+                          name={player.isReady || player.isHost ? 'checkmark' : 'time'}
+                          size={14}
+                          color={player.isReady || player.isHost ? '#4CAF50' : 'rgba(255,255,255,0.5)'}
+                        />
+                        <Text style={[
                           styles.readyText,
                           (player.isReady || player.isHost) && styles.readyTextActive,
-                        ]}
-                      >
-                        {player.isHost ? 'Hôte' : player.isReady ? 'Prêt' : 'En attente'}
-                      </Text>
+                        ]}>
+                          {player.isHost ? 'Hote' : player.isReady ? 'Pret' : 'En attente'}
+                        </Text>
+                      </View>
                     </View>
-                  </View>
+                  </DynamicGradientBorder>
                 </Animated.View>
               ))
             )}
@@ -490,23 +538,12 @@ export default function CreateRoomScreen() {
         </Animated.View>
       </ScrollView>
 
-      {/* Bouton démarrer */}
-      <View
-        style={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          paddingHorizontal: SPACING[4],
-          paddingBottom: insets.bottom + SPACING[4],
-          paddingTop: SPACING[3],
-          backgroundColor: 'rgba(12, 36, 62, 0.95)',
-        }}
-      >
+      {/* Bottom button */}
+      <View style={[styles.bottomBar, { paddingBottom: insets.bottom + SPACING[4] }]}>
         <GameButton
           variant="yellow"
           fullWidth
-          title={isLoading ? 'Chargement...' : 'Démarrer la partie'}
+          title={isLoading ? 'CHARGEMENT...' : 'DEMARRER LA PARTIE'}
           loading={isLoading}
           disabled={playersList.length < 2}
           onPress={handleStartGame}
@@ -515,108 +552,223 @@ export default function CreateRoomScreen() {
           <Text style={styles.waitingText}>Minimum 2 joueurs requis</Text>
         )}
         {playersList.length >= 2 && !allReady && (
-          <Text style={styles.waitingText}>En attente que tous soient prêts...</Text>
+          <Text style={styles.waitingText}>En attente que tous soient prets...</Text>
         )}
       </View>
     </View>
   );
 }
 
-const styles = {
-  label: {
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#0C243E',
+  },
+  header: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    paddingBottom: SPACING[3],
+    paddingHorizontal: SPACING[4],
+    backgroundColor: '#0A1929',
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerTitle: {
+    fontFamily: FONTS.title,
+    fontSize: 20,
+    color: 'white',
+    letterSpacing: 0.5,
+  },
+  configTitle: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES.xl,
+    color: '#FFFFFF',
+    textAlign: 'center',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  configCard: {
+    padding: SPACING[5],
+    gap: SPACING[5],
+  },
+  fieldGroup: {
+    gap: SPACING[2],
+  },
+  fieldLabel: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.sm,
+    color: 'rgba(255, 255, 255, 0.7)',
+  },
+  inputBorderWrapper: {
+    width: '100%',
+    overflow: 'hidden',
+  },
+  inputInner: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  configInput: {
     fontFamily: FONTS.bodySemiBold,
     fontSize: FONT_SIZES.md,
-    color: COLORS.text,
-    marginBottom: SPACING[3],
+    color: '#FFFFFF',
+  },
+  confirmationCard: {
+    padding: SPACING[6],
+    alignItems: 'center',
+    gap: SPACING[5],
+  },
+  globeIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  confirmationTitle: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES.lg,
+    color: '#FFBC40',
+    textAlign: 'center',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  codeBoxWrapper: {
+    width: '100%',
+    minWidth: 280,
+    alignSelf: 'stretch',
+    marginHorizontal: -SPACING[4],
+    overflow: 'hidden',
+  },
+  codeBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: SPACING[2],
+  },
+  codeLabelText: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.md,
+    color: '#4CAF50',
+  },
+  codeValue: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES.lg,
+    color: '#4CAF50',
+    letterSpacing: 2,
+  },
+  confirmationActions: {
+    flexDirection: 'row',
+    gap: SPACING[3],
+    width: '100%',
+  },
+  confirmationButton: {
+    flex: 1,
+  },
+  actionButtonBorder: {
+    width: '100%',
+    overflow: 'hidden',
+  },
+  actionButtonInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING[2],
+    paddingVertical: 12,
+  },
+  actionButtonText: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.sm,
+    color: '#FFFFFF',
+  },
+  label: {
+    fontFamily: FONTS.title,
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginBottom: SPACING[2],
     marginTop: SPACING[5],
-  } as const,
-  inputContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  } as const,
+  },
   input: {
     fontFamily: FONTS.body,
     fontSize: FONT_SIZES.md,
-    color: COLORS.text,
+    color: 'white',
     padding: SPACING[4],
-  } as const,
-  optionCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 12,
-    paddingVertical: SPACING[3],
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    alignItems: 'center' as const,
   },
-  optionCardSelected: {
-    borderColor: '#FFBC40',
-    backgroundColor: 'rgba(255, 188, 64, 0.15)',
-  } as const,
+  optionCard: {
+    paddingVertical: SPACING[3],
+    alignItems: 'center',
+  },
   optionText: {
     fontFamily: FONTS.title,
-    fontSize: FONT_SIZES.xl,
-    color: COLORS.text,
-  } as const,
-  optionTextSelected: {
-    color: '#FFBC40',
-  } as const,
+    fontSize: 22,
+    color: 'white',
+  },
+  betText: {
+    fontFamily: FONTS.title,
+    fontSize: 15,
+    color: 'white',
+  },
   editionCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 16,
-    padding: SPACING[4],
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    alignItems: 'center' as const,
+    padding: SPACING[3],
+    alignItems: 'center',
     width: 100,
   },
   editionIcon: {
     width: 48,
     height: 48,
     borderRadius: 12,
-    justifyContent: 'center' as const,
-    alignItems: 'center' as const,
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: SPACING[2],
   },
   editionName: {
     fontFamily: FONTS.bodySemiBold,
     fontSize: FONT_SIZES.sm,
-    color: COLORS.text,
-  } as const,
-  primaryButton: {
-    paddingVertical: SPACING[4],
-    borderRadius: 16,
-    alignItems: 'center' as const,
+    color: 'white',
   },
-  primaryButtonText: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: FONT_SIZES.md,
-    color: '#0C243E',
-  } as const,
-  codeCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 20,
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: SPACING[4],
+    paddingTop: SPACING[3],
+  },
+  codeSection: {
+    alignItems: 'center',
     padding: SPACING[5],
-    alignItems: 'center' as const,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 188, 64, 0.2)',
+    minWidth: 280,
+    alignSelf: 'stretch',
+    marginHorizontal: -SPACING[4],
   },
   codeLabel: {
     fontFamily: FONTS.body,
     fontSize: FONT_SIZES.sm,
-    color: COLORS.textSecondary,
+    color: 'rgba(255, 255, 255, 0.5)',
     marginBottom: SPACING[2],
-  } as const,
+  },
   codeText: {
     fontFamily: FONTS.title,
     fontSize: 32,
     color: '#FFBC40',
     letterSpacing: 4,
-  } as const,
+  },
+  codeActions: {
+    flexDirection: 'row',
+    gap: SPACING[3],
+    marginTop: SPACING[3],
+  },
   codeAction: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: 'rgba(255, 188, 64, 0.15)',
     paddingHorizontal: SPACING[4],
     paddingVertical: SPACING[2],
@@ -627,35 +779,36 @@ const styles = {
     fontFamily: FONTS.bodySemiBold,
     fontSize: FONT_SIZES.sm,
     color: '#FFBC40',
-  } as const,
+  },
+  playersLabel: {
+    fontFamily: FONTS.title,
+    fontSize: 16,
+    color: 'white',
+    marginBottom: SPACING[3],
+  },
   emptyPlayers: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 12,
-    padding: SPACING[4],
-    alignItems: 'center' as const,
+    alignItems: 'center',
+    padding: SPACING[5],
+    gap: SPACING[2],
   },
   emptyText: {
     fontFamily: FONTS.body,
     fontSize: FONT_SIZES.sm,
-    color: COLORS.textSecondary,
-  } as const,
+    color: 'rgba(255, 255, 255, 0.4)',
+  },
   playerCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 16,
-    padding: SPACING[4],
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SPACING[3],
   },
   playerName: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: FONT_SIZES.md,
-    color: COLORS.text,
-  } as const,
+    fontFamily: FONTS.title,
+    fontSize: 15,
+    color: 'white',
+  },
   hostBadge: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 2,
     marginTop: 2,
   },
@@ -663,32 +816,32 @@ const styles = {
     fontFamily: FONTS.body,
     fontSize: FONT_SIZES.xs,
     color: '#FFBC40',
-  } as const,
+  },
   readyBadge: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: SPACING[1],
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     paddingHorizontal: SPACING[3],
     paddingVertical: SPACING[1],
     borderRadius: 12,
   },
   readyBadgeActive: {
     backgroundColor: 'rgba(76, 175, 80, 0.2)',
-  } as const,
+  },
   readyText: {
     fontFamily: FONTS.body,
     fontSize: FONT_SIZES.xs,
-    color: COLORS.textSecondary,
-  } as const,
+    color: 'rgba(255, 255, 255, 0.5)',
+  },
   readyTextActive: {
     color: '#4CAF50',
-  } as const,
+  },
   waitingText: {
     fontFamily: FONTS.body,
     fontSize: FONT_SIZES.sm,
-    color: COLORS.textSecondary,
-    textAlign: 'center' as const,
+    color: 'rgba(255, 255, 255, 0.5)',
+    textAlign: 'center',
     marginTop: SPACING[2],
   },
-};
+});

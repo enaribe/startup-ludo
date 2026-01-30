@@ -215,6 +215,19 @@ export function useMultiplayer(userId: string | null): UseMultiplayerReturn {
     unsubscribesRef.current.push(unsubChat);
   }, []);
 
+  // Reconnect subscriptions if singleton already has a room (e.g., navigating from quick-match)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const existingRoomId = multiplayerSync.getRoomId();
+    if (existingRoomId && unsubscribesRef.current.length === 0) {
+      setupSubscriptions();
+      setState((prev) => ({
+        ...prev,
+        isConnected: multiplayerSync.getIsConnected(),
+      }));
+    }
+  }, [setupSubscriptions]);
+
   const leaveRoom = useCallback(async () => {
     setState((prev) => ({ ...prev, isLoading: true }));
 

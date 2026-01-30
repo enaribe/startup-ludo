@@ -8,18 +8,10 @@ import { SPACING } from '@/styles/spacing';
 import { FONTS } from '@/styles/typography';
 import { useAuthStore, useUserStore } from '@/stores';
 import { RadialBackground, DynamicGradientBorder } from '@/components/ui';
+import { ACHIEVEMENTS as ALL_ACHIEVEMENTS } from '@/config/achievements';
+import { getRankFromXP, getXPForNextRank } from '@/config/progression';
 
 const { width: screenWidth } = Dimensions.get('window');
-
-// Mock achievements based on image
-const ACHIEVEMENTS = [
-  { id: '1', icon: 'rocket' as const, title: 'PREMIÈRE STARTUP', unlocked: true },
-  { id: '2', icon: 'trophy' as const, title: 'VAINQUEUR', unlocked: true },
-  { id: '3', icon: 'star' as const, title: 'CRÉATEUR', unlocked: true },
-  { id: '4', icon: 'cash-outline' as const, title: 'INVESTISSEUR', unlocked: false },
-  { id: '5', icon: 'business' as const, title: 'EMPIRE', unlocked: false },
-  { id: '6', icon: 'ribbon-outline' as const, title: 'LÉGENDE', unlocked: false },
-];
 
 // Menu items based on image
 const MENU_ITEMS = [
@@ -36,22 +28,41 @@ export default function ProfilScreen() {
   const { user } = useAuthStore();
   const profile = useUserStore((state) => state.profile);
   const levelProgress = useUserStore((state) => state.levelProgress);
+  const unlockedAchievementIds = useUserStore((state) => state.getUnlockedAchievements());
 
   // Progression XP
-  const currentXP = levelProgress?.currentXP ?? 8432;
-  const xpForNextLevel = levelProgress?.xpForNext ?? 15000;
-  const xpProgress = (currentXP / xpForNextLevel) * 100;
-  
+  const totalXP = profile?.xp ?? 0;
+  const currentXP = levelProgress?.currentXP ?? 0;
+  const xpForNextLevel = levelProgress?.xpForNext ?? 100;
+  const xpProgress = xpForNextLevel > 0 ? (currentXP / xpForNextLevel) * 100 : 0;
+
+  // Rang et prochain rang
+  const rankInfo = getRankFromXP(totalXP);
+  const nextRankInfo = getXPForNextRank(totalXP);
+
   // Nom affiché
-  const displayName = user?.displayName || profile?.displayName || 'VICTOR THIAM';
-  const displayRank = profile?.rank || 'Scale-up';
+  const displayName = user?.displayName || profile?.displayName || 'Joueur';
+  const displayRank = rankInfo.title;
+
+  // Achievements dynamiques : 6 premiers (unlocked first, then locked)
+  const achievementsDisplay = ALL_ACHIEVEMENTS.slice(0, 6).map((a) => ({
+    id: a.id,
+    icon: a.icon as keyof typeof Ionicons.glyphMap,
+    title: a.title.toUpperCase(),
+    unlocked: unlockedAchievementIds.includes(a.id),
+  }));
 
   const handleMenuPress = (itemId: string) => {
     switch (itemId) {
       case 'settings':
         router.push('/settings' as never);
         break;
-      // Add other routes as needed
+      case 'stats':
+        router.push('/history' as never);
+        break;
+      case 'help':
+        router.push('/help' as never);
+        break;
     }
   };
 
@@ -88,7 +99,7 @@ export default function ProfilScreen() {
               
               <Pressable style={[styles.followButton, styles.followButtonActive]}>
                 <Ionicons name="person" size={16} color="#FFBC40" style={{ marginRight: 6 }} />
-                <Text style={[styles.followButtonText, { color: '#FFBC40' }]}>25 SUIVIS</Text>
+                <Text style={[styles.followButtonText, { color: '#FFBC40' }]}>0 SUIVIS</Text>
               </Pressable>
             </View>
           </Animated.View>
@@ -106,7 +117,7 @@ export default function ProfilScreen() {
           >
             <View style={styles.cardContent}>
               <Text style={styles.progressionSubtitle}>
-                {displayRank} - Prochain: Entreprise (25K XP)
+                {displayRank}{nextRankInfo.nextRank ? ` - Prochain: ${nextRankInfo.nextRank.title} (${nextRankInfo.xpNeeded.toLocaleString()} XP restants)` : ' - Rang max atteint !'}
               </Text>
               
               <View style={styles.progressBarContainer}>
@@ -131,7 +142,7 @@ export default function ProfilScreen() {
             boxWidth={contentWidth}
           >
             <View style={[styles.cardContent, styles.achievementsGrid]}>
-              {ACHIEVEMENTS.map((item) => (
+              {achievementsDisplay.map((item) => (
                 <View key={item.id} style={styles.achievementItem}>
                   <View style={[
                     styles.achievementIconBox, 
