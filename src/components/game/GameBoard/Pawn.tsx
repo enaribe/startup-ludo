@@ -1,10 +1,10 @@
 /**
  * Pawn - Composant de pion animé
  *
- * Gère les animations de déplacement et les interactions
+ * Gère les animations de déplacement case par case et les interactions
  */
 
-import { memo, useEffect, useRef } from 'react';
+import { memo, useEffect, useRef, useCallback } from 'react';
 import { StyleSheet, View, Pressable } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -14,6 +14,7 @@ import Animated, {
   withTiming,
   Easing,
   runOnJS,
+  cancelAnimation,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import type { PlayerColor } from '@/types';
@@ -24,6 +25,7 @@ interface PawnProps {
   targetX: number;
   targetY: number;
   cellSize: number;
+  movePath?: { x: number; y: number }[];
   isActive?: boolean;
   isSelected?: boolean;
   isInHome?: boolean;
@@ -33,6 +35,8 @@ interface PawnProps {
   onPress?: () => void;
 }
 
+const STEP_DURATION = 100; // ms par case (augmenté pour stabilité)
+
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export const Pawn = memo(function Pawn({
@@ -40,16 +44,18 @@ export const Pawn = memo(function Pawn({
   targetX,
   targetY,
   cellSize,
+  movePath,
   isActive = false,
   isSelected = false,
   isInHome = false,
   isAI = false,
-  pawnIndex: _pawnIndex,
+  pawnIndex,
   onAnimationComplete,
   onPress,
 }: PawnProps) {
   const pawnSize = cellSize * 0.7;
   const isFirstRender = useRef(true);
+  const lastTargetRef = useRef<string>('');
 
   // Valeurs d'animation
   const translateX = useSharedValue(targetX - pawnSize / 2);
@@ -58,43 +64,91 @@ export const Pawn = memo(function Pawn({
   const rotation = useSharedValue(0);
   const bounce = useSharedValue(0);
 
+  // Callback stable pour éviter les re-renders
+  const handleAnimationComplete = useCallback(() => {
+    console.log(`[Pawn ${pawnIndex}] Animation complete`);
+    onAnimationComplete?.();
+  }, [onAnimationComplete, pawnIndex]);
+
   // Animation de déplacement
   useEffect(() => {
     const newX = targetX - pawnSize / 2;
     const newY = targetY - pawnSize / 2;
+    const targetKey = `${targetX},${targetY}`;
 
+    console.log(`[Pawn ${pawnIndex}] useEffect triggered`, {
+      targetX,
+      targetY,
+      newX,
+      newY,
+      isFirstRender: isFirstRender.current,
+      lastTarget: lastTargetRef.current,
+      hasMovePath: !!movePath,
+      movePathLength: movePath?.length ?? 0,
+    });
+
+    // Premier rendu : positionnement direct sans animation
     if (isFirstRender.current) {
+      console.log(`[Pawn ${pawnIndex}] First render - direct positioning`);
       translateX.value = newX;
       translateY.value = newY;
       isFirstRender.current = false;
+      lastTargetRef.current = targetKey;
       return;
     }
 
-    // Animation de déplacement avec rebond
-    translateX.value = withSpring(newX, {
-      damping: 12,
-      stiffness: 100,
-    });
+    // Si la cible n'a pas changé, ne rien faire
+    if (targetKey === lastTargetRef.current) {
+      console.log(`[Pawn ${pawnIndex}] Target unchanged, skipping animation`);
+      return;
+    }
 
-    translateY.value = withSpring(
-      newY,
-      {
-        damping: 12,
-        stiffness: 100,
-      },
-      (finished) => {
-        if (finished && onAnimationComplete) {
-          runOnJS(onAnimationComplete)();
+    lastTargetRef.current = targetKey;
+
+    // Annuler les animations en cours pour éviter les conflits
+    try {
+      cancelAnimation(translateX);
+      cancelAnimation(translateY);
+      cancelAnimation(bounce);
+    } catch (e) {
+      console.warn(`[Pawn ${pawnIndex}] cancelAnimation error:`, e);
+    }
+
+    // Animation simple et robuste : spring direct vers la cible
+    console.log(`[Pawn ${pawnIndex}] Starting spring animation to (${newX}, ${newY})`);
+    
+    try {
+      translateX.value = withSpring(newX, { 
+        damping: 15, 
+        stiffness: 120,
+        mass: 0.8,
+      });
+      
+      translateY.value = withSpring(newY, { 
+        damping: 15, 
+        stiffness: 120,
+        mass: 0.8,
+      }, (finished) => {
+        'worklet';
+        if (finished) {
+          runOnJS(handleAnimationComplete)();
         }
-      }
-    );
+      });
 
-    // Effet de rebond pendant le mouvement
-    bounce.value = withSequence(
-      withTiming(-8, { duration: 150, easing: Easing.out(Easing.quad) }),
-      withSpring(0, { damping: 8 })
-    );
-  }, [targetX, targetY, pawnSize, translateX, translateY, bounce, onAnimationComplete]);
+      // Petit rebond
+      bounce.value = withSequence(
+        withTiming(-6, { duration: 120, easing: Easing.out(Easing.quad) }),
+        withTiming(0, { duration: 180, easing: Easing.inOut(Easing.quad) })
+      );
+    } catch (error) {
+      console.error(`[Pawn ${pawnIndex}] Animation error:`, error);
+      // Fallback : positionnement direct
+      translateX.value = newX;
+      translateY.value = newY;
+      bounce.value = 0;
+      handleAnimationComplete();
+    }
+  }, [targetX, targetY, pawnSize, pawnIndex, handleAnimationComplete, translateX, translateY, bounce]);
 
   // Animation de pulsation pour pion actif
   useEffect(() => {
@@ -128,14 +182,24 @@ export const Pawn = memo(function Pawn({
     }
   }, [isSelected, isActive, rotation, scale]);
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: translateX.value },
-      { translateY: translateY.value + bounce.value },
-      { scale: scale.value },
-      { rotate: `${rotation.value}deg` },
-    ],
-  }));
+  const animatedStyle = useAnimatedStyle(() => {
+    'worklet';
+    // Protection contre les valeurs NaN
+    const tx = isNaN(translateX.value) ? 0 : translateX.value;
+    const ty = isNaN(translateY.value) ? 0 : translateY.value;
+    const b = isNaN(bounce.value) ? 0 : bounce.value;
+    const s = isNaN(scale.value) || scale.value <= 0 ? 1 : scale.value;
+    const r = isNaN(rotation.value) ? 0 : rotation.value;
+    
+    return {
+      transform: [
+        { translateX: tx },
+        { translateY: ty + b },
+        { scale: s },
+        { rotate: `${r}deg` },
+      ],
+    };
+  });
 
   const pawnColor = COLORS.players[color];
 

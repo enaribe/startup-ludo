@@ -223,11 +223,12 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   progressDots: {
+    flex: 1,
     flexDirection: 'row',
-    gap: 3,
+    gap: 4,
   },
   progressDot: {
-    width: 6,
+    flex: 1,
     height: 6,
     borderRadius: 3,
   },

@@ -293,21 +293,36 @@ export const useGameStore = create<GameStore>()(
       // ===== ACTIONS DE JEU =====
 
       executeMove: (pawnIndex) => {
+        console.log('[useGameStore.executeMove] Starting move for pawn:', pawnIndex);
+        
         const { game } = get();
-        if (!game || game.diceValue === null) return null;
+        if (!game || game.diceValue === null) {
+          console.log('[useGameStore.executeMove] No game or dice value');
+          return null;
+        }
 
         const currentPlayer = game.players[game.currentPlayerIndex];
-        if (!currentPlayer) return null;
+        if (!currentPlayer) {
+          console.log('[useGameStore.executeMove] No current player');
+          return null;
+        }
 
         const pawn = currentPlayer.pawns[pawnIndex];
-        if (!pawn) return null;
+        if (!pawn) {
+          console.log('[useGameStore.executeMove] No pawn at index:', pawnIndex);
+          return null;
+        }
+
+        console.log('[useGameStore.executeMove] Pawn state:', pawn);
 
         // Sortie de maison
         if (pawn.status === 'home') {
+          console.log('[useGameStore.executeMove] Pawn is at home, calling exitHome');
           return get().exitHome(pawnIndex);
         }
 
         // Mouvement normal
+        console.log('[useGameStore.executeMove] Moving pawn on circuit/final');
         const result = GameEngine.movePawn(
           currentPlayer,
           pawnIndex,
@@ -315,7 +330,17 @@ export const useGameStore = create<GameStore>()(
           game.players
         );
 
-        if (!result.canMove) return null;
+        console.log('[useGameStore.executeMove] Move result:', {
+          canMove: result.canMove,
+          newStatus: result.newState?.status,
+          newPosition: result.newState?.position,
+          pathLength: result.path?.length,
+        });
+
+        if (!result.canMove) {
+          console.log('[useGameStore.executeMove] Cannot move');
+          return null;
+        }
 
         set((state) => {
           if (state.game) {
@@ -324,6 +349,7 @@ export const useGameStore = create<GameStore>()(
               player.pawns[pawnIndex] = result.newState;
               state.game.updatedAt = Date.now();
               state.lastMoveResult = result;
+              console.log('[useGameStore.executeMove] State updated, lastMoveResult set');
             }
           }
         });
@@ -332,11 +358,19 @@ export const useGameStore = create<GameStore>()(
       },
 
       exitHome: (pawnIndex) => {
+        console.log('[useGameStore.exitHome] Exiting home for pawn:', pawnIndex);
+        
         const { game } = get();
-        if (!game || game.diceValue !== 6) return null;
+        if (!game || game.diceValue !== 6) {
+          console.log('[useGameStore.exitHome] Cannot exit - no 6');
+          return null;
+        }
 
         const currentPlayer = game.players[game.currentPlayerIndex];
-        if (!currentPlayer) return null;
+        if (!currentPlayer) {
+          console.log('[useGameStore.exitHome] No current player');
+          return null;
+        }
 
         const result = GameEngine.exitHome(
           currentPlayer,
@@ -344,7 +378,17 @@ export const useGameStore = create<GameStore>()(
           game.players
         );
 
-        if (!result.canMove) return null;
+        console.log('[useGameStore.exitHome] Exit result:', {
+          canMove: result.canMove,
+          newStatus: result.newState?.status,
+          newPosition: result.newState?.position,
+          pathLength: result.path?.length,
+        });
+
+        if (!result.canMove) {
+          console.log('[useGameStore.exitHome] Cannot exit');
+          return null;
+        }
 
         set((state) => {
           if (state.game) {
@@ -353,6 +397,7 @@ export const useGameStore = create<GameStore>()(
               player.pawns[pawnIndex] = result.newState;
               state.game.updatedAt = Date.now();
               state.lastMoveResult = result;
+              console.log('[useGameStore.exitHome] State updated');
             }
           }
         });

@@ -18,6 +18,7 @@ import {
     type Coordinate,
 } from '@/config/boardConfig';
 import { GameEngine } from '@/services/game/GameEngine';
+import { useGameStore } from '@/stores';
 import type { Player, PlayerColor } from '@/types';
 import { memo, useMemo } from 'react';
 import { Dimensions, StyleSheet, View } from 'react-native';
@@ -53,6 +54,40 @@ export const GameBoard = memo(function GameBoard({
 
   // Taille des zones maison (5 cellules pour grille 13x13)
   const homeZoneSize = cellSize * 5;
+
+  // Dernier résultat de mouvement (pour animation case par case)
+  const lastMoveResult = useGameStore((s) => s.lastMoveResult);
+
+  // Convertir le chemin du dernier mouvement en pixels
+  const movePathPixels = useMemo(() => {
+    if (!lastMoveResult?.path?.length) {
+      console.log('[GameBoard] No move path to convert');
+      return null;
+    }
+    
+    console.log('[GameBoard] Converting move path:', {
+      pathLength: lastMoveResult.path.length,
+      path: lastMoveResult.path,
+    });
+    
+    // Filtrer les coordonnées invalides
+    const validPath = lastMoveResult.path.filter(
+      (coord) => coord && typeof coord.col === 'number' && typeof coord.row === 'number'
+    );
+    
+    if (validPath.length !== lastMoveResult.path.length) {
+      console.warn('[GameBoard] Some coords in path were invalid!', {
+        original: lastMoveResult.path.length,
+        valid: validPath.length,
+      });
+    }
+    
+    if (validPath.length === 0) {
+      return null;
+    }
+    
+    return validPath.map((coord) => coordsToPixels(coord, cellSize, boardPadding));
+  }, [lastMoveResult, cellSize, boardPadding]);
 
   // Données des cases du circuit
   const pathCells = useMemo(() => {
@@ -97,6 +132,8 @@ export const GameBoard = memo(function GameBoard({
 
   // Positions des pions
   const pawnPositions = useMemo(() => {
+    console.log('[GameBoard] Calculating pawn positions...');
+    
     const positions: {
       playerId: string;
       playerColor: PlayerColor;
@@ -109,8 +146,21 @@ export const GameBoard = memo(function GameBoard({
 
     players.forEach(player => {
       player.pawns.forEach((pawn, index) => {
-        const coords = GameEngine.getPawnCoordinates(player.color, pawn);
-        if (coords) {
+        try {
+          const coords = GameEngine.getPawnCoordinates(player.color, pawn);
+          
+          if (!coords) {
+            console.warn(`[GameBoard] No coords for pawn ${index} of ${player.color}`, pawn);
+            return;
+          }
+          
+          // Vérifier que les coordonnées sont valides
+          if (typeof coords.row !== 'number' || typeof coords.col !== 'number' ||
+              isNaN(coords.row) || isNaN(coords.col)) {
+            console.error(`[GameBoard] Invalid coords for pawn ${index} of ${player.color}:`, coords, pawn);
+            return;
+          }
+          
           positions.push({
             playerId: player.id,
             playerColor: player.color,
@@ -120,10 +170,13 @@ export const GameBoard = memo(function GameBoard({
             isFinished: pawn.status === 'finished',
             isAI: player.isAI,
           });
+        } catch (error) {
+          console.error(`[GameBoard] Error getting coords for pawn ${index} of ${player.color}:`, error);
         }
       });
     });
 
+    console.log('[GameBoard] Pawn positions calculated:', positions.length);
     return positions;
   }, [players]);
 
@@ -156,7 +209,6 @@ export const GameBoard = memo(function GameBoard({
           size={homeZoneSize}
           boardPadding={boardPadding}
           player={players.find(p => p.color === 'yellow')}
-          isCurrentPlayer={players.find(p => p.color === 'yellow')?.id === currentPlayerId}
         />
         <HomeZone
           color="blue"
@@ -164,7 +216,6 @@ export const GameBoard = memo(function GameBoard({
           size={homeZoneSize}
           boardPadding={boardPadding}
           player={players.find(p => p.color === 'blue')}
-          isCurrentPlayer={players.find(p => p.color === 'blue')?.id === currentPlayerId}
         />
         <HomeZone
           color="red"
@@ -172,7 +223,6 @@ export const GameBoard = memo(function GameBoard({
           size={homeZoneSize}
           boardPadding={boardPadding}
           player={players.find(p => p.color === 'red')}
-          isCurrentPlayer={players.find(p => p.color === 'red')?.id === currentPlayerId}
         />
         <HomeZone
           color="green"
@@ -180,7 +230,6 @@ export const GameBoard = memo(function GameBoard({
           size={homeZoneSize}
           boardPadding={boardPadding}
           player={players.find(p => p.color === 'green')}
-          isCurrentPlayer={players.find(p => p.color === 'green')?.id === currentPlayerId}
         />
 
         {/* Cases du chemin (circuit + finaux) */}
@@ -220,6 +269,32 @@ export const GameBoard = memo(function GameBoard({
             const isSelected = isCurrentPlayer && selectedPawnIndex === pawn.pawnIndex;
             const { x, y } = coordsToPixels(pawn.coords, cellSize, boardPadding);
 
+            // Protection contre coordonnées invalides
+            if (isNaN(x) || isNaN(y) || x === 0 && y === 0) {
+              console.error('[GameBoard] Skipping pawn with invalid pixel coords:', {
+                pawn,
+                x,
+                y,
+              });
+              return null;
+            }
+
+            // Fournir le chemin d'animation case par case au pion qui vient de bouger
+            const isMovingPawn = isCurrentPlayer
+              && selectedPawnIndex === pawn.pawnIndex
+              && movePathPixels && movePathPixels.length > 0;
+
+            // Log le mouvement
+            if (isMovingPawn) {
+              console.log('[GameBoard] Pawn is moving:', {
+                pawnIndex: pawn.pawnIndex,
+                color: pawn.playerColor,
+                targetX: x,
+                targetY: y,
+                pathLength: movePathPixels?.length,
+              });
+            }
+
             return (
               <Pawn
                 key={`${pawn.playerId}-${pawn.pawnIndex}`}
@@ -227,6 +302,7 @@ export const GameBoard = memo(function GameBoard({
                 targetX={x}
                 targetY={y}
                 cellSize={cellSize}
+                movePath={isMovingPawn ? movePathPixels : undefined}
                 isActive={isCurrentPlayer && !pawn.isHome}
                 isSelected={isSelected}
                 isInHome={pawn.isHome}

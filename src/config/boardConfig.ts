@@ -284,6 +284,17 @@ export function coordsToPixels(
   cellSize: number,
   boardPadding: number = 0
 ): { x: number; y: number } {
+  // Protection contre les coordonnées invalides
+  if (!coords || typeof coords.col !== 'number' || typeof coords.row !== 'number') {
+    console.error('[coordsToPixels] Invalid coords:', coords);
+    return { x: 0, y: 0 };
+  }
+  
+  if (isNaN(coords.col) || isNaN(coords.row)) {
+    console.error('[coordsToPixels] NaN coords:', coords);
+    return { x: 0, y: 0 };
+  }
+  
   return {
     x: boardPadding + coords.col * cellSize + cellSize / 2,
     y: boardPadding + coords.row * cellSize + cellSize / 2,

@@ -19,6 +19,8 @@ import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import type { ChallengeEvent, DuelEvent, FundingEvent, OpportunityEvent, Player, QuizEvent } from '@/types';
 
+const PAWN_STEP_MS = 80; // Doit correspondre à STEP_DURATION dans Pawn.tsx
+
 export default function PlayScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -160,6 +162,15 @@ export default function PlayScreen() {
     return GameEngine.canExitHome(currentPlayer, game.diceValue);
   }, [currentPlayer, game?.diceValue]);
 
+  // End turn — defined early so all callbacks can reference it
+  const handleEndTurn = useCallback(() => {
+    setAnimating(false);
+    clearSelection();
+    setDiceValue(null);
+    setIsRolling(false);
+    nextTurn();
+  }, [clearSelection, nextTurn, setAnimating]);
+
   // Handle dice roll
   const handleRollDice = useCallback(() => {
     if (!canRollDice()) return;
@@ -172,6 +183,51 @@ export default function PlayScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
   }, [canRollDice, rollDice, hapticsEnabled]);
+
+  // Handle exiting a pawn from home
+  const handleExitHome = useCallback((pawnIndex: number) => {
+    if (!currentPlayer || !canExitHome) return;
+
+    setAnimating(true);
+    const result = exitHome(pawnIndex);
+
+    const animDelay = result?.path?.length
+      ? result.path.length * PAWN_STEP_MS + 150
+      : 400;
+
+    if (result) {
+      // Handle capture at start position (après animation)
+      if (result.capturedPawn) {
+        setTimeout(() => {
+          handleCapture(result.capturedPawn!.playerId, result.capturedPawn!.pawnIndex);
+          if (hapticsEnabled) {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          }
+        }, animDelay);
+      }
+
+      // Handle triggered event (après animation)
+      if (result.triggeredEvent) {
+        setTimeout(() => {
+          handleTriggeredEvent(result.triggeredEvent!);
+          setAnimating(false);
+        }, animDelay);
+        return;
+      }
+    }
+
+    setTimeout(() => {
+      setAnimating(false);
+      clearSelection();
+
+      // Rolled 6 = extra turn
+      if (game?.diceValue === 6) {
+        grantExtraTurn();
+      } else {
+        handleEndTurn();
+      }
+    }, animDelay);
+  }, [currentPlayer, canExitHome, exitHome, game, handleCapture, hapticsEnabled, clearSelection, grantExtraTurn, handleEndTurn, setAnimating]);
 
   // Handle dice roll complete
   const handleDiceComplete = useCallback(
@@ -198,45 +254,8 @@ export default function PlayScreen() {
         setTimeout(() => handleEndTurn(), 1500);
       }
     },
-    [getValidMoves, hapticsEnabled, selectPawn]
+    [getValidMoves, hapticsEnabled, selectPawn, handleEndTurn, handleExitHome]
   );
-
-  // Handle exiting a pawn from home
-  const handleExitHome = useCallback((pawnIndex: number) => {
-    if (!currentPlayer || !canExitHome) return;
-
-    setAnimating(true);
-    const result = exitHome(pawnIndex);
-
-    if (result) {
-      // Handle capture at start position
-      if (result.capturedPawn) {
-        handleCapture(result.capturedPawn.playerId, result.capturedPawn.pawnIndex);
-        if (hapticsEnabled) {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        }
-      }
-
-      // Handle triggered event
-      if (result.triggeredEvent) {
-        handleTriggeredEvent(result.triggeredEvent);
-        setTimeout(() => setAnimating(false), 800);
-        return;
-      }
-    }
-
-    setTimeout(() => {
-      setAnimating(false);
-      clearSelection();
-
-      // Rolled 6 = extra turn
-      if (game?.diceValue === 6) {
-        grantExtraTurn();
-      } else {
-        handleEndTurn();
-      }
-    }, 800);
-  }, [currentPlayer, canExitHome, exitHome, game, handleCapture, hapticsEnabled, clearSelection, grantExtraTurn]);
 
   // Handle pawn selection/movement
   const handlePawnPress = useCallback(
@@ -258,29 +277,39 @@ export default function PlayScreen() {
         setAnimating(true);
         const result = executeMove(pawnIndex);
 
+        // Durée de l'animation case par case
+        const animDelay = result?.path?.length
+          ? result.path.length * PAWN_STEP_MS + 150
+          : 400;
+
         if (result) {
-          // Handle capture
+          // Handle capture (après l'animation)
           if (result.capturedPawn) {
-            handleCapture(result.capturedPawn.playerId, result.capturedPawn.pawnIndex);
-            if (hapticsEnabled) {
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            }
+            setTimeout(() => {
+              handleCapture(result.capturedPawn!.playerId, result.capturedPawn!.pawnIndex);
+              if (hapticsEnabled) {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              }
+            }, animDelay);
           }
 
           // Handle finish
           if (result.isFinished) {
-            // Check win condition
-            if (checkWinCondition(playerId)) {
-              endGame(playerId);
-              router.push(`/(game)/results/${game.id}`);
-              return;
-            }
+            setTimeout(() => {
+              if (checkWinCondition(playerId)) {
+                endGame(playerId);
+                router.push(`/(game)/results/${game.id}`);
+              }
+            }, animDelay);
+            return;
           }
 
-          // Handle triggered event
+          // Handle triggered event (après l'animation)
           if (result.triggeredEvent) {
-            handleTriggeredEvent(result.triggeredEvent);
-            setTimeout(() => setAnimating(false), 800);
+            setTimeout(() => {
+              handleTriggeredEvent(result.triggeredEvent!);
+              setAnimating(false);
+            }, animDelay);
             return;
           }
         }
@@ -295,7 +324,7 @@ export default function PlayScreen() {
           } else {
             handleEndTurn();
           }
-        }, 800);
+        }, animDelay);
       } else {
         // Select pawn and highlight destination
         selectPawn(pawnIndex);
@@ -331,6 +360,8 @@ export default function PlayScreen() {
       hapticsEnabled,
       grantExtraTurn,
       handleExitHome,
+      handleEndTurn,
+      setAnimating,
     ]
   );
 
@@ -371,7 +402,7 @@ export default function PlayScreen() {
           break;
       }
     },
-    [game, currentPlayer, triggerEvent]
+    [game, currentPlayer, triggerEvent, handleEndTurn]
   );
 
   // Event handlers
@@ -384,7 +415,7 @@ export default function PlayScreen() {
       resolveEvent();
       handleEndTurn();
     },
-    [currentPlayer, addTokens, resolveEvent]
+    [currentPlayer, addTokens, resolveEvent, handleEndTurn]
   );
 
   const handleFundingAccept = useCallback(
@@ -396,7 +427,7 @@ export default function PlayScreen() {
       resolveEvent();
       handleEndTurn();
     },
-    [currentPlayer, addTokens, resolveEvent]
+    [currentPlayer, addTokens, resolveEvent, handleEndTurn]
   );
 
   const handleEventAccept = useCallback(
@@ -417,7 +448,7 @@ export default function PlayScreen() {
       resolveEvent();
       handleEndTurn();
     },
-    [currentPlayer, addTokens, removeTokens, resolveEvent]
+    [currentPlayer, addTokens, removeTokens, resolveEvent, handleEndTurn]
   );
 
   const handleDuelAnswer = useCallback(
@@ -435,15 +466,8 @@ export default function PlayScreen() {
       resolveEvent();
       handleEndTurn();
     },
-    [currentPlayer, addTokens, removeTokens, resolveEvent]
+    [currentPlayer, addTokens, removeTokens, resolveEvent, handleEndTurn]
   );
-
-  // End turn
-  const handleEndTurn = useCallback(() => {
-    clearSelection();
-    setDiceValue(null);
-    nextTurn();
-  }, [clearSelection, nextTurn]);
 
   // Handle quit
   const handleQuit = useCallback(() => {
@@ -453,7 +477,7 @@ export default function PlayScreen() {
 
   // Handle pawn move animation complete
   const handlePawnMoveComplete = useCallback(() => {
-    // Animation completed
+    console.log('[PlayScreen] Pawn animation completed');
   }, []);
 
   if (!game) {

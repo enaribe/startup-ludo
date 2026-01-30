@@ -3,16 +3,28 @@
  *
  * Design basé sur l'image :
  * - Cases blanches par défaut
+ * - Cases de sortie colorées par joueur (sans icône)
  * - Icônes pour les événements
+ * - Icônes distribuées sur les cases normales vides
  * - Couleur du joueur pour les chemins finaux
  */
 
 import { memo } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import type { PlayerColor } from '@/types';
 import { COLORS } from '@/styles/colors';
 import { QuizIcon, EventIcon, DuelIcon, FundingIcon } from './BoardIcons';
+
+// Cases de départ → couleur du joueur
+const START_COLOR: Record<number, PlayerColor> = {
+  1: 'yellow',
+  12: 'blue',
+  23: 'red',
+  34: 'green',
+};
+
+// Cycle d'icônes pour les cases normales (sans événement assigné)
+const NORMAL_ICONS = ['quiz', 'funding', 'duel', 'event'] as const;
 
 interface PathCellProps {
   row: number;
@@ -43,12 +55,20 @@ export const PathCell = memo(function PathCell({
   const isHiddenFinal = finalInfo !== null && finalInfo.index === 4;
   if (isHiddenFinal) return null;
 
+  // Déterminer si c'est une case de départ
+  const isStart = eventType === 'start' && circuitIndex !== null;
+  const startColor = isStart ? START_COLOR[circuitIndex] : null;
+
   // Déterminer la couleur de fond
-  let backgroundColor = '#FFFFFF'; // Blanc par défaut pour le circuit
+  let backgroundColor = '#FFFFFF';
   let borderColor = 'rgba(0, 0, 0, 0.1)';
 
-  if (finalInfo) {
-    // Chemin final - couleur du joueur
+  if (startColor) {
+    // Case de sortie — couleur du joueur
+    backgroundColor = COLORS.players[startColor];
+    borderColor = 'rgba(255, 255, 255, 0.3)';
+  } else if (finalInfo) {
+    // Chemin final — couleur du joueur
     backgroundColor = COLORS.players[finalInfo.color];
     borderColor = 'rgba(255, 255, 255, 0.3)';
   }
@@ -57,14 +77,23 @@ export const PathCell = memo(function PathCell({
     borderColor = COLORS.primary;
   }
 
-  // Rendu de l'icône selon le type (taille réduite, intensité couleur adoucie)
+  // Rendu de l'icône selon le type
   const renderIcon = () => {
     if (circuitIndex === null) return null;
+    // Pas d'icône sur les cases de départ
+    if (isStart) return null;
 
     const iconSize = cellSize * 0.45;
     const iconStyle = { width: iconSize, height: iconSize, opacity: 0.65 };
 
-    switch (eventType) {
+    // Déterminer l'icône — cases avec événement assigné ou cases normales
+    let iconType = eventType;
+    if (eventType === 'normal') {
+      // Distribuer une icône basée sur l'index du circuit
+      iconType = NORMAL_ICONS[circuitIndex % NORMAL_ICONS.length] ?? 'event';
+    }
+
+    switch (iconType) {
       case 'quiz':
         return <View style={iconStyle}><QuizIcon /></View>;
       case 'funding':
@@ -73,9 +102,8 @@ export const PathCell = memo(function PathCell({
         return <View style={iconStyle}><DuelIcon /></View>;
       case 'opportunity':
       case 'challenge':
+      case 'event':
         return <View style={iconStyle}><EventIcon /></View>;
-      case 'start':
-        return <Ionicons name="flag" size={cellSize * 0.35} color="#2ECC71" />;
       default:
         return null;
     }

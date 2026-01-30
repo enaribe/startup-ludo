@@ -7,7 +7,6 @@
 import { memo } from 'react';
 import { Image, type ImageSourcePropType, StyleSheet, View } from 'react-native';
 import type { Player, PlayerColor } from '@/types';
-import { COLORS } from '@/styles/colors';
 import { BOARD_SIZE } from '@/config/boardConfig';
 
 interface HomeZoneProps {
@@ -16,7 +15,6 @@ interface HomeZoneProps {
   size: number;
   boardPadding: number;
   player?: Player;
-  isCurrentPlayer?: boolean;
 }
 
 const HOUSE_IMAGES: Record<PlayerColor, ImageSourcePropType> = {
@@ -31,7 +29,6 @@ export const HomeZone = memo(function HomeZone({
   position,
   size,
   boardPadding,
-  isCurrentPlayer = false,
 }: HomeZoneProps) {
   const cellSize = size / 5;
   // Inset pour ne pas coller aux cases du chemin, tout en restant aligné
@@ -70,8 +67,6 @@ export const HomeZone = memo(function HomeZone({
           left,
           width: displaySize,
           height: displaySize,
-          borderColor: isCurrentPlayer ? COLORS.success : 'transparent',
-          borderWidth: isCurrentPlayer ? 3 : 0,
         },
       ]}
     >

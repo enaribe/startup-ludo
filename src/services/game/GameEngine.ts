@@ -269,15 +269,29 @@ export class GameEngine {
    * Construit le chemin d'animation sur le circuit
    */
   private static buildCircuitPath(from: number, to: number): Coordinate[] {
+    console.log('[GameEngine.buildCircuitPath] Building path from', from, 'to', to);
+    
     const path: Coordinate[] = [];
     let current = from;
+    let iterations = 0;
+    const maxIterations = CIRCUIT_LENGTH + 1; // Protection contre boucle infinie
 
-    while (current !== to) {
+    while (current !== to && iterations < maxIterations) {
       current = (current + 1) % CIRCUIT_LENGTH;
       const coord = MAIN_CIRCUIT[current];
-      if (coord) path.push(coord);
+      if (coord) {
+        path.push(coord);
+      } else {
+        console.warn('[GameEngine.buildCircuitPath] Missing coord at position:', current);
+      }
+      iterations++;
     }
 
+    if (iterations >= maxIterations) {
+      console.error('[GameEngine.buildCircuitPath] Max iterations reached!', { from, to });
+    }
+
+    console.log('[GameEngine.buildCircuitPath] Path built with', path.length, 'steps');
     return path;
   }
 
@@ -289,23 +303,53 @@ export class GameEngine {
     fromCircuit: number,
     toFinalPos: number
   ): Coordinate[] {
+    console.log('[GameEngine.buildPathToFinal]', { color, fromCircuit, toFinalPos });
+    
     const config = PLAYER_CONFIG[color];
+    if (!config) {
+      console.error('[GameEngine.buildPathToFinal] No config for color:', color);
+      return [];
+    }
+    
     const path: Coordinate[] = [];
+    let iterations = 0;
+    const maxIterations = CIRCUIT_LENGTH + 1;
 
     // D'abord, aller jusqu'à la case de sortie
     let current = fromCircuit;
-    while (current !== config.exitIndex) {
+    while (current !== config.exitIndex && iterations < maxIterations) {
       current = (current + 1) % CIRCUIT_LENGTH;
       const coord = MAIN_CIRCUIT[current];
-      if (coord) path.push(coord);
+      if (coord) {
+        path.push(coord);
+      } else {
+        console.warn('[GameEngine.buildPathToFinal] Missing circuit coord at:', current);
+      }
+      iterations++;
+    }
+
+    if (iterations >= maxIterations) {
+      console.error('[GameEngine.buildPathToFinal] Max iterations reached for circuit!');
+      return path;
     }
 
     // Puis entrer dans le chemin final
+    const finalPath = FINAL_PATHS[color];
+    if (!finalPath) {
+      console.error('[GameEngine.buildPathToFinal] No final path for color:', color);
+      return path;
+    }
+    
     for (let i = 0; i <= toFinalPos; i++) {
-      const coord = FINAL_PATHS[color][i];
-      if (coord) path.push(coord);
+      const coord = finalPath[i];
+      if (coord) {
+        path.push(coord);
+      } else {
+        console.warn('[GameEngine.buildPathToFinal] Missing final coord at:', i);
+      }
     }
 
+    console.log('[GameEngine.buildPathToFinal] Path built with', path.length, 'steps');
     return path;
   }
 
@@ -422,24 +466,63 @@ export class GameEngine {
     color: PlayerColor,
     pawn: PawnState
   ): Coordinate | null {
-    if (pawn.status === 'home') {
-      const slot = PLAYER_CONFIG[color].homeSlots[pawn.slotIndex];
-      return slot ?? PLAYER_CONFIG[color].homeCoords;
-    }
+    try {
+      if (!pawn || !color) {
+        console.error('[GameEngine.getPawnCoordinates] Invalid params:', { color, pawn });
+        return null;
+      }
 
-    if (pawn.status === 'circuit') {
-      return MAIN_CIRCUIT[pawn.position] ?? null;
-    }
+      if (pawn.status === 'home') {
+        const config = PLAYER_CONFIG[color];
+        if (!config) {
+          console.error('[GameEngine.getPawnCoordinates] No config for color:', color);
+          return null;
+        }
+        const slotIndex = pawn.slotIndex ?? 0;
+        const slot = config.homeSlots[slotIndex];
+        const result = slot ?? config.homeCoords;
+        console.log(`[GameEngine.getPawnCoordinates] home pawn ${color} slot ${slotIndex}:`, result);
+        return result;
+      }
 
-    if (pawn.status === 'final') {
-      return FINAL_PATHS[color][pawn.position] ?? null;
-    }
+      if (pawn.status === 'circuit') {
+        const position = pawn.position ?? 0;
+        const result = MAIN_CIRCUIT[position];
+        if (!result) {
+          console.error('[GameEngine.getPawnCoordinates] Invalid circuit position:', position);
+          return null;
+        }
+        console.log(`[GameEngine.getPawnCoordinates] circuit pawn ${color} pos ${position}:`, result);
+        return result;
+      }
 
-    if (pawn.status === 'finished') {
-      return CENTER_COORDS;
-    }
+      if (pawn.status === 'final') {
+        const position = pawn.position ?? 0;
+        const finalPath = FINAL_PATHS[color];
+        if (!finalPath) {
+          console.error('[GameEngine.getPawnCoordinates] No final path for color:', color);
+          return null;
+        }
+        const result = finalPath[position];
+        if (!result) {
+          console.error('[GameEngine.getPawnCoordinates] Invalid final position:', { color, position });
+          return null;
+        }
+        console.log(`[GameEngine.getPawnCoordinates] final pawn ${color} pos ${position}:`, result);
+        return result;
+      }
 
-    return null;
+      if (pawn.status === 'finished') {
+        console.log(`[GameEngine.getPawnCoordinates] finished pawn ${color}:`, CENTER_COORDS);
+        return CENTER_COORDS;
+      }
+
+      console.warn('[GameEngine.getPawnCoordinates] Unknown pawn status:', pawn.status);
+      return null;
+    } catch (error) {
+      console.error('[GameEngine.getPawnCoordinates] Error:', error, { color, pawn });
+      return null;
+    }
   }
 
   /**

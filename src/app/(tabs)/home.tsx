@@ -183,7 +183,7 @@ export default function HomeScreen() {
                   BIENTOT DISPONIBLE
                 </Text>
                 <Text style={[styles.challengeDescText, { textAlign: 'center', marginTop: 6 }]}>
-                  Les challenges hebdomadaires arrivent bientot !
+                  Les challenges arrivent bientot !
                 </Text>
               </View>
             </View>
