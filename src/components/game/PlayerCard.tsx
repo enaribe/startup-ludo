@@ -1,7 +1,5 @@
 /**
- * PlayerCard - Carte d'information joueur
- *
- * Utilise le nouveau système PawnState
+ * PlayerCard - Carte d'information joueur avec dé 3D intégré
  */
 
 import { memo, useEffect } from 'react';
@@ -16,15 +14,20 @@ import Animated, {
 import { Ionicons } from '@expo/vector-icons';
 import type { Player } from '@/types';
 import { COLORS } from '@/styles/colors';
-import { FONTS, FONT_SIZES } from '@/styles/typography';
-import { SPACING } from '@/styles/spacing';
+import { FONTS } from '@/styles/typography';
 import { Avatar } from '@/components/ui/Avatar';
+import { Dice } from '@/components/game/Dice';
 
 interface PlayerCardProps {
   player: Player;
   isCurrentTurn: boolean;
   isCompact?: boolean;
   onPress?: () => void;
+  diceValue?: number | null;
+  isDiceRolling?: boolean;
+  isDiceDisabled?: boolean;
+  onRollDice?: () => number;
+  onDiceComplete?: (value: number) => void;
 }
 
 export const PlayerCard = memo(function PlayerCard({
@@ -32,14 +35,14 @@ export const PlayerCard = memo(function PlayerCard({
   isCurrentTurn,
   isCompact = false,
   onPress,
+  diceValue = null,
+  isDiceRolling = false,
+  isDiceDisabled = true,
+  onRollDice,
+  onDiceComplete,
 }: PlayerCardProps) {
   const scale = useSharedValue(1);
   const glowOpacity = useSharedValue(0);
-
-  // Compteurs basés sur le nouveau système PawnState
-  const pawnsAtHome = player.pawns.filter(p => p.status === 'home').length;
-  const pawnsOnBoard = player.pawns.filter(p => p.status === 'circuit' || p.status === 'final').length;
-  const pawnsFinished = player.pawns.filter(p => p.status === 'finished').length;
 
   // Pulse animation for current turn
   useEffect(() => {
@@ -67,10 +70,6 @@ export const PlayerCard = memo(function PlayerCard({
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
-  }));
-
-  const glowStyle = useAnimatedStyle(() => ({
-    opacity: glowOpacity.value,
   }));
 
   const playerColor = COLORS.players[player.color];
@@ -112,97 +111,60 @@ export const PlayerCard = memo(function PlayerCard({
   return (
     <Animated.View style={[styles.container, animatedStyle]}>
       <Pressable onPress={onPress} disabled={!onPress}>
-        {/* Glow effect */}
-        {isCurrentTurn && (
-          <Animated.View
-            style={[
-              styles.glow,
-              { backgroundColor: playerColor },
-              glowStyle,
-            ]}
-          />
-        )}
-
         <View
           style={[
             styles.card,
             {
-              borderColor: isCurrentTurn ? playerColor : COLORS.border,
-              borderWidth: isCurrentTurn ? 2 : 1,
+              borderColor: isCurrentTurn ? playerColor : 'transparent',
+              borderWidth: isCurrentTurn ? 1 : 0,
             },
           ]}
         >
-          {/* Player Info */}
-          <View style={styles.header}>
-            <Avatar
-              name={player.name}
-              source={player.avatar}
-              playerColor={player.color}
-              size="md"
-              showBorder={isCurrentTurn}
-            />
-            <View style={styles.info}>
-              <View style={styles.nameRow}>
-                <Text style={styles.name} numberOfLines={1}>
-                  {player.name}
-                </Text>
-                {player.isAI && (
-                  <View style={styles.aiBadge}>
-                    <Ionicons name="hardware-chip" size={12} color={COLORS.background} />
-                  </View>
-                )}
+          {/* Top Row: User Info + Dice 3D */}
+          <View style={styles.topRow}>
+            <View style={styles.userInfo}>
+              <Avatar
+                name={player.name}
+                source={player.avatar}
+                playerColor={player.color}
+                size="sm"
+                showBorder={false}
+              />
+              <View style={styles.textContainer}>
+                <Text style={styles.companyName}>concree</Text>
+                <Text style={styles.userName} numberOfLines={1}>{player.name}</Text>
               </View>
-              {isCurrentTurn && (
-                <Text style={[styles.turnIndicator, { color: playerColor }]}>
-                  C'est ton tour !
-                </Text>
-              )}
+            </View>
+
+            {/* Dé 3D animé */}
+            <View style={styles.diceWrapper}>
+              <Dice
+                value={diceValue}
+                isRolling={isDiceRolling}
+                disabled={isDiceDisabled}
+                size={28}
+                onRoll={onRollDice}
+                onRollComplete={onDiceComplete}
+              />
             </View>
           </View>
 
-          {/* Stats */}
-          <View style={styles.stats}>
-            {/* Tokens */}
-            <View style={styles.stat}>
-              <Ionicons name="cash" size={16} color={COLORS.primary} />
-              <Text style={styles.statValue}>{player.tokens}</Text>
-              <Text style={styles.statLabel}>Jetons</Text>
+          {/* Bottom Row: Progress Bar */}
+          <View style={styles.progressContainer}>
+            <View style={styles.progressDots}>
+              {[...Array(7)].map((_, i) => (
+                <View
+                  key={i}
+                  style={[
+                    styles.progressDot,
+                    {
+                      backgroundColor: i < player.tokens ? playerColor : 'rgba(255, 255, 255, 0.1)',
+                    },
+                  ]}
+                />
+              ))}
             </View>
-
-            {/* Pawns indicator */}
-            <View style={styles.stat}>
-              <View style={styles.pawnsIndicator}>
-                {[0, 1, 2, 3].map((i) => {
-                  // Couleur selon l'état du pion
-                  let dotColor: string;
-                  if (i < pawnsOnBoard) {
-                    dotColor = playerColor; // Sur le plateau
-                  } else if (i < pawnsOnBoard + pawnsAtHome) {
-                    dotColor = 'rgba(255, 255, 255, 0.3)'; // À la maison
-                  } else {
-                    dotColor = COLORS.success; // Terminé
-                  }
-
-                  return (
-                    <View
-                      key={i}
-                      style={[
-                        styles.pawnDot,
-                        { backgroundColor: dotColor },
-                      ]}
-                    />
-                  );
-                })}
-              </View>
-              <Text style={styles.statLabel}>Pions</Text>
-            </View>
-
-            {/* Finished */}
-            <View style={styles.stat}>
-              <Ionicons name="flag" size={16} color={COLORS.success} />
-              <Text style={styles.statValue}>{pawnsFinished}</Text>
-              <Text style={styles.statLabel}>Arrivés</Text>
-            </View>
+            <Text style={styles.progressText}>{player.tokens}/7</Text>
           </View>
         </View>
       </Pressable>
@@ -212,87 +174,82 @@ export const PlayerCard = memo(function PlayerCard({
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: SPACING[2],
-  },
-  compactContainer: {
-    flex: 1,
-  },
-  glow: {
-    position: 'absolute',
-    top: -4,
-    left: -4,
-    right: -4,
-    bottom: -4,
-    borderRadius: 20,
-    opacity: 0.2,
+    width: '100%',
   },
   card: {
-    backgroundColor: COLORS.card,
-    borderRadius: 16,
-    padding: SPACING[4],
+    backgroundColor: '#1B314A',
+    borderRadius: 14,
+    padding: 8,
   },
+  topRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  userInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  textContainer: {
+    flex: 1,
+  },
+  companyName: {
+    fontFamily: FONTS.title,
+    fontSize: 12,
+    color: '#FFFFFF',
+    textTransform: 'lowercase',
+  },
+  userName: {
+    fontFamily: FONTS.body,
+    fontSize: 9,
+    color: 'rgba(255, 255, 255, 0.7)',
+  },
+  diceWrapper: {
+    width: 36,
+    height: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  progressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    borderRadius: 14,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
+  progressDots: {
+    flexDirection: 'row',
+    gap: 3,
+  },
+  progressDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  progressText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 10,
+    color: '#FFFFFF',
+    marginLeft: 6,
+  },
+  compactContainer: {},
   compactCard: {
-    backgroundColor: COLORS.card,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1B314A',
     borderRadius: 12,
-    padding: SPACING[2],
-    alignItems: 'center',
-    gap: SPACING[1],
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: SPACING[3],
-  },
-  info: {
-    flex: 1,
-    marginLeft: SPACING[3],
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  name: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: FONT_SIZES.md,
-    color: COLORS.text,
-    flex: 1,
+    padding: 8,
+    gap: 6,
   },
   compactName: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: FONT_SIZES.xs,
-    textAlign: 'center',
-  },
-  aiBadge: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 10,
-    padding: 4,
-    marginLeft: SPACING[2],
-  },
-  turnIndicator: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: FONT_SIZES.sm,
-    marginTop: 2,
-  },
-  stats: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingTop: SPACING[3],
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-  },
-  stat: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  statValue: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: FONT_SIZES.lg,
-    color: COLORS.text,
-  },
-  statLabel: {
     fontFamily: FONTS.body,
-    fontSize: FONT_SIZES.xs,
-    color: COLORS.textSecondary,
+    fontSize: 12,
+    flex: 1,
   },
   compactTokens: {
     flexDirection: 'row',
@@ -300,17 +257,8 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   compactTokenText: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: FONT_SIZES.xs,
-    color: COLORS.primary,
-  },
-  pawnsIndicator: {
-    flexDirection: 'row',
-    gap: 4,
-  },
-  pawnDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    fontFamily: FONTS.body,
+    fontSize: 11,
+    color: '#FFFFFF',
   },
 });

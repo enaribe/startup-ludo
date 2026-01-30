@@ -12,6 +12,7 @@ import { View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { PlayerColor } from '@/types';
 import { COLORS } from '@/styles/colors';
+import { QuizIcon, EventIcon, DuelIcon, FundingIcon } from './BoardIcons';
 
 interface PathCellProps {
   row: number;
@@ -24,16 +25,6 @@ interface PathCellProps {
   isHighlighted?: boolean;
 }
 
-// Icônes pour les types d'événements
-const EVENT_ICONS: Record<string, { name: keyof typeof Ionicons.glyphMap; color: string }> = {
-  quiz: { name: 'help-circle', color: '#4A90E2' },
-  funding: { name: 'cash', color: '#50C878' },
-  duel: { name: 'flash', color: '#FF6B6B' },
-  opportunity: { name: 'trending-up', color: '#FFB347' },
-  challenge: { name: 'warning', color: '#9B59B6' },
-  start: { name: 'flag', color: '#2ECC71' },
-};
-
 export const PathCell = memo(function PathCell({
   row,
   col,
@@ -44,9 +35,13 @@ export const PathCell = memo(function PathCell({
   eventType,
   isHighlighted = false,
 }: PathCellProps) {
-  // Position absolue de la case
-  const left = boardPadding + col * cellSize;
-  const top = boardPadding + row * cellSize;
+  // Position absolue de la case (centrée dans la cellule avec gap)
+  const left = boardPadding + col * cellSize + 2;
+  const top = boardPadding + row * cellSize + 2;
+
+  // Cases finales adjacentes au centre (index 4) : invisibles
+  const isHiddenFinal = finalInfo !== null && finalInfo.index === 4;
+  if (isHiddenFinal) return null;
 
   // Déterminer la couleur de fond
   let backgroundColor = '#FFFFFF'; // Blanc par défaut pour le circuit
@@ -62,8 +57,29 @@ export const PathCell = memo(function PathCell({
     borderColor = COLORS.primary;
   }
 
-  // Icône de l'événement
-  const eventIcon = EVENT_ICONS[eventType];
+  // Rendu de l'icône selon le type (taille réduite, intensité couleur adoucie)
+  const renderIcon = () => {
+    if (circuitIndex === null) return null;
+
+    const iconSize = cellSize * 0.45;
+    const iconStyle = { width: iconSize, height: iconSize, opacity: 0.65 };
+
+    switch (eventType) {
+      case 'quiz':
+        return <View style={iconStyle}><QuizIcon /></View>;
+      case 'funding':
+        return <View style={iconStyle}><FundingIcon /></View>;
+      case 'duel':
+        return <View style={iconStyle}><DuelIcon /></View>;
+      case 'opportunity':
+      case 'challenge':
+        return <View style={iconStyle}><EventIcon /></View>;
+      case 'start':
+        return <Ionicons name="flag" size={cellSize * 0.35} color="#2ECC71" />;
+      default:
+        return null;
+    }
+  };
 
   return (
     <View
@@ -72,8 +88,8 @@ export const PathCell = memo(function PathCell({
         {
           left,
           top,
-          width: cellSize - 2,
-          height: cellSize - 2,
+          width: cellSize - 4,
+          height: cellSize - 4,
           backgroundColor,
           borderColor,
           borderWidth: isHighlighted ? 2 : 1,
@@ -81,13 +97,7 @@ export const PathCell = memo(function PathCell({
       ]}
     >
       {/* Icône d'événement */}
-      {eventIcon && circuitIndex !== null && (
-        <Ionicons
-          name={eventIcon.name}
-          size={cellSize * 0.5}
-          color={eventIcon.color}
-        />
-      )}
+      {renderIcon()}
 
       {/* Indicateur de highlight */}
       {isHighlighted && (
@@ -103,7 +113,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     justifyContent: 'center',
     alignItems: 'center',
-    margin: 1,
   },
   highlightOverlay: {
     position: 'absolute',

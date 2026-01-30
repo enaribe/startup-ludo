@@ -18,7 +18,6 @@ import {
     type Coordinate,
 } from '@/config/boardConfig';
 import { GameEngine } from '@/services/game/GameEngine';
-import { COLORS } from '@/styles/colors';
 import type { Player, PlayerColor } from '@/types';
 import { memo, useMemo } from 'react';
 import { Dimensions, StyleSheet, View } from 'react-native';
@@ -253,10 +252,7 @@ const styles = StyleSheet.create({
   },
   board: {
     flex: 1,
-    backgroundColor: COLORS.card,
     borderRadius: 16,
-    borderWidth: 2,
-    borderColor: COLORS.border,
     position: 'relative',
   },
 });

@@ -1,18 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Dice } from '@/components/game/Dice';
 import { GameBoard } from '@/components/game/GameBoard';
 import { PlayerCard } from '@/components/game/PlayerCard';
 import { DuelPopup, EventPopup, FundingPopup, QuizPopup } from '@/components/game/popups';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
+import { RadialBackground } from '@/components/ui';
 import { AIPlayer } from '@/services/game/AIPlayer';
 import { GameEngine } from '@/services/game/GameEngine';
 import { useGameStore, useSettingsStore } from '@/stores';
@@ -58,7 +56,7 @@ export default function PlayScreen() {
   const [showQuitConfirm, setShowQuitConfirm] = useState(false);
   const [diceValue, setDiceValue] = useState<number | null>(null);
   const [isRolling, setIsRolling] = useState(false);
-  const [aiMessage, setAiMessage] = useState<string | null>(null);
+  const [_aiMessage, setAiMessage] = useState<string | null>(null);
   const [isAIPlaying, setIsAIPlaying] = useState(false);
 
   // Event popups state
@@ -473,134 +471,112 @@ export default function PlayScreen() {
   }
 
   return (
-    <LinearGradient
-      colors={COLORS.backgroundGradient}
-      style={styles.container}
-      start={{ x: 0.5, y: 0 }}
-      end={{ x: 0.5, y: 1 }}
-    >
-      <View style={[styles.content, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-        {/* Header */}
-        <Animated.View entering={FadeIn.duration(500)} style={styles.header}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.turnText}>Tour {game.currentTurn}</Text>
-            {game.diceValue === 6 && (
-              <View style={styles.extraTurnBadge}>
-                <Ionicons name="reload" size={12} color={COLORS.white} />
-                <Text style={styles.extraTurnText}>+1</Text>
-              </View>
-            )}
-          </View>
-          <Button
-            title="Quitter"
-            variant="ghost"
-            size="sm"
-            onPress={() => setShowQuitConfirm(true)}
-          />
-        </Animated.View>
-
-        {/* Player Cards - Compact Row */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.playersContainer}
-        >
-          {game.players.map((player) => (
-            <PlayerCard
-              key={player.id}
-              player={player}
-              isCurrentTurn={player.id === currentPlayer?.id}
-              isCompact
+    <View style={styles.container}>
+      <RadialBackground />
+      <View style={[styles.content, { paddingTop: insets.top + 72, paddingBottom: insets.bottom }]}>
+        {/* Fixed Header: Back, Logo Startupludo, Settings (design system: bg #0A1929) */}
+        <View style={[styles.fixedHeader, { paddingTop: insets.top + SPACING[2] }]}>
+          <Pressable onPress={() => setShowQuitConfirm(true)} hitSlop={8} style={styles.headerButton}>
+            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+          </Pressable>
+          <View style={styles.logoContainer}>
+            <Image
+              source={require('../../../../assets/images/logostartupludo.png')}
+              style={styles.logoImage}
+              resizeMode="contain"
             />
-          ))}
-        </ScrollView>
-
-        {/* AI Message */}
-        {aiMessage && (
-          <Animated.View entering={SlideInDown} style={styles.aiMessageContainer}>
-            <Ionicons name="hardware-chip" size={16} color={COLORS.info} />
-            <Text style={styles.aiMessageText}>{aiMessage}</Text>
-          </Animated.View>
-        )}
-
-        {/* Game Board */}
-        <View style={styles.boardContainer}>
-          <GameBoard
-            players={game.players}
-            currentPlayerId={currentPlayer?.id || ''}
-            selectedPawnIndex={selectedPawnIndex}
-            highlightedPositions={highlightedPositions.filter(
-              (hp): hp is { type: 'circuit' | 'final'; position: number; color?: typeof hp.color } =>
-                hp.type !== 'home'
-            )}
-            onPawnPress={handlePawnPress}
-            onPawnMoveComplete={handlePawnMoveComplete}
-          />
+          </View>
+          <Pressable style={styles.headerButton}>
+            <Ionicons name="settings-outline" size={24} color="#FFFFFF" />
+          </Pressable>
         </View>
 
-        {/* Bottom Controls */}
-        <View style={styles.controls}>
-          {currentPlayer && (
-            <>
-              <Text style={styles.currentPlayerText}>
-                Tour de{' '}
-                <Text style={[styles.playerNameText, { color: COLORS.players[currentPlayer.color] }]}>
-                  {currentPlayer.name}
-                </Text>
-                {currentPlayer.isAI && ' (IA)'}
-              </Text>
-
-              {/* Dice */}
-              <Dice
-                value={diceValue}
-                isRolling={isRolling}
-                disabled={!canRollDice() || currentPlayer.isAI}
-                size={80}
-                onRoll={() => rollDice()}
-                onRollComplete={handleDiceComplete}
-              />
-
-              {/* Action Buttons */}
-              {canMove() && !currentPlayer.isAI && (
-                <View style={styles.actionButtons}>
-                  {canExitHome && (
-                    <Button
-                      title="Sortir un pion"
-                      variant="primary"
-                      size="md"
-                      leftIcon={<Ionicons name="exit" size={18} color={COLORS.white} />}
-                      onPress={() => {
-                        // Find first pawn at home
-                        const homeIndex = currentPlayer.pawns.findIndex(p => p.status === 'home');
-                        if (homeIndex !== -1) {
-                          handleExitHome(homeIndex);
-                        }
-                      }}
-                    />
-                  )}
-
-                  {validMoves.length === 0 && !canExitHome && (
-                    <Text style={styles.noMovesText}>Aucun mouvement possible</Text>
-                  )}
-
-                  {selectedPawnIndex !== null && (
-                    <Button
-                      title="Déplacer"
-                      variant="primary"
-                      size="md"
-                      leftIcon={<Ionicons name="arrow-forward" size={18} color={COLORS.white} />}
-                      onPress={() => handlePawnPress(currentPlayer.id, selectedPawnIndex)}
-                    />
-                  )}
-                </View>
+        {/* Semi-transparent container: PlayerCards + Board */}
+        <View style={styles.boardWrapper}>
+          {/* Top Players Row — yellow (top-left) and blue (top-right) */}
+          <View style={styles.playersRow}>
+            {/* Top-left slot: yellow */}
+            <View style={styles.playerSlot}>
+              {game.players.find(p => p.color === 'yellow') && (
+                <PlayerCard
+                  player={game.players.find(p => p.color === 'yellow')!}
+                  isCurrentTurn={game.players.find(p => p.color === 'yellow')!.id === currentPlayer?.id}
+                  diceValue={game.players.find(p => p.color === 'yellow')!.id === currentPlayer?.id ? diceValue : (game.diceValue ?? null)}
+                  isDiceRolling={game.players.find(p => p.color === 'yellow')!.id === currentPlayer?.id ? isRolling : false}
+                  isDiceDisabled={game.players.find(p => p.color === 'yellow')!.id !== currentPlayer?.id || !canRollDice() || !!game.players.find(p => p.color === 'yellow')!.isAI}
+                  onRollDice={game.players.find(p => p.color === 'yellow')!.id === currentPlayer?.id ? () => rollDice() : undefined}
+                  onDiceComplete={game.players.find(p => p.color === 'yellow')!.id === currentPlayer?.id ? handleDiceComplete : undefined}
+                />
               )}
-            </>
-          )}
+            </View>
+            {/* Top-right slot: blue */}
+            <View style={styles.playerSlot}>
+              {game.players.find(p => p.color === 'blue') && (
+                <PlayerCard
+                  player={game.players.find(p => p.color === 'blue')!}
+                  isCurrentTurn={game.players.find(p => p.color === 'blue')!.id === currentPlayer?.id}
+                  diceValue={game.players.find(p => p.color === 'blue')!.id === currentPlayer?.id ? diceValue : (game.diceValue ?? null)}
+                  isDiceRolling={game.players.find(p => p.color === 'blue')!.id === currentPlayer?.id ? isRolling : false}
+                  isDiceDisabled={game.players.find(p => p.color === 'blue')!.id !== currentPlayer?.id || !canRollDice() || !!game.players.find(p => p.color === 'blue')!.isAI}
+                  onRollDice={game.players.find(p => p.color === 'blue')!.id === currentPlayer?.id ? () => rollDice() : undefined}
+                  onDiceComplete={game.players.find(p => p.color === 'blue')!.id === currentPlayer?.id ? handleDiceComplete : undefined}
+                />
+              )}
+            </View>
+          </View>
+
+          {/* Game Board */}
+          <View style={styles.boardContainer}>
+            <GameBoard
+              players={game.players}
+              currentPlayerId={currentPlayer?.id || ''}
+              selectedPawnIndex={selectedPawnIndex}
+              highlightedPositions={highlightedPositions.filter(
+                (hp): hp is { type: 'circuit' | 'final'; position: number; color?: typeof hp.color } =>
+                  hp.type !== 'home'
+              )}
+              onPawnPress={handlePawnPress}
+              onPawnMoveComplete={handlePawnMoveComplete}
+            />
+          </View>
+
+          {/* Bottom Players Row — green (bottom-left) and red (bottom-right) */}
+          <View style={styles.playersRow}>
+            {/* Bottom-left slot: green */}
+            <View style={styles.playerSlot}>
+              {game.players.find(p => p.color === 'green') && (
+                <PlayerCard
+                  player={game.players.find(p => p.color === 'green')!}
+                  isCurrentTurn={game.players.find(p => p.color === 'green')!.id === currentPlayer?.id}
+                  diceValue={game.players.find(p => p.color === 'green')!.id === currentPlayer?.id ? diceValue : (game.diceValue ?? null)}
+                  isDiceRolling={game.players.find(p => p.color === 'green')!.id === currentPlayer?.id ? isRolling : false}
+                  isDiceDisabled={game.players.find(p => p.color === 'green')!.id !== currentPlayer?.id || !canRollDice() || !!game.players.find(p => p.color === 'green')!.isAI}
+                  onRollDice={game.players.find(p => p.color === 'green')!.id === currentPlayer?.id ? () => rollDice() : undefined}
+                  onDiceComplete={game.players.find(p => p.color === 'green')!.id === currentPlayer?.id ? handleDiceComplete : undefined}
+                />
+              )}
+            </View>
+            {/* Bottom-right slot: red */}
+            <View style={styles.playerSlot}>
+              {game.players.find(p => p.color === 'red') && (
+                <PlayerCard
+                  player={game.players.find(p => p.color === 'red')!}
+                  isCurrentTurn={game.players.find(p => p.color === 'red')!.id === currentPlayer?.id}
+                  diceValue={game.players.find(p => p.color === 'red')!.id === currentPlayer?.id ? diceValue : (game.diceValue ?? null)}
+                  isDiceRolling={game.players.find(p => p.color === 'red')!.id === currentPlayer?.id ? isRolling : false}
+                  isDiceDisabled={game.players.find(p => p.color === 'red')!.id !== currentPlayer?.id || !canRollDice() || !!game.players.find(p => p.color === 'red')!.isAI}
+                  onRollDice={game.players.find(p => p.color === 'red')!.id === currentPlayer?.id ? () => rollDice() : undefined}
+                  onDiceComplete={game.players.find(p => p.color === 'red')!.id === currentPlayer?.id ? handleDiceComplete : undefined}
+                />
+              )}
+            </View>
+          </View>
         </View>
       </View>
 
       {/* Quit Confirmation Modal */}
       <Modal visible={showQuitConfirm} onClose={() => setShowQuitConfirm(false)}>
+        {/* ... existing modal ... */}
         <View style={styles.modalContent}>
           <Ionicons name="warning" size={48} color={COLORS.warning} />
           <Text style={styles.modalTitle}>Quitter la partie ?</Text>
@@ -625,6 +601,7 @@ export default function PlayScreen() {
       </Modal>
 
       {/* Event Popups */}
+      {/* ... existing popups ... */}
       <QuizPopup
         visible={!!quizData}
         quiz={quizData}
@@ -666,110 +643,71 @@ export default function PlayScreen() {
           setDuelOpponent(null);
         }}
       />
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#0C243E',
   },
   content: {
     flex: 1,
   },
-  header: {
+  fixedHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: SPACING[4],
-    paddingVertical: SPACING[3],
+    paddingBottom: SPACING[3],
+    backgroundColor: '#0A1929',
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
   },
-  headerLeft: {
-    flexDirection: 'row',
+  headerButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: SPACING[2],
   },
-  turnText: {
-    fontFamily: FONTS.title,
-    fontSize: FONT_SIZES.lg,
-    color: COLORS.text,
-  },
-  extraTurnBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.success,
-    paddingHorizontal: SPACING[2],
-    paddingVertical: 2,
-    borderRadius: 10,
-    gap: 2,
-  },
-  extraTurnText: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: FONT_SIZES.xs,
-    color: COLORS.white,
-  },
-  playersContainer: {
-    paddingHorizontal: SPACING[3],
-    gap: SPACING[2],
-  },
-  aiMessageContainer: {
-    flexDirection: 'row',
+  logoContainer: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: SPACING[2],
-    paddingVertical: SPACING[2],
-    backgroundColor: `${COLORS.info}20`,
-    marginHorizontal: SPACING[4],
-    borderRadius: 8,
-    marginBottom: SPACING[2],
   },
-  aiMessageText: {
-    fontFamily: FONTS.body,
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.info,
+  logoImage: {
+    width: 120,
+    height: 48,
+  },
+  boardWrapper: {
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+    borderRadius: 20,
+    marginHorizontal: SPACING[2],
+    paddingVertical: SPACING[1],
+    paddingHorizontal: SPACING[1],
+  },
+  playersRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING[1],
+    gap: SPACING[1],
+  },
+  playerSlot: {
+    width: '48%',
   },
   boardContainer: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: SPACING[2],
+    position: 'relative',
+    marginVertical: SPACING[1],
   },
-  controls: {
-    padding: SPACING[4],
-    alignItems: 'center',
-    gap: SPACING[3],
-  },
-  currentPlayerText: {
-    fontFamily: FONTS.body,
-    fontSize: FONT_SIZES.base,
-    color: COLORS.textSecondary,
-  },
-  playerNameText: {
-    fontFamily: FONTS.bodySemiBold,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: SPACING[3],
-    marginTop: SPACING[2],
-  },
-  noMovesText: {
-    fontFamily: FONTS.body,
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.textMuted,
-  },
-  noGame: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: COLORS.background,
-  },
-  noGameText: {
-    fontFamily: FONTS.body,
-    color: COLORS.text,
-  },
-  noGameButton: {
-    marginTop: SPACING[4],
-  },
+  // Keep existing modal styles
   modalContent: {
     alignItems: 'center',
     padding: SPACING[4],
@@ -794,5 +732,38 @@ const styles = StyleSheet.create({
   },
   modalButton: {
     minWidth: 100,
+  },
+  // Missing styles from original file to avoid errors
+  aiMessageContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING[2],
+    paddingVertical: SPACING[2],
+    backgroundColor: `${COLORS.info}20`,
+    marginHorizontal: SPACING[4],
+    borderRadius: 8,
+    marginBottom: SPACING[2],
+  },
+  aiMessageText: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.info,
+  },
+  noGame: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#0C243E',
+    padding: SPACING[4],
+  },
+  noGameText: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES.lg,
+    color: '#FFFFFF',
+    marginBottom: SPACING[4],
+  },
+  noGameButton: {
+    minWidth: 140,
   },
 });

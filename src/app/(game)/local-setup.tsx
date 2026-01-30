@@ -20,13 +20,20 @@ import type { PlayerColor } from '@/types';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CONTENT_WIDTH = SCREEN_WIDTH - 36;
 
-// Couleurs des joueurs
-const PLAYER_COLORS: { color: PlayerColor; hex: string; name: string }[] = [
+// Couleurs des joueurs (toutes)
+const ALL_PLAYER_COLORS: { color: PlayerColor; hex: string; name: string }[] = [
   { color: 'yellow', hex: '#FFBC40', name: 'Jaune' },
   { color: 'blue', hex: '#1F91D0', name: 'Bleu' },
   { color: 'green', hex: '#4CAF50', name: 'Vert' },
   { color: 'red', hex: '#FF6B6B', name: 'Rouge' },
 ];
+
+// Couleurs par nombre de joueurs (design: 2=vert vs bleu, 3=vert rouge bleu, 4=tous)
+const COLORS_BY_PLAYER_COUNT: Record<number, PlayerColor[]> = {
+  2: ['green', 'blue'],
+  3: ['green', 'red', 'blue'],
+  4: ['yellow', 'blue', 'green', 'red'],
+};
 
 // Éditions disponibles
 const EDITIONS = [
@@ -56,7 +63,7 @@ export default function LocalSetupScreen() {
   const [gameMode, setGameMode] = useState<'solo' | 'local'>('solo');
   const [playerCount, setPlayerCount] = useState(2);
   const [players, setPlayers] = useState<PlayerSetup[]>([
-    { name: user?.displayName || 'Vous', color: 'yellow', isAI: false },
+    { name: user?.displayName || 'Vous', color: 'green', isAI: false },
     { name: 'IA', color: 'blue', isAI: true },
   ]);
   const [selectedEdition, setSelectedEdition] = useState(isAgriMode ? 'agriculture' : 'classic');
@@ -73,37 +80,39 @@ export default function LocalSetupScreen() {
 
   const handleModeChange = (mode: 'solo' | 'local') => {
     setGameMode(mode);
+    const colors = COLORS_BY_PLAYER_COUNT[2]!;
     if (mode === 'solo') {
       setPlayerCount(2);
       setPlayers([
-        { name: user?.displayName || 'Vous', color: 'yellow', isAI: false },
-        { name: 'IA', color: 'blue', isAI: true },
+        { name: user?.displayName || 'Vous', color: colors[0]!, isAI: false },
+        { name: 'IA', color: colors[1]!, isAI: true },
       ]);
     } else {
       setPlayerCount(2);
       setPlayers([
-        { name: user?.displayName || 'Vous', color: 'yellow', isAI: false },
-        { name: 'Joueur 2', color: 'blue', isAI: false },
+        { name: user?.displayName || 'Vous', color: colors[0]!, isAI: false },
+        { name: 'Joueur 2', color: colors[1]!, isAI: false },
       ]);
     }
   };
 
   const handlePlayerCountChange = (count: number) => {
     setPlayerCount(count);
+    const colors = COLORS_BY_PLAYER_COUNT[count] ?? COLORS_BY_PLAYER_COUNT[4]!;
     const newPlayers: PlayerSetup[] = [];
     for (let i = 0; i < count; i++) {
       const existing = players[i];
-      const colorData = PLAYER_COLORS[i]!;
+      const playerColor = colors[i]!;
       if (gameMode === 'solo') {
         newPlayers.push({
           name: i === 0 ? (user?.displayName || 'Vous') : 'IA',
-          color: colorData.color,
+          color: playerColor,
           isAI: i > 0,
         });
       } else {
         newPlayers.push({
           name: existing?.name || `Joueur ${i + 1}`,
-          color: colorData.color,
+          color: playerColor,
           isAI: false,
         });
       }
@@ -151,7 +160,7 @@ export default function LocalSetupScreen() {
 
   const getAvailableColors = (currentIndex: number) => {
     const usedColors = players.filter((_, i) => i !== currentIndex).map((p) => p.color);
-    return PLAYER_COLORS.filter((c) => !usedColors.includes(c.color));
+    return ALL_PLAYER_COLORS.filter((c) => !usedColors.includes(c.color));
   };
 
   const buttonText = useMemo(() => {
@@ -336,7 +345,7 @@ export default function LocalSetupScreen() {
                             </Text>
                           </View>
                           <View style={styles.colorSquaresRow}>
-                            {PLAYER_COLORS.map((c) => {
+                            {ALL_PLAYER_COLORS.map((c) => {
                               const isUsedByOther = players.some(
                                 (p, i) => i !== index && p.color === c.color
                               );
