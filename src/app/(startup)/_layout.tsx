@@ -10,8 +10,9 @@ export default function StartupLayout() {
         animation: 'slide_from_right',
       }}
     >
+      <Stack.Screen name="ideation" />
       <Stack.Screen name="inspiration-cards" />
-      <Stack.Screen name="creation" />
+      <Stack.Screen name="creation-method" />
       <Stack.Screen name="confirmation" />
     </Stack>
   );

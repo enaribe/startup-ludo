@@ -181,6 +181,7 @@ export interface TargetCard {
   title: string;
   description: string;
   rarity: 'common' | 'rare' | 'legendary';
+  xpMultiplier?: number;
 }
 
 export interface MissionCard {
@@ -189,6 +190,14 @@ export interface MissionCard {
   title: string;
   description: string;
   rarity: 'common' | 'rare' | 'legendary';
+  xpMultiplier?: number;
+}
+
+export interface SectorCard {
+  id: string;
+  title: string;
+  rarity: 'common' | 'rare' | 'legendary';
+  xpMultiplier: number;
 }
 
 // ===== EDITION TYPES =====

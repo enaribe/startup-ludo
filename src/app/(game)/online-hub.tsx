@@ -98,7 +98,7 @@ export default function OnlineHubScreen() {
 
   const handleCreateStartup = () => {
     setShowNoProjectPopup(false);
-    router.push('/(startup)/inspiration-cards');
+    router.push('/(startup)/ideation');
   };
 
   return (

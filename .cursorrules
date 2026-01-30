@@ -42,7 +42,7 @@ src/
     (auth)/               # Auth group (login, register, forgot-password)
     (tabs)/               # Bottom tabs (home, portfolio, classement, profil)
     (game)/               # Game flow (mode-selection, lobby, play, results)
-    (startup)/            # Startup creation flow
+    (startup)/            # Startup creation flow (ideation -> inspiration-cards -> creation-method -> creation -> confirmation)
   components/
     ui/                   # Design system (Button, Card, Input, Modal, Avatar, etc.)
       index.ts            # Barrel exports
@@ -67,7 +67,7 @@ src/
     typography.ts         # FONTS, FONT_SIZES, TEXT_STYLES
     spacing.ts            # SPACING, BORDER_RADIUS, SHADOWS, Z_INDEX
   config/                 # boardConfig, achievements, progression
-  constants/              # animations, images, sounds
+  constants/              # animations, images, sounds, ideation (cibles/missions/secteurs)
   data/                   # Static game data, board-layout.json, editions/
   i18n/                   # Internationalization (fr, en)
   types/                  # TypeScript interfaces
@@ -94,6 +94,9 @@ Card:        rgba(0,0,0,0.3) avec bordure rgba(255,255,255,0.1)
 - **Cartes et boutons type "Nouvelle partie"** : utiliser `fill="rgba(0, 0, 0, 0.35)"` dans GradientBorder / DynamicGradientBorder (fond sombre semi-transparent).
 - **A eviter** : fonds de cartes en blanc/gris semi-transparent (ex. `rgba(255,255,255,0.05)` ou `rgba(255,255,255,0.08)`) pour garder la coherence avec l’accueil et le theme dark.
 
+### Bordures (a respecter)
+- **Toujours utiliser une bordure en gradient** : pour les cartes, popups, blocs de contenu, utiliser GradientBorder ou DynamicGradientBorder (bordure SVG gradient gris argente). Ne pas utiliser de bordure pleine (`borderWidth` + `borderColor`) a la place.
+
 ### Joueurs
 ```
 Jaune: #FFBC40 | Bleu: #1F91D0 | Vert: #4CAF50 | Rouge: #F35145
@@ -118,7 +121,7 @@ Border radius  : sm(4) md(8) lg(12) xl(16) 2xl(20) 3xl(24)
 
 ### Patterns UI Recurrents
 - **RadialBackground** : fond radial SVG (center #0F3A6B, edge #081A2A) sur tous les ecrans
-- **GradientBorder / DynamicGradientBorder** : bordure SVG gradient gris argente sur les cartes
+- **GradientBorder / DynamicGradientBorder** : bordure SVG gradient gris argente ; a utiliser systematiquement pour cartes, popups et blocs de contenu (voir section Bordures)
 - **FixedHeader** : header fixe (position absolute, zIndex 10, bg #0A1929, borderBottomRadius 24). Ne pas ajouter de vue gradient ou lumiere a cote du header.
 - **StatCard** : carte stat avec DynamicGradientBorder, valeur + label
 - **FilterChips** : chips filtres horizontaux scrollables
@@ -127,10 +130,11 @@ Border radius  : sm(4) md(8) lg(12) xl(16) 2xl(20) 3xl(24)
 - **FAB** : bouton flottant gradient jaune
 
 ### Boutons CTA (GameButton)
-- **Composant** : `GameButton` de `@/components/ui` (variants `green` | `yellow`).
+- **Composant** : `GameButton` de `@/components/ui` (variants `green` | `yellow` | `blue`).
 - **Variant `green`** : bouton vert (#4CAF50), bordure blanche, texte blanc. Utiliser pour les actions secondaires type « Commencer » sur une carte (ex. carte Challenge accueil).
-- **Variant `yellow`** : bouton CTA principal (Suivant, Démarrer la partie, Commencer la partie, etc.). Style : dégradé jaune-orange (#FFDC64 → #F0B432), bordure blanche 2px, texte bleu foncé (#1E325A), Luckiest Guy, majuscules. Utiliser pour tous les boutons de validation / passage à l’étape suivante en bas d’écran.
-- **Usage** : `<GameButton variant="yellow" fullWidth title="SUIVANT" onPress={handleNext} />` ou avec `loading` / `disabled` si besoin. Éviter de recréer un bouton jaune custom : réutiliser GameButton variant yellow.
+- **Variant `yellow`** : bouton CTA principal (Suivant, Demarrer la partie, Commencer la partie, etc.). Style : degrade jaune-orange (#FFDC64 -> #F0B432), bordure blanche 2px, texte bleu fonce (#1E325A), Luckiest Guy, majuscules. Utiliser pour tous les boutons de validation / passage a l'etape suivante en bas d'ecran.
+- **Variant `blue`** : bouton bleu fonce (#2A5A8A -> #1A3A5E), bordure blanche, texte blanc. Utiliser pour les actions tertiaires (ex. generer avec l'IA, creer manuellement).
+- **Usage** : `<GameButton variant="yellow" fullWidth title="SUIVANT" onPress={handleNext} />` ou avec `loading` / `disabled` si besoin. Eviter de recreer un bouton custom : reutiliser GameButton avec la bonne variant.
 
 ---
 
@@ -322,6 +326,29 @@ const styles = StyleSheet.create({
 8. **Validation Zod** - Toutes les donnees entrantes (API, Firebase)
 9. **Performance 60 FPS** - Meme sur appareils anciens
 10. **Pas de styles inline** sauf pour les valeurs dynamiques (dimensions, positions calculees)
+
+---
+
+## Flow Creation Startup (ideation)
+
+Le flow de creation de startup se fait en 5 ecrans sequentiels :
+
+1. **`ideation.tsx`** : Ecran intro avec icone ampoule, 4 etapes, bouton COMMENCER
+2. **`inspiration-cards.tsx`** : 3 cartes (Cible/Mission/Secteur) avec :
+   - Icone sync : tirage aleatoire pondere par rarete (70% commun, 25% rare, 5% legendaire)
+   - Zone blanche : ouvre un picker bottom-sheet pour choisir manuellement
+   - Donnees dans `@/constants/ideation` (36 cibles, 40 missions, 17 secteurs avec multiplicateurs XP)
+3. **`creation-method.tsx`** : Resume des cartes + choix methode (AI Tambali / Manuel)
+4. **`creation.tsx`** : Formulaire nom + description + secteur (pre-selectionne depuis les cartes)
+5. **`confirmation.tsx`** : Ecran de succes avec resume de la startup creee
+
+### Types d'ideation
+- `TargetCard` : id, category, title, description, rarity, xpMultiplier
+- `MissionCard` : id, category, title, description, rarity, xpMultiplier
+- `SectorCard` : id, title, rarity, xpMultiplier
+
+### Secteurs disponibles (17)
+Fintech, Mobilite, Proptech, E-commerce, Gaming, Greentech, Foodtech, Entertainment & Media, AgriTech, Cybersecurite, Energie renouvelable, Sport & Fitness, Tourisme, Mobile & Telecom, Logistique, EdTech, CleanTech
 
 ---
 

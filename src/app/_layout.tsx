@@ -102,8 +102,7 @@ export default function RootLayout() {
               <Stack.Screen
                 name="(startup)"
                 options={{
-                  animation: 'slide_from_bottom',
-                  presentation: 'modal',
+                  animation: 'slide_from_right',
                 }}
               />
             </Stack>

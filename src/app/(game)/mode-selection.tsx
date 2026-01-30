@@ -106,7 +106,7 @@ export default function GameModeSelectionScreen() {
 
   const handleCreateStartup = () => {
     setShowNoProjectPopup(false);
-    router.push('/(startup)/inspiration-cards');
+    router.push('/(startup)/ideation');
   };
 
   const contentWidth = SCREEN_WIDTH - SPACING[4] * 2;

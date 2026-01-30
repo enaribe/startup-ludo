@@ -54,7 +54,7 @@ export default function PortfolioScreen() {
 
   const handleCreateStartup = () => {
     if (canAddStartup) {
-      router.push('/(startup)/inspiration-cards');
+      router.push('/(startup)/ideation');
     }
   };
 
