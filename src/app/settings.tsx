@@ -1,17 +1,17 @@
-import { View, Text, Pressable, ScrollView, Switch } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { useAuthStore, useSettingsStore } from '@/stores';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
-import { Card } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { useSettingsStore, useAuthStore } from '@/stores';
 
 interface SettingRowProps {
   icon: keyof typeof Ionicons.glyphMap;

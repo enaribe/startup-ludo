@@ -30,11 +30,16 @@ service cloud.firestore {
       // Allow update/delete only for own user document
       allow update, delete: if isOwner(userId);
       
-      // User's startups subcollection
+      // User's startups subcollection (path-based)
       match /startups/{startupId} {
         allow read: if isAuthenticated();
         allow write: if isOwner(userId);
       }
+    }
+    
+    // Collection group: allow reading all "startups" subcollections (for classement getAllStartups)
+    match /{path=**}/startups/{startupId} {
+      allow read: if isAuthenticated();
     }
     
     // User Stats collection

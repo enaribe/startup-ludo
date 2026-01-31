@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { View, Text, ScrollView, StyleSheet, Dimensions } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,10 +12,14 @@ import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { useUserStore, useSettingsStore, useAuthStore } from '@/stores';
-import { addStartup as firestoreAddStartup } from '@/services/firebase/firestore';
+import { addStartup as firestoreAddStartup, updateUserStats } from '@/services/firebase/firestore';
+import { TARGET_CARDS, MISSION_CARDS, SECTOR_CARDS } from '@/constants/ideation';
+import { XP_REWARDS } from '@/config/progression';
 import type { Startup, TargetCard, MissionCard } from '@/types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+const BASE_VALUATION = 50_000;
 
 const SECTOR_INFO: Record<string, { name: string; icon: string }> = {
   fintech: { name: 'Fintech', icon: 'cash' },
@@ -49,6 +53,13 @@ function formatDate(timestamp: number): string {
   return `${day}/${month}/${year}`;
 }
 
+function formatValorisation(val: number): string {
+  if (val >= 1_000_000) {
+    return `${(val / 1_000_000).toFixed(1).replace('.0', '')}M€`;
+  }
+  return `${Math.round(val / 1000)}K€`;
+}
+
 export default function StartupConfirmationScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -56,6 +67,8 @@ export default function StartupConfirmationScreen() {
   const addStartup = useUserStore((state) => state.addStartup);
   const addXP = useUserStore((state) => state.addXP);
   const userId = useAuthStore((state) => state.user?.id);
+  const userName = useAuthStore((state) => state.user?.displayName);
+  const hasApplied = useRef(false);
 
   const params = useLocalSearchParams<{
     startupName?: string;
@@ -75,29 +88,58 @@ export default function StartupConfirmationScreen() {
   const sectorInfo = SECTOR_INFO[sectorId] ?? { name: 'Fintech', icon: 'cash' };
   const createdAt = Date.now();
 
-  // Reconstruct cards from params
+  // Look up real card data from constants for multipliers
+  const targetCardData = params.targetCardId
+    ? TARGET_CARDS.find((c) => c.id === params.targetCardId)
+    : undefined;
+  const missionCardData = params.missionCardId
+    ? MISSION_CARDS.find((c) => c.id === params.missionCardId)
+    : undefined;
+  const sectorCardData = SECTOR_CARDS.find((c) => c.id === sectorId);
+
+  const targetMultiplier = targetCardData?.xpMultiplier ?? 1.0;
+  const missionMultiplier = missionCardData?.xpMultiplier ?? 1.0;
+  const sectorMultiplier = sectorCardData?.xpMultiplier ?? 1.0;
+
+  // Real valorisation based on card multipliers
+  const valorisation = Math.round(
+    BASE_VALUATION * targetMultiplier * missionMultiplier * sectorMultiplier
+  );
+
+  // Real XP reward based on card multipliers
+  const baseXP = XP_REWARDS.STARTUP_CREATED?.amount ?? 25;
+  const xpReward = Math.round(
+    baseXP * ((targetMultiplier + missionMultiplier + sectorMultiplier) / 3)
+  );
+
+  // Reconstruct cards from params (use real data if found)
   const targetCard: TargetCard | undefined = params.targetCardId
     ? {
         id: params.targetCardId,
-        category: 'demographic',
-        title: params.targetCardTitle || '',
-        description: params.targetCardDesc || '',
-        rarity: 'common',
+        category: targetCardData?.category ?? 'demographic',
+        title: targetCardData?.title ?? params.targetCardTitle ?? '',
+        description: targetCardData?.description ?? params.targetCardDesc ?? '',
+        rarity: targetCardData?.rarity ?? 'common',
+        xpMultiplier: targetMultiplier,
       }
     : undefined;
 
   const missionCard: MissionCard | undefined = params.missionCardId
     ? {
         id: params.missionCardId,
-        category: 'efficiency',
-        title: params.missionCardTitle || '',
-        description: params.missionCardDesc || '',
-        rarity: 'common',
+        category: missionCardData?.category ?? 'efficiency',
+        title: missionCardData?.title ?? params.missionCardTitle ?? '',
+        description: missionCardData?.description ?? params.missionCardDesc ?? '',
+        rarity: missionCardData?.rarity ?? 'common',
+        xpMultiplier: missionMultiplier,
       }
     : undefined;
 
   useEffect(() => {
-    // Create and save the startup
+    if (hasApplied.current) return;
+    hasApplied.current = true;
+
+    // Create and save the startup with real valorisation
     const newStartup: Startup = {
       id: generateId(),
       name: startupName,
@@ -106,22 +148,28 @@ export default function StartupConfirmationScreen() {
       targetCard,
       missionCard,
       createdAt,
-      tokensInvested: 0,
+      tokensInvested: valorisation,
+      valorisation,
       level: 1,
+      creatorId: userId ?? undefined,
+      creatorName: userName ?? undefined,
     };
 
     // Save locally (Zustand store)
     addStartup(newStartup);
 
-    // Save to Firestore (fire-and-forget, only if authenticated)
+    // Save to Firestore + sync XP (fire-and-forget, only if authenticated)
     if (userId) {
       firestoreAddStartup(userId, newStartup).catch((err) => {
         console.warn('[Firestore] Failed to save startup:', err);
       });
+      updateUserStats(userId, { xpGained: xpReward }).catch((err) => {
+        console.warn('[Firestore] Failed to sync XP:', err);
+      });
     }
 
-    // Award XP for creating a startup
-    addXP(200);
+    // Award XP locally
+    addXP(xpReward);
 
     // Celebration haptic
     if (hapticsEnabled) {
@@ -224,7 +272,7 @@ export default function StartupConfirmationScreen() {
                   <Ionicons name="diamond" size={14} color={COLORS.textSecondary} />
                   <Text style={styles.infoLabelText}>Valorisation initiale</Text>
                 </View>
-                <Text style={styles.infoValueHighlight}>150K€</Text>
+                <Text style={styles.infoValueHighlight}>{formatValorisation(valorisation)}</Text>
               </View>
 
               <View style={styles.infoSeparator} />
@@ -252,7 +300,7 @@ export default function StartupConfirmationScreen() {
             >
               <View style={styles.rewardContent}>
                 <Text style={styles.rewardIcon}>⭐</Text>
-                <Text style={styles.rewardValue}>+200 PX</Text>
+                <Text style={styles.rewardValue}>+{xpReward} PX</Text>
               </View>
             </DynamicGradientBorder>
 

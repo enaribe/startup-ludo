@@ -1,12 +1,25 @@
 import { useState, useCallback } from 'react';
-import { View, Text, ScrollView, Pressable, RefreshControl, StyleSheet } from 'react-native';
+import {
+  View,
+  Text,
+  ScrollView,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Modal,
+  Dimensions,
+  Alert,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeIn, SlideInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 
-import { FONTS } from '@/styles/typography';
-import { useUserStore } from '@/stores';
+import { COLORS } from '@/styles/colors';
+import { SPACING } from '@/styles/spacing';
+import { FONTS, FONT_SIZES } from '@/styles/typography';
+import { useUserStore, useAuthStore } from '@/stores';
+import { deleteStartup } from '@/services/firebase/firestore';
 import { PortfolioIcon } from '@/components/icons';
 import {
   RadialBackground,
@@ -16,7 +29,302 @@ import {
   StatCard,
   ScreenHeader,
   FAB,
+  GameButton,
 } from '@/components/ui';
+import type { Startup } from '@/types';
+
+const { width: screenWidth } = Dimensions.get('window');
+
+function formatValorisationPopup(value: number): string {
+  if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M€`;
+  if (value >= 1000) return `${Math.round(value / 1000)}K€`;
+  return `${value}€`;
+}
+
+function formatDateDDMMYYYY(ts: number): string {
+  const d = new Date(ts);
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
+function StartupDetailPopup({
+  startup,
+  onClose,
+  onDelete,
+}: {
+  startup: Startup;
+  onClose: () => void;
+  onDelete?: () => void;
+}) {
+  const valorisationStr = formatValorisationPopup(startup.valorisation ?? startup.tokensInvested ?? 0);
+  const createdAtStr = formatDateDDMMYYYY(startup.createdAt);
+
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={popupStyles.backdrop} onPress={onClose}>
+        <Animated.View
+          entering={FadeIn.duration(200)}
+          style={StyleSheet.absoluteFill}
+        >
+          <View style={popupStyles.backdropInner} />
+        </Animated.View>
+        <Pressable onPress={(e) => e.stopPropagation()} style={popupStyles.centered}>
+          <Animated.View entering={SlideInUp.duration(100).springify().damping(32)}>
+            <DynamicGradientBorder
+              borderRadius={24}
+              fill="rgba(10, 25, 41, 0.95)"
+              boxWidth={screenWidth - 36}
+            >
+              <View style={popupStyles.card}>
+                <Pressable
+                  style={popupStyles.closeBtn}
+                  onPress={onClose}
+                  hitSlop={8}
+                >
+                  <Ionicons name="close" size={20} color="rgba(255,255,255,0.6)" />
+                </Pressable>
+
+                {/* 1. Header */}
+                <View style={popupStyles.header}>
+                  <View style={popupStyles.iconBadge}>
+                    <PortfolioIcon color="#FFBC40" size={36} />
+                  </View>
+                  <Text style={popupStyles.startupName}>{startup.name.toUpperCase()}</Text>
+                  {startup.description ? (
+                    <Text style={popupStyles.startupDesc}>{startup.description}</Text>
+                  ) : null}
+                </View>
+
+                <View style={popupStyles.divider} />
+
+                {/* 2. Tableau stats : Valorisation | Niveau */}
+                <View style={popupStyles.statsRow}>
+                  <View style={popupStyles.statCol}>
+                    <Text style={popupStyles.statValue}>{valorisationStr}</Text>
+                    <Text style={popupStyles.statLabel}>Valorisation</Text>
+                  </View>
+                  <View style={popupStyles.statSeparator} />
+                  <View style={popupStyles.statCol}>
+                    <Text style={popupStyles.statValue}>{startup.level}</Text>
+                    <Text style={popupStyles.statLabel}>Niveau</Text>
+                  </View>
+                </View>
+
+                <View style={popupStyles.divider} />
+
+                {/* 3. Detail lines (Cible, Mission, Secteur, etc.) */}
+                <View style={popupStyles.detailBlock}>
+                  <View style={popupStyles.detailRow}>
+                    <View style={popupStyles.detailLeft}>
+                      <Ionicons name="people" size={14} color={COLORS.textSecondary} />
+                      <Text style={popupStyles.detailLabel}>Cible</Text>
+                    </View>
+                    <Text style={popupStyles.detailValue}>
+                      {startup.targetCard?.title ?? 'Non définie'}
+                    </Text>
+                  </View>
+                  <View style={popupStyles.detailSeparator} />
+                  <View style={popupStyles.detailRow}>
+                    <View style={popupStyles.detailLeft}>
+                      <Ionicons name="flag" size={14} color={COLORS.textSecondary} />
+                      <Text style={popupStyles.detailLabel}>Mission</Text>
+                    </View>
+                    <Text style={popupStyles.detailValue}>
+                      {startup.missionCard?.title ?? 'Non définie'}
+                    </Text>
+                  </View>
+                  <View style={popupStyles.detailSeparator} />
+                  <View style={popupStyles.detailRow}>
+                    <View style={popupStyles.detailLeft}>
+                      <Ionicons name="business" size={14} color={COLORS.textSecondary} />
+                      <Text style={popupStyles.detailLabel}>Secteur</Text>
+                    </View>
+                    <Text style={[popupStyles.detailValue, popupStyles.detailValueWrap]} numberOfLines={3}>
+                      {startup.sector}
+                    </Text>
+                  </View>
+                  <View style={popupStyles.detailSeparator} />
+                  <View style={popupStyles.detailRow}>
+                    <View style={popupStyles.detailLeft}>
+                      <Ionicons name="calendar" size={14} color={COLORS.textSecondary} />
+                      <Text style={popupStyles.detailLabel}>Créée le</Text>
+                    </View>
+                    <Text style={popupStyles.detailValue}>{createdAtStr}</Text>
+                  </View>
+                  <View style={popupStyles.detailSeparator} />
+                  <View style={popupStyles.detailRow}>
+                    <View style={popupStyles.detailLeft}>
+                      <Ionicons name="diamond" size={14} color={COLORS.textSecondary} />
+                      <Text style={popupStyles.detailLabel}>Tokens investis</Text>
+                    </View>
+                    <Text style={popupStyles.detailValue}>
+                      {startup.tokensInvested.toLocaleString()}
+                    </Text>
+                  </View>
+                  {startup.creatorName ? (
+                    <>
+                      <View style={popupStyles.detailSeparator} />
+                      <View style={popupStyles.detailRow}>
+                        <View style={popupStyles.detailLeft}>
+                          <Ionicons name="person" size={14} color={COLORS.textSecondary} />
+                          <Text style={popupStyles.detailLabel}>Créateur</Text>
+                        </View>
+                        <Text style={popupStyles.detailValue}>{startup.creatorName}</Text>
+                      </View>
+                    </>
+                  ) : null}
+                </View>
+
+                <View style={popupStyles.divider} />
+
+                {/* 4. Actions */}
+                <View style={popupStyles.actions}>
+                  {onDelete != null && (
+                    <GameButton
+                      title="SUPPRIMER L'ENTREPRISE"
+                      variant="yellow"
+                      fullWidth
+                      onPress={onDelete}
+                    />
+                  )}
+                  <GameButton title="FERMER" variant="blue" fullWidth onPress={onClose} />
+                </View>
+              </View>
+            </DynamicGradientBorder>
+          </Animated.View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+const popupStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  backdropInner: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+  },
+  centered: {
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 18,
+  },
+  card: {
+    padding: SPACING[5],
+    position: 'relative',
+  },
+  closeBtn: {
+    position: 'absolute',
+    top: SPACING[2],
+    right: SPACING[2],
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  header: {
+    alignItems: 'center',
+  },
+  iconBadge: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 188, 64, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: SPACING[3],
+  },
+  startupName: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES.xl,
+    color: COLORS.primary,
+    textAlign: 'center',
+  },
+  startupDesc: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.base,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginTop: SPACING[2],
+  },
+  divider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    marginVertical: SPACING[4],
+  },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+  },
+  statCol: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statSeparator: {
+    width: 1,
+    height: 32,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  statValue: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES.xl,
+    color: COLORS.primary,
+  },
+  statLabel: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.textSecondary,
+    marginTop: 4,
+  },
+  detailBlock: {
+    gap: 0,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: SPACING[2],
+  },
+  detailLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[2],
+  },
+  detailLabel: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
+  },
+  detailValue: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.text,
+  },
+  detailValueWrap: {
+    flex: 1,
+    marginLeft: SPACING[2],
+    textAlign: 'right',
+  },
+  detailSeparator: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  actions: {
+    gap: SPACING[3],
+  },
+});
 
 const FILTERS = [
   { id: 'all', label: 'TOUT' },
@@ -37,6 +345,7 @@ export default function PortfolioScreen() {
   const profile = useUserStore((state) => state.profile);
   const [activeFilter, setActiveFilter] = useState('all');
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedStartup, setSelectedStartup] = useState<Startup | null>(null);
 
   const startups = profile?.startups ?? [];
   const totalValorisation = startups.reduce((sum, s) => sum + s.tokensInvested, 0);
@@ -139,7 +448,7 @@ export default function PortfolioScreen() {
                 key={startup.id}
                 entering={FadeInDown.delay(400 + index * 100).duration(500)}
               >
-                <Pressable>
+                <Pressable onPress={() => setSelectedStartup(startup)}>
                   <DynamicGradientBorder
                     borderRadius={16}
                     fill="rgba(0, 0, 0, 0.3)"
@@ -192,6 +501,41 @@ export default function PortfolioScreen() {
       {/* Bouton Flottant + */}
       {canAddStartup && (
         <FAB onPress={handleCreateStartup} bottom={insets.bottom + 100} />
+      )}
+
+      {/* Popup détail startup */}
+      {selectedStartup && (
+        <StartupDetailPopup
+          startup={selectedStartup}
+          onClose={() => setSelectedStartup(null)}
+          onDelete={() => {
+            Alert.alert(
+              "Supprimer l'entreprise",
+              `Es-tu sûr de vouloir supprimer "${selectedStartup.name}" ? Cette action est irréversible.`,
+              [
+                { text: 'Annuler', style: 'cancel' },
+                {
+                  text: 'Supprimer',
+                  style: 'destructive',
+                  onPress: async () => {
+                    const userId = useAuthStore.getState().user?.id;
+                    if (!userId) return;
+                    try {
+                      await deleteStartup(userId, selectedStartup.id);
+                      useUserStore.getState().removeStartup(selectedStartup.id);
+                      setSelectedStartup(null);
+                    } catch (e) {
+                      Alert.alert(
+                        'Erreur',
+                        "Impossible de supprimer l'entreprise. Réessaie plus tard."
+                      );
+                    }
+                  },
+                },
+              ]
+            );
+          }}
+        />
       )}
     </View>
   );

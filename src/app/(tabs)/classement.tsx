@@ -1,128 +1,212 @@
-import { useState, useCallback, memo, useEffect } from 'react';
-import { View, Text, ScrollView, Pressable, RefreshControl, Dimensions, StyleSheet, Modal, ActivityIndicator } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import Animated, {
-  FadeInDown,
-  FadeIn,
-  FadeOut,
-  SlideInUp,
-  useSharedValue,
-  useAnimatedStyle,
-  withRepeat,
-  withTiming,
-  withDelay,
-  Easing,
-} from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
+import { memo, useCallback, useEffect, useState } from 'react';
+import { Dimensions, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  Easing,
+  FadeIn,
+  FadeInDown,
+  FadeOut,
+  SlideInUp,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { EmptyState } from '@/components/common/EmptyState';
+import { Avatar, DynamicGradientBorder, GameButton, RadialBackground, ScreenHeader } from '@/components/ui';
+import { getLeaderboard, getAllStartups } from '@/services/firebase/firestore';
+import { useAuthStore, useSettingsStore, useUserStore } from '@/stores';
+import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
-import { COLORS } from '@/styles/colors';
-import { Avatar, RadialBackground, ScreenHeader, DynamicGradientBorder, GameButton } from '@/components/ui';
-import { EmptyState } from '@/components/common/EmptyState';
-import { useSettingsStore, useAuthStore } from '@/stores';
-import { getLeaderboard, type LeaderboardEntry } from '@/services/firebase/firestore';
+import type { Startup } from '@/types';
 
-// Hauteur approximative du header fixe (safe area + titre + padding)
 const HEADER_CONTENT_HEIGHT = 82;
-
 const { width: screenWidth } = Dimensions.get('window');
 
-// Filtres disponibles
 const FILTERS = [
-  { id: 'entrepreneurs', label: 'JOUEURS', icon: 'people' as const },
-  { id: 'startups', label: 'ENTREPRISES', icon: 'rocket' as const },
+  { id: 'joueurs', label: 'JOUEURS', icon: 'people' as const },
+  { id: 'entreprises', label: 'ENTREPRISES', icon: 'rocket' as const },
 ];
 
-// Types pour le profil popup
-interface LeaderboardUser {
+// Unified ranked item for both tabs
+interface RankedItem {
   id: string;
   name: string;
-  xp: number;
-  avatar: string | null;
+  score: number;
   subtitle: string;
-  isUser?: boolean;
-  rank?: string;
+  type: 'user' | 'startup';
+  avatar?: string | null;
+  // User-specific
+  isCurrentUser?: boolean;
   level?: number;
   gamesPlayed?: number;
   gamesWon?: number;
   startupCount?: number;
+  rank?: string;
+  // Startup-specific
+  sector?: string;
+  creatorName?: string;
+  valorisation?: number;
 }
 
-interface LeaderboardStartup {
-  id: string;
-  name: string;
-  xp: number;
-  subtitle: string;
-  sector: string;
-}
-
-type LeaderboardItem = LeaderboardUser | LeaderboardStartup;
-
-function isLeaderboardUser(item: LeaderboardItem): item is LeaderboardUser {
-  return 'avatar' in item;
-}
-
-function mapLeaderboardEntry(entry: LeaderboardEntry, currentUserId: string | undefined): LeaderboardUser {
-  return {
-    id: entry.id,
-    name: entry.displayName.toUpperCase(),
-    xp: entry.xp,
-    avatar: entry.avatarUrl,
-    subtitle: `${entry.xp.toLocaleString()} xp`,
-    isUser: entry.id === currentUserId,
-    level: entry.level,
-    gamesPlayed: 0,
-    gamesWon: entry.gamesWon,
-    startupCount: 0,
-  };
+function formatScore(item: RankedItem): string {
+  if (item.type === 'startup') {
+    const val = item.valorisation ?? item.score;
+    if (val >= 1_000_000) {
+      return `${(val / 1_000_000).toFixed(1).replace('.0', '')}M€`;
+    }
+    if (val >= 1000) {
+      return `${Math.round(val / 1000)}K€`;
+    }
+    return `${val}€`;
+  }
+  return `${item.score.toLocaleString()} xp`;
 }
 
 export default function ClassementScreen() {
   const insets = useSafeAreaInsets();
   const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
   const currentUserId = useAuthStore((state) => state.user?.id);
-  const [activeFilter, setActiveFilter] = useState('entrepreneurs');
+  const currentUserName = useAuthStore((state) => state.user?.displayName);
+  const localProfile = useUserStore((state) => state.profile);
+  const [activeFilter, setActiveFilter] = useState('joueurs');
   const [refreshing, setRefreshing] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [leaderboardData, setLeaderboardData] = useState<LeaderboardUser[]>([]);
-  const [selectedProfile, setSelectedProfile] = useState<{ item: LeaderboardItem; rank: number } | null>(null);
+  const [remoteUsers, setRemoteUsers] = useState<RankedItem[]>([]);
+  const [remoteStartups, setRemoteStartups] = useState<Startup[]>([]);
+  const [selectedProfile, setSelectedProfile] = useState<{ item: RankedItem; rank: number } | null>(null);
   const [followedIds, setFollowedIds] = useState<Set<string>>(new Set());
 
-  const isEntrepreneurs = activeFilter === 'entrepreneurs';
+  const isJoueurs = activeFilter === 'joueurs';
 
-  const fetchLeaderboard = useCallback(async () => {
+  const fetchRemoteData = useCallback(async () => {
     try {
-      const entries = await getLeaderboard('allTime', 50);
-      const mapped = entries.map((e) => mapLeaderboardEntry(e, currentUserId));
-      setLeaderboardData(mapped);
+      const [entries, startups] = await Promise.all([
+        getLeaderboard('allTime', 50),
+        getAllStartups(100),
+      ]);
+
+      const mappedUsers: RankedItem[] = entries.map((e) => ({
+        id: e.id,
+        name: e.displayName.toUpperCase(),
+        score: e.xp,
+        subtitle: `${e.xp.toLocaleString()} xp`,
+        type: 'user' as const,
+        avatar: e.avatarUrl,
+        isCurrentUser: e.id === currentUserId,
+        level: e.level,
+        gamesPlayed: 0,
+        gamesWon: e.gamesWon,
+        startupCount: 0,
+      }));
+
+      setRemoteUsers(mappedUsers);
+      setRemoteStartups(startups);
     } catch (error) {
-      console.warn('[Classement] Failed to fetch leaderboard:', error);
-      setLeaderboardData([]);
+      console.warn('[Classement] Failed to fetch remote data:', error);
     } finally {
-      setLoading(false);
       setRefreshing(false);
     }
   }, [currentUserId]);
 
   useEffect(() => {
-    fetchLeaderboard();
-  }, [fetchLeaderboard]);
+    fetchRemoteData();
+  }, [fetchRemoteData]);
 
-  const data: LeaderboardItem[] = isEntrepreneurs ? leaderboardData : [];
+  // === JOUEURS DATA: merge remote users with local profile ===
+  const joueurData: RankedItem[] = (() => {
+    const list = [...remoteUsers];
 
-  // Reorder for Podium: 2nd, 1st, 3rd
-  const podiumData = data.length >= 3 ? [data[1], data[0], data[2]].filter(Boolean) : [];
-  const restOfList = data.slice(3);
+    // Always inject local user if authenticated (even with 0 XP)
+    if (localProfile && currentUserId) {
+      const alreadyPresent = list.some((u) => u.id === currentUserId);
+      if (!alreadyPresent) {
+        list.push({
+          id: currentUserId,
+          name: (currentUserName ?? localProfile.displayName ?? 'Moi').toUpperCase(),
+          score: localProfile.xp,
+          subtitle: `${localProfile.xp.toLocaleString()} xp`,
+          type: 'user',
+          avatar: localProfile.avatarUrl,
+          isCurrentUser: true,
+          level: localProfile.level,
+          gamesPlayed: localProfile.gamesPlayed,
+          gamesWon: localProfile.gamesWon,
+          startupCount: localProfile.startups?.length ?? 0,
+        });
+      } else {
+        // Update existing entry with local data if more recent
+        const idx = list.findIndex((u) => u.id === currentUserId);
+        const existing = list[idx];
+        if (idx >= 0 && existing) {
+          const bestScore = Math.max(existing.score, localProfile.xp);
+          list[idx] = {
+            ...existing,
+            isCurrentUser: true,
+            score: bestScore,
+            subtitle: `${bestScore.toLocaleString()} xp`,
+            gamesPlayed: localProfile.gamesPlayed,
+            gamesWon: localProfile.gamesWon,
+            startupCount: localProfile.startups?.length ?? 0,
+          };
+        }
+      }
+    }
+
+    list.sort((a, b) => b.score - a.score);
+    return list;
+  })();
+
+  // === ENTREPRISES DATA: merge remote startups with local startups ===
+  const entrepriseData: RankedItem[] = (() => {
+    // Start with remote startups
+    const startupMap = new Map<string, Startup>();
+    for (const s of remoteStartups) {
+      startupMap.set(s.id, s);
+    }
+
+    // Merge local startups (may have newer data)
+    const localStartups = localProfile?.startups ?? [];
+    for (const s of localStartups) {
+      if (!startupMap.has(s.id)) {
+        startupMap.set(s.id, s);
+      }
+    }
+
+    const allStartups = Array.from(startupMap.values());
+    // Sort by valorisation descending
+    allStartups.sort((a, b) => (b.valorisation ?? 0) - (a.valorisation ?? 0));
+
+    return allStartups.map((s) => ({
+      id: s.id,
+      name: s.name.toUpperCase(),
+      score: s.valorisation ?? 0,
+      subtitle: formatStartupValorisation(s.valorisation ?? 0),
+      type: 'startup' as const,
+      sector: s.sector,
+      creatorName: s.creatorName,
+      valorisation: s.valorisation,
+    }));
+  })();
+
+  const data = isJoueurs ? joueurData : entrepriseData;
+
+  // Handle podium: need 3+ items
+  const hasPodium = data.length >= 3;
+  const podiumData = hasPodium ? [data[1], data[0], data[2]].filter(Boolean) : [];
+  const restOfList = hasPodium ? data.slice(3) : [];
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    fetchLeaderboard();
-  }, [fetchLeaderboard]);
+    fetchRemoteData();
+  }, [fetchRemoteData]);
 
-  const handleProfilePress = useCallback((item: LeaderboardItem, rank: number) => {
+  const handleProfilePress = useCallback((item: RankedItem, rank: number) => {
     if (hapticsEnabled) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
@@ -155,7 +239,7 @@ export default function ClassementScreen() {
     <View style={styles.container}>
       <RadialBackground />
 
-      {/* Header fixe (design system: FixedHeader + ScreenHeader) */}
+      {/* Header fixe */}
       <View style={[styles.fixedHeader, { paddingTop: headerTopPadding }]}>
         <Animated.View entering={FadeInDown.duration(500)}>
           <ScreenHeader
@@ -227,119 +311,134 @@ export default function ClassementScreen() {
           })}
         </View>
 
-        {/* Loading State */}
-        {loading ? (
-          <View style={{ alignItems: 'center', paddingVertical: SPACING[8] }}>
-            <ActivityIndicator size="large" color={COLORS.primary} />
-          </View>
-        ) : data.length === 0 ? (
+        {data.length === 0 ? (
           <View style={{ paddingVertical: SPACING[8] }}>
             <EmptyState
               icon="trophy-outline"
-              title={isEntrepreneurs ? 'Aucun joueur' : 'Bientot disponible'}
-              description={isEntrepreneurs ? 'Le classement sera disponible quand des joueurs auront joue !' : 'Le classement des entreprises arrive bientot.'}
+              title={isJoueurs ? 'Aucun joueur' : 'Aucune entreprise'}
+              description={
+                isJoueurs
+                  ? 'Le classement sera disponible quand des joueurs auront joue !'
+                  : 'Creez votre premiere startup pour apparaitre ici !'
+              }
             />
           </View>
-        ) : (
-        <>
-        {/* Title */}
-        <Text
-          style={{
-            fontFamily: FONTS.title,
-            fontSize: FONT_SIZES.xl,
-            color: '#FFFFFF',
-            marginBottom: SPACING[4],
-            textTransform: 'uppercase',
-          }}
-        >
-          TOP 3 {isEntrepreneurs ? 'ENTREPRENEURS' : 'ENTREPRISES'}
-        </Text>
-
-        {/* Podium Section - Or, Argent, Bronze */}
-        {podiumData.length >= 3 && (
-          <Animated.View entering={FadeInDown.delay(200).duration(500)} style={{ marginBottom: SPACING[6] }}>
+        ) : !hasPodium ? (
+          /* Less than 3 items — simple list, no podium */
+          <Animated.View entering={FadeInDown.delay(200).duration(500)}>
             <DynamicGradientBorder
               borderRadius={24}
               fill="rgba(10, 25, 41, 0.6)"
               boxWidth={screenWidth - SPACING[4] * 2}
-              style={{
-                height: 220,
-                padding: SPACING[4],
-                paddingBottom: 0,
-                justifyContent: 'flex-end',
-              }}
+              style={{ paddingVertical: SPACING[2] }}
             >
-              <View
-                style={{
-                  flexDirection: 'row',
-                  justifyContent: 'center',
-                  alignItems: 'flex-end',
-                  height: '100%',
-                  gap: 12,
-                }}
-              >
-                {/* 2ème Place - Argent */}
-                <PodiumItem
-                  rank={2}
-                  item={podiumData[0]!}
-                  height={72}
-                  medal="silver"
-                  onPress={() => podiumData[0] && handleProfilePress(podiumData[0], 2)}
-                />
-
-                {/* 1ère Place - Or */}
-                <PodiumItem
-                  rank={1}
-                  item={podiumData[1]!}
-                  height={100}
-                  isFirst
-                  medal="gold"
-                  onPress={() => podiumData[1] && handleProfilePress(podiumData[1], 1)}
-                />
-
-                {/* 3ème Place - Bronze */}
-                <PodiumItem
-                  rank={3}
-                  item={podiumData[2]!}
-                  height={58}
-                  medal="bronze"
-                  onPress={() => podiumData[2] && handleProfilePress(podiumData[2], 3)}
-                />
-              </View>
-            </DynamicGradientBorder>
-          </Animated.View>
-        )}
-
-        {/* List Section */}
-        <Animated.View entering={FadeInDown.delay(300).duration(500)}>
-          <DynamicGradientBorder
-            borderRadius={24}
-            fill="rgba(10, 25, 41, 0.6)"
-            boxWidth={screenWidth - SPACING[4] * 2}
-            style={{ paddingVertical: SPACING[2] }}
-          >
-            {restOfList.length === 0 ? (
-              <View style={{ padding: SPACING[4] }}>
-                <EmptyState
-                  icon="trophy-outline"
-                  title="Aucun autre classement"
-                  description="Jouez pour apparaître ici !"
-                />
-              </View>
-            ) : (
-              restOfList.map((item, index) => (
+              {data.map((item, index) => (
                 <RankingItem
                   key={item.id}
-                  rank={index + 4}
+                  rank={index + 1}
                   item={item}
-                  isLast={index === restOfList.length - 1}
-                  onPress={() => handleProfilePress(item, index + 4)}
+                  isLast={index === data.length - 1}
+                  onPress={() => handleProfilePress(item, index + 1)}
                 />
-              ))
-            )}
-          </DynamicGradientBorder>
-        </Animated.View>
-        </>
+              ))}
+            </DynamicGradientBorder>
+          </Animated.View>
+        ) : (
+          <>
+            {/* Title */}
+            <Text
+              style={{
+                fontFamily: FONTS.title,
+                fontSize: FONT_SIZES.xl,
+                color: '#FFFFFF',
+                marginBottom: SPACING[4],
+                textTransform: 'uppercase',
+              }}
+            >
+              TOP 3 {isJoueurs ? 'JOUEURS' : 'ENTREPRISES'}
+            </Text>
+
+            {/* Podium Section */}
+            <Animated.View entering={FadeInDown.delay(200).duration(500)} style={{ marginBottom: SPACING[6] }}>
+              <DynamicGradientBorder
+                borderRadius={24}
+                fill="rgba(10, 25, 41, 0.6)"
+                boxWidth={screenWidth - SPACING[4] * 2}
+                style={{
+                  height: 220,
+                  padding: SPACING[4],
+                  paddingBottom: 0,
+                  justifyContent: 'flex-end',
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    justifyContent: 'center',
+                    alignItems: 'flex-end',
+                    height: '100%',
+                    gap: 12,
+                  }}
+                >
+                  {/* 2nd Place */}
+                  <PodiumItem
+                    rank={2}
+                    item={podiumData[0]!}
+                    height={72}
+                    medal="silver"
+                    onPress={() => podiumData[0] && handleProfilePress(podiumData[0], 2)}
+                  />
+                  {/* 1st Place */}
+                  <PodiumItem
+                    rank={1}
+                    item={podiumData[1]!}
+                    height={100}
+                    isFirst
+                    medal="gold"
+                    onPress={() => podiumData[1] && handleProfilePress(podiumData[1], 1)}
+                  />
+                  {/* 3rd Place */}
+                  <PodiumItem
+                    rank={3}
+                    item={podiumData[2]!}
+                    height={58}
+                    medal="bronze"
+                    onPress={() => podiumData[2] && handleProfilePress(podiumData[2], 3)}
+                  />
+                </View>
+              </DynamicGradientBorder>
+            </Animated.View>
+
+            {/* List Section */}
+            <Animated.View entering={FadeInDown.delay(300).duration(500)}>
+              <DynamicGradientBorder
+                borderRadius={24}
+                fill="rgba(10, 25, 41, 0.6)"
+                boxWidth={screenWidth - SPACING[4] * 2}
+                style={{ paddingVertical: SPACING[2] }}
+              >
+                {restOfList.length === 0 ? (
+                  <View style={{ padding: SPACING[4] }}>
+                    <EmptyState
+                      icon="trophy-outline"
+                      title="Aucun autre classement"
+                      description="Jouez pour apparaitre ici !"
+                    />
+                  </View>
+                ) : (
+                  restOfList.map((item, index) => (
+                    <RankingItem
+                      key={item.id}
+                      rank={index + 4}
+                      item={item}
+                      isLast={index === restOfList.length - 1}
+                      onPress={() => handleProfilePress(item, index + 4)}
+                    />
+                  ))
+                )}
+              </DynamicGradientBorder>
+            </Animated.View>
+          </>
         )}
       </ScrollView>
 
@@ -357,10 +456,22 @@ export default function ClassementScreen() {
   );
 }
 
-/* ───────────────────────── Profile Popup ───────────────────────── */
+/* ───────────────── Helpers ───────────────── */
+
+function formatStartupValorisation(val: number): string {
+  if (val >= 1_000_000) {
+    return `${(val / 1_000_000).toFixed(1).replace('.0', '')}M€`;
+  }
+  if (val >= 1000) {
+    return `${Math.round(val / 1000)}K€`;
+  }
+  return `${val}€`;
+}
+
+/* ───────────────── Profile Popup ───────────────── */
 
 interface ProfilePopupProps {
-  item: LeaderboardItem;
+  item: RankedItem;
   rank: number;
   isFollowed: boolean;
   onToggleFollow: () => void;
@@ -368,13 +479,10 @@ interface ProfilePopupProps {
 }
 
 function ProfilePopup({ item, rank, isFollowed, onToggleFollow, onClose }: ProfilePopupProps) {
-  const isUser = isLeaderboardUser(item);
-  const user = isUser ? item : null;
-  const startup = !isUser ? item : null;
+  const isUser = item.type === 'user';
 
   return (
     <Modal transparent visible animationType="none" onRequestClose={onClose}>
-      {/* Backdrop */}
       <Animated.View
         entering={FadeIn.duration(200)}
         exiting={FadeOut.duration(150)}
@@ -382,7 +490,6 @@ function ProfilePopup({ item, rank, isFollowed, onToggleFollow, onClose }: Profi
       >
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
 
-        {/* Popup Content */}
         <Animated.View
           entering={SlideInUp.duration(100).springify().damping(32)}
           style={styles.popupContainer}
@@ -401,8 +508,8 @@ function ProfilePopup({ item, rank, isFollowed, onToggleFollow, onClose }: Profi
               {/* Avatar + Name */}
               <View style={styles.popupHeader}>
                 <View style={styles.popupAvatar}>
-                  {user?.avatar ? (
-                    <Avatar name={item.name} size="lg" source={user.avatar} />
+                  {isUser && item.avatar ? (
+                    <Avatar name={item.name} size="lg" source={item.avatar} />
                   ) : (
                     <Ionicons
                       name={isUser ? 'person' : 'rocket'}
@@ -414,86 +521,60 @@ function ProfilePopup({ item, rank, isFollowed, onToggleFollow, onClose }: Profi
 
                 <Text style={styles.popupName}>{item.name}</Text>
 
-                {/* Rank badge */}
                 <View style={styles.popupRankBadge}>
                   <Text style={styles.popupRankText}>
-                    #{rank} {isUser ? (user?.rank || '') : (startup?.sector || '')}
+                    #{rank} {isUser ? (item.rank || '') : (item.sector || '')}
                   </Text>
                 </View>
               </View>
 
-              {/* Divider */}
               <View style={styles.popupDivider} />
 
               {/* Stats */}
-              {isUser && user ? (
+              {isUser ? (
                 <View style={styles.popupStatsRow}>
-                  <View style={styles.popupStatItem}>
-                    <Text style={styles.popupStatValue}>{user.level || 1}</Text>
-                    <Text style={styles.popupStatLabel}>Niveau</Text>
-                  </View>
+                  <PopupStat value={String(item.level || 1)} label="Niveau" />
                   <View style={styles.popupStatSep} />
-                  <View style={styles.popupStatItem}>
-                    <Text style={styles.popupStatValue}>{user.xp.toLocaleString()}</Text>
-                    <Text style={styles.popupStatLabel}>XP</Text>
-                  </View>
+                  <PopupStat value={item.score.toLocaleString()} label="XP" />
                   <View style={styles.popupStatSep} />
-                  <View style={styles.popupStatItem}>
-                    <Text style={styles.popupStatValue}>{user.startupCount || 0}</Text>
-                    <Text style={styles.popupStatLabel}>Startups</Text>
-                  </View>
+                  <PopupStat value={String(item.startupCount || 0)} label="Startups" />
                 </View>
-              ) : startup ? (
+              ) : (
                 <View style={styles.popupStatsRow}>
-                  <View style={styles.popupStatItem}>
-                    <Text style={styles.popupStatValue}>{startup.xp.toLocaleString()}</Text>
-                    <Text style={styles.popupStatLabel}>Jetons</Text>
-                  </View>
+                  <PopupStat value={formatScore(item)} label="Valorisation" />
                   <View style={styles.popupStatSep} />
-                  <View style={styles.popupStatItem}>
-                    <Text style={styles.popupStatValue}>{startup.sector}</Text>
-                    <Text style={styles.popupStatLabel}>Secteur</Text>
-                  </View>
+                  <PopupStat value={item.sector || '-'} label="Secteur" />
+                  {item.creatorName ? (
+                    <>
+                      <View style={styles.popupStatSep} />
+                      <PopupStat value={item.creatorName} label="Createur" />
+                    </>
+                  ) : null}
                 </View>
-              ) : null}
+              )}
 
               {/* Extra stats for users */}
-              {isUser && user ? (
+              {isUser ? (
                 <>
                   <View style={styles.popupDivider} />
                   <View style={styles.popupDetailRows}>
-                    <View style={styles.popupDetailRow}>
-                      <View style={styles.popupDetailLabel}>
-                        <Ionicons name="game-controller" size={14} color={COLORS.textSecondary} />
-                        <Text style={styles.popupDetailLabelText}>Parties jouées</Text>
-                      </View>
-                      <Text style={styles.popupDetailValue}>{user.gamesPlayed || 0}</Text>
-                    </View>
+                    <PopupDetailRow icon="game-controller" label="Parties jouees" value={String(item.gamesPlayed || 0)} />
                     <View style={styles.popupDetailSep} />
-                    <View style={styles.popupDetailRow}>
-                      <View style={styles.popupDetailLabel}>
-                        <Ionicons name="trophy" size={14} color={COLORS.textSecondary} />
-                        <Text style={styles.popupDetailLabelText}>Victoires</Text>
-                      </View>
-                      <Text style={styles.popupDetailValue}>{user.gamesWon || 0}</Text>
-                    </View>
+                    <PopupDetailRow icon="trophy" label="Victoires" value={String(item.gamesWon || 0)} />
                     <View style={styles.popupDetailSep} />
-                    <View style={styles.popupDetailRow}>
-                      <View style={styles.popupDetailLabel}>
-                        <Ionicons name="star" size={14} color={COLORS.textSecondary} />
-                        <Text style={styles.popupDetailLabelText}>Taux de victoire</Text>
-                      </View>
-                      <Text style={styles.popupDetailValueHighlight}>
-                        {user.gamesPlayed ? Math.round(((user.gamesWon || 0) / user.gamesPlayed) * 100) : 0}%
-                      </Text>
-                    </View>
+                    <PopupDetailRow
+                      icon="star"
+                      label="Taux de victoire"
+                      value={`${item.gamesPlayed ? Math.round(((item.gamesWon || 0) / item.gamesPlayed) * 100) : 0}%`}
+                      highlight
+                    />
                   </View>
                 </>
               ) : null}
 
               {/* Follow button */}
               <View style={styles.popupActions}>
-                {isUser && !user?.isUser ? (
+                {isUser && !item.isCurrentUser ? (
                   <GameButton
                     title={isFollowed ? 'SUIVI' : 'SUIVRE'}
                     variant={isFollowed ? 'blue' : 'yellow'}
@@ -517,7 +598,28 @@ function ProfilePopup({ item, rank, isFollowed, onToggleFollow, onClose }: Profi
   );
 }
 
-/* ───────────────────────── Podium ───────────────────────── */
+function PopupStat({ value, label }: { value: string; label: string }) {
+  return (
+    <View style={styles.popupStatItem}>
+      <Text style={styles.popupStatValue} numberOfLines={1}>{value}</Text>
+      <Text style={styles.popupStatLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function PopupDetailRow({ icon, label, value, highlight }: { icon: string; label: string; value: string; highlight?: boolean }) {
+  return (
+    <View style={styles.popupDetailRow}>
+      <View style={styles.popupDetailLabel}>
+        <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={14} color={COLORS.textSecondary} />
+        <Text style={styles.popupDetailLabelText}>{label}</Text>
+      </View>
+      <Text style={highlight ? styles.popupDetailValueHighlight : styles.popupDetailValue}>{value}</Text>
+    </View>
+  );
+}
+
+/* ───────────────── Podium ───────────────── */
 
 const MEDAL_GRADIENTS = {
   gold: ['#FFE55C', '#F0B432', '#D4A017'] as [string, string, ...string[]],
@@ -527,7 +629,7 @@ const MEDAL_GRADIENTS = {
 
 interface PodiumItemProps {
   rank: number;
-  item: LeaderboardItem;
+  item: RankedItem;
   height: number;
   isFirst?: boolean;
   medal: 'gold' | 'silver' | 'bronze';
@@ -537,7 +639,6 @@ interface PodiumItemProps {
 const PodiumItem = memo(function PodiumItem({ rank, item, height, isFirst = false, medal, onPress }: PodiumItemProps) {
   const colors = MEDAL_GRADIENTS[medal];
   const scaleY = useSharedValue(1);
-  const hasAvatar = isLeaderboardUser(item) && item.avatar;
 
   useEffect(() => {
     const delay = (rank - 1) * 150;
@@ -572,10 +673,10 @@ const PodiumItem = memo(function PodiumItem({ rank, item, height, isFirst = fals
             marginBottom: 4,
           }}
         >
-          {hasAvatar ? (
-            <Avatar name={item.name} size={isFirst ? 'md' : 'sm'} source={(item as LeaderboardUser).avatar} />
+          {item.type === 'user' && item.avatar ? (
+            <Avatar name={item.name} size={isFirst ? 'md' : 'sm'} source={item.avatar} />
           ) : (
-            <Ionicons name="person" size={isFirst ? 22 : 16} color="#FFF" />
+            <Ionicons name={item.type === 'user' ? 'person' : 'rocket'} size={isFirst ? 22 : 16} color="#FFF" />
           )}
         </View>
         <Text
@@ -602,13 +703,10 @@ const PodiumItem = memo(function PodiumItem({ rank, item, height, isFirst = fals
         </Text>
       </View>
 
-      {/* Podium Block - Or / Argent / Bronze (animation étire / rétrécit) */}
+      {/* Podium Block */}
       <Animated.View
         style={[
-          {
-            width: '100%',
-            height: height,
-          },
+          { width: '100%', height },
           animatedBlockStyle,
         ]}
       >
@@ -641,17 +739,17 @@ const PodiumItem = memo(function PodiumItem({ rank, item, height, isFirst = fals
   );
 });
 
-/* ───────────────────────── Ranking Item ───────────────────────── */
+/* ───────────────── Ranking Item ───────────────── */
 
 interface RankingItemProps {
   rank: number;
-  item: LeaderboardItem;
+  item: RankedItem;
   isLast?: boolean;
   onPress?: () => void;
 }
 
 const RankingItem = memo(function RankingItem({ rank, item, isLast, onPress }: RankingItemProps) {
-  const isUser = isLeaderboardUser(item) && item.isUser;
+  const isHighlighted = item.type === 'user' && item.isCurrentUser;
 
   return (
     <Pressable
@@ -661,18 +759,18 @@ const RankingItem = memo(function RankingItem({ rank, item, isLast, onPress }: R
         alignItems: 'center',
         paddingVertical: 14,
         paddingHorizontal: 16,
-        backgroundColor: isUser ? 'rgba(255, 188, 64, 0.05)' : 'transparent',
+        backgroundColor: isHighlighted ? 'rgba(255, 188, 64, 0.05)' : 'transparent',
         borderBottomWidth: isLast ? 0 : 1,
         borderBottomColor: 'rgba(255, 255, 255, 0.05)',
-        ...(isUser && {
+        ...(isHighlighted && {
           borderWidth: 1,
           borderColor: 'rgba(255, 188, 64, 0.3)',
           marginHorizontal: 8,
           borderRadius: 12,
-        })
+        }),
       }}
     >
-      {/* Rang */}
+      {/* Rank */}
       <Text
         style={{
           fontFamily: FONTS.title,
@@ -697,7 +795,7 @@ const RankingItem = memo(function RankingItem({ rank, item, isLast, onPress }: R
           marginRight: 12,
         }}
       >
-        <Ionicons name={isLeaderboardUser(item) ? 'person' : 'rocket'} size={16} color="#FFF" />
+        <Ionicons name={item.type === 'user' ? 'person' : 'rocket'} size={16} color="#FFF" />
       </View>
 
       {/* Infos */}
@@ -720,7 +818,7 @@ const RankingItem = memo(function RankingItem({ rank, item, isLast, onPress }: R
             color: 'rgba(255, 255, 255, 0.5)',
           }}
         >
-          {item.subtitle}
+          {item.type === 'startup' && item.sector ? item.sector : item.subtitle}
         </Text>
       </View>
 
@@ -732,13 +830,13 @@ const RankingItem = memo(function RankingItem({ rank, item, isLast, onPress }: R
           color: '#FFBC40',
         }}
       >
-        {item.xp.toLocaleString()} xp
+        {formatScore(item)}
       </Text>
     </Pressable>
   );
 });
 
-/* ───────────────────────── Styles ───────────────────────── */
+/* ───────────────── Styles ───────────────── */
 
 const styles = StyleSheet.create({
   container: {
@@ -766,7 +864,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  /* ── Profile Popup ── */
+  /* Profile Popup */
   popupOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',

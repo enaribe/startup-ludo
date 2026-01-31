@@ -36,6 +36,8 @@ interface ModalProps extends Omit<RNModalProps, 'visible'> {
   size?: ModalSize;
   showCloseButton?: boolean;
   closeOnBackdrop?: boolean;
+  /** Quand true, n'affiche que le contenu (children) sans wrapper ni en-tête — pour les popups type carte blanche */
+  bareContent?: boolean;
   children: React.ReactNode;
   footer?: React.ReactNode;
   containerStyle?: ViewStyle;
@@ -68,6 +70,7 @@ export const Modal = memo(function Modal({
   size = 'md',
   showCloseButton = true,
   closeOnBackdrop = true,
+  bareContent = false,
   children,
   footer,
   containerStyle,
@@ -150,18 +153,24 @@ export const Modal = memo(function Modal({
           {/* Content */}
           <Animated.View
             style={[
-              {
-                backgroundColor: COLORS.background,
-                borderRadius: BORDER_RADIUS['2xl'],
-                maxHeight: isFullSize ? '100%' : SCREEN_HEIGHT * 0.85,
-                zIndex: Z_INDEX.modal,
-                overflow: 'hidden',
-              },
-              SIZE_STYLES[size],
-              !isFullSize && {
-                marginHorizontal: SPACING[4],
-              },
-              isFullSize && {
+              bareContent
+                ? {
+                    backgroundColor: 'transparent',
+                    zIndex: Z_INDEX.modal,
+                    width: '100%',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }
+                : {
+                    backgroundColor: COLORS.background,
+                    borderRadius: BORDER_RADIUS['2xl'],
+                    maxHeight: isFullSize ? '100%' : SCREEN_HEIGHT * 0.85,
+                    zIndex: Z_INDEX.modal,
+                    overflow: 'hidden',
+                  },
+              !bareContent && SIZE_STYLES[size],
+              !bareContent && !isFullSize && { marginHorizontal: SPACING[4] },
+              isFullSize && !bareContent && {
                 paddingTop: insets.top,
                 paddingBottom: insets.bottom,
               },
@@ -169,75 +178,81 @@ export const Modal = memo(function Modal({
               containerStyle,
             ]}
           >
-            {/* Header */}
-            {(title || showCloseButton) && (
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  paddingHorizontal: SPACING[5],
-                  paddingTop: SPACING[5],
-                  paddingBottom: SPACING[3],
-                }}
-              >
-                {title ? (
-                  <Text
+            {bareContent ? (
+              children
+            ) : (
+              <>
+                {/* Header */}
+                {(title || showCloseButton) && (
+                  <View
                     style={{
-                      fontFamily: FONTS.title,
-                      fontSize: FONT_SIZES.xl,
-                      color: COLORS.text,
-                      flex: 1,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      paddingHorizontal: SPACING[5],
+                      paddingTop: SPACING[5],
+                      paddingBottom: SPACING[3],
                     }}
                   >
-                    {title}
-                  </Text>
-                ) : (
-                  <View />
+                    {title ? (
+                      <Text
+                        style={{
+                          fontFamily: FONTS.title,
+                          fontSize: FONT_SIZES.xl,
+                          color: COLORS.text,
+                          flex: 1,
+                        }}
+                      >
+                        {title}
+                      </Text>
+                    ) : (
+                      <View />
+                    )}
+
+                    {showCloseButton && (
+                      <Pressable
+                        onPress={onClose}
+                        hitSlop={8}
+                        style={{
+                          padding: SPACING[2],
+                          marginLeft: SPACING[2],
+                        }}
+                      >
+                        <Ionicons
+                          name="close"
+                          size={24}
+                          color={COLORS.textSecondary}
+                        />
+                      </Pressable>
+                    )}
+                  </View>
                 )}
 
-                {showCloseButton && (
-                  <Pressable
-                    onPress={onClose}
-                    hitSlop={8}
+                {/* Body */}
+                <View
+                  style={{
+                    flex: isFullSize ? 1 : undefined,
+                    paddingHorizontal: SPACING[5],
+                    paddingBottom: footer ? 0 : SPACING[5],
+                  }}
+                >
+                  {children}
+                </View>
+
+                {/* Footer */}
+                {footer && (
+                  <View
                     style={{
-                      padding: SPACING[2],
-                      marginLeft: SPACING[2],
+                      borderTopWidth: 1,
+                      borderTopColor: COLORS.border,
+                      paddingHorizontal: SPACING[5],
+                      paddingVertical: SPACING[4],
                     }}
                   >
-                    <Ionicons
-                      name="close"
-                      size={24}
-                      color={COLORS.textSecondary}
-                    />
-                  </Pressable>
+                    {footer}
+                  </View>
                 )}
-              </View>
-            )}
-
-            {/* Body */}
-            <View
-              style={{
-                flex: isFullSize ? 1 : undefined,
-                paddingHorizontal: SPACING[5],
-                paddingBottom: footer ? 0 : SPACING[5],
-              }}
-            >
-              {children}
-            </View>
-
-            {/* Footer */}
-            {footer && (
-              <View
-                style={{
-                  borderTopWidth: 1,
-                  borderTopColor: COLORS.border,
-                  paddingHorizontal: SPACING[5],
-                  paddingVertical: SPACING[4],
-                }}
-              >
-                {footer}
-              </View>
+              </>
             )}
           </Animated.View>
         </View>

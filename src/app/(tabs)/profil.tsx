@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { View, Text, ScrollView, Pressable, Dimensions, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -28,7 +29,10 @@ export default function ProfilScreen() {
   const { user } = useAuthStore();
   const profile = useUserStore((state) => state.profile);
   const levelProgress = useUserStore((state) => state.levelProgress);
-  const unlockedAchievementIds = useUserStore((state) => state.getUnlockedAchievements());
+  const unlockedAchievementIds = useMemo(
+    () => profile?.achievements ?? [],
+    [profile?.achievements]
+  );
 
   // Progression XP
   const totalXP = profile?.xp ?? 0;

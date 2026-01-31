@@ -1,42 +1,42 @@
-import { useCallback, useState, useRef, useEffect, memo } from 'react';
-import {
-  View,
-  Text,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Modal,
-  KeyboardAvoidingView,
-  Platform,
-  TextInput,
-  Dimensions,
-} from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, {
-  FadeInDown,
-  FadeIn,
-  FadeOut,
-  ZoomIn,
-  SlideInUp,
-  useSharedValue,
-  useAnimatedStyle,
-  withRepeat,
-  withTiming,
-  withSequence,
-  withDelay,
-  withSpring,
-  Easing,
-  interpolate,
-  cancelAnimation,
-} from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import {
+    Dimensions,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
+} from 'react-native';
+import Animated, {
+    cancelAnimation,
+    Easing,
+    FadeIn,
+    FadeInDown,
+    FadeOut,
+    interpolate,
+    SlideInUp,
+    useAnimatedStyle,
+    useSharedValue,
+    withDelay,
+    withRepeat,
+    withSequence,
+    withSpring,
+    withTiming,
+    ZoomIn,
+} from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { RadialBackground, DynamicGradientBorder, GameButton } from '@/components/ui';
-import { FONTS } from '@/styles/typography';
-import { useSettingsStore } from '@/stores';
+import { DynamicGradientBorder, GameButton, RadialBackground } from '@/components/ui';
 import { generateStartupIdeas } from '@/services/ai';
+import { useSettingsStore } from '@/stores';
+import { FONTS } from '@/styles/typography';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 

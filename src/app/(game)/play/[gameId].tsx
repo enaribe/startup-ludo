@@ -19,6 +19,45 @@ import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import type { ChallengeEvent, DuelEvent, FundingEvent, OpportunityEvent, Player, QuizEvent } from '@/types';
 
+// Données de test pour afficher les popups rapidement
+const MOCK_QUIZ: QuizEvent = {
+  id: 'test-quiz',
+  category: 'business',
+  question: "Quel document décrit la stratégie et le modèle économique d'une entreprise ?",
+  options: ['Business Plan', 'Statut juridique', 'Contrat de travail'],
+  correctAnswer: 0,
+  difficulty: 'medium',
+  reward: 2,
+  timeLimit: 30,
+};
+
+const MOCK_FUNDING: FundingEvent = {
+  id: 'test-funding',
+  name: 'Subvention BPI',
+  description: "Quel document décrit la stratégie et le modèle économique d'une entreprise ?",
+  type: 'subvention',
+  amount: 2,
+  rarity: 'common',
+};
+
+const MOCK_OPPORTUNITY: OpportunityEvent = {
+  id: 'test-opp',
+  title: 'Partenaire stratégique',
+  description: "Quel document décrit la stratégie et le modèle économique d'une entreprise ?",
+  effect: 'tokens',
+  value: 2,
+  rarity: 'common',
+};
+
+const MOCK_CHALLENGE: ChallengeEvent = {
+  id: 'test-challenge',
+  title: 'Imprévu fiscal',
+  description: "Quel document décrit la stratégie et le modèle économique d'une entreprise ?",
+  effect: 'loseTokens',
+  value: 2,
+  rarity: 'common',
+};
+
 export default function PlayScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -536,6 +575,46 @@ export default function PlayScreen() {
               {renderPlayerCard('red')}
             </View>
           </View>
+
+          {/* Boutons de test des popups (sous le gameboard) */}
+          <View style={styles.testPopupsRow}>
+            <Pressable
+              style={styles.testPopupButton}
+              onPress={() => {
+                setIsEventSpectator(false);
+                setQuizData(MOCK_QUIZ);
+              }}
+            >
+              <Text style={styles.testPopupLabel}>Quiz</Text>
+            </Pressable>
+            <Pressable
+              style={styles.testPopupButton}
+              onPress={() => {
+                setIsEventSpectator(false);
+                setFundingData(MOCK_FUNDING);
+              }}
+            >
+              <Text style={styles.testPopupLabel}>Financement</Text>
+            </Pressable>
+            <Pressable
+              style={styles.testPopupButton}
+              onPress={() => {
+                setIsEventSpectator(false);
+                setOpportunityData(MOCK_OPPORTUNITY);
+              }}
+            >
+              <Text style={styles.testPopupLabel}>Opportunité</Text>
+            </Pressable>
+            <Pressable
+              style={styles.testPopupButton}
+              onPress={() => {
+                setIsEventSpectator(false);
+                setChallengeData(MOCK_CHALLENGE);
+              }}
+            >
+              <Text style={styles.testPopupLabel}>Challenge</Text>
+            </Pressable>
+          </View>
         </View>
       </View>
 
@@ -704,6 +783,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     position: 'relative',
     marginVertical: SPACING[1],
+  },
+  testPopupsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: SPACING[2],
+    paddingHorizontal: SPACING[2],
+    paddingVertical: SPACING[3],
+    marginTop: SPACING[2],
+  },
+  testPopupButton: {
+    backgroundColor: COLORS.card,
+    paddingVertical: SPACING[2],
+    paddingHorizontal: SPACING[3],
+    borderRadius: 12,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  testPopupLabel: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.text,
   },
   modalContent: {
     alignItems: 'center',

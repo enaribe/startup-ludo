@@ -1,31 +1,32 @@
 // Firebase Firestore Service
+import { DEFAULT_RANK, getRankFromXP } from '@/config/progression';
+import type { Startup, UserProfile } from '@/types';
 import {
-  doc,
-  getDoc,
-  setDoc,
-  updateDoc,
-  deleteDoc,
-  collection,
-  query,
-  where,
-  orderBy,
-  limit,
-  getDocs,
-  onSnapshot,
-  serverTimestamp,
-  Timestamp,
-  QueryConstraint,
+    collection,
+    collectionGroup,
+    deleteDoc,
+    doc,
+    getDoc,
+    getDocs,
+    limit,
+    onSnapshot,
+    orderBy,
+    query,
+    QueryConstraint,
+    serverTimestamp,
+    setDoc,
+    Timestamp,
+    updateDoc,
+    where,
 } from 'firebase/firestore';
 import {
-  firestore,
-  firebaseLog,
-  getFirebaseErrorMessage,
-  FIRESTORE_COLLECTIONS,
-  type FirestoreUser,
-  type FirestoreUserStats,
+    firebaseLog,
+    firestore,
+    FIRESTORE_COLLECTIONS,
+    getFirebaseErrorMessage,
+    type FirestoreUser,
+    type FirestoreUserStats,
 } from './config';
-import type { UserProfile, Startup } from '@/types';
-import { DEFAULT_RANK, getRankFromXP } from '@/config/progression';
 
 // ===== USER PROFILE =====
 
@@ -256,6 +257,25 @@ export const deleteStartup = async (userId: string, startupId: string): Promise<
   } catch (error) {
     firebaseLog('Failed to delete startup', error);
     throw new Error(getFirebaseErrorMessage(error));
+  }
+};
+
+// Get all startups across all users (for leaderboard)
+export const getAllStartups = async (limitCount: number = 100): Promise<Startup[]> => {
+  try {
+    firebaseLog('Fetching all startups', { limit: limitCount });
+
+    const startupsGroup = collectionGroup(firestore, 'startups');
+    const q = query(startupsGroup, limit(limitCount));
+    const snapshot = await getDocs(q);
+
+    const startups = snapshot.docs.map((d) => d.data() as Startup);
+
+    firebaseLog('All startups fetched successfully', { count: startups.length });
+    return startups;
+  } catch (error) {
+    firebaseLog('Failed to fetch all startups', error);
+    return [];
   }
 };
 

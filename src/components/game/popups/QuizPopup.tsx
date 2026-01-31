@@ -5,12 +5,17 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
   withTiming,
+  withSequence,
+  withDelay,
   FadeIn,
+  FadeInDown,
   SlideInUp,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Modal } from '@/components/ui/Modal';
+import { PopupQuizIcon } from '@/components/game/popups/PopupIcons';
 import { COLORS } from '@/styles/colors';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { SPACING } from '@/styles/spacing';
@@ -22,13 +27,26 @@ interface QuizPopupProps {
   quiz: QuizEvent | null;
   onAnswer: (correct: boolean, reward: number) => void;
   onClose: () => void;
-  /** When true, the popup is shown as read-only (spectating another player's quiz) */
   isSpectator?: boolean;
-  /** Result from the active player (shown to spectators) */
   spectatorResult?: { ok: boolean; reward: number };
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+const CARD_STYLE = {
+  backgroundColor: '#FFFFFF',
+  borderRadius: 24,
+  padding: SPACING[6],
+  maxWidth: 340,
+  width: '90%' as const,
+  alignItems: 'center' as const,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 8 },
+  shadowOpacity: 0.15,
+  shadowRadius: 16,
+  elevation: 12,
+  overflow: 'hidden' as const,
+};
 
 export const QuizPopup = memo(function QuizPopup({
   visible,
@@ -41,13 +59,14 @@ export const QuizPopup = memo(function QuizPopup({
   const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [hasAnswered, setHasAnswered] = useState(false);
-  const [timeRemaining, setTimeRemaining] = useState(30);
+  const [, setTimeRemaining] = useState(30);
 
-  // Animation values
   const timerProgress = useSharedValue(1);
   const resultScale = useSharedValue(0);
+  const iconScale = useSharedValue(0);
+  const iconRotate = useSharedValue(0);
+  const badgeBounce = useSharedValue(0);
 
-  // Reset state when quiz changes
   useEffect(() => {
     if (visible && quiz) {
       setSelectedAnswer(null);
@@ -55,13 +74,23 @@ export const QuizPopup = memo(function QuizPopup({
       setTimeRemaining(quiz.timeLimit || 30);
       timerProgress.value = 1;
       resultScale.value = 0;
+      badgeBounce.value = 0;
+      iconScale.value = withSequence(
+        withTiming(0, { duration: 0 }),
+        withSpring(1.2, { damping: 8, stiffness: 140 }),
+        withSpring(1, { damping: 12 })
+      );
+      iconRotate.value = withSequence(
+        withTiming(-8, { duration: 100 }),
+        withTiming(8, { duration: 100 }),
+        withTiming(-4, { duration: 80 }),
+        withTiming(0, { duration: 80 })
+      );
     }
-  }, [visible, quiz, timerProgress, resultScale]);
+  }, [visible, quiz, timerProgress, resultScale, iconScale, iconRotate, badgeBounce]);
 
-  // Timer countdown (disabled for spectators)
   useEffect(() => {
     if (!visible || hasAnswered || !quiz || isSpectator) return;
-
     const interval = setInterval(() => {
       setTimeRemaining((prev) => {
         if (prev <= 1) {
@@ -72,265 +101,185 @@ export const QuizPopup = memo(function QuizPopup({
         return prev - 1;
       });
     }, 1000);
-
-    // Animate timer bar
     timerProgress.value = withTiming(0, { duration: (quiz.timeLimit || 30) * 1000 });
-
     return () => clearInterval(interval);
   }, [visible, hasAnswered, quiz, timerProgress, isSpectator]);
 
-  // Spectator: show result when it arrives
   useEffect(() => {
     if (!isSpectator || !spectatorResult || !quiz) return;
-
     setHasAnswered(true);
-    // Show the correct answer highlighted
     setSelectedAnswer(spectatorResult.ok ? quiz.correctAnswer : -1);
     resultScale.value = withSpring(1);
-  }, [isSpectator, spectatorResult, quiz, resultScale]);
+    badgeBounce.value = withDelay(200, withSpring(1, { damping: 6 }));
+  }, [isSpectator, spectatorResult, quiz, resultScale, badgeBounce]);
 
   const handleTimeUp = useCallback(() => {
     if (hasAnswered) return;
     setHasAnswered(true);
     resultScale.value = withSpring(1);
-
-    if (hapticsEnabled) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-    }
-
-    // Time's up = wrong answer
-    setTimeout(() => {
-      onAnswer(false, 0);
-    }, 2000);
-  }, [hasAnswered, hapticsEnabled, onAnswer, resultScale]);
+    badgeBounce.value = withDelay(200, withSpring(1, { damping: 6 }));
+    if (hapticsEnabled) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    setTimeout(() => onAnswer(false, 0), 2000);
+  }, [hasAnswered, hapticsEnabled, onAnswer, resultScale, badgeBounce]);
 
   const handleSelectAnswer = useCallback(
     (index: number) => {
       if (hasAnswered || !quiz) return;
-
       setSelectedAnswer(index);
       setHasAnswered(true);
-
       const isCorrect = index === quiz.correctAnswer;
       const reward = isCorrect ? quiz.reward : 0;
-
       resultScale.value = withSpring(1);
-
+      badgeBounce.value = withDelay(200, withSpring(1, { damping: 6 }));
       if (hapticsEnabled) {
-        if (isCorrect) {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        } else {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        }
+        if (isCorrect) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        else Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
-
-      // Delay before closing to show result
-      setTimeout(() => {
-        onAnswer(isCorrect, reward);
-      }, 2000);
+      setTimeout(() => onAnswer(isCorrect, reward), 2000);
     },
-    [hasAnswered, quiz, hapticsEnabled, onAnswer, resultScale]
+    [hasAnswered, quiz, hapticsEnabled, onAnswer, resultScale, badgeBounce]
   );
 
-  const timerStyle = useAnimatedStyle(() => ({
+  const timerAnimStyle = useAnimatedStyle(() => ({
     width: `${timerProgress.value * 100}%`,
   }));
 
-  const resultStyle = useAnimatedStyle(() => ({
+  const resultAnimStyle = useAnimatedStyle(() => ({
     transform: [{ scale: resultScale.value }],
     opacity: resultScale.value,
   }));
 
-  const isCorrect = isSpectator ? spectatorResult?.ok ?? false : selectedAnswer === quiz?.correctAnswer;
+  const iconAnimStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: iconScale.value },
+      { rotate: `${iconRotate.value}deg` },
+    ],
+  }));
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case 'easy':
-        return COLORS.success;
-      case 'medium':
-        return COLORS.warning;
-      case 'hard':
-        return COLORS.error;
-      default:
-        return COLORS.primary;
-    }
-  };
+  const badgeAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: badgeBounce.value }],
+    opacity: badgeBounce.value,
+  }));
 
-  const getDifficultyLabel = (difficulty: string) => {
-    switch (difficulty) {
-      case 'easy':
-        return 'Facile';
-      case 'medium':
-        return 'Moyen';
-      case 'hard':
-        return 'Difficile';
-      default:
-        return difficulty;
-    }
-  };
+  const isCorrect =
+    isSpectator ? spectatorResult?.ok ?? false : selectedAnswer === quiz?.correctAnswer;
 
   if (!quiz) return null;
 
   return (
-    <Modal visible={visible} onClose={onClose} closeOnBackdrop={false}>
-      <Animated.View entering={SlideInUp.springify()} style={styles.container}>
-        {/* Spectator banner */}
+    <Modal visible={visible} onClose={onClose} closeOnBackdrop={false} showCloseButton={false} bareContent>
+      <Animated.View entering={SlideInUp.springify().damping(18)} style={[styles.card, CARD_STYLE]}>
         {isSpectator && (
           <View style={styles.spectatorBanner}>
-            <Ionicons name="eye" size={16} color={COLORS.white} />
+            <Ionicons name="eye" size={14} color={COLORS.white} />
             <Text style={styles.spectatorText}>L'adversaire répond au quiz...</Text>
           </View>
         )}
 
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <Ionicons name="help-circle" size={28} color={COLORS.info} />
-            <Text style={styles.title}>Quiz</Text>
-          </View>
-          <View
-            style={[
-              styles.difficultyBadge,
-              { backgroundColor: getDifficultyColor(quiz.difficulty) },
-            ]}
-          >
-            <Text style={styles.difficultyText}>
-              {getDifficultyLabel(quiz.difficulty)}
-            </Text>
-          </View>
-        </View>
+        <Animated.View style={[styles.iconWrap, iconAnimStyle]}>
+          <PopupQuizIcon size={56} />
+        </Animated.View>
 
-        {/* Timer bar */}
-        <View style={styles.timerContainer}>
-          <Animated.View
-            style={[
-              styles.timerBar,
-              timerStyle,
-              {
-                backgroundColor:
-                  timeRemaining <= 5 ? COLORS.error : COLORS.primary,
-              },
-            ]}
-          />
-          <View style={styles.timerTextContainer}>
-            <Ionicons
-              name="time"
-              size={16}
-              color={timeRemaining <= 5 ? COLORS.error : COLORS.textSecondary}
-            />
-            <Text
-              style={[
-                styles.timerText,
-                timeRemaining <= 5 && styles.timerTextUrgent,
-              ]}
-            >
-              {timeRemaining}s
-            </Text>
-          </View>
-        </View>
+        <Text style={styles.title}>QUIZZ</Text>
+        <Text style={styles.question}>{quiz.question}</Text>
 
-        {/* Category */}
-        <View style={styles.categoryContainer}>
-          <Text style={styles.categoryLabel}>Catégorie:</Text>
-          <Text style={styles.categoryValue}>{quiz.category}</Text>
-        </View>
-
-        {/* Question */}
-        <View style={styles.questionContainer}>
-          <Text style={styles.question}>{quiz.question}</Text>
-        </View>
-
-        {/* Options */}
-        <View style={styles.optionsContainer}>
-          {quiz.options.map((option, index) => {
-            const isSelected = selectedAnswer === index;
-            const isCorrectOption = quiz.correctAnswer === index;
-            const showCorrect = hasAnswered && isCorrectOption;
-            const showWrong = hasAnswered && isSelected && !isCorrectOption;
-
-            return (
-              <AnimatedPressable
-                key={index}
-                entering={FadeIn.delay(index * 100)}
-                onPress={() => handleSelectAnswer(index)}
-                disabled={hasAnswered || isSpectator}
-                style={[
-                  styles.option,
-                  isSelected && !hasAnswered && styles.optionSelected,
-                  showCorrect && styles.optionCorrect,
-                  showWrong && styles.optionWrong,
-                ]}
-              >
-                <View style={styles.optionIndex}>
-                  <Text style={styles.optionIndexText}>
-                    {String.fromCharCode(65 + index)}
-                  </Text>
-                </View>
-                <Text
-                  style={[
-                    styles.optionText,
-                    showCorrect && styles.optionTextCorrect,
-                    showWrong && styles.optionTextWrong,
+        {!hasAnswered && (
+          <>
+            <View style={styles.timerTrack}>
+              <Animated.View style={[styles.timerFillWrap, timerAnimStyle]}>
+                <LinearGradient
+                  colors={['#FFBC40', '#90CAF9']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={StyleSheet.absoluteFill}
+                />
+              </Animated.View>
+            </View>
+            <View style={styles.options}>
+              {quiz.options.map((option, index) => (
+                <AnimatedPressable
+                  key={index}
+                  entering={FadeInDown.delay(index * 80).springify()}
+                  onPress={() => handleSelectAnswer(index)}
+                  disabled={isSpectator}
+                  style={({ pressed }) => [
+                    styles.optionPill,
+                    pressed && styles.optionPillPressed,
                   ]}
                 >
-                  {option}
-                </Text>
-                {showCorrect && (
-                  <Ionicons
-                    name="checkmark-circle"
-                    size={24}
-                    color={COLORS.success}
-                  />
-                )}
-                {showWrong && (
-                  <Ionicons
-                    name="close-circle"
-                    size={24}
-                    color={COLORS.error}
-                  />
-                )}
-              </AnimatedPressable>
-            );
-          })}
-        </View>
-
-        {/* Result overlay */}
-        {hasAnswered && (
-          <Animated.View style={[styles.resultOverlay, resultStyle]}>
-            <View
-              style={[
-                styles.resultBadge,
-                {
-                  backgroundColor: isCorrect ? COLORS.success : COLORS.error,
-                },
-              ]}
-            >
-              <Ionicons
-                name={isCorrect ? 'checkmark-circle' : 'close-circle'}
-                size={48}
-                color={COLORS.white}
-              />
-              <Text style={styles.resultText}>
-                {isCorrect ? 'Bonne réponse !' : 'Mauvaise réponse'}
-              </Text>
-              {isCorrect && (
-                <View style={styles.rewardContainer}>
-                  <Ionicons name="cash" size={20} color={COLORS.white} />
-                  <Text style={styles.rewardText}>+{quiz.reward} jetons</Text>
-                </View>
-              )}
+                  <Text style={styles.optionPrefix}>{String.fromCharCode(65 + index)}. </Text>
+                  <Text style={styles.optionLabel}>{option}</Text>
+                </AnimatedPressable>
+              ))}
             </View>
-          </Animated.View>
+          </>
         )}
 
-        {/* Reward preview */}
-        {!hasAnswered && (
-          <View style={styles.rewardPreview}>
-            <Ionicons name="gift" size={16} color={COLORS.primary} />
-            <Text style={styles.rewardPreviewText}>
-              Récompense: {quiz.reward} jetons
-            </Text>
-          </View>
+        {hasAnswered && (
+          <>
+            <View style={styles.options}>
+              {quiz.options.map((option, index) => {
+                const isCorrectOption = index === quiz.correctAnswer;
+                const isSelectedWrong = selectedAnswer === index && !isCorrectOption;
+                const isSelectedCorrect = index === quiz.correctAnswer;
+                const pillStyle =
+                  isSelectedCorrect && isCorrect
+                    ? styles.optionPillCorrect
+                    : isSelectedWrong
+                      ? styles.optionPillWrong
+                      : isCorrectOption && !isCorrect
+                        ? styles.optionPillCorrectBorder
+                        : styles.optionPillDisabled;
+                const textStyle =
+                  isSelectedCorrect && isCorrect
+                    ? styles.optionTextCorrect
+                    : isSelectedWrong
+                      ? styles.optionTextWrong
+                      : styles.optionLabel;
+                return (
+                  <Animated.View
+                    key={index}
+                    entering={FadeIn.delay(index * 60)}
+                    style={[styles.optionPill, pillStyle]}
+                  >
+                    <Text
+                      style={[
+                        styles.optionPrefix,
+                        (isSelectedCorrect && isCorrect) || isSelectedWrong
+                          ? styles.optionTextCorrect
+                          : undefined,
+                      ]}
+                    >
+                      {String.fromCharCode(65 + index)}.{' '}
+                    </Text>
+                    <Text style={[styles.optionLabel, textStyle]}>{option}</Text>
+                    {isSelectedCorrect && isCorrect && (
+                      <View style={styles.optionRewardBadge}>
+                        <Text style={styles.optionRewardText}>+{quiz.reward}</Text>
+                      </View>
+                    )}
+                  </Animated.View>
+                );
+              })}
+            </View>
+
+            <Animated.View style={[styles.resultWrap, resultAnimStyle]}>
+              <Text style={styles.resultTitle}>
+                {isCorrect ? 'VOUS GAGNEZ' : 'VOUS PERDEZ'}
+              </Text>
+              <Animated.View
+                style={[
+                  styles.badge,
+                  isCorrect ? styles.badgeGain : styles.badgeLoss,
+                  badgeAnimStyle,
+                ]}
+              >
+                <Text style={styles.badgeText}>
+                  {isCorrect ? `+${quiz.reward}` : `-${quiz.reward}`}
+                </Text>
+              </Animated.View>
+            </Animated.View>
+          </>
         )}
       </Animated.View>
     </Modal>
@@ -338,13 +287,7 @@ export const QuizPopup = memo(function QuizPopup({
 });
 
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: COLORS.card,
-    borderRadius: 20,
-    padding: SPACING[5],
-    maxWidth: 400,
-    width: '100%',
-  },
+  card: {},
   spectatorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -361,187 +304,135 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.sm,
     color: COLORS.white,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: SPACING[4],
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING[2],
+  iconWrap: {
+    marginBottom: SPACING[3],
   },
   title: {
-    fontFamily: FONTS.heading,
-    fontSize: FONT_SIZES.xl,
-    color: COLORS.text,
-  },
-  difficultyBadge: {
-    paddingHorizontal: SPACING[3],
-    paddingVertical: SPACING[1],
-    borderRadius: 12,
-  },
-  difficultyText: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: FONT_SIZES.xs,
-    color: COLORS.white,
-  },
-  timerContainer: {
-    height: 8,
-    backgroundColor: COLORS.border,
-    borderRadius: 4,
-    marginBottom: SPACING[3],
-    overflow: 'hidden',
-  },
-  timerBar: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  timerTextContainer: {
-    position: 'absolute',
-    right: 0,
-    top: -24,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  timerText: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.textSecondary,
-  },
-  timerTextUrgent: {
-    color: COLORS.error,
-  },
-  categoryContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING[2],
-    marginBottom: SPACING[3],
-  },
-  categoryLabel: {
-    fontFamily: FONTS.body,
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.textSecondary,
-  },
-  categoryValue: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.primary,
-    textTransform: 'capitalize',
-  },
-  questionContainer: {
-    backgroundColor: COLORS.background,
-    borderRadius: 12,
-    padding: SPACING[4],
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES['2xl'],
+    color: '#4CAF50',
+    textShadowColor: '#2E7D32',
+    textShadowOffset: { width: 2, height: 2 },
+    textShadowRadius: 0,
     marginBottom: SPACING[4],
   },
   question: {
-    fontFamily: FONTS.bodySemiBold,
+    fontFamily: FONTS.body,
     fontSize: FONT_SIZES.md,
-    color: COLORS.text,
+    color: '#2C3E50',
     textAlign: 'center',
     lineHeight: 24,
+    marginBottom: SPACING[4],
   },
-  optionsContainer: {
+  timerTrack: {
+    height: 8,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 4,
+    width: '100%',
+    overflow: 'hidden',
+    marginBottom: SPACING[4],
+  },
+  timerFillWrap: {
+    height: '100%',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  options: {
+    width: '100%',
     gap: SPACING[3],
   },
-  option: {
+  optionPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.background,
-    borderRadius: 12,
-    padding: SPACING[3],
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E0E0E0',
+    borderRadius: 28,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+  },
+  optionPillPressed: {
+    borderColor: '#4CAF50',
+    backgroundColor: 'rgba(76, 175, 80, 0.08)',
+  },
+  optionPillCorrect: {
+    backgroundColor: '#4CAF50',
+    borderColor: '#4CAF50',
+  },
+  optionPillWrong: {
+    backgroundColor: '#E57373',
+    borderColor: '#E57373',
+  },
+  optionPillCorrectBorder: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#4CAF50',
     borderWidth: 2,
-    borderColor: 'transparent',
-    gap: SPACING[3],
   },
-  optionSelected: {
-    borderColor: COLORS.primary,
-    backgroundColor: `${COLORS.primary}10`,
+  optionPillDisabled: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E0E0E0',
+    opacity: 0.85,
   },
-  optionCorrect: {
-    borderColor: COLORS.success,
-    backgroundColor: `${COLORS.success}20`,
+  optionPrefix: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.md,
+    color: '#546E7A',
   },
-  optionWrong: {
-    borderColor: COLORS.error,
-    backgroundColor: `${COLORS.error}20`,
-  },
-  optionIndex: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: COLORS.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  optionIndexText: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.white,
-  },
-  optionText: {
-    flex: 1,
+  optionLabel: {
     fontFamily: FONTS.body,
     fontSize: FONT_SIZES.md,
-    color: COLORS.text,
+    color: '#546E7A',
+    flex: 1,
   },
   optionTextCorrect: {
-    color: COLORS.success,
-    fontFamily: FONTS.bodySemiBold,
+    color: '#FFFFFF',
   },
   optionTextWrong: {
-    color: COLORS.error,
+    color: '#FFFFFF',
   },
-  resultOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    borderRadius: 20,
+  optionRewardBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
+    marginLeft: SPACING[2],
   },
-  resultBadge: {
-    padding: SPACING[6],
-    borderRadius: 20,
-    alignItems: 'center',
-    gap: SPACING[2],
-  },
-  resultText: {
-    fontFamily: FONTS.heading,
-    fontSize: FONT_SIZES.xl,
-    color: COLORS.white,
-    textAlign: 'center',
-  },
-  rewardContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING[2],
-    marginTop: SPACING[2],
-  },
-  rewardText: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: FONT_SIZES.lg,
-    color: COLORS.white,
-  },
-  rewardPreview: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING[2],
-    marginTop: SPACING[4],
-    paddingTop: SPACING[3],
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-  },
-  rewardPreviewText: {
-    fontFamily: FONTS.body,
+  optionRewardText: {
+    fontFamily: FONTS.title,
     fontSize: FONT_SIZES.sm,
-    color: COLORS.textSecondary,
+    color: '#4CAF50',
+  },
+  resultWrap: {
+    alignItems: 'center',
+    marginTop: SPACING[4],
+  },
+  resultTitle: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES.xl,
+    color: '#1B2A4A',
+    marginBottom: SPACING[3],
+  },
+  badge: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 3,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  badgeGain: {
+    backgroundColor: '#4CAF50',
+    borderColor: '#2E7D32',
+  },
+  badgeLoss: {
+    backgroundColor: '#E57373',
+    borderColor: '#C62828',
+  },
+  badgeText: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES.lg,
+    color: '#FFFFFF',
   },
 });

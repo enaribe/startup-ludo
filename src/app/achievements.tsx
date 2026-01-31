@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { View, Text, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,7 +28,11 @@ import {
 export default function AchievementsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const unlockedAchievements = useUserStore((state) => state.getUnlockedAchievements());
+  const profile = useUserStore((state) => state.profile);
+  const unlockedAchievements = useMemo(
+    () => profile?.achievements ?? [],
+    [profile?.achievements]
+  );
 
   const totalAchievements = getTotalAchievements();
   const unlockedCount = getUnlockedCount(unlockedAchievements);

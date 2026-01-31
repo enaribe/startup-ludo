@@ -172,7 +172,10 @@ export interface Startup {
   missionCard?: MissionCard;
   createdAt: number;
   tokensInvested: number;
+  valorisation: number;
   level: number;
+  creatorId?: string;
+  creatorName?: string;
 }
 
 export interface TargetCard {
