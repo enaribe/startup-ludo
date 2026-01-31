@@ -8,10 +8,10 @@
  * Phases: idle → rolling → moving → event → ending → idle
  */
 
-import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
-import * as Haptics from 'expo-haptics';
 import type { MoveResult, ValidMove } from '@/services/game/GameEngine';
 import type { GameState, Player } from '@/types';
+import * as Haptics from 'expo-haptics';
+import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 
 // ===== CONSTANTS =====
 
@@ -26,7 +26,6 @@ export interface TurnState {
   diceValue: number | null;
   isRolling: boolean;
   rolledSix: boolean;
-  deferredEvent: string | null;
   moveResult: MoveResult | null;
 }
 
@@ -87,7 +86,6 @@ const initialTurnState: TurnState = {
   diceValue: null,
   isRolling: false,
   rolledSix: false,
-  deferredEvent: null,
   moveResult: null,
 };
 
@@ -122,28 +120,21 @@ export function turnReducer(state: TurnState, action: TurnAction): TurnState {
 
       const { result, rolledSix } = action;
 
-      // Store deferred event if rolling 6
-      let deferredEvent = state.deferredEvent;
-      if (result?.triggeredEvent) {
-        if (rolledSix) {
-          deferredEvent = result.triggeredEvent;
-        } else {
-          // Show event immediately
-          return {
-            ...state,
-            phase: 'event',
-            moveResult: result,
-            deferredEvent,
-            rolledSix,
-          };
-        }
+      // On a 6: ignore any triggered event — extra turn takes priority
+      // On non-6: show event popup immediately before ending the turn
+      if (result?.triggeredEvent && !rolledSix) {
+        return {
+          ...state,
+          phase: 'event',
+          moveResult: result,
+          rolledSix,
+        };
       }
 
       return {
         ...state,
         phase: 'ending',
         moveResult: result,
-        deferredEvent,
         rolledSix,
       };
     }
@@ -172,17 +163,8 @@ export function turnReducer(state: TurnState, action: TurnAction): TurnState {
         !state.moveResult.isFinished;
 
       if (earnedExtraTurn) {
-        // Reset to idle for same player, keep deferred event for later
-        return { ...initialTurnState, deferredEvent: state.deferredEvent };
-      }
-
-      // No extra turn, but deferred event waiting → show it
-      if (state.deferredEvent) {
-        return {
-          ...state,
-          phase: 'event',
-          deferredEvent: null,
-        };
+        // Reset to idle for same player — ready for extra turn
+        return { ...initialTurnState };
       }
 
       // Normal end
@@ -416,7 +398,7 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
     if (turnState.phase !== 'event') return;
     if (!currentPlayer) return;
 
-    const eventType = turnState.moveResult?.triggeredEvent ?? turnState.deferredEvent;
+    const eventType = turnState.moveResult?.triggeredEvent;
     if (eventType) {
       onEventRef.current(eventType);
     }
@@ -436,14 +418,6 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
       // and the pawn didn't finish. No valid move on 6 → no extra turn.
       if (state.rolledSix && state.moveResult && !state.moveResult.isFinished) {
         actionsRef.current.grantExtraTurn();
-        clearSelection();
-        setAnimating(false);
-        dispatch({ type: 'TURN_ENDED' });
-        return;
-      }
-
-      // If there's a deferred event, TURN_ENDED reducer will transition to 'event'
-      if (state.deferredEvent) {
         clearSelection();
         setAnimating(false);
         dispatch({ type: 'TURN_ENDED' });

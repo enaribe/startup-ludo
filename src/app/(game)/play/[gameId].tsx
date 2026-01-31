@@ -235,6 +235,10 @@ export default function PlayScreen() {
     if (!isOnline || !onlineGame.remoteEvent) return;
 
     const { eventType, eventData } = onlineGame.remoteEvent;
+    console.log('[PlayScreen] Affichage popup événement distant (spectateur):', {
+      eventType,
+      hasEventData: !!eventData && Object.keys(eventData).length > 0,
+    });
     setIsEventSpectator(true);
 
     switch (eventType) {
@@ -253,6 +257,8 @@ export default function PlayScreen() {
       case 'duel':
         setDuelData(eventData as unknown as DuelEvent);
         break;
+      default:
+        console.warn('[PlayScreen] Type d\'événement distant inconnu:', eventType);
     }
   }, [isOnline, onlineGame.remoteEvent]);
 

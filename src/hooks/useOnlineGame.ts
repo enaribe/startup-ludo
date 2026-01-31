@@ -164,14 +164,25 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
           break;
         }
         case 'ev': {
-          // Remote event triggered: show popup as spectator
+          // Remote event triggered: show popup as spectator (ne pas toucher au store)
           const data = action.d as { type: string; data: Record<string, unknown> };
-          setRemoteEvent({
-            playerId: action.p,
-            eventType: data.type,
-            eventData: data.data,
+          const eventType = data?.type ?? '';
+          const eventData = data?.data ?? {};
+          console.log('[useOnlineGame] Événement distant (spectateur):', {
+            eventType,
+            hasData: Object.keys(eventData).length > 0,
           });
-          break;
+          // Mise à jour au prochain tick pour éviter un batch React avec le callback Firebase
+          const payload = {
+            playerId: action.p,
+            eventType,
+            eventData: eventData as Record<string, unknown>,
+          };
+          setTimeout(() => {
+            setRemoteEvent(payload);
+          }, 0);
+          // Ne pas appeler applyRemoteAction pour 'ev' (UI uniquement)
+          return;
         }
         case 'e': {
           // Remote event result: show the answer/result
@@ -186,11 +197,13 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
             setRemoteEvent(null);
             setRemoteEventResult(null);
           }, 3000);
+          // Ne pas appeler applyRemoteAction pour 'e' ici : le store sera mis à jour
+          // par applyRemoteAction ci-dessous (case 'e' dans le store applique tokens + resolveEvent)
           break;
         }
       }
 
-      // Apply to local store (for state-modifying actions)
+      // Apply to local store (for state-modifying actions; 'ev' déjà return ci-dessus)
       applyRemoteAction(action as RemoteAction);
     });
 
