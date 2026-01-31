@@ -1,6 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,55 +10,56 @@ import { DuelPopup, EventPopup, FundingPopup, QuizPopup } from '@/components/gam
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { RadialBackground } from '@/components/ui';
-import { AIPlayer } from '@/services/game/AIPlayer';
 import { GameEngine } from '@/services/game/GameEngine';
-import { useGameStore, useSettingsStore } from '@/stores';
+import { useGameStore, useSettingsStore, useAuthStore } from '@/stores';
+import { useOnlineGame } from '@/hooks/useOnlineGame';
+import { useTurnMachine, type TurnActions } from '@/hooks/useTurnMachine';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import type { ChallengeEvent, DuelEvent, FundingEvent, OpportunityEvent, Player, QuizEvent } from '@/types';
 
-const PAWN_STEP_MS = 80; // Doit correspondre à STEP_DURATION dans Pawn.tsx
-
 export default function PlayScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
+  const params = useLocalSearchParams<{ mode?: string; roomId?: string }>();
+  const isOnline = params.mode === 'online';
+  const userId = useAuthStore((s) => s.user?.id) ?? null;
 
-  // Game store
-  const {
-    game,
-    selectedPawnIndex,
-    highlightedPositions,
-    isAnimating,
-    rollDice,
-    getCurrentPlayer,
-    canRollDice,
-    canMove,
-    selectPawn,
-    setHighlightedPositions,
-    clearSelection,
-    setAnimating,
-    executeMove,
-    exitHome,
-    handleCapture,
-    checkWinCondition,
-    getValidMoves,
-    triggerEvent,
-    resolveEvent,
-    addTokens,
-    removeTokens,
-    nextTurn,
-    grantExtraTurn,
-    endGame,
-  } = useGameStore();
+  // Online game hook (only active in online mode)
+  const onlineGame = useOnlineGame(isOnline ? userId : null);
+
+  // Game store — actions
+  const storeRollDice = useGameStore((s) => s.rollDice);
+  const storeExecuteMove = useGameStore((s) => s.executeMove);
+  const storeExitHome = useGameStore((s) => s.exitHome);
+  const storeHandleCapture = useGameStore((s) => s.handleCapture);
+  const storeCheckWinCondition = useGameStore((s) => s.checkWinCondition);
+  const storeGetValidMoves = useGameStore((s) => s.getValidMoves);
+  const triggerEvent = useGameStore((s) => s.triggerEvent);
+  const storeResolveEvent = useGameStore((s) => s.resolveEvent);
+  const addTokens = useGameStore((s) => s.addTokens);
+  const removeTokens = useGameStore((s) => s.removeTokens);
+  const storeNextTurn = useGameStore((s) => s.nextTurn);
+  const storeGrantExtraTurn = useGameStore((s) => s.grantExtraTurn);
+  const storeEndGame = useGameStore((s) => s.endGame);
+  const clearSelection = useGameStore((s) => s.clearSelection);
+  const setAnimating = useGameStore((s) => s.setAnimating);
+  const getCurrentPlayer = useGameStore((s) => s.getCurrentPlayer);
+
+  // Game store — reactive state (re-renders when these change)
+  const game = useGameStore((s) => s.game);
+  const selectedPawnIndex = useGameStore((s) => s.selectedPawnIndex);
+  const highlightedPositions = useGameStore((s) => s.highlightedPositions);
+
+  // Reactive current player — this MUST re-render when currentPlayerIndex changes
+  const currentPlayer = useGameStore(
+    (s) => s.game ? s.game.players[s.game.currentPlayerIndex] ?? null : null
+  );
 
   // Local state
   const [showQuitConfirm, setShowQuitConfirm] = useState(false);
-  const [diceValue, setDiceValue] = useState<number | null>(null);
-  const [isRolling, setIsRolling] = useState(false);
-  const [_aiMessage, setAiMessage] = useState<string | null>(null);
-  const [isAIPlaying, setIsAIPlaying] = useState(false);
 
   // Event popups state
   const [quizData, setQuizData] = useState<QuizEvent | null>(null);
@@ -68,313 +68,92 @@ export default function PlayScreen() {
   const [challengeData, setChallengeData] = useState<ChallengeEvent | null>(null);
   const [duelData, setDuelData] = useState<DuelEvent | null>(null);
   const [duelOpponent, setDuelOpponent] = useState<Player | null>(null);
+  const [isEventSpectator, setIsEventSpectator] = useState(false);
 
-  // AI Player ref
-  const aiPlayerRef = useRef<AIPlayer | null>(null);
+  // Remote dice animation tracking
+  const [remoteRollingPlayerId, setRemoteRollingPlayerId] = useState<string | null>(null);
+  const [remoteDiceValue, setRemoteDiceValue] = useState<number | null>(null);
 
-  const currentPlayer = getCurrentPlayer();
+  // Online disconnection/forfeit state
+  const [showDisconnectPopup, setShowDisconnectPopup] = useState(false);
+  const disconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Initialize AI player
-  useEffect(() => {
-    if (game && game.mode === 'local') {
-      const hasAI = game.players.some((p) => p.isAI);
-      if (hasAI && !aiPlayerRef.current) {
-        aiPlayerRef.current = new AIPlayer('medium');
-      }
+  // ===== UNIFIED ACTIONS (resolve online/local split once) =====
+
+  const actions: TurnActions = useMemo(() => {
+    if (isOnline) {
+      return {
+        rollDice: onlineGame.rollDice,
+        executeMove: onlineGame.movePawn,
+        exitHome: onlineGame.exitHome,
+        nextTurn: () => onlineGame.endTurn(false),
+        grantExtraTurn: () => onlineGame.endTurn(true),
+        handleCapture: onlineGame.broadcastCapture,
+        endGame: onlineGame.broadcastWin,
+        resolveEvent: onlineGame.resolveEvent,
+        broadcastEvent: onlineGame.broadcastEvent,
+        getValidMoves: storeGetValidMoves,
+        checkWinCondition: storeCheckWinCondition,
+      };
     }
-  }, [game]);
-
-  // AI turn handler - Fixed dependencies and added guard
-  useEffect(() => {
-    // Guard conditions
-    if (!game || !currentPlayer?.isAI || isAnimating || game.pendingEvent || isAIPlaying) return;
-
-    const handleAITurn = async () => {
-      if (!aiPlayerRef.current) {
-        aiPlayerRef.current = new AIPlayer('medium');
-      }
-
-      // Check if AI can roll dice
-      const canAIRoll = game.status === 'playing' && !game.diceRolled && !game.pendingEvent && !isAnimating;
-
-      if (canAIRoll) {
-        setIsAIPlaying(true);
-        setTimeout(() => {
-          handleRollDice();
-          setIsAIPlaying(false);
-        }, 1000);
-        return;
-      }
-
-      // Check if AI can move
-      const canAIMove = game.status === 'playing' && game.diceRolled && !game.pendingEvent && !isAnimating;
-
-      if (canAIMove && game.diceValue !== null) {
-        setIsAIPlaying(true);
-
-        const decision = await aiPlayerRef.current.makeDecision(
-          currentPlayer,
-          game.diceValue,
-          game.players
-        );
-
-        setAiMessage(decision.reasoning);
-
-        setTimeout(() => {
-          if (decision.type === 'exit' && decision.pawnIndex !== undefined) {
-            handleExitHome(decision.pawnIndex);
-          } else if (decision.type === 'move' && decision.pawnIndex !== undefined) {
-            handlePawnPress(currentPlayer.id, decision.pawnIndex);
-          } else {
-            // No valid moves, skip turn
-            handleEndTurn();
+    return {
+      rollDice: storeRollDice,
+      executeMove: storeExecuteMove,
+      exitHome: storeExitHome,
+      nextTurn: storeNextTurn,
+      grantExtraTurn: storeGrantExtraTurn,
+      handleCapture: storeHandleCapture,
+      endGame: storeEndGame,
+      resolveEvent: (r: { ok: boolean; reward: number }) => {
+        const cp = getCurrentPlayer();
+        if (cp) {
+          if (r.ok && r.reward > 0) {
+            addTokens(cp.id, r.reward);
+          } else if (!r.ok && r.reward > 0) {
+            removeTokens(cp.id, r.reward);
           }
-
-          setTimeout(() => {
-            setAiMessage(null);
-            setIsAIPlaying(false);
-          }, 2000);
-        }, 1500);
-      }
+        }
+        storeResolveEvent();
+      },
+      broadcastEvent: () => {},
+      getValidMoves: storeGetValidMoves,
+      checkWinCondition: storeCheckWinCondition,
     };
-
-    handleAITurn();
   }, [
-    game?.currentPlayerIndex,
-    game?.diceValue,
-    game?.diceRolled,
-    game?.pendingEvent,
-    game?.status,
-    currentPlayer?.isAI,
-    isAnimating,
-    isAIPlaying,
+    isOnline,
+    onlineGame,
+    storeRollDice,
+    storeExecuteMove,
+    storeExitHome,
+    storeNextTurn,
+    storeGrantExtraTurn,
+    storeHandleCapture,
+    storeEndGame,
+    storeResolveEvent,
+    storeGetValidMoves,
+    storeCheckWinCondition,
+    getCurrentPlayer,
+    addTokens,
+    removeTokens,
   ]);
 
-  // Get valid moves when dice is rolled
-  const validMoves = useMemo(() => {
-    if (!game || !game.diceRolled) return [];
-    return getValidMoves();
-  }, [game, game?.diceRolled, getValidMoves]);
+  // ===== EVENT HANDLER (called by turn machine when phase enters 'event') =====
 
-  // Check if player can exit home
-  const canExitHome = useMemo(() => {
-    if (!currentPlayer || !game?.diceValue) return false;
-    return GameEngine.canExitHome(currentPlayer, game.diceValue);
-  }, [currentPlayer, game?.diceValue]);
-
-  // End turn — defined early so all callbacks can reference it
-  const handleEndTurn = useCallback(() => {
-    setAnimating(false);
-    clearSelection();
-    setDiceValue(null);
-    setIsRolling(false);
-    nextTurn();
-  }, [clearSelection, nextTurn, setAnimating]);
-
-  // Handle dice roll
-  const handleRollDice = useCallback(() => {
-    if (!canRollDice()) return;
-
-    setIsRolling(true);
-    const value = rollDice();
-    setDiceValue(value);
-
-    if (hapticsEnabled) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    }
-  }, [canRollDice, rollDice, hapticsEnabled]);
-
-  // Handle exiting a pawn from home
-  const handleExitHome = useCallback((pawnIndex: number) => {
-    if (!currentPlayer || !canExitHome) return;
-
-    setAnimating(true);
-    const result = exitHome(pawnIndex);
-
-    const animDelay = result?.path?.length
-      ? result.path.length * PAWN_STEP_MS + 150
-      : 400;
-
-    if (result) {
-      // Handle capture at start position (après animation)
-      if (result.capturedPawn) {
-        setTimeout(() => {
-          handleCapture(result.capturedPawn!.playerId, result.capturedPawn!.pawnIndex);
-          if (hapticsEnabled) {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          }
-        }, animDelay);
-      }
-
-      // Handle triggered event (après animation)
-      if (result.triggeredEvent) {
-        setTimeout(() => {
-          handleTriggeredEvent(result.triggeredEvent!);
-          setAnimating(false);
-        }, animDelay);
-        return;
-      }
-    }
-
-    setTimeout(() => {
-      setAnimating(false);
-      clearSelection();
-
-      // Rolled 6 = extra turn
-      if (game?.diceValue === 6) {
-        grantExtraTurn();
-      } else {
-        handleEndTurn();
-      }
-    }, animDelay);
-  }, [currentPlayer, canExitHome, exitHome, game, handleCapture, hapticsEnabled, clearSelection, grantExtraTurn, handleEndTurn, setAnimating]);
-
-  // Handle dice roll complete
-  const handleDiceComplete = useCallback(
-    (value: number) => {
-      setIsRolling(false);
-      setDiceValue(value);
-
-      // Check for rolled 6
-      if (value === 6 && hapticsEnabled) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }
-
-      // Auto-select if only one valid move
-      const moves = getValidMoves();
-      if (moves.length === 1) {
-        const move = moves[0]!;
-        if (move.type === 'exit') {
-          setTimeout(() => handleExitHome(move.pawnIndex), 500);
-        } else if (move.type === 'move') {
-          selectPawn(move.pawnIndex);
-        }
-      } else if (moves.length === 0) {
-        // No valid moves - show message and end turn
-        setTimeout(() => handleEndTurn(), 1500);
-      }
-    },
-    [getValidMoves, hapticsEnabled, selectPawn, handleEndTurn, handleExitHome]
-  );
-
-  // Handle pawn selection/movement
-  const handlePawnPress = useCallback(
-    (playerId: string, pawnIndex: number) => {
-      if (!game || !currentPlayer || playerId !== currentPlayer.id || !canMove()) return;
-
-      // Check if this pawn can move
-      const move = validMoves.find((m) => m.pawnIndex === pawnIndex);
-      if (!move) return;
-
-      // If it's an exit move
-      if (move.type === 'exit') {
-        handleExitHome(pawnIndex);
-        return;
-      }
-
-      if (selectedPawnIndex === pawnIndex) {
-        // Execute move
-        setAnimating(true);
-        const result = executeMove(pawnIndex);
-
-        // Durée de l'animation case par case
-        const animDelay = result?.path?.length
-          ? result.path.length * PAWN_STEP_MS + 150
-          : 400;
-
-        if (result) {
-          // Handle capture (après l'animation)
-          if (result.capturedPawn) {
-            setTimeout(() => {
-              handleCapture(result.capturedPawn!.playerId, result.capturedPawn!.pawnIndex);
-              if (hapticsEnabled) {
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              }
-            }, animDelay);
-          }
-
-          // Handle finish
-          if (result.isFinished) {
-            setTimeout(() => {
-              if (checkWinCondition(playerId)) {
-                endGame(playerId);
-                router.push(`/(game)/results/${game.id}`);
-              }
-            }, animDelay);
-            return;
-          }
-
-          // Handle triggered event (après l'animation)
-          if (result.triggeredEvent) {
-            setTimeout(() => {
-              handleTriggeredEvent(result.triggeredEvent!);
-              setAnimating(false);
-            }, animDelay);
-            return;
-          }
-        }
-
-        setTimeout(() => {
-          setAnimating(false);
-          clearSelection();
-
-          // Rolled 6 = extra turn
-          if (game?.diceValue === 6) {
-            grantExtraTurn();
-          } else {
-            handleEndTurn();
-          }
-        }, animDelay);
-      } else {
-        // Select pawn and highlight destination
-        selectPawn(pawnIndex);
-
-        // Build highlighted positions
-        if (move.result.newState.status === 'circuit') {
-          setHighlightedPositions([{
-            type: 'circuit',
-            position: move.result.newState.position,
-          }]);
-        } else if (move.result.newState.status === 'final') {
-          setHighlightedPositions([{
-            type: 'final',
-            position: move.result.newState.position,
-            color: currentPlayer.color,
-          }]);
-        }
-      }
-    },
-    [
-      game,
-      currentPlayer,
-      canMove,
-      validMoves,
-      selectedPawnIndex,
-      executeMove,
-      handleCapture,
-      checkWinCondition,
-      endGame,
-      clearSelection,
-      selectPawn,
-      setHighlightedPositions,
-      hapticsEnabled,
-      grantExtraTurn,
-      handleExitHome,
-      handleEndTurn,
-      setAnimating,
-    ]
-  );
-
-  // Handle triggered events
   const handleTriggeredEvent = useCallback(
     (eventType: string) => {
       const event = GameEngine.generateEvent(eventType as any, game?.edition || 'startup');
       if (!event) {
-        handleEndTurn();
+        // No event generated — skip directly
         return;
       }
 
       triggerEvent(event);
+      setIsEventSpectator(false);
+
+      // Broadcast event to other players in online mode
+      if (isOnline) {
+        onlineGame.broadcastEvent(event.type, event.data as unknown as Record<string, unknown>);
+      }
 
       switch (event.type) {
         case 'quiz':
@@ -389,9 +168,8 @@ export default function PlayScreen() {
         case 'challenge':
           setChallengeData(event.data as ChallengeEvent);
           break;
-        case 'duel':
+        case 'duel': {
           setDuelData(event.data as DuelEvent);
-          // Select random opponent for duel
           const opponents = game?.players.filter((p) => p.id !== currentPlayer?.id) || [];
           if (opponents.length > 0) {
             const randomOpponent = opponents[Math.floor(Math.random() * opponents.length)];
@@ -400,85 +178,265 @@ export default function PlayScreen() {
             }
           }
           break;
+        }
       }
     },
-    [game, currentPlayer, triggerEvent, handleEndTurn]
+    [game, currentPlayer, triggerEvent, isOnline, onlineGame]
   );
 
-  // Event handlers
+  // ===== WIN HANDLER =====
+
+  const handleWin = useCallback(
+    (playerId: string) => {
+      if (isOnline) {
+        onlineGame.broadcastWin(playerId);
+      } else {
+        storeEndGame(playerId);
+      }
+      router.push(`/(game)/results/${game?.id}`);
+    },
+    [isOnline, onlineGame, storeEndGame, router, game?.id]
+  );
+
+  // ===== TURN MACHINE =====
+
+  const { turnState, diceProps, handleEventResolve } = useTurnMachine({
+    game,
+    currentPlayer,
+    isOnline,
+    userId,
+    actions,
+    onEvent: handleTriggeredEvent,
+    onWin: handleWin,
+    hapticsEnabled,
+    setAnimating,
+    clearSelection,
+  });
+
+  // ===== ONLINE: React to remote dice rolls =====
+
+  useEffect(() => {
+    if (!isOnline || !onlineGame.remoteDiceRoll) return;
+
+    const { playerId, value } = onlineGame.remoteDiceRoll;
+    setRemoteRollingPlayerId(playerId);
+    setRemoteDiceValue(value);
+
+    const timer = setTimeout(() => {
+      setRemoteRollingPlayerId(null);
+    }, 1200);
+
+    return () => clearTimeout(timer);
+  }, [isOnline, onlineGame.remoteDiceRoll]);
+
+  // ===== ONLINE: React to remote event triggers =====
+
+  useEffect(() => {
+    if (!isOnline || !onlineGame.remoteEvent) return;
+
+    const { eventType, eventData } = onlineGame.remoteEvent;
+    setIsEventSpectator(true);
+
+    switch (eventType) {
+      case 'quiz':
+        setQuizData(eventData as unknown as QuizEvent);
+        break;
+      case 'funding':
+        setFundingData(eventData as unknown as FundingEvent);
+        break;
+      case 'opportunity':
+        setOpportunityData(eventData as unknown as OpportunityEvent);
+        break;
+      case 'challenge':
+        setChallengeData(eventData as unknown as ChallengeEvent);
+        break;
+      case 'duel':
+        setDuelData(eventData as unknown as DuelEvent);
+        break;
+    }
+  }, [isOnline, onlineGame.remoteEvent]);
+
+  // ===== ONLINE: React to remote event result (close popup) =====
+
+  useEffect(() => {
+    if (!isOnline || !onlineGame.remoteEventResult) return;
+
+    const timer = setTimeout(() => {
+      setQuizData(null);
+      setFundingData(null);
+      setOpportunityData(null);
+      setChallengeData(null);
+      setDuelData(null);
+      setDuelOpponent(null);
+      setIsEventSpectator(false);
+      onlineGame.clearRemoteEvent();
+      onlineGame.clearRemoteEventResult();
+    }, 2500);
+
+    return () => clearTimeout(timer);
+  }, [isOnline, onlineGame.remoteEventResult, onlineGame]);
+
+  // Clear remote dice value on turn change
+  useEffect(() => {
+    setRemoteDiceValue(null);
+    setRemoteRollingPlayerId(null);
+  }, [game?.currentPlayerIndex]);
+
+  // ===== ONLINE: Detect opponent disconnect → forfeit after 30s =====
+
+  useEffect(() => {
+    if (!isOnline) return;
+
+    if (onlineGame.opponentDisconnected) {
+      setShowDisconnectPopup(true);
+      disconnectTimerRef.current = setTimeout(() => {
+        if (userId) {
+          onlineGame.broadcastWin(userId);
+          router.push(`/(game)/results/${game?.id}`);
+        }
+      }, 30000);
+    } else {
+      setShowDisconnectPopup(false);
+      if (disconnectTimerRef.current) {
+        clearTimeout(disconnectTimerRef.current);
+        disconnectTimerRef.current = null;
+      }
+    }
+
+    return () => {
+      if (disconnectTimerRef.current) {
+        clearTimeout(disconnectTimerRef.current);
+      }
+    };
+  }, [isOnline, onlineGame.opponentDisconnected, userId, game?.id, router, onlineGame]);
+
+  // ===== ONLINE: Detect game ended (forfeit from remote) =====
+
+  useEffect(() => {
+    if (!isOnline || !game) return;
+    if (game.status === 'finished' && game.winner) {
+      const timer = setTimeout(() => {
+        router.push(`/(game)/results/${game.id}`);
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [isOnline, game?.status, game?.winner, game?.id, router, game]);
+
+  // ===== EVENT POPUP HANDLERS =====
+
   const handleQuizAnswer = useCallback(
     (correct: boolean, reward: number) => {
-      if (currentPlayer && correct) {
-        addTokens(currentPlayer.id, reward);
-      }
+      actions.resolveEvent({ ok: correct, reward });
       setQuizData(null);
-      resolveEvent();
-      handleEndTurn();
+      handleEventResolve();
     },
-    [currentPlayer, addTokens, resolveEvent, handleEndTurn]
+    [actions, handleEventResolve]
   );
 
   const handleFundingAccept = useCallback(
     (amount: number) => {
-      if (currentPlayer) {
-        addTokens(currentPlayer.id, amount);
-      }
+      actions.resolveEvent({ ok: true, reward: amount });
       setFundingData(null);
-      resolveEvent();
-      handleEndTurn();
+      handleEventResolve();
     },
-    [currentPlayer, addTokens, resolveEvent, handleEndTurn]
+    [actions, handleEventResolve]
   );
 
   const handleEventAccept = useCallback(
     (value: number, effect: string) => {
-      if (!currentPlayer) return;
-
-      switch (effect) {
-        case 'tokens':
-          addTokens(currentPlayer.id, value);
-          break;
-        case 'loseTokens':
-          removeTokens(currentPlayer.id, value);
-          break;
-      }
-
+      const isPositive = effect === 'tokens';
+      actions.resolveEvent({ ok: isPositive, reward: value });
       setOpportunityData(null);
       setChallengeData(null);
-      resolveEvent();
-      handleEndTurn();
+      handleEventResolve();
     },
-    [currentPlayer, addTokens, removeTokens, resolveEvent, handleEndTurn]
+    [actions, handleEventResolve]
   );
 
   const handleDuelAnswer = useCallback(
     (won: boolean, stake: number) => {
-      if (!currentPlayer) return;
-
-      if (won) {
-        addTokens(currentPlayer.id, stake);
-      } else {
-        removeTokens(currentPlayer.id, stake);
-      }
-
+      actions.resolveEvent({ ok: won, reward: stake });
       setDuelData(null);
       setDuelOpponent(null);
-      resolveEvent();
-      handleEndTurn();
+      handleEventResolve();
     },
-    [currentPlayer, addTokens, removeTokens, resolveEvent, handleEndTurn]
+    [actions, handleEventResolve]
   );
 
-  // Handle quit
+  // ===== QUIT HANDLER =====
+
   const handleQuit = useCallback(() => {
     setShowQuitConfirm(false);
+    if (isOnline) {
+      onlineGame.forfeit();
+    }
     router.replace('/(tabs)/home');
-  }, [router]);
+  }, [router, isOnline, onlineGame]);
 
-  // Handle pawn move animation complete
+  // ===== PAWN MOVE ANIMATION COMPLETE (kept for GameBoard) =====
+
   const handlePawnMoveComplete = useCallback(() => {
-    console.log('[PlayScreen] Pawn animation completed');
+    // No-op: movement is handled by the turn machine
   }, []);
+
+  // ===== PAWN PRESS (kept for GameBoard but simplified) =====
+
+  const handlePawnPress = useCallback(
+    (_playerId: string, _pawnIndex: number) => {
+      // Auto-move is handled by the turn machine
+      // This is kept for GameBoard's onPawnPress prop compatibility
+    },
+    []
+  );
+
+  // ===== RENDER HELPER: get dice props for a specific player card =====
+
+  const getPlayerCardDiceProps = useCallback(
+    (pl: Player) => {
+      const isMe = isOnline ? pl.id === userId : !pl.isAI;
+      const isTurn = pl.id === currentPlayer?.id;
+      const isRemoteRolling = remoteRollingPlayerId === pl.id;
+
+      let diceValue: number | null = null;
+      let isDiceRolling = false;
+      let isDiceDisabled = true;
+      let onRollDice: (() => number) | undefined;
+      let onDiceComplete: ((value: number) => void) | undefined;
+
+      if (isMe && isTurn) {
+        // My turn (human, local): use turn machine state + wire up dice controls
+        diceValue = turnState.diceValue;
+        isDiceRolling = turnState.isRolling;
+        isDiceDisabled = turnState.phase !== 'idle' || (isOnline && !onlineGame.isMyTurn);
+        onRollDice = diceProps.onRoll;
+        onDiceComplete = diceProps.onDiceComplete;
+      } else if (isRemoteRolling) {
+        // Remote online player rolling (opponent's device)
+        diceValue = remoteDiceValue;
+        isDiceRolling = true;
+      } else if (isTurn) {
+        // AI or non-local player's turn: show turn machine dice state
+        // This gives the AI rolling animation + dice value display
+        diceValue = turnState.diceValue;
+        isDiceRolling = turnState.isRolling;
+      }
+
+      return { diceValue, isDiceRolling, isDiceDisabled, onRollDice, onDiceComplete };
+    },
+    [
+      isOnline,
+      userId,
+      currentPlayer,
+      remoteRollingPlayerId,
+      remoteDiceValue,
+      turnState.diceValue,
+      turnState.isRolling,
+      turnState.phase,
+      onlineGame.isMyTurn,
+      diceProps,
+    ]
+  );
 
   if (!game) {
     return (
@@ -494,11 +452,32 @@ export default function PlayScreen() {
     );
   }
 
+  // Helper to render a player card for a given color slot
+  const renderPlayerCard = (color: string) => {
+    const pl = game.players.find((p) => p.color === color);
+    if (!pl) return null;
+
+    const isTurn = pl.id === currentPlayer?.id;
+    const dp = getPlayerCardDiceProps(pl);
+
+    return (
+      <PlayerCard
+        player={pl}
+        isCurrentTurn={isTurn}
+        diceValue={dp.diceValue}
+        isDiceRolling={dp.isDiceRolling}
+        isDiceDisabled={dp.isDiceDisabled}
+        onRollDice={dp.onRollDice}
+        onDiceComplete={dp.onDiceComplete}
+      />
+    );
+  };
+
   return (
     <View style={styles.container}>
       <RadialBackground />
       <View style={[styles.content, { paddingTop: insets.top + 72, paddingBottom: insets.bottom }]}>
-        {/* Fixed Header: Back, Logo Startupludo, Settings (design system: bg #0A1929) */}
+        {/* Fixed Header */}
         <View style={[styles.fixedHeader, { paddingTop: insets.top + SPACING[2] }]}>
           <Pressable onPress={() => setShowQuitConfirm(true)} hitSlop={8} style={styles.headerButton}>
             <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
@@ -515,37 +494,15 @@ export default function PlayScreen() {
           </Pressable>
         </View>
 
-        {/* Semi-transparent container: PlayerCards + Board */}
+        {/* Board + PlayerCards */}
         <View style={styles.boardWrapper}>
           {/* Top Players Row — yellow (top-left) and blue (top-right) */}
           <View style={styles.playersRow}>
-            {/* Top-left slot: yellow */}
             <View style={styles.playerSlot}>
-              {game.players.find(p => p.color === 'yellow') && (
-                <PlayerCard
-                  player={game.players.find(p => p.color === 'yellow')!}
-                  isCurrentTurn={game.players.find(p => p.color === 'yellow')!.id === currentPlayer?.id}
-                  diceValue={game.players.find(p => p.color === 'yellow')!.id === currentPlayer?.id ? diceValue : (game.diceValue ?? null)}
-                  isDiceRolling={game.players.find(p => p.color === 'yellow')!.id === currentPlayer?.id ? isRolling : false}
-                  isDiceDisabled={game.players.find(p => p.color === 'yellow')!.id !== currentPlayer?.id || !canRollDice() || !!game.players.find(p => p.color === 'yellow')!.isAI}
-                  onRollDice={game.players.find(p => p.color === 'yellow')!.id === currentPlayer?.id ? () => rollDice() : undefined}
-                  onDiceComplete={game.players.find(p => p.color === 'yellow')!.id === currentPlayer?.id ? handleDiceComplete : undefined}
-                />
-              )}
+              {renderPlayerCard('yellow')}
             </View>
-            {/* Top-right slot: blue */}
             <View style={styles.playerSlot}>
-              {game.players.find(p => p.color === 'blue') && (
-                <PlayerCard
-                  player={game.players.find(p => p.color === 'blue')!}
-                  isCurrentTurn={game.players.find(p => p.color === 'blue')!.id === currentPlayer?.id}
-                  diceValue={game.players.find(p => p.color === 'blue')!.id === currentPlayer?.id ? diceValue : (game.diceValue ?? null)}
-                  isDiceRolling={game.players.find(p => p.color === 'blue')!.id === currentPlayer?.id ? isRolling : false}
-                  isDiceDisabled={game.players.find(p => p.color === 'blue')!.id !== currentPlayer?.id || !canRollDice() || !!game.players.find(p => p.color === 'blue')!.isAI}
-                  onRollDice={game.players.find(p => p.color === 'blue')!.id === currentPlayer?.id ? () => rollDice() : undefined}
-                  onDiceComplete={game.players.find(p => p.color === 'blue')!.id === currentPlayer?.id ? handleDiceComplete : undefined}
-                />
-              )}
+              {renderPlayerCard('blue')}
             </View>
           </View>
 
@@ -566,33 +523,11 @@ export default function PlayScreen() {
 
           {/* Bottom Players Row — green (bottom-left) and red (bottom-right) */}
           <View style={styles.playersRow}>
-            {/* Bottom-left slot: green */}
             <View style={styles.playerSlot}>
-              {game.players.find(p => p.color === 'green') && (
-                <PlayerCard
-                  player={game.players.find(p => p.color === 'green')!}
-                  isCurrentTurn={game.players.find(p => p.color === 'green')!.id === currentPlayer?.id}
-                  diceValue={game.players.find(p => p.color === 'green')!.id === currentPlayer?.id ? diceValue : (game.diceValue ?? null)}
-                  isDiceRolling={game.players.find(p => p.color === 'green')!.id === currentPlayer?.id ? isRolling : false}
-                  isDiceDisabled={game.players.find(p => p.color === 'green')!.id !== currentPlayer?.id || !canRollDice() || !!game.players.find(p => p.color === 'green')!.isAI}
-                  onRollDice={game.players.find(p => p.color === 'green')!.id === currentPlayer?.id ? () => rollDice() : undefined}
-                  onDiceComplete={game.players.find(p => p.color === 'green')!.id === currentPlayer?.id ? handleDiceComplete : undefined}
-                />
-              )}
+              {renderPlayerCard('green')}
             </View>
-            {/* Bottom-right slot: red */}
             <View style={styles.playerSlot}>
-              {game.players.find(p => p.color === 'red') && (
-                <PlayerCard
-                  player={game.players.find(p => p.color === 'red')!}
-                  isCurrentTurn={game.players.find(p => p.color === 'red')!.id === currentPlayer?.id}
-                  diceValue={game.players.find(p => p.color === 'red')!.id === currentPlayer?.id ? diceValue : (game.diceValue ?? null)}
-                  isDiceRolling={game.players.find(p => p.color === 'red')!.id === currentPlayer?.id ? isRolling : false}
-                  isDiceDisabled={game.players.find(p => p.color === 'red')!.id !== currentPlayer?.id || !canRollDice() || !!game.players.find(p => p.color === 'red')!.isAI}
-                  onRollDice={game.players.find(p => p.color === 'red')!.id === currentPlayer?.id ? () => rollDice() : undefined}
-                  onDiceComplete={game.players.find(p => p.color === 'red')!.id === currentPlayer?.id ? handleDiceComplete : undefined}
-                />
-              )}
+              {renderPlayerCard('red')}
             </View>
           </View>
         </View>
@@ -600,12 +535,13 @@ export default function PlayScreen() {
 
       {/* Quit Confirmation Modal */}
       <Modal visible={showQuitConfirm} onClose={() => setShowQuitConfirm(false)}>
-        {/* ... existing modal ... */}
         <View style={styles.modalContent}>
           <Ionicons name="warning" size={48} color={COLORS.warning} />
           <Text style={styles.modalTitle}>Quitter la partie ?</Text>
           <Text style={styles.modalText}>
-            Ta progression sera perdue si tu quittes maintenant.
+            {isOnline
+              ? 'Si tu quittes, tu perds la partie par forfait.'
+              : 'Ta progression sera perdue si tu quittes maintenant.'}
           </Text>
           <View style={styles.modalButtons}>
             <Button
@@ -624,13 +560,40 @@ export default function PlayScreen() {
         </View>
       </Modal>
 
+      {/* Opponent Disconnected Modal (online) */}
+      {isOnline && (
+        <Modal visible={showDisconnectPopup} onClose={() => {}} closeOnBackdrop={false}>
+          <View style={styles.modalContent}>
+            <Ionicons name="wifi" size={48} color={COLORS.warning} />
+            <Text style={styles.modalTitle}>Adversaire deconnecte</Text>
+            <Text style={styles.modalText}>
+              {onlineGame.disconnectedPlayerName || 'Votre adversaire'} s'est deconnecte.{'\n'}
+              Victoire par forfait dans 30 secondes...
+            </Text>
+            <Button
+              title="Reclamer la victoire"
+              variant="primary"
+              onPress={() => {
+                if (disconnectTimerRef.current) clearTimeout(disconnectTimerRef.current);
+                if (userId) {
+                  onlineGame.broadcastWin(userId);
+                  router.push(`/(game)/results/${game.id}`);
+                }
+              }}
+              style={styles.modalButton}
+            />
+          </View>
+        </Modal>
+      )}
+
       {/* Event Popups */}
-      {/* ... existing popups ... */}
       <QuizPopup
         visible={!!quizData}
         quiz={quizData}
         onAnswer={handleQuizAnswer}
         onClose={() => setQuizData(null)}
+        isSpectator={isEventSpectator}
+        spectatorResult={onlineGame.remoteEventResult ? { ok: onlineGame.remoteEventResult.ok, reward: onlineGame.remoteEventResult.reward } : undefined}
       />
 
       <FundingPopup
@@ -638,6 +601,7 @@ export default function PlayScreen() {
         funding={fundingData}
         onAccept={handleFundingAccept}
         onClose={() => setFundingData(null)}
+        isSpectator={isEventSpectator}
       />
 
       <EventPopup
@@ -646,6 +610,7 @@ export default function PlayScreen() {
         event={opportunityData}
         onAccept={handleEventAccept}
         onClose={() => setOpportunityData(null)}
+        isSpectator={isEventSpectator}
       />
 
       <EventPopup
@@ -654,6 +619,7 @@ export default function PlayScreen() {
         event={challengeData}
         onAccept={handleEventAccept}
         onClose={() => setChallengeData(null)}
+        isSpectator={isEventSpectator}
       />
 
       <DuelPopup
@@ -666,6 +632,8 @@ export default function PlayScreen() {
           setDuelData(null);
           setDuelOpponent(null);
         }}
+        isSpectator={isEventSpectator}
+        spectatorResult={onlineGame.remoteEventResult ? { ok: onlineGame.remoteEventResult.ok, reward: onlineGame.remoteEventResult.reward } : undefined}
       />
     </View>
   );
@@ -731,7 +699,6 @@ const styles = StyleSheet.create({
     position: 'relative',
     marginVertical: SPACING[1],
   },
-  // Keep existing modal styles
   modalContent: {
     alignItems: 'center',
     padding: SPACING[4],
@@ -756,23 +723,6 @@ const styles = StyleSheet.create({
   },
   modalButton: {
     minWidth: 100,
-  },
-  // Missing styles from original file to avoid errors
-  aiMessageContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING[2],
-    paddingVertical: SPACING[2],
-    backgroundColor: `${COLORS.info}20`,
-    marginHorizontal: SPACING[4],
-    borderRadius: 8,
-    marginBottom: SPACING[2],
-  },
-  aiMessageText: {
-    fontFamily: FONTS.body,
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.info,
   },
   noGame: {
     flex: 1,

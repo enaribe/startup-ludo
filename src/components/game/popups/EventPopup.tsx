@@ -28,6 +28,7 @@ interface EventPopupProps {
   event: EventData | null;
   onAccept: (value: number, effect: string) => void;
   onClose: () => void;
+  isSpectator?: boolean;
 }
 
 const OPPORTUNITY_EFFECTS: Record<string, { icon: string; label: string }> = {
@@ -57,6 +58,7 @@ export const EventPopup = memo(function EventPopup({
   event,
   onAccept,
   onClose,
+  isSpectator = false,
 }: EventPopupProps) {
   const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
 
@@ -221,25 +223,37 @@ export const EventPopup = memo(function EventPopup({
           </View>
         </View>
 
+        {/* Spectator banner */}
+        {isSpectator && (
+          <View style={styles.spectatorBanner}>
+            <Ionicons name="eye" size={16} color={COLORS.white} />
+            <Text style={styles.spectatorText}>
+              {isOpportunity ? "L'adversaire profite d'une opportunité" : "L'adversaire subit un challenge"}
+            </Text>
+          </View>
+        )}
+
         {/* Action button */}
-        <Button
-          title={isOpportunity ? 'Profiter' : 'Subir'}
-          onPress={handleAccept}
-          variant={isOpportunity ? 'primary' : 'secondary'}
-          size="lg"
-          leftIcon={
-            <Ionicons
-              name={isOpportunity ? 'checkmark-circle' : 'alert-circle'}
-              size={20}
-              color={isOpportunity ? COLORS.white : eventColor}
-            />
-          }
-          style={
-            !isOpportunity
-              ? { width: '100%', borderColor: eventColor, borderWidth: 2 }
-              : { width: '100%' }
-          }
-        />
+        {!isSpectator && (
+          <Button
+            title={isOpportunity ? 'Profiter' : 'Subir'}
+            onPress={handleAccept}
+            variant={isOpportunity ? 'primary' : 'secondary'}
+            size="lg"
+            leftIcon={
+              <Ionicons
+                name={isOpportunity ? 'checkmark-circle' : 'alert-circle'}
+                size={20}
+                color={isOpportunity ? COLORS.white : eventColor}
+              />
+            }
+            style={
+              !isOpportunity
+                ? { width: '100%', borderColor: eventColor, borderWidth: 2 }
+                : { width: '100%' }
+            }
+          />
+        )}
       </Animated.View>
     </Modal>
   );
@@ -368,5 +382,22 @@ const styles = StyleSheet.create({
   },
   button: {
     width: '100%',
+  },
+  spectatorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING[2],
+    backgroundColor: COLORS.info,
+    borderRadius: 8,
+    paddingVertical: SPACING[2],
+    paddingHorizontal: SPACING[3],
+    marginBottom: SPACING[3],
+    width: '100%',
+  },
+  spectatorText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.white,
   },
 });

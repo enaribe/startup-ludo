@@ -17,6 +17,21 @@ import type { GameState, GameMode, Player, GameEvent, PlayerColor, PawnState, Ev
 import { GameEngine, type MoveResult, type ValidMove } from '@/services/game/GameEngine';
 import { eventManager, type GeneratedGameEvent } from '@/services/game/EventManager';
 import type { EditionId } from '@/data';
+import type { CheckpointData } from '@/utils/onlineCodec';
+
+/** Action compacte recue d'un joueur distant via RTDB */
+export interface RemoteAction {
+  /** Type: r=roll, m=move, x=exit, e=event, s=skip, n=nextTurn, w=win */
+  t: string;
+  /** Player ID */
+  p: string;
+  /** Data payload */
+  d: Record<string, unknown>;
+  /** Timestamp */
+  ts?: number;
+  /** Action ID (from Firebase key) */
+  id?: string | null;
+}
 
 interface HighlightedPosition {
   type: 'circuit' | 'final' | 'home';
@@ -84,6 +99,10 @@ interface GameStoreActions {
   // Helpers de logique
   getValidMoves: () => ValidMove[];
   checkWinCondition: (playerId: string) => boolean;
+
+  // Online multiplayer
+  applyRemoteAction: (action: RemoteAction) => void;
+  loadFromCheckpoint: (data: CheckpointData) => void;
 
   // Gestion d'état
   setLoading: (isLoading: boolean) => void;
@@ -333,7 +352,7 @@ export const useGameStore = create<GameStore>()(
         console.log('[useGameStore.executeMove] Move result:', {
           canMove: result.canMove,
           newStatus: result.newState?.status,
-          newPosition: result.newState?.position,
+          newPosition: result.newState && 'position' in result.newState ? result.newState.position : undefined,
           pathLength: result.path?.length,
         });
 
@@ -381,7 +400,7 @@ export const useGameStore = create<GameStore>()(
         console.log('[useGameStore.exitHome] Exit result:', {
           canMove: result.canMove,
           newStatus: result.newState?.status,
-          newPosition: result.newState?.position,
+          newPosition: result.newState && 'position' in result.newState ? result.newState.position : undefined,
           pathLength: result.path?.length,
         });
 
@@ -626,6 +645,143 @@ export const useGameStore = create<GameStore>()(
         if (!player) return false;
 
         return GameEngine.hasPlayerWon(player);
+      },
+
+      // ===== ONLINE MULTIPLAYER =====
+
+      applyRemoteAction: (action) => {
+        const { game } = get();
+        if (!game) {
+          console.log('[useGameStore.applyRemoteAction] Pas de partie, action ignorée:', action.t);
+          return;
+        }
+
+        console.log('[useGameStore.applyRemoteAction]', action.t, {
+          from: action.p,
+          currentPlayerIndex: game.currentPlayerIndex,
+          currentPlayerId: game.players[game.currentPlayerIndex]?.id,
+          diceRolled: game.diceRolled,
+          diceValue: game.diceValue,
+        });
+
+        switch (action.t) {
+          case 'r': {
+            // Roll: apply remote dice value
+            const value = (action.d as { v: number }).v;
+            console.log('[useGameStore.applyRemoteAction] r (roll): valeur', value);
+            set((state) => {
+              if (state.game) {
+                state.game.diceValue = value;
+                state.game.diceRolled = true;
+                state.game.updatedAt = Date.now();
+              }
+            });
+            break;
+          }
+
+          case 'm': {
+            // Move: execute the same move locally
+            const pawnIndex = (action.d as { i: number }).i;
+            console.log('[useGameStore.applyRemoteAction] m (move): pawnIndex', pawnIndex);
+            const moveResult = get().executeMove(pawnIndex);
+            console.log('[useGameStore.applyRemoteAction] m résultat:', {
+              canMove: moveResult?.canMove,
+              newStatus: moveResult?.newState?.status,
+            });
+            break;
+          }
+
+          case 'x': {
+            // Exit home: execute locally
+            const pawnIndex = (action.d as { i: number }).i;
+            console.log('[useGameStore.applyRemoteAction] x (exit): pawnIndex', pawnIndex);
+            const exitResult = get().exitHome(pawnIndex);
+            console.log('[useGameStore.applyRemoteAction] x résultat:', {
+              canMove: exitResult?.canMove,
+            });
+            break;
+          }
+
+          case 'e': {
+            // Event result: apply tokens
+            const data = action.d as { ok?: boolean; r?: number };
+            if (data.ok && data.r && data.r > 0) {
+              get().addTokens(action.p, data.r);
+            } else if (!data.ok && data.r && data.r > 0) {
+              get().removeTokens(action.p, data.r);
+            }
+            get().resolveEvent();
+            break;
+          }
+
+          case 's': {
+            // Skip turn
+            get().nextTurn();
+            break;
+          }
+
+          case 'n': {
+            // Next turn (after move completed)
+            const data = action.d as { extra?: boolean };
+            console.log('[useGameStore.applyRemoteAction] n (nextTurn): extra=', data.extra);
+            if (data.extra) {
+              get().grantExtraTurn();
+            } else {
+              get().nextTurn();
+            }
+            break;
+          }
+
+          case 'w': {
+            // Win
+            const winnerId = (action.d as { winner: string }).winner;
+            get().endGame(winnerId);
+            break;
+          }
+
+          case 'k': {
+            // Capture
+            const data = action.d as { pid: string; pi: number };
+            get().handleCapture(data.pid, data.pi);
+            break;
+          }
+
+          case 'f': {
+            // Forfeit — opponent quit, winner declared
+            const winnerId = (action.d as { winner: string }).winner;
+            get().endGame(winnerId);
+            break;
+          }
+        }
+      },
+
+      loadFromCheckpoint: (data) => {
+        set((state) => {
+          if (!state.game) return;
+
+          state.game.currentTurn = data.currentTurn;
+          state.game.currentPlayerIndex = data.currentPlayerIndex;
+          state.game.diceValue = null;
+          state.game.diceRolled = false;
+          state.game.pendingEvent = null;
+          state.game.selectedPawnIndex = null;
+          state.game.updatedAt = Date.now();
+          state.selectedPawnIndex = null;
+          state.highlightedPositions = [];
+          state.lastMoveResult = null;
+
+          // Restore pawns and tokens for each player
+          for (const player of state.game.players) {
+            const savedPawns = data.pawns[player.id];
+            if (savedPawns) {
+              player.pawns = savedPawns;
+            }
+            const savedTokens = data.tokens[player.id];
+            if (savedTokens !== undefined) {
+              player.tokens = savedTokens;
+            }
+          }
+        });
       },
 
       // ===== GESTION D'ÉTAT =====

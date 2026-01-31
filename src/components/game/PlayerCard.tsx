@@ -2,21 +2,21 @@
  * PlayerCard - Carte d'information joueur avec dé 3D intégré
  */
 
-import { memo, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  withSpring,
-  useSharedValue,
-  withSequence,
-  withTiming,
-} from 'react-native-reanimated';
-import { Ionicons } from '@expo/vector-icons';
-import type { Player } from '@/types';
+import { Dice } from '@/components/game/Dice';
+import { Avatar } from '@/components/ui/Avatar';
 import { COLORS } from '@/styles/colors';
 import { FONTS } from '@/styles/typography';
-import { Avatar } from '@/components/ui/Avatar';
-import { Dice } from '@/components/game/Dice';
+import type { Player } from '@/types';
+import { Ionicons } from '@expo/vector-icons';
+import { memo, useEffect } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated, {
+    useAnimatedStyle,
+    useSharedValue,
+    withSequence,
+    withSpring,
+    withTiming,
+} from 'react-native-reanimated';
 
 interface PlayerCardProps {
   player: Player;
@@ -136,17 +136,19 @@ export const PlayerCard = memo(function PlayerCard({
               </View>
             </View>
 
-            {/* Dé 3D animé */}
-            <View style={styles.diceWrapper}>
-              <Dice
-                value={diceValue}
-                isRolling={isDiceRolling}
-                disabled={isDiceDisabled}
-                size={28}
-                onRoll={onRollDice}
-                onRollComplete={onDiceComplete}
-              />
-            </View>
+            {/* Dé 3D animé — visible uniquement quand c'est le tour de ce joueur */}
+            {isCurrentTurn && (
+              <View style={styles.diceWrapper}>
+                <Dice
+                  value={diceValue}
+                  isRolling={isDiceRolling}
+                  disabled={isDiceDisabled}
+                  size={28}
+                  onRoll={onRollDice}
+                  onRollComplete={onDiceComplete}
+                />
+              </View>
+            )}
           </View>
 
           {/* Bottom Row: Progress Bar */}

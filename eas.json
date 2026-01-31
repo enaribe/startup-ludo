@@ -57,10 +57,6 @@
   },
   "submit": {
     "production": {
-      "ios": {
-        "appleId": "YOUR_APPLE_ID",
-        "ascAppId": "YOUR_APP_STORE_CONNECT_APP_ID"
-      },
       "android": {
         "track": "internal"
       }

@@ -184,6 +184,59 @@ export const Dice = memo(function Dice({
     }
   }, [value, isRolling]);
 
+  // Handle external rolling (remote player dice animation)
+  useEffect(() => {
+    if (!externalRolling || internalRolling) return;
+
+    // Animate dice rolling for remote player
+    let rollCount = 0;
+    const maxRolls = 8;
+    const rollInterval = setInterval(() => {
+      setDisplayValue(Math.floor(Math.random() * 6) + 1);
+      rollCount++;
+      if (rollCount >= maxRolls) {
+        clearInterval(rollInterval);
+        if (value !== null) {
+          setDisplayValue(value);
+          onRollComplete?.(value);
+        }
+      }
+    }, 100);
+
+    // Rolling animation
+    rotateX.value = withSequence(
+      withRepeat(
+        withTiming(360, { duration: 200, easing: Easing.linear }),
+        4,
+        false
+      ),
+      withSpring(0, { damping: 10 })
+    );
+
+    rotateY.value = withSequence(
+      withRepeat(
+        withTiming(360, { duration: 300, easing: Easing.linear }),
+        3,
+        false
+      ),
+      withSpring(0, { damping: 10 })
+    );
+
+    translateY.value = withSequence(
+      withTiming(-20, { duration: 150, easing: Easing.out(Easing.quad) }),
+      withTiming(5, { duration: 100, easing: Easing.in(Easing.quad) }),
+      withSpring(0, { damping: 8 })
+    );
+
+    scale.value = withSequence(
+      withTiming(1.15, { duration: 100 }),
+      withTiming(0.95, { duration: 100 }),
+      withSpring(1, { damping: 10 })
+    );
+
+    return () => clearInterval(rollInterval);
+  }, [externalRolling]);
+
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [
       { perspective: 1000 },

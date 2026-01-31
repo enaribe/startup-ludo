@@ -21,6 +21,7 @@ import {
   remove,
   push,
   onValue,
+  onChildAdded,
   onDisconnect,
   type Unsubscribe,
 } from 'firebase/database';
@@ -91,7 +92,9 @@ type EventCallback = (event: RoomEvent) => void;
 
 // ===== COULEURS DISPONIBLES =====
 
-const PLAYER_COLORS: PlayerColor[] = ['yellow', 'blue', 'green', 'red'];
+// For 2 players: green (bottom-left) + blue (top-right) — opposite corners
+// For 3-4 players: green, blue, yellow, red
+const PLAYER_COLORS: PlayerColor[] = ['green', 'blue', 'yellow', 'red'];
 
 // ===== GÉNÉRATION CODE =====
 
@@ -145,7 +148,7 @@ export class MultiplayerSync {
         id: config.hostId,
         displayName: config.hostName,
         name: config.hostName,
-        color: 'yellow',
+        color: 'green',
         isHost: true,
         isReady: false,
         isConnected: true,
@@ -396,8 +399,13 @@ export class MultiplayerSync {
   /**
    * Envoie une action de jeu
    */
-  async sendAction(action: Omit<RealtimeAction, 'id' | 'timestamp'>): Promise<void> {
-    if (!this.roomId) return;
+  async sendAction(action: Omit<RealtimeAction, 'id' | 'timestamp' | 'ts'>): Promise<void> {
+    if (!this.roomId) {
+      console.log('[MultiplayerSync.sendAction] Abandon: roomId absent');
+      return;
+    }
+
+    console.log('[MultiplayerSync.sendAction] Envoi:', { type: action.t, p: action.p, d: action.d });
 
     try {
       const actionsRef = ref(database, REALTIME_PATHS.roomActions(this.roomId));
@@ -408,8 +416,10 @@ export class MultiplayerSync {
         ts: Date.now(),
       });
 
+      console.log('[MultiplayerSync.sendAction] OK:', action.t);
       firebaseLog('Action sent', { type: action.t });
     } catch (error) {
+      console.error('[MultiplayerSync.sendAction] Erreur:', error);
       firebaseLog('Failed to send action', error);
       throw new Error(getFirebaseErrorMessage(error));
     }
@@ -585,30 +595,41 @@ export class MultiplayerSync {
   }
 
   /**
-   * S'abonne aux actions (nouvelles uniquement)
+   * S'abonne aux actions (nouvelles uniquement via onChildAdded)
    */
   subscribeToActions(callback: (action: RealtimeAction) => void): () => void {
     if (!this.roomId) return () => {};
 
     const actionsRef = ref(database, REALTIME_PATHS.roomActions(this.roomId));
-    let isInitialLoad = true;
 
-    const unsubscribe = onValue(actionsRef, (snapshot) => {
-      if (isInitialLoad) {
-        isInitialLoad = false;
-        return;
-      }
+    // onChildAdded fires once per existing child then once per new child
+    // We skip initial children by tracking init phase
+    let initialLoadDone = false;
+    let initialCount = 0;
+
+    // First get the current count to skip existing actions
+    get(actionsRef).then((snapshot) => {
+      initialCount = snapshot.exists() ? snapshot.size : 0;
+      initialLoadDone = true;
+    }).catch(() => {
+      initialLoadDone = true;
+    });
+
+    let received = 0;
+    const unsubscribe = onChildAdded(actionsRef, (snapshot) => {
+      received++;
+      // Skip actions that existed before subscription
+      if (!initialLoadDone || received <= initialCount) return;
 
       if (snapshot.exists()) {
-        const actions: RealtimeAction[] = [];
-        snapshot.forEach((child) => {
-          actions.push(child.val() as RealtimeAction);
+        const action = snapshot.val() as RealtimeAction;
+        const fullAction = { ...action, id: snapshot.key } as RealtimeAction;
+        console.log('[MultiplayerSync.subscribeToActions] Nouvelle action reçue (RTDB):', {
+          type: fullAction.t,
+          from: fullAction.p,
+          id: fullAction.id,
         });
-
-        const latestAction = actions[actions.length - 1];
-        if (latestAction) {
-          callback(latestAction);
-        }
+        callback(fullAction);
       }
     });
 
@@ -662,6 +683,56 @@ export class MultiplayerSync {
       unsubscribe();
       this.listeners.delete(key);
     };
+  }
+
+  // ===== CHECKPOINTS =====
+
+  /**
+   * Sauvegarde un checkpoint compact de l'etat du jeu (pour reconnexion)
+   */
+  async saveCheckpoint(data: Record<string, unknown>): Promise<void> {
+    if (!this.roomId) return;
+
+    try {
+      await set(ref(database, `${REALTIME_PATHS.room(this.roomId)}/checkpoint`), {
+        ...data,
+        ts: Date.now(),
+      });
+      firebaseLog('Checkpoint saved');
+    } catch (error) {
+      firebaseLog('Failed to save checkpoint', error);
+    }
+  }
+
+  /**
+   * Recupere le dernier checkpoint (pour reconnexion)
+   */
+  async getCheckpoint(): Promise<Record<string, unknown> | null> {
+    if (!this.roomId) return null;
+
+    try {
+      const snap = await get(ref(database, `${REALTIME_PATHS.room(this.roomId)}/checkpoint`));
+      return snap.exists() ? (snap.val() as Record<string, unknown>) : null;
+    } catch (error) {
+      firebaseLog('Failed to get checkpoint', error);
+      return null;
+    }
+  }
+
+  /**
+   * Met a jour le statut de la room (pour fin de partie)
+   */
+  async updateRoomStatus(status: 'waiting' | 'playing' | 'finished'): Promise<void> {
+    if (!this.roomId) return;
+
+    try {
+      await update(ref(database, REALTIME_PATHS.room(this.roomId)), {
+        status,
+        updatedAt: Date.now(),
+      });
+    } catch (error) {
+      firebaseLog('Failed to update room status', error);
+    }
   }
 
   // ===== PRÉSENCE =====

@@ -25,6 +25,7 @@ interface FundingPopupProps {
   funding: FundingEvent | null;
   onAccept: (amount: number) => void;
   onClose: () => void;
+  isSpectator?: boolean;
 }
 
 const FUNDING_ICONS: Record<string, string> = {
@@ -47,6 +48,7 @@ export const FundingPopup = memo(function FundingPopup({
   funding,
   onAccept,
   onClose,
+  isSpectator = false,
 }: FundingPopupProps) {
   const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
 
@@ -176,15 +178,25 @@ export const FundingPopup = memo(function FundingPopup({
           </View>
         </View>
 
+        {/* Spectator banner */}
+        {isSpectator && (
+          <View style={styles.spectatorBanner}>
+            <Ionicons name="eye" size={16} color={COLORS.white} />
+            <Text style={styles.spectatorText}>L'adversaire reçoit un financement</Text>
+          </View>
+        )}
+
         {/* Action button */}
-        <Button
-          title="Collecter"
-          onPress={handleAccept}
-          variant="primary"
-          size="lg"
-          leftIcon={<Ionicons name="checkmark-circle" size={20} color={COLORS.white} />}
-          style={styles.button}
-        />
+        {!isSpectator && (
+          <Button
+            title="Collecter"
+            onPress={handleAccept}
+            variant="primary"
+            size="lg"
+            leftIcon={<Ionicons name="checkmark-circle" size={20} color={COLORS.white} />}
+            style={styles.button}
+          />
+        )}
       </Animated.View>
     </Modal>
   );
@@ -309,5 +321,22 @@ const styles = StyleSheet.create({
   },
   button: {
     width: '100%',
+  },
+  spectatorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING[2],
+    backgroundColor: COLORS.info,
+    borderRadius: 8,
+    paddingVertical: SPACING[2],
+    paddingHorizontal: SPACING[3],
+    marginBottom: SPACING[3],
+    width: '100%',
+  },
+  spectatorText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.white,
   },
 });

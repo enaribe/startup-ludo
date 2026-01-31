@@ -167,18 +167,8 @@ export class GameEngine {
       // Entrer dans le chemin final
       const stepsIntoFinal = diceValue - stepsToExit - 1;
 
-      if (stepsIntoFinal < FINAL_PATH_LENGTH) {
-        // Position valide dans le chemin final
-        const path = this.buildPathToFinal(player.color, currentPos, stepsIntoFinal);
-        const newState: PawnState = { status: 'final', position: stepsIntoFinal };
-
-        return {
-          canMove: true,
-          newState,
-          path,
-        };
-      } else if (stepsIntoFinal === FINAL_PATH_LENGTH - 1) {
-        // Atteint exactement le centre → VICTOIRE
+      if (stepsIntoFinal === FINAL_PATH_LENGTH - 1) {
+        // Atteint exactement la dernière case → VICTOIRE
         const path = this.buildPathToFinal(player.color, currentPos, FINAL_PATH_LENGTH - 1);
 
         return {
@@ -186,6 +176,16 @@ export class GameEngine {
           newState: { status: 'finished' },
           path: [...path, CENTER_COORDS],
           isFinished: true,
+        };
+      } else if (stepsIntoFinal < FINAL_PATH_LENGTH - 1) {
+        // Position valide dans le chemin final (avant la dernière case)
+        const path = this.buildPathToFinal(player.color, currentPos, stepsIntoFinal);
+        const newState: PawnState = { status: 'final', position: stepsIntoFinal };
+
+        return {
+          canMove: true,
+          newState,
+          path,
         };
       } else {
         // Dépasse le centre → ne peut pas bouger

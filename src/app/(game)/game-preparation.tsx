@@ -24,6 +24,13 @@ import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { LoadingIndicator } from '@/components/common';
+import { multiplayerSync } from '@/services/multiplayer';
+import { useGameStore } from '@/stores';
+import { ref, get } from 'firebase/database';
+import { database, REALTIME_PATHS } from '@/services/firebase/config';
+import type { RealtimePlayer } from '@/services/firebase/config';
+import { decodeCheckpoint } from '@/utils/onlineCodec';
+import type { CompactCheckpoint } from '@/utils/onlineCodec';
 
 type PreparationState = 'connecting' | 'syncing' | 'loading' | 'finalizing' | 'starting' | 'error';
 
@@ -73,9 +80,11 @@ export default function GamePreparationScreen() {
   }>();
 
   const [state, setState] = useState<PreparationState>('connecting');
+  const initGame = useGameStore((s) => s.initGame);
+  const loadFromCheckpoint = useGameStore((s) => s.loadFromCheckpoint);
 
   const rotationValue = useSharedValue(0);
-  const progressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasInitRef = useRef(false);
 
   // Animation de rotation pour le spinner
   useEffect(() => {
@@ -90,42 +99,131 @@ export default function GamePreparationScreen() {
     transform: [{ rotate: `${rotationValue.value}deg` }],
   }));
 
-  // Simulation des étapes de chargement
+  // Real game initialization for online mode
   useEffect(() => {
-    const transitions: { delay: number; state: PreparationState }[] = [
-      { delay: 1000, state: 'syncing' },
-      { delay: 2000, state: 'loading' },
-      { delay: 3500, state: 'finalizing' },
-      { delay: 4500, state: 'starting' },
-    ];
+    if (hasInitRef.current) return;
+    hasInitRef.current = true;
 
-    transitions.forEach(({ delay, state: nextState }) => {
-      progressRef.current = setTimeout(() => {
-        setState(nextState);
-      }, delay);
-    });
+    const isOnline = params.mode === 'online';
 
-    // Redirection après "starting"
-    const redirectTimeout = setTimeout(() => {
-      if (params.gameId) {
-        router.replace({
-          pathname: '/(game)/play/[gameId]',
-          params: {
-            gameId: params.gameId,
-            mode: params.mode || 'online',
-            roomId: params.roomId,
-          },
+    if (isOnline && params.roomId) {
+      // Online mode: fetch players from RTDB and init game
+      initOnlineGame();
+    } else {
+      // Local/solo mode: game is already initialized, just transition quickly
+      initLocalGame();
+    }
+
+    async function initOnlineGame() {
+      try {
+        const roomId = params.roomId!;
+
+        // Phase 1: Connecting - fetch room data
+        setState('connecting');
+
+        // Phase 2: Syncing - fetch players
+        await new Promise((r) => setTimeout(r, 500));
+        setState('syncing');
+
+        const playersRef = ref(database, REALTIME_PATHS.roomPlayers(roomId));
+        const playersSnap = await get(playersRef);
+
+        if (!playersSnap.exists()) {
+          setState('error');
+          return;
+        }
+
+        const rtdbPlayers: RealtimePlayer[] = [];
+        playersSnap.forEach((child) => {
+          rtdbPlayers.push(child.val() as RealtimePlayer);
         });
-      }
-    }, 5500);
 
-    return () => {
-      if (progressRef.current) {
-        clearTimeout(progressRef.current);
+        // Phase 3: Loading - check for existing checkpoint (reconnection)
+        setState('loading');
+        const checkpoint = await multiplayerSync.getCheckpoint();
+
+        // Get room info for edition
+        const roomRef = ref(database, REALTIME_PATHS.room(roomId));
+        const roomSnap = await get(roomRef);
+        const roomData = roomSnap.val();
+        const edition = roomData?.edition || 'classic';
+
+        // Phase 4: Finalizing - init game in store
+        await new Promise((r) => setTimeout(r, 300));
+        setState('finalizing');
+
+        if (checkpoint && (checkpoint as unknown as CompactCheckpoint).t) {
+          // Reconnection: restore from checkpoint
+          const gamePlayers = rtdbPlayers.map((p) => ({
+            id: p.id,
+            name: p.displayName || p.name || 'Joueur',
+            color: p.color,
+            isAI: false,
+          }));
+          initGame('online', edition, gamePlayers);
+          loadFromCheckpoint(decodeCheckpoint(checkpoint as unknown as CompactCheckpoint));
+        } else {
+          // Fresh game: init from player list
+          const gamePlayers = rtdbPlayers.map((p) => ({
+            id: p.id,
+            name: p.displayName || p.name || 'Joueur',
+            color: p.color,
+            isAI: false,
+          }));
+          initGame('online', edition, gamePlayers);
+        }
+
+        // Setup presence
+        multiplayerSync.setupPresence();
+
+        // Phase 5: Starting - navigate to play
+        await new Promise((r) => setTimeout(r, 500));
+        setState('starting');
+
+        setTimeout(() => {
+          router.replace({
+            pathname: '/(game)/play/[gameId]',
+            params: {
+              gameId: params.gameId || `game_${roomId}_${Date.now()}`,
+              mode: 'online',
+              roomId,
+            },
+          });
+        }, 600);
+      } catch (error) {
+        console.error('[GamePreparation] Init error:', error);
+        setState('error');
       }
-      clearTimeout(redirectTimeout);
-    };
-  }, [params.gameId, params.mode, params.roomId, router]);
+    }
+
+    function initLocalGame() {
+      // For local/solo, game is already in store from local-setup
+      // Just show quick animation and redirect
+      const transitions: { delay: number; nextState: PreparationState }[] = [
+        { delay: 300, nextState: 'syncing' },
+        { delay: 600, nextState: 'loading' },
+        { delay: 900, nextState: 'finalizing' },
+        { delay: 1200, nextState: 'starting' },
+      ];
+
+      transitions.forEach(({ delay, nextState }) => {
+        setTimeout(() => setState(nextState), delay);
+      });
+
+      setTimeout(() => {
+        if (params.gameId) {
+          router.replace({
+            pathname: '/(game)/play/[gameId]',
+            params: {
+              gameId: params.gameId,
+              mode: params.mode || 'local',
+              roomId: params.roomId,
+            },
+          });
+        }
+      }, 1800);
+    }
+  }, [params.gameId, params.mode, params.roomId, router, initGame, loadFromCheckpoint]);
 
   // Gestion des erreurs (retour auto après 3s)
   useEffect(() => {

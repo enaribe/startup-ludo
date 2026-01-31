@@ -30,6 +30,8 @@ interface DuelPopupProps {
   opponent: Player | null;
   onAnswer: (won: boolean, stake: number) => void;
   onClose: () => void;
+  isSpectator?: boolean;
+  spectatorResult?: { ok: boolean; reward: number };
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -41,6 +43,8 @@ export const DuelPopup = memo(function DuelPopup({
   opponent,
   onAnswer,
   onClose,
+  isSpectator = false,
+  spectatorResult,
 }: DuelPopupProps) {
   const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
   const [phase, setPhase] = useState<'intro' | 'question' | 'result'>('intro');
@@ -95,9 +99,9 @@ export const DuelPopup = memo(function DuelPopup({
     return undefined;
   }, [visible, duel, vsScale, vsRotate, timerProgress, resultScale, hapticsEnabled]);
 
-  // Timer countdown
+  // Timer countdown (disabled for spectators)
   useEffect(() => {
-    if (phase !== 'question' || selectedAnswer !== null || !duel) return;
+    if (phase !== 'question' || selectedAnswer !== null || !duel || isSpectator) return;
 
     const interval = setInterval(() => {
       setTimeRemaining((prev) => {
@@ -113,7 +117,15 @@ export const DuelPopup = memo(function DuelPopup({
     timerProgress.value = withTiming(0, { duration: 15000 });
 
     return () => clearInterval(interval);
-  }, [phase, selectedAnswer, duel, timerProgress]);
+  }, [phase, selectedAnswer, duel, timerProgress, isSpectator]);
+
+  // Spectator: show result when it arrives
+  useEffect(() => {
+    if (!isSpectator || !spectatorResult || !duel) return;
+
+    resultScale.value = withSpring(1);
+    setPhase('result');
+  }, [isSpectator, spectatorResult, duel, resultScale]);
 
   const handleTimeUp = useCallback(() => {
     if (selectedAnswer !== null) return;
@@ -174,7 +186,7 @@ export const DuelPopup = memo(function DuelPopup({
 
   const handleSelectAnswer = useCallback(
     (index: number) => {
-      if (selectedAnswer !== null || phase !== 'question') return;
+      if (selectedAnswer !== null || phase !== 'question' || isSpectator) return;
 
       setSelectedAnswer(index);
 

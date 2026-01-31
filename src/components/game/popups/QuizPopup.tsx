@@ -22,6 +22,10 @@ interface QuizPopupProps {
   quiz: QuizEvent | null;
   onAnswer: (correct: boolean, reward: number) => void;
   onClose: () => void;
+  /** When true, the popup is shown as read-only (spectating another player's quiz) */
+  isSpectator?: boolean;
+  /** Result from the active player (shown to spectators) */
+  spectatorResult?: { ok: boolean; reward: number };
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -31,6 +35,8 @@ export const QuizPopup = memo(function QuizPopup({
   quiz,
   onAnswer,
   onClose,
+  isSpectator = false,
+  spectatorResult,
 }: QuizPopupProps) {
   const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
@@ -52,9 +58,9 @@ export const QuizPopup = memo(function QuizPopup({
     }
   }, [visible, quiz, timerProgress, resultScale]);
 
-  // Timer countdown
+  // Timer countdown (disabled for spectators)
   useEffect(() => {
-    if (!visible || hasAnswered || !quiz) return;
+    if (!visible || hasAnswered || !quiz || isSpectator) return;
 
     const interval = setInterval(() => {
       setTimeRemaining((prev) => {
@@ -71,7 +77,17 @@ export const QuizPopup = memo(function QuizPopup({
     timerProgress.value = withTiming(0, { duration: (quiz.timeLimit || 30) * 1000 });
 
     return () => clearInterval(interval);
-  }, [visible, hasAnswered, quiz, timerProgress]);
+  }, [visible, hasAnswered, quiz, timerProgress, isSpectator]);
+
+  // Spectator: show result when it arrives
+  useEffect(() => {
+    if (!isSpectator || !spectatorResult || !quiz) return;
+
+    setHasAnswered(true);
+    // Show the correct answer highlighted
+    setSelectedAnswer(spectatorResult.ok ? quiz.correctAnswer : -1);
+    resultScale.value = withSpring(1);
+  }, [isSpectator, spectatorResult, quiz, resultScale]);
 
   const handleTimeUp = useCallback(() => {
     if (hasAnswered) return;
@@ -125,7 +141,7 @@ export const QuizPopup = memo(function QuizPopup({
     opacity: resultScale.value,
   }));
 
-  const isCorrect = selectedAnswer === quiz?.correctAnswer;
+  const isCorrect = isSpectator ? spectatorResult?.ok ?? false : selectedAnswer === quiz?.correctAnswer;
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
@@ -158,6 +174,14 @@ export const QuizPopup = memo(function QuizPopup({
   return (
     <Modal visible={visible} onClose={onClose} closeOnBackdrop={false}>
       <Animated.View entering={SlideInUp.springify()} style={styles.container}>
+        {/* Spectator banner */}
+        {isSpectator && (
+          <View style={styles.spectatorBanner}>
+            <Ionicons name="eye" size={16} color={COLORS.white} />
+            <Text style={styles.spectatorText}>L'adversaire répond au quiz...</Text>
+          </View>
+        )}
+
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
@@ -229,7 +253,7 @@ export const QuizPopup = memo(function QuizPopup({
                 key={index}
                 entering={FadeIn.delay(index * 100)}
                 onPress={() => handleSelectAnswer(index)}
-                disabled={hasAnswered}
+                disabled={hasAnswered || isSpectator}
                 style={[
                   styles.option,
                   isSelected && !hasAnswered && styles.optionSelected,
@@ -320,6 +344,22 @@ const styles = StyleSheet.create({
     padding: SPACING[5],
     maxWidth: 400,
     width: '100%',
+  },
+  spectatorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING[2],
+    backgroundColor: COLORS.info,
+    borderRadius: 8,
+    paddingVertical: SPACING[2],
+    paddingHorizontal: SPACING[3],
+    marginBottom: SPACING[3],
+  },
+  spectatorText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.white,
   },
   header: {
     flexDirection: 'row',
