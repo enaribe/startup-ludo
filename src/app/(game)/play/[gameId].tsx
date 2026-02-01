@@ -6,7 +6,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GameBoard } from '@/components/game/GameBoard';
 import { PlayerCard } from '@/components/game/PlayerCard';
-import { DuelPopup, EventPopup, FundingPopup, QuizPopup } from '@/components/game/popups';
+import {
+  EventPopup,
+  FundingPopup,
+  QuizPopup,
+  QuitConfirmPopup,
+  DuelSelectOpponentPopup,
+  DuelPreparePopup,
+  DuelSpectatorPopup,
+  DuelQuestionPopup,
+  DuelResultPopup,
+} from '@/components/game/popups';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { RadialBackground } from '@/components/ui';
@@ -14,10 +24,11 @@ import { GameEngine } from '@/services/game/GameEngine';
 import { useGameStore, useSettingsStore, useAuthStore } from '@/stores';
 import { useOnlineGame } from '@/hooks/useOnlineGame';
 import { useTurnMachine, type TurnActions } from '@/hooks/useTurnMachine';
+import { useDuel } from '@/hooks/useDuel';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
-import type { ChallengeEvent, DuelEvent, FundingEvent, OpportunityEvent, Player, QuizEvent } from '@/types';
+import type { ChallengeEvent, FundingEvent, OpportunityEvent, Player, QuizEvent, DuelResult } from '@/types';
 
 // Données de test pour afficher les popups rapidement
 const MOCK_QUIZ: QuizEvent = {
@@ -105,9 +116,23 @@ export default function PlayScreen() {
   const [fundingData, setFundingData] = useState<FundingEvent | null>(null);
   const [opportunityData, setOpportunityData] = useState<OpportunityEvent | null>(null);
   const [challengeData, setChallengeData] = useState<ChallengeEvent | null>(null);
-  const [duelData, setDuelData] = useState<DuelEvent | null>(null);
-  const [duelOpponent, setDuelOpponent] = useState<Player | null>(null);
+  const [duelTriggered, setDuelTriggered] = useState(false);
   const [isEventSpectator, setIsEventSpectator] = useState(false);
+
+  // Duel system hook
+  const duel = useDuel({
+    players: game?.players || [],
+    isOnline,
+    onDuelComplete: useCallback((result: DuelResult) => {
+      // Appliquer les récompenses aux joueurs
+      if (result.challengerReward > 0) {
+        addTokens(result.challengerId, result.challengerReward);
+      }
+      if (result.opponentReward > 0) {
+        addTokens(result.opponentId, result.opponentReward);
+      }
+    }, [addTokens]),
+  });
 
   // Remote dice animation tracking
   const [remoteRollingPlayerId, setRemoteRollingPlayerId] = useState<string | null>(null);
@@ -208,13 +233,10 @@ export default function PlayScreen() {
           setChallengeData(event.data as ChallengeEvent);
           break;
         case 'duel': {
-          setDuelData(event.data as DuelEvent);
-          const opponents = game?.players.filter((p) => p.id !== currentPlayer?.id) || [];
-          if (opponents.length > 0) {
-            const randomOpponent = opponents[Math.floor(Math.random() * opponents.length)];
-            if (randomOpponent) {
-              setDuelOpponent(randomOpponent);
-            }
+          // Déclencher le nouveau système de duel
+          setDuelTriggered(true);
+          if (currentPlayer) {
+            duel.startDuel(currentPlayer.id);
           }
           break;
         }
@@ -294,7 +316,8 @@ export default function PlayScreen() {
         setChallengeData(eventData as unknown as ChallengeEvent);
         break;
       case 'duel':
-        setDuelData(eventData as unknown as DuelEvent);
+        // Pour le mode spectateur, on marque juste que le duel est en cours
+        setDuelTriggered(true);
         break;
       default:
         console.warn('[PlayScreen] Type d\'événement distant inconnu:', eventType);
@@ -311,8 +334,8 @@ export default function PlayScreen() {
       setFundingData(null);
       setOpportunityData(null);
       setChallengeData(null);
-      setDuelData(null);
-      setDuelOpponent(null);
+      setDuelTriggered(false);
+      duel.resetDuel();
       setIsEventSpectator(false);
       onlineGame.clearRemoteEvent();
       onlineGame.clearRemoteEventResult();
@@ -399,15 +422,38 @@ export default function PlayScreen() {
     [actions, handleEventResolve]
   );
 
-  const handleDuelAnswer = useCallback(
-    (won: boolean, stake: number) => {
-      actions.resolveEvent({ ok: won, reward: stake });
-      setDuelData(null);
-      setDuelOpponent(null);
-      handleEventResolve();
-    },
-    [actions, handleEventResolve]
-  );
+  // Duel handlers
+  const handleDuelSelectOpponent = useCallback((opponent: Player) => {
+    duel.selectOpponent(opponent.id);
+  }, [duel]);
+
+  const handleDuelStartChallenger = useCallback(() => {
+    duel.startChallengerTurn();
+  }, [duel]);
+
+  const handleDuelChallengerComplete = useCallback((answers: number[], score: number) => {
+    duel.submitChallengerAnswers(answers, score);
+  }, [duel]);
+
+  const handleDuelStartOpponent = useCallback(() => {
+    duel.startOpponentTurn();
+  }, [duel]);
+
+  const handleDuelOpponentComplete = useCallback((answers: number[], score: number) => {
+    duel.submitOpponentAnswers(answers, score);
+  }, [duel]);
+
+  const handleDuelClose = useCallback(() => {
+    // Résoudre l'événement de duel
+    const isWinner = duel.result?.winnerId === currentPlayer?.id;
+    const reward = isWinner ? (duel.result?.challengerReward || duel.result?.opponentReward || 0) : 0;
+    actions.resolveEvent({ ok: isWinner, reward });
+
+    // Reset duel state
+    setDuelTriggered(false);
+    duel.resetDuel();
+    handleEventResolve();
+  }, [duel.result, currentPlayer?.id, actions, handleEventResolve, duel]);
 
   // ===== QUIT HANDLER =====
 
@@ -614,36 +660,29 @@ export default function PlayScreen() {
             >
               <Text style={styles.testPopupLabel}>Challenge</Text>
             </Pressable>
+            <Pressable
+              style={[styles.testPopupButton, { backgroundColor: COLORS.success }]}
+              onPress={() => {
+                setIsEventSpectator(false);
+                setDuelTriggered(true);
+                if (currentPlayer) {
+                  duel.startDuel(currentPlayer.id);
+                }
+              }}
+            >
+              <Text style={[styles.testPopupLabel, { color: COLORS.white }]}>Duel</Text>
+            </Pressable>
           </View>
         </View>
       </View>
 
       {/* Quit Confirmation Modal */}
-      <Modal visible={showQuitConfirm} onClose={() => setShowQuitConfirm(false)}>
-        <View style={styles.modalContent}>
-          <Ionicons name="warning" size={48} color={COLORS.warning} />
-          <Text style={styles.modalTitle}>Quitter la partie ?</Text>
-          <Text style={styles.modalText}>
-            {isOnline
-              ? 'Si tu quittes, tu perds la partie par forfait.'
-              : 'Ta progression sera perdue si tu quittes maintenant.'}
-          </Text>
-          <View style={styles.modalButtons}>
-            <Button
-              title="Annuler"
-              variant="secondary"
-              onPress={() => setShowQuitConfirm(false)}
-              style={styles.modalButton}
-            />
-            <Button
-              title="Quitter"
-              variant="primary"
-              onPress={handleQuit}
-              style={styles.modalButton}
-            />
-          </View>
-        </View>
-      </Modal>
+      <QuitConfirmPopup
+        visible={showQuitConfirm}
+        onCancel={() => setShowQuitConfirm(false)}
+        onConfirm={handleQuit}
+        isOnline={isOnline}
+      />
 
       {/* Opponent Disconnected Modal (online) */}
       {isOnline && (
@@ -707,18 +746,55 @@ export default function PlayScreen() {
         isSpectator={isEventSpectator}
       />
 
-      <DuelPopup
-        visible={!!duelData}
-        duel={duelData}
-        currentPlayer={currentPlayer}
-        opponent={duelOpponent}
-        onAnswer={handleDuelAnswer}
+      {/* New Duel System Popups */}
+      {duel.challenger && (
+        <DuelSelectOpponentPopup
+          visible={duel.currentPhase === 'select_opponent'}
+          opponents={duel.spectators}
+          currentPlayer={duel.challenger}
+          onSelectOpponent={handleDuelSelectOpponent}
+          onClose={() => {
+            setDuelTriggered(false);
+            duel.resetDuel();
+            handleEventResolve();
+          }}
+        />
+      )}
+
+      <DuelPreparePopup
+        visible={duel.currentPhase === 'intro' || duel.currentPhase === 'opponent_prepare'}
+        phase={duel.currentPhase === 'intro' ? 'intro' : 'opponent_prepare'}
+        challenger={duel.challenger}
+        opponent={duel.opponent}
+        currentPlayerId={userId || currentPlayer?.id || ''}
+        onStart={duel.currentPhase === 'intro' ? handleDuelStartChallenger : handleDuelStartOpponent}
+      />
+
+      <DuelQuestionPopup
+        visible={duel.currentPhase === 'challenger_turn' || duel.currentPhase === 'opponent_turn'}
+        questions={duel.questions}
+        onComplete={duel.currentPhase === 'challenger_turn' ? handleDuelChallengerComplete : handleDuelOpponentComplete}
         onClose={() => {
-          setDuelData(null);
-          setDuelOpponent(null);
+          setDuelTriggered(false);
+          duel.resetDuel();
         }}
-        isSpectator={isEventSpectator}
-        spectatorResult={onlineGame.remoteEventResult ? { ok: onlineGame.remoteEventResult.ok, reward: onlineGame.remoteEventResult.reward } : undefined}
+      />
+
+      {duel.challenger && duel.opponent && (
+        <DuelSpectatorPopup
+          visible={duelTriggered && isEventSpectator && duel.currentPhase !== 'result'}
+          challenger={duel.challenger}
+          opponent={duel.opponent}
+        />
+      )}
+
+      <DuelResultPopup
+        visible={duel.currentPhase === 'result'}
+        result={duel.result}
+        challenger={duel.challenger}
+        opponent={duel.opponent}
+        currentPlayerId={userId || currentPlayer?.id || ''}
+        onClose={handleDuelClose}
       />
     </View>
   );

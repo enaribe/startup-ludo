@@ -1,5 +1,5 @@
 import { memo, useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -15,11 +15,11 @@ import Animated, {
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Modal } from '@/components/ui/Modal';
-import { Button } from '@/components/ui/Button';
+import { GameButton } from '@/components/ui/GameButton';
 import { PopupFundingIcon } from '@/components/game/popups/PopupIcons';
 import { COLORS } from '@/styles/colors';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
-import { SPACING } from '@/styles/spacing';
+import { SPACING, BORDER_RADIUS, SHADOWS } from '@/styles/spacing';
 import { useSettingsStore } from '@/stores';
 import type { FundingEvent } from '@/types';
 
@@ -47,11 +47,10 @@ export const FundingPopup = memo(function FundingPopup({
 
   useEffect(() => {
     if (visible && funding) {
-      // Icon entrance: pop in with bounce
+      // Icon entrance: simple fade-in scale
       iconScale.value = withSequence(
         withTiming(0, { duration: 0 }),
-        withSpring(1.15, { damping: 8, stiffness: 150 }),
-        withSpring(1, { damping: 12 })
+        withTiming(1, { duration: 280 })
       );
 
       // Gentle floating animation
@@ -64,11 +63,8 @@ export const FundingPopup = memo(function FundingPopup({
         true
       );
 
-      // Badge bounce in delayed
-      badgeBounce.value = withDelay(
-        400,
-        withSpring(1, { damping: 6, stiffness: 120 })
-      );
+      // Badge: simple apparition
+      badgeBounce.value = withTiming(1, { duration: 250 });
 
       // Shimmer effect
       shimmer.value = withRepeat(
@@ -111,45 +107,46 @@ export const FundingPopup = memo(function FundingPopup({
   return (
     <Modal visible={visible} onClose={onClose} closeOnBackdrop={false} showCloseButton={false} bareContent>
       <Animated.View entering={SlideInUp.springify().damping(18)} style={styles.card}>
-        {isSpectator && (
-          <View style={styles.spectatorBanner}>
-            <Ionicons name="eye" size={14} color={COLORS.white} />
-            <Text style={styles.spectatorText}>L'adversaire recoit un financement</Text>
-          </View>
-        )}
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
+          {isSpectator && (
+            <View style={styles.spectatorBanner}>
+              <Ionicons name="eye" size={14} color={COLORS.white} />
+              <Text style={styles.spectatorText}>L'adversaire reçoit un financement</Text>
+            </View>
+          )}
 
-        {/* Icon with float */}
-        <Animated.View style={[styles.iconWrap, iconStyle]}>
-          <PopupFundingIcon size={80} />
-        </Animated.View>
-
-        {/* Title */}
-        <Text style={styles.title}>FINANCEMENT</Text>
-
-        {/* Description */}
-        <View style={styles.descriptionBox}>
-          <Text style={styles.description}>{funding.description}</Text>
-        </View>
-
-        {/* Result */}
-        <Text style={styles.resultTitle}>VOUS GAGNEZ</Text>
-        <Animated.View style={[styles.badge, badgeStyle]}>
-          <Text style={styles.badgeText}>+{funding.amount}</Text>
-        </Animated.View>
-
-        {/* Button */}
-        {!isSpectator && (
-          <Animated.View entering={FadeInDown.delay(500).springify()} style={styles.buttonWrap}>
-            <Button
-              title="Collecter"
-              onPress={handleAccept}
-              variant="primary"
-              size="lg"
-              leftIcon={<Ionicons name="checkmark-circle" size={20} color={COLORS.white} />}
-              style={styles.button}
-            />
+          {/* Icon avec animation flottante */}
+          <Animated.View style={[styles.iconWrap, iconStyle]}>
+            <PopupFundingIcon size={56} />
           </Animated.View>
-        )}
+
+          {/* Titre */}
+          <Text style={styles.title}>FINANCEMENT</Text>
+
+          {/* Description */}
+          <View style={styles.descriptionBox}>
+            <Text style={styles.description}>{funding.description}</Text>
+          </View>
+
+          {/* Résultat */}
+          <View style={styles.resultSection}>
+            <Text style={styles.resultTitle}>VOUS GAGNEZ</Text>
+            <Animated.View style={[styles.badge, badgeStyle]}>
+              <Text style={styles.badgeText}>+{funding.amount}</Text>
+            </Animated.View>
+          </View>
+
+          {/* Bouton */}
+          {!isSpectator && (
+            <Animated.View entering={FadeInDown.delay(500).springify()} style={styles.buttonWrap}>
+              <GameButton title="Collecter" onPress={handleAccept} variant="green" fullWidth />
+            </Animated.View>
+          )}
+        </ScrollView>
       </Animated.View>
     </Modal>
   );
@@ -157,20 +154,18 @@ export const FundingPopup = memo(function FundingPopup({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 28,
-    paddingTop: SPACING[6],
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS['3xl'],
+    maxWidth: 360,
+    width: '92%',
+    ...SHADOWS.xl,
+    overflow: 'hidden',
+  },
+  scrollContent: {
+    paddingTop: SPACING[5],
     paddingBottom: SPACING[6],
     paddingHorizontal: SPACING[5],
-    maxWidth: 340,
-    width: '90%',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.18,
-    shadowRadius: 20,
-    elevation: 14,
-    overflow: 'hidden',
   },
   spectatorBanner: {
     flexDirection: 'row',
@@ -178,10 +173,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: SPACING[2],
     backgroundColor: COLORS.info,
-    borderRadius: 20,
-    paddingVertical: 6,
+    borderRadius: BORDER_RADIUS.full,
+    paddingVertical: SPACING[1],
     paddingHorizontal: SPACING[3],
-    marginBottom: SPACING[3],
+    marginBottom: SPACING[4],
   },
   spectatorText: {
     fontFamily: FONTS.bodySemiBold,
@@ -189,56 +184,69 @@ const styles = StyleSheet.create({
     color: COLORS.white,
   },
   iconWrap: {
-    marginBottom: SPACING[2],
+    marginBottom: SPACING[3],
+  },
+  iconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(80, 200, 120, 0.12)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   title: {
     fontFamily: FONTS.title,
     fontSize: FONT_SIZES['2xl'],
-    color: '#4CAF50',
+    color: COLORS.events.funding,
     letterSpacing: 2,
     marginBottom: SPACING[3],
   },
   descriptionBox: {
     backgroundColor: '#F8F9FA',
-    borderRadius: 16,
+    borderRadius: BORDER_RADIUS.xl,
     paddingVertical: SPACING[3],
     paddingHorizontal: SPACING[4],
     width: '100%',
     marginBottom: SPACING[4],
   },
   description: {
-    fontFamily: FONTS.body,
+    fontFamily: FONTS.bodyMedium,
     fontSize: FONT_SIZES.base,
     color: '#2C3E50',
     textAlign: 'center',
     lineHeight: 22,
   },
+  resultSection: {
+    alignItems: 'center',
+    paddingTop: SPACING[3],
+    borderTopWidth: 1,
+    borderTopColor: '#E8EEF4',
+    width: '100%',
+    marginBottom: SPACING[4],
+  },
   resultTitle: {
     fontFamily: FONTS.title,
-    fontSize: FONT_SIZES.xl,
-    color: '#1B2A4A',
+    fontSize: FONT_SIZES.lg,
+    color: COLORS.success,
     marginBottom: SPACING[3],
   },
   badge: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     borderWidth: 3,
-    backgroundColor: '#4CAF50',
+    backgroundColor: COLORS.success,
     borderColor: '#2E7D32',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: SPACING[4],
+    ...SHADOWS.md,
   },
   badgeText: {
     fontFamily: FONTS.title,
-    fontSize: FONT_SIZES.lg,
-    color: '#FFFFFF',
+    fontSize: FONT_SIZES.xl,
+    color: COLORS.white,
   },
   buttonWrap: {
-    width: '100%',
-  },
-  button: {
     width: '100%',
   },
 });

@@ -109,6 +109,47 @@ export const PopupOpportunityIcon = ({ size = 56 }: PopupIconProps) => {
   );
 };
 
+// ===== DUEL — Éclair VS =====
+export const PopupDuelIcon = ({ size = 56 }: PopupIconProps) => {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 56 56" fill="none">
+      {/* Cercle de fond */}
+      <Defs>
+        <LinearGradient id="paint_duel_bg" x1="28" y1="0" x2="28" y2="56" gradientUnits="userSpaceOnUse">
+          <Stop stopColor="#4CAF50" />
+          <Stop offset="1" stopColor="#2E7D32" />
+        </LinearGradient>
+      </Defs>
+      {/* Cercle */}
+      <Path
+        d="M28 56C43.464 56 56 43.464 56 28C56 12.536 43.464 0 28 0C12.536 0 0 12.536 0 28C0 43.464 12.536 56 28 56Z"
+        fill="url(#paint_duel_bg)"
+      />
+      {/* Éclair gauche */}
+      <Path
+        d="M18 12L10 28H16L12 44L24 24H17L18 12Z"
+        fill="white"
+        stroke="#1C6B3B"
+        strokeWidth="1"
+        strokeLinejoin="round"
+      />
+      {/* Éclair droit */}
+      <Path
+        d="M38 12L46 28H40L44 44L32 24H39L38 12Z"
+        fill="white"
+        stroke="#1C6B3B"
+        strokeWidth="1"
+        strokeLinejoin="round"
+      />
+      {/* VS au centre */}
+      <Path
+        d="M23 30L26 38H24L28 32L32 38H30L33 30H30L28 34L26 30H23Z"
+        fill="#1C6B3B"
+      />
+    </Svg>
+  );
+};
+
 // ===== CHALLENGE — Triangle avertissement avec point d'exclamation =====
 export const PopupChallengeIcon = ({ size = 77 }: PopupIconProps) => {
   const aspectRatio = 55 / 61;

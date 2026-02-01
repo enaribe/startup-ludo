@@ -89,13 +89,49 @@ export interface FundingEvent {
   rarity: 'common' | 'rare' | 'legendary';
 }
 
-export interface DuelEvent {
+// Option de réponse pour un duel (toutes sont "correctes" mais avec des points différents)
+export interface DuelOption {
+  text: string;
+  points: number; // 30, 20, ou 10
+}
+
+// Question de duel
+export interface DuelQuestion {
   id: string;
   question: string;
-  options: string[];
-  correctAnswer: number;
-  stake: number;
+  options: DuelOption[]; // 3 options avec points différents
   category: string;
+}
+
+// Événement duel (contient 3 questions)
+export interface DuelEvent {
+  id: string;
+  questions: DuelQuestion[];
+  category: string;
+}
+
+// État du duel en cours
+export interface DuelState {
+  challengerId: string;
+  opponentId: string;
+  questions: DuelQuestion[];
+  challengerAnswers: number[];
+  opponentAnswers: number[];
+  challengerScore: number;
+  opponentScore: number;
+  phase: 'select_opponent' | 'intro' | 'challenger_turn' | 'opponent_prepare' | 'opponent_turn' | 'waiting' | 'result';
+  currentQuestionIndex: number;
+}
+
+// Résultat du duel
+export interface DuelResult {
+  winnerId: string | null; // null si égalité
+  challengerId: string;
+  opponentId: string;
+  challengerScore: number;
+  opponentScore: number;
+  challengerReward: number;
+  opponentReward: number;
 }
 
 export interface OpportunityEvent {

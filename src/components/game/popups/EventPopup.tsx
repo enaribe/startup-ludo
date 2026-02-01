@@ -1,5 +1,5 @@
 import { memo, useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -15,11 +15,11 @@ import Animated, {
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Modal } from '@/components/ui/Modal';
-import { Button } from '@/components/ui/Button';
+import { GameButton } from '@/components/ui/GameButton';
 import { PopupOpportunityIcon, PopupChallengeIcon } from '@/components/game/popups/PopupIcons';
 import { COLORS } from '@/styles/colors';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
-import { SPACING } from '@/styles/spacing';
+import { SPACING, BORDER_RADIUS, SHADOWS } from '@/styles/spacing';
 import { useSettingsStore } from '@/stores';
 import type { OpportunityEvent, ChallengeEvent } from '@/types';
 
@@ -34,20 +34,6 @@ interface EventPopupProps {
   isSpectator?: boolean;
 }
 
-const CARD_STYLE = {
-  backgroundColor: '#FFFFFF',
-  borderRadius: 24,
-  padding: SPACING[6],
-  maxWidth: 340,
-  width: '90%' as const,
-  alignItems: 'center' as const,
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 8 },
-  shadowOpacity: 0.15,
-  shadowRadius: 16,
-  elevation: 12,
-  overflow: 'hidden' as const,
-};
 
 export const EventPopup = memo(function EventPopup({
   visible,
@@ -72,8 +58,7 @@ export const EventPopup = memo(function EventPopup({
 
       iconScale.value = withSequence(
         withTiming(0, { duration: 0 }),
-        withSpring(1.25, { damping: 7, stiffness: 140 }),
-        withSpring(1, { damping: 12 })
+        withTiming(1, { duration: 280 })
       );
 
       if (isOpportunity) {
@@ -106,10 +91,7 @@ export const EventPopup = memo(function EventPopup({
         iconFloat.value = 0;
       }
 
-      badgeBounce.value = withDelay(
-        400,
-        withSpring(1, { damping: 6, stiffness: 120 })
-      );
+      badgeBounce.value = withTiming(1, { duration: 250 });
 
       if (hapticsEnabled) {
         if (isOpportunity) {
@@ -149,163 +131,183 @@ export const EventPopup = memo(function EventPopup({
 
   return (
     <Modal visible={visible} onClose={onClose} closeOnBackdrop={false} showCloseButton={false} bareContent>
-      <Animated.View entering={SlideInUp.springify().damping(18)} style={[styles.card, CARD_STYLE]}>
-        {isSpectator && (
-          <View style={styles.spectatorBanner}>
-            <Ionicons name="eye" size={14} color={COLORS.white} />
-            <Text style={styles.spectatorText}>
-              {isOpportunity ? "L'adversaire profite d'une opportunité" : "L'adversaire subit un challenge"}
-            </Text>
-          </View>
-        )}
-
-        <Animated.View style={[styles.iconWrap, iconAnimStyle]}>
-          {isOpportunity ? (
-            <PopupOpportunityIcon size={56} />
-          ) : (
-            <View style={styles.challengeIconCircle}>
-              <PopupChallengeIcon size={56} />
+      <Animated.View entering={SlideInUp.springify().damping(18)} style={styles.card}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
+          {isSpectator && (
+            <View style={styles.spectatorBanner}>
+              <Ionicons name="eye" size={14} color={COLORS.white} />
+              <Text style={styles.spectatorText}>
+                {isOpportunity ? "L'adversaire profite d'une opportunité" : "L'adversaire subit un challenge"}
+              </Text>
             </View>
           )}
-        </Animated.View>
 
-        <Text
-          style={[
-            styles.title,
-            isOpportunity ? styles.titleOpportunity : styles.titleChallenge,
-          ]}
-        >
-          {isOpportunity ? 'OPPORTUNITÉ' : 'CHALLENGE'}
-        </Text>
-
-        <Text style={styles.description}>{event.description}</Text>
-
-        <Text style={styles.resultTitle}>
-          {isOpportunity ? 'VOUS GAGNEZ' : 'VOUS PERDEZ'}
-        </Text>
-        <Animated.View
-          style={[
-            styles.badge,
-            isOpportunity ? styles.badgeGain : styles.badgeLoss,
-            badgeAnimStyle,
-          ]}
-        >
-          <Text style={styles.badgeText}>
-            {isOpportunity ? `+${event.value}` : `-${event.value}`}
-          </Text>
-        </Animated.View>
-
-        {!isSpectator && (
-          <Animated.View entering={FadeInDown.delay(500).springify()} style={styles.buttonWrap}>
-            <Button
-              title={isOpportunity ? 'Profiter' : 'Subir'}
-              onPress={handleAccept}
-              variant={isOpportunity ? 'primary' : 'secondary'}
-              size="lg"
-              leftIcon={
-                <Ionicons
-                  name={isOpportunity ? 'checkmark-circle' : 'alert-circle'}
-                  size={20}
-                  color={isOpportunity ? COLORS.white : '#E57373'}
-                />
-              }
-              style={
-                !isOpportunity
-                  ? { width: '100%', borderColor: '#E57373', borderWidth: 2 }
-                  : styles.button
-              }
-            />
+          {/* Icon avec animation */}
+          <Animated.View style={[styles.iconWrap, iconAnimStyle]}>
+            <View style={isOpportunity ? styles.opportunityIconCircle : styles.challengeIconCircle}>
+              {isOpportunity ? (
+                <PopupOpportunityIcon size={48} />
+              ) : (
+                <PopupChallengeIcon size={48} />
+              )}
+            </View>
           </Animated.View>
-        )}
+
+          {/* Titre */}
+          <Text
+            style={[
+              styles.title,
+              !isOpportunity && styles.titleChallenge,
+            ]}
+          >
+            {isOpportunity ? 'OPPORTUNITÉ' : 'CHALLENGE'}
+          </Text>
+
+          {/* Description */}
+          <View style={styles.descriptionBox}>
+            <Text style={styles.description}>{event.description}</Text>
+          </View>
+
+          {/* Résultat */}
+          <View style={styles.resultSection}>
+            <Text style={[styles.resultTitle, isOpportunity ? styles.resultTitleGain : styles.resultTitleLoss]}>
+              {isOpportunity ? 'VOUS GAGNEZ' : 'VOUS PERDEZ'}
+            </Text>
+            <Animated.View
+              style={[
+                styles.badge,
+                isOpportunity ? styles.badgeGain : styles.badgeLoss,
+                badgeAnimStyle,
+              ]}
+            >
+              <Text style={styles.badgeText}>
+                {isOpportunity ? `+${event.value}` : `-${event.value}`}
+              </Text>
+            </Animated.View>
+          </View>
+
+          {/* Bouton */}
+          {!isSpectator && (
+            <Animated.View entering={FadeInDown.delay(500).springify()} style={styles.buttonWrap}>
+              <GameButton
+                title={isOpportunity ? 'Profiter' : 'Continuer'}
+                onPress={handleAccept}
+                variant={isOpportunity ? 'green' : 'red'}
+                fullWidth
+              />
+            </Animated.View>
+          )}
+        </ScrollView>
       </Animated.View>
     </Modal>
   );
 });
 
 const styles = StyleSheet.create({
-  card: {},
+  card: {
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS['3xl'],
+    maxWidth: 360,
+    width: '92%',
+    ...SHADOWS.xl,
+    overflow: 'hidden',
+  },
+  scrollContent: {
+    paddingTop: SPACING[5],
+    paddingBottom: SPACING[6],
+    paddingHorizontal: SPACING[5],
+    alignItems: 'center',
+  },
   spectatorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: SPACING[2],
     backgroundColor: COLORS.info,
-    borderRadius: 8,
-    paddingVertical: SPACING[2],
+    borderRadius: BORDER_RADIUS.full,
+    paddingVertical: SPACING[1],
     paddingHorizontal: SPACING[3],
-    marginBottom: SPACING[3],
+    marginBottom: SPACING[4],
   },
   spectatorText: {
     fontFamily: FONTS.bodySemiBold,
-    fontSize: FONT_SIZES.sm,
+    fontSize: FONT_SIZES.xs,
     color: COLORS.white,
   },
   iconWrap: {
     marginBottom: SPACING[3],
   },
-  challengeIconCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: 'rgba(229, 115, 115, 0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   title: {
     fontFamily: FONTS.title,
     fontSize: FONT_SIZES['2xl'],
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 0,
-    marginBottom: SPACING[4],
-  },
-  titleOpportunity: {
-    color: '#4CAF50',
-    textShadowColor: '#2E7D32',
+    color: COLORS.success,
+    letterSpacing: 2,
+    marginBottom: SPACING[3],
   },
   titleChallenge: {
-    color: '#E57373',
-    textShadowColor: '#C62828',
+    color: COLORS.error,
+  },
+  descriptionBox: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: BORDER_RADIUS.xl,
+    paddingVertical: SPACING[3],
+    paddingHorizontal: SPACING[4],
+    width: '100%',
+    marginBottom: SPACING[4],
   },
   description: {
-    fontFamily: FONTS.body,
-    fontSize: FONT_SIZES.md,
+    fontFamily: FONTS.bodyMedium,
+    fontSize: FONT_SIZES.base,
     color: '#2C3E50',
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 22,
+  },
+  resultSection: {
+    alignItems: 'center',
+    paddingTop: SPACING[3],
+    borderTopWidth: 1,
+    borderTopColor: '#E8EEF4',
+    width: '100%',
     marginBottom: SPACING[4],
   },
   resultTitle: {
     fontFamily: FONTS.title,
-    fontSize: FONT_SIZES.xl,
-    color: '#1B2A4A',
+    fontSize: FONT_SIZES.lg,
     marginBottom: SPACING[3],
   },
+  resultTitleGain: {
+    color: COLORS.success,
+  },
+  resultTitleLoss: {
+    color: COLORS.error,
+  },
   badge: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     borderWidth: 3,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: SPACING[4],
+    ...SHADOWS.md,
   },
   badgeGain: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: COLORS.success,
     borderColor: '#2E7D32',
   },
   badgeLoss: {
-    backgroundColor: '#E57373',
+    backgroundColor: COLORS.error,
     borderColor: '#C62828',
   },
   badgeText: {
     fontFamily: FONTS.title,
-    fontSize: FONT_SIZES.lg,
-    color: '#FFFFFF',
+    fontSize: FONT_SIZES.xl,
+    color: COLORS.white,
   },
   buttonWrap: {
-    width: '100%',
-  },
-  button: {
     width: '100%',
   },
 });

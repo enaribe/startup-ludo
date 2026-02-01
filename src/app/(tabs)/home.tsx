@@ -19,6 +19,15 @@ import { FONTS } from '@/styles/typography';
 
 const { width } = Dimensions.get('window');
 
+/** Formate un nombre en version courte (k, M, B) pour gagner de l'espace */
+function formatShortValue(value: number): string {
+  const abs = Math.abs(value);
+  if (abs >= 1e9) return (value / 1e9).toFixed(1).replace(/\.0$/, '') + 'B';
+  if (abs >= 1e6) return (value / 1e6).toFixed(1).replace(/\.0$/, '') + 'M';
+  if (abs >= 1e3) return (value / 1e3).toFixed(1).replace(/\.0$/, '') + 'k';
+  return String(Math.round(value));
+}
+
 // Rayons tournants sous le logo
 const SpinningRays = memo(function SpinningRays() {
   const rotation = useSharedValue(0);
@@ -124,7 +133,7 @@ export default function HomeScreen() {
           <Animated.View entering={FadeInDown.delay(300).duration(500)}>
             <GradientBorder boxHeight={78} boxWidth={(width - 36 - 20) / 3} borderRadius={15} fill="rgba(0, 0, 0, 0.15)">
               <View style={styles.statBoxContent}>
-                <Text style={styles.statValueLuckiest}>{portfolioValue}M€</Text>
+                <Text style={styles.statValueLuckiest}>{formatShortValue(portfolioValue)}€</Text>
                 <Text style={styles.statLabel}>Valorisation</Text>
               </View>
             </GradientBorder>

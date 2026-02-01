@@ -612,14 +612,13 @@ export class GameEngine {
         };
 
       case 'duel':
+        // Le DuelEvent est maintenant juste un déclencheur
+        // Les questions sont générées par le hook useDuel
         return {
           type: 'duel',
           data: {
             id: `duel_${Date.now()}`,
-            question: 'Quel business model génère des revenus récurrents ?',
-            options: ['Vente unique', 'Abonnement', 'Freemium', 'Commission'],
-            correctAnswer: 1,
-            stake: 3,
+            questions: [], // Les questions sont chargées dynamiquement par useDuel
             category: 'business',
           },
         };
