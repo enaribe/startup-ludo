@@ -43,6 +43,15 @@ export interface RemoteDuelScore {
   score: number;
 }
 
+/** Info about a remote duel result (pour informer les spectateurs) */
+export interface RemoteDuelResult {
+  challengerId: string;
+  opponentId: string;
+  challengerScore: number;
+  opponentScore: number;
+  winnerId: string | null;
+}
+
 interface UseOnlineGameReturn {
   /** Roll dice and broadcast to other players */
   rollDice: () => number;
@@ -66,6 +75,8 @@ interface UseOnlineGameReturn {
   broadcastDuelStart: (challengerId: string, opponentId: string, questions: Record<string, unknown>[]) => void;
   /** Broadcast son score en duel (action 'dr') */
   broadcastDuelScore: (score: number) => void;
+  /** Broadcast le résultat du duel aux spectateurs (action 'dres') */
+  broadcastDuelResult: (result: RemoteDuelResult) => void;
   /** Forfeit (quit) the game — opponent wins */
   forfeit: () => void;
 
@@ -92,6 +103,10 @@ interface UseOnlineGameReturn {
   remoteDuelScore: RemoteDuelScore | null;
   /** Clear remote duel score after processing */
   clearRemoteDuelScore: () => void;
+  /** Résultat du duel reçu (pour les spectateurs) */
+  remoteDuelResult: RemoteDuelResult | null;
+  /** Clear remote duel result after processing */
+  clearRemoteDuelResult: () => void;
 }
 
 // Checkpoint every N turns
@@ -125,10 +140,12 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
   const [remoteEvent, setRemoteEvent] = useState<RemoteEvent | null>(null);
   const [remoteEventResult, setRemoteEventResult] = useState<RemoteEventResult | null>(null);
   const [remoteDuelScore, setRemoteDuelScore] = useState<RemoteDuelScore | null>(null);
+  const [remoteDuelResult, setRemoteDuelResult] = useState<RemoteDuelResult | null>(null);
 
   const clearRemoteEvent = useCallback(() => setRemoteEvent(null), []);
   const clearRemoteEventResult = useCallback(() => setRemoteEventResult(null), []);
   const clearRemoteDuelScore = useCallback(() => setRemoteDuelScore(null), []);
+  const clearRemoteDuelResult = useCallback(() => setRemoteDuelResult(null), []);
 
   // Track processed actions to avoid duplicates
   const processedActionsRef = useRef<Set<string>>(new Set());
@@ -223,6 +240,20 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
           // Duel result (score) : l'autre joueur envoie son score
           const data = action.d as { score: number };
           setRemoteDuelScore({ playerId: action.p, score: data?.score ?? 0 });
+          return;
+        }
+        case 'dres': {
+          // Duel result broadcast : informer les spectateurs du résultat
+          const rawData = action.d as Record<string, unknown>;
+          const data: RemoteDuelResult = {
+            challengerId: String(rawData.challengerId ?? ''),
+            opponentId: String(rawData.opponentId ?? ''),
+            challengerScore: Number(rawData.challengerScore ?? 0),
+            opponentScore: Number(rawData.opponentScore ?? 0),
+            winnerId: rawData.winnerId ? String(rawData.winnerId) : null,
+          };
+          console.log('[useOnlineGame] Résultat duel reçu (spectateur):', data);
+          setRemoteDuelResult(data);
           return;
         }
       }
@@ -590,6 +621,25 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
     [userId]
   );
 
+  const broadcastDuelResult = useCallback(
+    (result: RemoteDuelResult) => {
+      if (!userId) return;
+      console.log('[useOnlineGame] Broadcast résultat duel:', result);
+      multiplayerSync.sendAction({
+        t: 'dres',
+        p: userId,
+        d: {
+          challengerId: result.challengerId,
+          opponentId: result.opponentId,
+          challengerScore: result.challengerScore,
+          opponentScore: result.opponentScore,
+          winnerId: result.winnerId,
+        },
+      });
+    },
+    [userId]
+  );
+
   const forfeit = useCallback(() => {
     if (!userId || !game) return;
 
@@ -630,7 +680,10 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
     clearRemoteEventResult,
     remoteDuelScore,
     clearRemoteDuelScore,
+    remoteDuelResult,
+    clearRemoteDuelResult,
     broadcastDuelStart,
     broadcastDuelScore,
+    broadcastDuelResult,
   };
 }

@@ -134,7 +134,17 @@ export default function PlayScreen() {
       if (result.opponentReward > 0) {
         addTokens(result.opponentId, result.opponentReward);
       }
-    }, [addTokens]),
+      // Broadcaster le résultat aux spectateurs en mode online
+      if (isOnline) {
+        onlineGame.broadcastDuelResult({
+          challengerId: result.challengerId,
+          opponentId: result.opponentId,
+          challengerScore: result.challengerScore,
+          opponentScore: result.opponentScore,
+          winnerId: result.winnerId,
+        });
+      }
+    }, [addTokens, isOnline, onlineGame]),
   });
 
   // Remote dice animation tracking
@@ -404,6 +414,30 @@ export default function PlayScreen() {
     onlineGame.clearRemoteDuelScore();
   }, [isOnline, onlineGame.remoteDuelScore, duel, onlineGame]);
 
+  // ===== ONLINE: Réception du résultat du duel (pour spectateurs) =====
+  useEffect(() => {
+    if (!isOnline || !onlineGame.remoteDuelResult) return;
+
+    const result = onlineGame.remoteDuelResult;
+    console.log('[PlayScreen] Résultat duel reçu (spectateur):', result);
+
+    // Si je suis spectateur, fermer le popup spectateur après un délai
+    if (isEventSpectator) {
+      const timer = setTimeout(() => {
+        setDuelTriggered(false);
+        setIsEventSpectator(false);
+        setSpectatorDuelChallengerId(null);
+        setSpectatorDuelOpponentId(null);
+        onlineGame.clearRemoteDuelResult();
+        onlineGame.clearRemoteEvent();
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+
+    onlineGame.clearRemoteDuelResult();
+    return undefined;
+  }, [isOnline, onlineGame.remoteDuelResult, isEventSpectator, onlineGame]);
+
   // ===== ONLINE: Detect opponent disconnect → forfeit after 30s =====
 
   useEffect(() => {
@@ -522,17 +556,35 @@ export default function PlayScreen() {
   );
 
   const handleDuelClose = useCallback(() => {
-    // Résoudre l'événement de duel
-    const isWinner = duel.result?.winnerId === currentPlayer?.id;
-    const reward = isWinner ? (duel.result?.challengerReward || duel.result?.opponentReward || 0) : 0;
-    actions.resolveEvent({ ok: isWinner, reward });
+    // Identifier si je suis le challenger ou l'opponent
+    const myId = userId || currentPlayer?.id;
+    const amChallenger = myId === duel.result?.challengerId;
+    const isWinner = duel.result?.winnerId === myId;
+
+    // Calculer la récompense selon mon rôle
+    let reward = 0;
+    if (isWinner) {
+      reward = amChallenger ? (duel.result?.challengerReward || 0) : (duel.result?.opponentReward || 0);
+    }
+
+    // En mode online, seul le joueur dont c'est le tour (challenger) résout l'événement
+    // En mode local, le challenger résout aussi l'événement
+    const shouldResolveEvent = amChallenger || (!isOnline && currentPlayer?.id === duel.result?.challengerId);
+
+    if (shouldResolveEvent) {
+      actions.resolveEvent({ ok: isWinner, reward });
+    }
 
     setDuelTriggered(false);
     setSpectatorDuelChallengerId(null);
     setSpectatorDuelOpponentId(null);
     duel.resetDuel();
-    handleEventResolve();
-  }, [duel.result, currentPlayer?.id, actions, handleEventResolve, duel]);
+
+    // Seul le challenger déclenche handleEventResolve (pour passer au tour suivant)
+    if (shouldResolveEvent) {
+      handleEventResolve();
+    }
+  }, [duel.result, currentPlayer?.id, userId, isOnline, actions, handleEventResolve, duel]);
 
   // ===== QUIT HANDLER =====
 
