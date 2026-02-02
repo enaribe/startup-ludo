@@ -1,14 +1,14 @@
-import { memo } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import Animated, { SlideInUp, SlideInLeft, SlideInRight } from 'react-native-reanimated';
-import { Modal } from '@/components/ui/Modal';
+import { PopupDuelIcon } from '@/components/game/popups/PopupIcons';
 import { Avatar } from '@/components/ui/Avatar';
 import { GameButton } from '@/components/ui/GameButton';
-import { PopupDuelIcon } from '@/components/game/popups/PopupIcons';
+import { Modal } from '@/components/ui/Modal';
 import { COLORS } from '@/styles/colors';
+import { BORDER_RADIUS, SHADOWS, SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
-import { SPACING, BORDER_RADIUS, SHADOWS } from '@/styles/spacing';
 import type { Player } from '@/types';
+import { memo } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import Animated, { SlideInLeft, SlideInRight, SlideInUp } from 'react-native-reanimated';
 
 interface DuelPreparePopupProps {
   visible: boolean;
@@ -16,6 +16,7 @@ interface DuelPreparePopupProps {
   challenger: Player | null;
   opponent: Player | null;
   currentPlayerId: string;
+  isOnline?: boolean;
   onStart: () => void;
 }
 
@@ -25,6 +26,7 @@ export const DuelPreparePopup = memo(function DuelPreparePopup({
   challenger,
   opponent,
   currentPlayerId,
+  isOnline = false,
   onStart,
 }: DuelPreparePopupProps) {
   if (!challenger || !opponent) return null;
@@ -34,10 +36,16 @@ export const DuelPreparePopup = memo(function DuelPreparePopup({
   const isCurrentPlayerChallenger = currentPlayerId === challenger.id;
   const isCurrentPlayerOpponent = currentPlayerId === opponent.id;
 
+  const handleStart = () => {
+    if (__DEV__) console.log('[DuelPreparePopup] onStart (Commencer) pressed', { phase, isMyTurn: !isOnline || (isIntroPhase ? isCurrentPlayerChallenger : isCurrentPlayerOpponent) });
+    onStart();
+  };
+
   // En phase intro, c'est le challenger qui joue
   // En phase opponent_prepare, c'est l'opponent qui joue
+  // En mode local, tous les joueurs partagent le même écran → le bouton s'affiche toujours
   const activePlayer = isIntroPhase ? challenger : opponent;
-  const isMyTurn = isIntroPhase ? isCurrentPlayerChallenger : isCurrentPlayerOpponent;
+  const isMyTurn = !isOnline || (isIntroPhase ? isCurrentPlayerChallenger : isCurrentPlayerOpponent);
 
   const title = isIntroPhase ? 'DUEL' : 'À TON TOUR';
   const message = isMyTurn
@@ -54,54 +62,51 @@ export const DuelPreparePopup = memo(function DuelPreparePopup({
     >
       <Animated.View entering={SlideInUp.springify().damping(18)} style={styles.card}>
         <View style={styles.content}>
-          {/* Icône */}
-          <View style={styles.iconCircle}>
-            <PopupDuelIcon size={48} />
+          {/* Header: icône gauche + titre DuEL droite (design system) */}
+          <View style={styles.header}>
+            <PopupDuelIcon size={32} />
+            <Text style={styles.title}>{title}</Text>
           </View>
 
-          {/* Titre */}
-          <Text style={styles.title}>{title}</Text>
-
-          {/* Affichage VS pour l'intro */}
+          {/* Phase intro: deux cartes joueur + VS au centre */}
           {isIntroPhase && (
-            <View style={styles.vsSection}>
-              <Animated.View entering={SlideInLeft.springify()} style={styles.playerSide}>
-                <Avatar
-                  name={challenger.name}
-                  playerColor={challenger.color}
-                  size="md"
-                  showBorder
-                />
-                <Text style={styles.vsPlayerName}>{challenger.startupName}</Text>
+            <>
+              <Animated.View entering={SlideInLeft.springify()} style={styles.playerCardRow}>
+                <View style={styles.avatarWrap}>
+                  <Avatar name={challenger.name} playerColor={challenger.color} size="md" showBorder />
+                </View>
+                <View style={styles.playerCardText}>
+                  <Text style={styles.playerCardName} numberOfLines={1}>{challenger.startupName || 'Startup'}</Text>
+                  <Text style={styles.playerCardSubtitle}>{challenger.name}</Text>
+                </View>
               </Animated.View>
 
               <View style={styles.vsCircle}>
-                <Text style={styles.vsText}>VS</Text>
+                <PopupDuelIcon size={28} />
               </View>
 
-              <Animated.View entering={SlideInRight.springify()} style={styles.playerSide}>
-                <Avatar
-                  name={opponent.name}
-                  playerColor={opponent.color}
-                  size="md"
-                  showBorder
-                />
-                <Text style={styles.vsPlayerName}>{opponent.startupName}</Text>
+              <Animated.View entering={SlideInRight.springify()} style={styles.playerCardRow}>
+                <View style={styles.avatarWrap}>
+                  <Avatar name={opponent.name} playerColor={opponent.color} size="md" showBorder />
+                </View>
+                <View style={styles.playerCardText}>
+                  <Text style={styles.playerCardName} numberOfLines={1}>{opponent.startupName || 'Startup'}</Text>
+                  <Text style={styles.playerCardSubtitle}>{opponent.name}</Text>
+                </View>
               </Animated.View>
-            </View>
+            </>
           )}
 
-          {/* Carte joueur actif pour opponent_prepare */}
+          {/* Phase opponent_prepare: une carte joueur actif */}
           {!isIntroPhase && (
-            <View style={styles.playerCard}>
-              <Avatar
-                name={activePlayer.name}
-                playerColor={activePlayer.color}
-                size="lg"
-                showBorder
-              />
-              <Text style={styles.playerName}>{activePlayer.startupName}</Text>
-              <Text style={styles.playerSubtitle}>{activePlayer.name}</Text>
+            <View style={styles.playerCardRow}>
+              <View style={styles.avatarWrap}>
+                <Avatar name={activePlayer.name} playerColor={activePlayer.color} size="md" showBorder />
+              </View>
+              <View style={styles.playerCardText}>
+                <Text style={styles.playerCardName} numberOfLines={1}>{activePlayer.startupName || 'Startup'}</Text>
+                <Text style={styles.playerCardSubtitle}>{activePlayer.name}</Text>
+              </View>
             </View>
           )}
 
@@ -110,15 +115,10 @@ export const DuelPreparePopup = memo(function DuelPreparePopup({
             <Text style={styles.message}>{message}</Text>
           </View>
 
-          {/* Bouton (seulement si c'est notre tour) */}
+          {/* Bouton Commencer — gradient jaune/orange (design system: variant yellow) */}
           {isMyTurn && (
             <View style={styles.buttonWrapper}>
-              <GameButton
-                title="Commencer"
-                onPress={onStart}
-                variant="green"
-                fullWidth
-              />
+              <GameButton title="Commencer" onPress={handleStart} variant="yellow" fullWidth />
             </View>
           )}
         </View>
@@ -142,75 +142,60 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING[5],
     alignItems: 'center',
   },
-  iconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(76, 175, 80, 0.12)',
-    justifyContent: 'center',
+  header: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: SPACING[3],
+    justifyContent: 'flex-start',
+    width: '100%',
+    marginBottom: SPACING[4],
+    gap: SPACING[3],
   },
   title: {
     fontFamily: FONTS.title,
     fontSize: FONT_SIZES['2xl'],
     color: COLORS.success,
     letterSpacing: 2,
-    marginBottom: SPACING[4],
   },
-  vsSection: {
+  playerCardRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     width: '100%',
-    marginBottom: SPACING[4],
-  },
-  playerSide: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  vsPlayerName: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: FONT_SIZES.sm,
-    color: '#2C3E50',
-    marginTop: SPACING[2],
-    textAlign: 'center',
-    maxWidth: 80,
-  },
-  vsCircle: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: COLORS.error,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...SHADOWS.md,
-  },
-  vsText: {
-    fontFamily: FONTS.title,
-    fontSize: FONT_SIZES.lg,
-    color: COLORS.white,
-  },
-  playerCard: {
-    alignItems: 'center',
-    backgroundColor: '#F5F7FA',
+    backgroundColor: COLORS.white,
     borderRadius: BORDER_RADIUS.xl,
-    paddingVertical: SPACING[4],
-    paddingHorizontal: SPACING[5],
-    width: '100%',
-    marginBottom: SPACING[4],
+    paddingVertical: SPACING[3],
+    paddingHorizontal: SPACING[4],
+    marginBottom: SPACING[2],
+    borderWidth: 1,
+    borderColor: '#E8EEF4',
     ...SHADOWS.sm,
   },
-  playerName: {
-    fontFamily: FONTS.title,
-    fontSize: FONT_SIZES.lg,
-    color: '#2C3E50',
-    marginTop: SPACING[2],
+  avatarWrap: {
+    marginRight: SPACING[3],
   },
-  playerSubtitle: {
-    fontFamily: FONTS.body,
+  playerCardText: {
+    flex: 1,
+  },
+  playerCardName: {
+    fontFamily: FONTS.title,
     fontSize: FONT_SIZES.sm,
+    color: '#2C3E50',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  playerCardSubtitle: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.xs,
     color: '#8E99A4',
+    marginTop: 2,
+  },
+  vsCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(28, 107, 59, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginVertical: SPACING[2],
   },
   messageBox: {
     backgroundColor: '#F8F9FA',
@@ -218,6 +203,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING[4],
     paddingHorizontal: SPACING[4],
     width: '100%',
+    marginTop: SPACING[2],
     marginBottom: SPACING[5],
   },
   message: {

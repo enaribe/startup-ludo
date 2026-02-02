@@ -259,11 +259,24 @@ export function isSafePosition(circuitIndex: number): boolean {
   return SAFE_POSITIONS.includes(circuitIndex);
 }
 
+// Types d'événements déclenchables (hors start/normal) — utilisés pour les cases sans événement fixe
+const FALLBACK_EVENTS: Array<'quiz' | 'funding' | 'duel' | 'opportunity' | 'challenge'> = [
+  'quiz',
+  'funding',
+  'duel',
+  'opportunity',
+  'challenge',
+];
+
 /**
- * Obtient le type d'événement pour une position
+ * Obtient le type d'événement pour une position du circuit.
+ * Les cases sans événement fixe dans CIRCUIT_EVENTS reçoivent un événement par défaut (cycle)
+ * pour que l'icône affichée et l'événement déclenché correspondent.
  */
 export function getEventAtCircuitPosition(circuitIndex: number): CellEventType {
-  return CIRCUIT_EVENTS[circuitIndex] ?? 'normal';
+  const fixed = CIRCUIT_EVENTS[circuitIndex];
+  if (fixed !== undefined) return fixed;
+  return FALLBACK_EVENTS[circuitIndex % FALLBACK_EVENTS.length];
 }
 
 /**

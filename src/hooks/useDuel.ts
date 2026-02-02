@@ -1,6 +1,11 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import type { Player, DuelQuestion, DuelState, DuelResult } from '@/types';
 import { getRandomDuelQuestions, generateAIScore } from '@/data/duelQuestions';
+
+const DEBUG_DUEL = __DEV__;
+function logDuel(...args: unknown[]) {
+  if (DEBUG_DUEL) console.log('[useDuel]', ...args);
+}
 
 interface UseDuelOptions {
   players: Player[];
@@ -27,11 +32,17 @@ interface UseDuelReturn {
 
   // Actions
   startDuel: (challengerId: string) => void;
+  /** Démarrer un duel avec adversaire et questions déjà définis (2 joueurs ou après sélection) */
+  startDuelWithQuestions: (challengerId: string, opponentId: string, questions: DuelQuestion[]) => void;
+  /** Rejoindre un duel en ligne avec les mêmes questions que le challenger */
+  joinDuel: (challengerId: string, opponentId: string, questions: DuelQuestion[]) => void;
   selectOpponent: (opponentId: string) => void;
   startChallengerTurn: () => void;
   submitChallengerAnswers: (answers: number[], score: number) => void;
   startOpponentTurn: () => void;
   submitOpponentAnswers: (answers: number[], score: number) => void;
+  /** Reçoit le score d'un joueur distant ; calcule le résultat si les deux scores sont présents */
+  receiveRemoteScore: (playerId: string, score: number) => void;
   endDuel: () => void;
   resetDuel: () => void;
 }
@@ -43,6 +54,7 @@ export function useDuel({
 }: UseDuelOptions): UseDuelReturn {
   const [duelState, setDuelState] = useState<DuelState | null>(null);
   const [result, setResult] = useState<DuelResult | null>(null);
+  const hasReceivedRemoteScoreRef = useRef(false);
 
   // Helpers
   const getPlayerById = useCallback((id: string) => {
@@ -56,10 +68,25 @@ export function useDuel({
     ? players.filter((p) => p.id !== duelState.challengerId && p.id !== duelState.opponentId)
     : [];
 
+  // Log état duel à chaque changement (debug)
+  useEffect(() => {
+    if (duelState) {
+      logDuel('state', {
+        phase: duelState.phase,
+        questionsLength: duelState.questions?.length ?? 0,
+        challengerId: duelState.challengerId,
+        opponentId: duelState.opponentId,
+      });
+    } else {
+      logDuel('state', null);
+    }
+  }, [duelState]);
+
   // Démarrer un duel (phase sélection adversaire ou intro si 2 joueurs)
   const startDuel = useCallback((challengerId: string) => {
     const questions = getRandomDuelQuestions(3);
     const otherPlayers = players.filter((p) => p.id !== challengerId);
+    logDuel('startDuel', { challengerId, questionsLength: questions.length, otherPlayersCount: otherPlayers.length });
 
     // Si seulement 2 joueurs, on passe directement à l'intro
     if (otherPlayers.length === 1 && otherPlayers[0]) {
@@ -91,6 +118,40 @@ export function useDuel({
     setResult(null);
   }, [players]);
 
+  // Démarrer un duel avec adversaire et questions déjà définis (online 2 joueurs ou après sélection)
+  const startDuelWithQuestions = useCallback((challengerId: string, opponentId: string, questions: DuelQuestion[]) => {
+    logDuel('startDuelWithQuestions', { challengerId, opponentId, questionsLength: questions.length });
+    setDuelState({
+      challengerId,
+      opponentId,
+      questions,
+      challengerAnswers: [],
+      opponentAnswers: [],
+      challengerScore: 0,
+      opponentScore: 0,
+      phase: 'intro',
+      currentQuestionIndex: 0,
+    });
+    setResult(null);
+  }, []);
+
+  // Rejoindre un duel en ligne (adversaire reçoit les mêmes questions)
+  const joinDuel = useCallback((challengerId: string, opponentId: string, questions: DuelQuestion[]) => {
+    logDuel('joinDuel', { challengerId, opponentId, questionsLength: questions.length });
+    setDuelState({
+      challengerId,
+      opponentId,
+      questions,
+      challengerAnswers: [],
+      opponentAnswers: [],
+      challengerScore: 0,
+      opponentScore: 0,
+      phase: 'opponent_prepare',
+      currentQuestionIndex: 0,
+    });
+    setResult(null);
+  }, []);
+
   // Sélectionner un adversaire
   const selectOpponent = useCallback((opponentId: string) => {
     if (!duelState) return;
@@ -107,10 +168,18 @@ export function useDuel({
 
   // Commencer le tour du challenger
   const startChallengerTurn = useCallback(() => {
+    logDuel('startChallengerTurn called');
     setDuelState((prev) => {
-      if (!prev) return prev;
+      if (!prev) {
+        logDuel('startChallengerTurn: no prev state');
+        return prev;
+      }
+      // Garantir que les questions sont présentes (évite popup vide si perdues)
+      const questions = prev.questions?.length ? prev.questions : getRandomDuelQuestions(3);
+      logDuel('startChallengerTurn: setting phase challenger_turn', { questionsLength: questions.length, hadQuestions: !!prev.questions?.length });
       return {
         ...prev,
+        questions,
         phase: 'challenger_turn',
       };
     });
@@ -148,7 +217,7 @@ export function useDuel({
           challengerAnswers: answers,
           challengerScore: score,
           opponentScore: aiScore,
-          phase: 'result',
+          phase: 'result' as const,
         };
       }
 
@@ -158,17 +227,26 @@ export function useDuel({
           ...prev,
           challengerAnswers: answers,
           challengerScore: score,
-          phase: 'opponent_prepare',
+          phase: 'opponent_prepare' as const,
         };
       }
 
-      // Mode online: attendre l'adversaire
-      return {
+      // Mode online: attendre le score de l'adversaire
+      const next: DuelState = {
         ...prev,
         challengerAnswers: answers,
         challengerScore: score,
-        phase: 'waiting',
+        phase: 'waiting' as const,
       };
+      if (hasReceivedRemoteScoreRef.current) {
+        const duelResult = calculateResult(prev.challengerId, prev.opponentId, score, prev.opponentScore);
+        setTimeout(() => {
+          setResult(duelResult);
+          onDuelComplete?.(duelResult);
+        }, 0);
+        return { ...next, phase: 'result' as const };
+      }
+      return next;
     });
   }, [duelState, getPlayerById, isOnline, onDuelComplete]);
 
@@ -176,8 +254,10 @@ export function useDuel({
   const startOpponentTurn = useCallback(() => {
     setDuelState((prev) => {
       if (!prev) return prev;
+      const questions = prev.questions?.length ? prev.questions : getRandomDuelQuestions(3);
       return {
         ...prev,
+        questions,
         phase: 'opponent_turn',
         currentQuestionIndex: 0,
       };
@@ -187,6 +267,20 @@ export function useDuel({
   // Soumettre les réponses de l'adversaire
   const submitOpponentAnswers = useCallback((answers: number[], score: number) => {
     if (!duelState) return;
+
+    // Mode online : attendre le score du challenger, ne pas calculer tout de suite
+    if (isOnline) {
+      setDuelState((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          opponentAnswers: answers,
+          opponentScore: score,
+          phase: 'waiting',
+        };
+      });
+      return;
+    }
 
     const duelResult = calculateResult(
       duelState.challengerId,
@@ -207,7 +301,32 @@ export function useDuel({
 
     setResult(duelResult);
     onDuelComplete?.(duelResult);
-  }, [duelState, onDuelComplete]);
+  }, [duelState, isOnline, onDuelComplete]);
+
+  // Reçoit le score d'un joueur distant ; calcule le résultat quand les deux scores sont présents
+  const receiveRemoteScore = useCallback((playerId: string, score: number) => {
+    hasReceivedRemoteScoreRef.current = true;
+    setDuelState((prev) => {
+      if (!prev) return prev;
+      const challengerScore = playerId === prev.challengerId ? score : prev.challengerScore;
+      const opponentScore = playerId === prev.opponentId ? score : prev.opponentScore;
+      const next = {
+        ...prev,
+        challengerScore,
+        opponentScore,
+      };
+      const isRemoteScore = playerId === prev.challengerId || playerId === prev.opponentId;
+      const weAlreadySubmitted = prev.phase === 'waiting';
+      if (!isRemoteScore || !weAlreadySubmitted) return next;
+
+      const duelResult = calculateResult(prev.challengerId, prev.opponentId, challengerScore, opponentScore);
+      setTimeout(() => {
+        setResult(duelResult);
+        onDuelComplete?.(duelResult);
+      }, 0);
+      return { ...next, phase: 'result' as const };
+    });
+  }, [onDuelComplete]);
 
   // Terminer le duel
   const endDuel = useCallback(() => {
@@ -216,6 +335,7 @@ export function useDuel({
 
   // Réinitialiser le duel
   const resetDuel = useCallback(() => {
+    hasReceivedRemoteScoreRef.current = false;
     setDuelState(null);
     setResult(null);
   }, []);
@@ -234,11 +354,14 @@ export function useDuel({
     result,
 
     startDuel,
+    startDuelWithQuestions,
+    joinDuel,
     selectOpponent,
     startChallengerTurn,
     submitChallengerAnswers,
     startOpponentTurn,
     submitOpponentAnswers,
+    receiveRemoteScore,
     endDuel,
     resetDuel,
   };

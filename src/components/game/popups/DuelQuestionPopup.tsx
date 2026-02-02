@@ -89,6 +89,16 @@ export const DuelQuestionPopup = memo(function DuelQuestionPopup({
 
   const currentQuestion = questions[currentIndex];
 
+  if (__DEV__) {
+    console.log('[DuelQuestionPopup] render', {
+      visible,
+      questionsLength: questions.length,
+      currentIndex,
+      hasCurrentQuestion: !!currentQuestion,
+      willReturnNull: !visible || questions.length === 0 || !currentQuestion,
+    });
+  }
+
   if (!visible || questions.length === 0 || !currentQuestion) return null;
 
   return (

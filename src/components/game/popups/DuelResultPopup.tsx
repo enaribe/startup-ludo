@@ -2,14 +2,16 @@ import { memo, useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Animated, {
   SlideInUp,
+  SlideInLeft,
+  SlideInRight,
   useSharedValue,
   useAnimatedStyle,
-  withSpring,
+  withTiming,
   withDelay,
 } from 'react-native-reanimated';
-import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Modal } from '@/components/ui/Modal';
+import { PopupDuelIcon } from '@/components/game/popups/PopupIcons';
 import { Avatar } from '@/components/ui/Avatar';
 import { GameButton } from '@/components/ui/GameButton';
 import { COLORS } from '@/styles/colors';
@@ -36,40 +38,25 @@ export const DuelResultPopup = memo(function DuelResultPopup({
   onClose,
 }: DuelResultPopupProps) {
   const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
-
-  const badgeScale = useSharedValue(0);
-  const scoresOpacity = useSharedValue(0);
+  const contentOpacity = useSharedValue(0);
 
   useEffect(() => {
     if (visible && result) {
-      badgeScale.value = withSpring(1, { damping: 8, stiffness: 150 });
-      scoresOpacity.value = withDelay(300, withSpring(1));
+      contentOpacity.value = withDelay(100, withTiming(1, { duration: 280 }));
 
       if (hapticsEnabled) {
         const isWinner = result.winnerId === currentPlayerId;
         const isDraw = result.winnerId === null;
-
-        if (isWinner) {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        } else if (isDraw) {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        } else {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        }
+        if (isWinner) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        else if (isDraw) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        else Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
     } else {
-      badgeScale.value = 0;
-      scoresOpacity.value = 0;
+      contentOpacity.value = 0;
     }
-  }, [visible, result, hapticsEnabled, currentPlayerId, badgeScale, scoresOpacity]);
+  }, [visible, result, hapticsEnabled, currentPlayerId, contentOpacity]);
 
-  const badgeStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: badgeScale.value }],
-  }));
-
-  const scoresStyle = useAnimatedStyle(() => ({
-    opacity: scoresOpacity.value,
-  }));
+  const contentStyle = useAnimatedStyle(() => ({ opacity: contentOpacity.value }));
 
   if (!result || !challenger || !opponent) return null;
 
@@ -80,79 +67,59 @@ export const DuelResultPopup = memo(function DuelResultPopup({
 
   const statusText = isDraw ? 'ÉGALITÉ' : isCurrentPlayerWinner ? 'VICTOIRE' : 'DÉFAITE';
   const statusColor = isDraw ? COLORS.warning : isCurrentPlayerWinner ? COLORS.success : COLORS.error;
-  const statusIcon = isDraw ? 'swap-horizontal' : isCurrentPlayerWinner ? 'trophy' : 'close-circle';
+  const challengerWon = result.challengerScore > result.opponentScore;
+  const opponentWon = result.opponentScore > result.challengerScore;
 
   return (
-    <Modal
-      visible={visible}
-      onClose={onClose}
-      closeOnBackdrop={false}
-      showCloseButton={false}
-      bareContent
-    >
+    <Modal visible={visible} onClose={onClose} closeOnBackdrop={false} showCloseButton={false} bareContent>
       <Animated.View entering={SlideInUp.springify().damping(18)} style={styles.card}>
         <View style={styles.content}>
-          {/* Badge de résultat */}
-          <Animated.View style={[styles.resultBadge, { backgroundColor: statusColor }, badgeStyle]}>
-            <Ionicons name={statusIcon as any} size={48} color={COLORS.white} />
-            <Text style={styles.resultText}>{statusText}</Text>
-          </Animated.View>
-
-          {/* Scores */}
-          <Animated.View style={[styles.scoresSection, scoresStyle]}>
-            {/* Challenger */}
-            <View style={styles.playerScore}>
-              <Avatar
-                name={challenger.name}
-                playerColor={challenger.color}
-                size="md"
-                showBorder
-              />
-              <Text style={styles.playerScoreName}>{challenger.startupName}</Text>
-              <Text style={[styles.scoreValue, result.challengerScore > result.opponentScore && styles.scoreWinner]}>
-                {result.challengerScore} pts
-              </Text>
-            </View>
-
-            <View style={styles.vsIndicator}>
-              <Text style={styles.vsText}>VS</Text>
-            </View>
-
-            {/* Opponent */}
-            <View style={styles.playerScore}>
-              <Avatar
-                name={opponent.name}
-                playerColor={opponent.color}
-                size="md"
-                showBorder
-              />
-              <Text style={styles.playerScoreName}>{opponent.startupName}</Text>
-              <Text style={[styles.scoreValue, result.opponentScore > result.challengerScore && styles.scoreWinner]}>
-                {result.opponentScore} pts
-              </Text>
-            </View>
-          </Animated.View>
-
-          {/* Récompense */}
-          <View style={styles.rewardSection}>
-            <Text style={styles.rewardLabel}>
-              {currentPlayerReward > 0 ? 'Tu gagnes' : 'Pas de jetons'}
-            </Text>
-            {currentPlayerReward > 0 && (
-              <View style={[styles.rewardBadge, { backgroundColor: statusColor }]}>
-                <Text style={styles.rewardText}>+{currentPlayerReward} jetons</Text>
-              </View>
-            )}
+          {/* Header: icône + titre (même style que DuelPreparePopup) */}
+          <View style={styles.header}>
+            <PopupDuelIcon size={32} />
+            <Text style={[styles.title, { color: statusColor }]}>{statusText}</Text>
           </View>
 
-          {/* Bouton */}
+          {/* Carte challenger */}
+          <Animated.View entering={SlideInLeft.springify()} style={styles.playerCardRow}>
+            <View style={styles.avatarWrap}>
+              <Avatar name={challenger.name} playerColor={challenger.color} size="md" showBorder />
+            </View>
+            <View style={styles.playerCardText}>
+              <Text style={styles.playerCardName} numberOfLines={1}>{challenger.startupName || 'Startup'}</Text>
+              <Text style={styles.playerCardSubtitle}>{challenger.name}</Text>
+              <Text style={[styles.scoreLine, challengerWon && styles.scoreWinner]}>{result.challengerScore} pts</Text>
+            </View>
+          </Animated.View>
+
+          <View style={styles.vsCircle}>
+            <PopupDuelIcon size={28} />
+          </View>
+
+          {/* Carte opponent */}
+          <Animated.View entering={SlideInRight.springify()} style={styles.playerCardRow}>
+            <View style={styles.avatarWrap}>
+              <Avatar name={opponent.name} playerColor={opponent.color} size="md" showBorder />
+            </View>
+            <View style={styles.playerCardText}>
+              <Text style={styles.playerCardName} numberOfLines={1}>{opponent.startupName || 'Startup'}</Text>
+              <Text style={styles.playerCardSubtitle}>{opponent.name}</Text>
+              <Text style={[styles.scoreLine, opponentWon && styles.scoreWinner]}>{result.opponentScore} pts</Text>
+            </View>
+          </Animated.View>
+
+          {/* Récompense — même boîte que le message du popup préparation */}
+          <Animated.View style={[styles.messageBox, contentStyle]}>
+            {currentPlayerReward > 0 ? (
+              <Text style={styles.message}>+{currentPlayerReward} jetons gagnés</Text>
+            ) : (
+              <Text style={styles.message}>Pas de jetons gagnés</Text>
+            )}
+          </Animated.View>
+
+          {/* Bouton — même style que DuelPreparePopup: variant yellow */}
           <View style={styles.buttonWrapper}>
-            <GameButton
-              title="Continuer"
-              onPress={onClose}
-              variant="blue"
-              fullWidth
-            />
+            <GameButton title="Continuer" onPress={onClose} variant="yellow" fullWidth />
           </View>
         </View>
       </Animated.View>
@@ -170,82 +137,89 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   content: {
-    paddingTop: SPACING[6],
+    paddingTop: SPACING[5],
     paddingBottom: SPACING[6],
     paddingHorizontal: SPACING[5],
     alignItems: 'center',
   },
-  resultBadge: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: SPACING[4],
-    paddingHorizontal: SPACING[6],
-    borderRadius: BORDER_RADIUS['2xl'],
-    marginBottom: SPACING[5],
-    ...SHADOWS.lg,
-  },
-  resultText: {
-    fontFamily: FONTS.title,
-    fontSize: FONT_SIZES['2xl'],
-    color: COLORS.white,
-    marginTop: SPACING[2],
-    letterSpacing: 2,
-  },
-  scoresSection: {
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     width: '100%',
-    marginBottom: SPACING[5],
+    marginBottom: SPACING[4],
+    gap: SPACING[3],
   },
-  playerScore: {
-    flex: 1,
+  title: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES['2xl'],
+    letterSpacing: 2,
+  },
+  playerCardRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    width: '100%',
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.xl,
+    paddingVertical: SPACING[3],
+    paddingHorizontal: SPACING[4],
+    marginBottom: SPACING[2],
+    borderWidth: 1,
+    borderColor: '#E8EEF4',
+    ...SHADOWS.sm,
   },
-  playerScoreName: {
-    fontFamily: FONTS.bodySemiBold,
+  avatarWrap: {
+    marginRight: SPACING[3],
+  },
+  playerCardText: {
+    flex: 1,
+  },
+  playerCardName: {
+    fontFamily: FONTS.title,
     fontSize: FONT_SIZES.sm,
     color: '#2C3E50',
-    marginTop: SPACING[2],
-    textAlign: 'center',
-    maxWidth: 80,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  scoreValue: {
-    fontFamily: FONTS.title,
-    fontSize: FONT_SIZES.xl,
+  playerCardSubtitle: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.xs,
     color: '#8E99A4',
-    marginTop: SPACING[1],
+    marginTop: 2,
+  },
+  scoreLine: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES.sm,
+    color: '#8E99A4',
+    marginTop: 4,
   },
   scoreWinner: {
     color: COLORS.success,
   },
-  vsIndicator: {
-    paddingHorizontal: SPACING[2],
-  },
-  vsText: {
-    fontFamily: FONTS.title,
-    fontSize: FONT_SIZES.sm,
-    color: '#8E99A4',
-  },
-  rewardSection: {
+  vsCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(28, 107, 59, 0.15)',
+    justifyContent: 'center',
     alignItems: 'center',
+    marginVertical: SPACING[2],
+  },
+  messageBox: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: BORDER_RADIUS.xl,
+    paddingVertical: SPACING[4],
+    paddingHorizontal: SPACING[4],
+    width: '100%',
+    marginTop: SPACING[2],
     marginBottom: SPACING[5],
   },
-  rewardLabel: {
-    fontFamily: FONTS.body,
-    fontSize: FONT_SIZES.sm,
-    color: '#8E99A4',
-    marginBottom: SPACING[2],
-  },
-  rewardBadge: {
-    paddingVertical: SPACING[2],
-    paddingHorizontal: SPACING[4],
-    borderRadius: BORDER_RADIUS.full,
-  },
-  rewardText: {
-    fontFamily: FONTS.title,
-    fontSize: FONT_SIZES.lg,
-    color: COLORS.white,
+  message: {
+    fontFamily: FONTS.bodyMedium,
+    fontSize: FONT_SIZES.base,
+    color: '#2C3E50',
+    textAlign: 'center',
+    lineHeight: 24,
   },
   buttonWrapper: {
     width: '100%',

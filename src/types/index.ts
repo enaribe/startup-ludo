@@ -134,6 +134,19 @@ export interface DuelResult {
   opponentReward: number;
 }
 
+/** Payload pour démarrer un duel en ligne (mêmes questions pour les deux joueurs) */
+export interface DuelStartPayload {
+  challengerId: string;
+  opponentId: string;
+  questions: DuelQuestion[];
+}
+
+/** Payload pour envoyer son score en duel en ligne */
+export interface DuelScorePayload {
+  playerId: string;
+  score: number;
+}
+
 export interface OpportunityEvent {
   id: string;
   title: string;

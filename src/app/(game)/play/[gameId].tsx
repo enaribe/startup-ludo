@@ -28,7 +28,8 @@ import { useDuel } from '@/hooks/useDuel';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
-import type { ChallengeEvent, FundingEvent, OpportunityEvent, Player, QuizEvent, DuelResult } from '@/types';
+import { getRandomDuelQuestions } from '@/data/duelQuestions';
+import type { ChallengeEvent, FundingEvent, OpportunityEvent, Player, QuizEvent, DuelResult, DuelQuestion } from '@/types';
 
 // Données de test pour afficher les popups rapidement
 const MOCK_QUIZ: QuizEvent = {
@@ -118,6 +119,8 @@ export default function PlayScreen() {
   const [challengeData, setChallengeData] = useState<ChallengeEvent | null>(null);
   const [duelTriggered, setDuelTriggered] = useState(false);
   const [isEventSpectator, setIsEventSpectator] = useState(false);
+  const [spectatorDuelChallengerId, setSpectatorDuelChallengerId] = useState<string | null>(null);
+  const [spectatorDuelOpponentId, setSpectatorDuelOpponentId] = useState<string | null>(null);
 
   // Duel system hook
   const duel = useDuel({
@@ -233,16 +236,24 @@ export default function PlayScreen() {
           setChallengeData(event.data as ChallengeEvent);
           break;
         case 'duel': {
-          // Déclencher le nouveau système de duel
           setDuelTriggered(true);
-          if (currentPlayer) {
+          if (!currentPlayer) break;
+          const otherPlayers = game?.players?.filter((p) => p.id !== currentPlayer.id) ?? [];
+          if (otherPlayers.length === 1) {
+            const opponentId = otherPlayers[0]!.id;
+            const questions = getRandomDuelQuestions(3);
+            duel.startDuelWithQuestions(currentPlayer.id, opponentId, questions);
+            if (isOnline) {
+              onlineGame.broadcastDuelStart(currentPlayer.id, opponentId, questions as unknown as Record<string, unknown>[]);
+            }
+          } else {
             duel.startDuel(currentPlayer.id);
           }
           break;
         }
       }
     },
-    [game, currentPlayer, triggerEvent, isOnline, onlineGame]
+    [game, currentPlayer, triggerEvent, isOnline, onlineGame, duel]
   );
 
   // ===== WIN HANDLER =====
@@ -299,8 +310,42 @@ export default function PlayScreen() {
     console.log('[PlayScreen] Affichage popup événement distant (spectateur):', {
       eventType,
       hasEventData: !!eventData && Object.keys(eventData).length > 0,
+      eventData,
     });
-    setIsEventSpectator(true);
+
+    // Ne montrer le popup "Duel en cours" que pour un vrai duel ; pour quiz/funding/opportunity/challenge, s'assurer que duelTriggered est false
+    if (eventType === 'duel') {
+      setDuelTriggered(true);
+      // Extraire les données du duel
+      const duelData = eventData as { challengerId?: string; opponentId?: string; questions?: DuelQuestion[] };
+      const { challengerId, opponentId, questions } = duelData;
+
+      console.log('[PlayScreen] Duel distant reçu:', { challengerId, opponentId, questionsCount: questions?.length, myId: userId });
+
+      if (challengerId && opponentId && questions && questions.length > 0) {
+        // Si je suis l'adversaire (opponent), je rejoins le duel avec les mêmes questions
+        if (userId === opponentId) {
+          console.log('[PlayScreen] Je suis l\'adversaire, je rejoins le duel');
+          setIsEventSpectator(false);
+          duel.joinDuel(challengerId, opponentId, questions);
+        } else if (userId === challengerId) {
+          // Je suis le challenger (ne devrait pas arriver car c'est moi qui ai envoyé)
+          console.log('[PlayScreen] Je suis le challenger (ignoré)');
+        } else {
+          // Je suis spectateur (3-4 joueurs)
+          console.log('[PlayScreen] Je suis spectateur du duel');
+          setIsEventSpectator(true);
+          setSpectatorDuelChallengerId(challengerId);
+          setSpectatorDuelOpponentId(opponentId);
+        }
+      } else {
+        // Données incomplètes, mode spectateur par défaut
+        setIsEventSpectator(true);
+      }
+    } else {
+      setDuelTriggered(false);
+      setIsEventSpectator(true);
+    }
 
     switch (eventType) {
       case 'quiz':
@@ -316,13 +361,12 @@ export default function PlayScreen() {
         setChallengeData(eventData as unknown as ChallengeEvent);
         break;
       case 'duel':
-        // Pour le mode spectateur, on marque juste que le duel est en cours
-        setDuelTriggered(true);
+        // Duel : déjà géré ci-dessus
         break;
       default:
         console.warn('[PlayScreen] Type d\'événement distant inconnu:', eventType);
     }
-  }, [isOnline, onlineGame.remoteEvent]);
+  }, [isOnline, onlineGame.remoteEvent, userId, duel]);
 
   // ===== ONLINE: React to remote event result (close popup) =====
 
@@ -335,6 +379,8 @@ export default function PlayScreen() {
       setOpportunityData(null);
       setChallengeData(null);
       setDuelTriggered(false);
+      setSpectatorDuelChallengerId(null);
+      setSpectatorDuelOpponentId(null);
       duel.resetDuel();
       setIsEventSpectator(false);
       onlineGame.clearRemoteEvent();
@@ -350,12 +396,27 @@ export default function PlayScreen() {
     setRemoteRollingPlayerId(null);
   }, [game?.currentPlayerIndex]);
 
+  // ===== ONLINE: Réception du score duel de l'adversaire =====
+  useEffect(() => {
+    if (!isOnline || !onlineGame.remoteDuelScore) return;
+    const { playerId, score } = onlineGame.remoteDuelScore;
+    duel.receiveRemoteScore(playerId, score);
+    onlineGame.clearRemoteDuelScore();
+  }, [isOnline, onlineGame.remoteDuelScore, duel, onlineGame]);
+
   // ===== ONLINE: Detect opponent disconnect → forfeit after 30s =====
 
   useEffect(() => {
     if (!isOnline) return;
 
     if (onlineGame.opponentDisconnected) {
+      if (__DEV__) {
+        console.log('[PlayScreen] Popup "Adversaire déconnecté" déclenché:', {
+          opponentDisconnected: onlineGame.opponentDisconnected,
+          disconnectedPlayerName: onlineGame.disconnectedPlayerName,
+          timestamp: Date.now(),
+        });
+      }
       setShowDisconnectPopup(true);
       disconnectTimerRef.current = setTimeout(() => {
         if (userId) {
@@ -423,25 +484,42 @@ export default function PlayScreen() {
   );
 
   // Duel handlers
-  const handleDuelSelectOpponent = useCallback((opponent: Player) => {
-    duel.selectOpponent(opponent.id);
-  }, [duel]);
+  const handleDuelSelectOpponent = useCallback(
+    (opponent: Player) => {
+      if (!duel.challenger) return;
+      duel.selectOpponent(opponent.id);
+      const questions = getRandomDuelQuestions(3);
+      duel.startDuelWithQuestions(duel.challenger.id, opponent.id, questions);
+      if (isOnline) {
+        onlineGame.broadcastDuelStart(duel.challenger.id, opponent.id, questions as unknown as Record<string, unknown>[]);
+      }
+    },
+    [duel, isOnline, onlineGame]
+  );
 
   const handleDuelStartChallenger = useCallback(() => {
     duel.startChallengerTurn();
   }, [duel]);
 
-  const handleDuelChallengerComplete = useCallback((answers: number[], score: number) => {
-    duel.submitChallengerAnswers(answers, score);
-  }, [duel]);
+  const handleDuelChallengerComplete = useCallback(
+    (answers: number[], score: number) => {
+      duel.submitChallengerAnswers(answers, score);
+      if (isOnline) onlineGame.broadcastDuelScore(score);
+    },
+    [duel, isOnline, onlineGame]
+  );
 
   const handleDuelStartOpponent = useCallback(() => {
     duel.startOpponentTurn();
   }, [duel]);
 
-  const handleDuelOpponentComplete = useCallback((answers: number[], score: number) => {
-    duel.submitOpponentAnswers(answers, score);
-  }, [duel]);
+  const handleDuelOpponentComplete = useCallback(
+    (answers: number[], score: number) => {
+      duel.submitOpponentAnswers(answers, score);
+      if (isOnline) onlineGame.broadcastDuelScore(score);
+    },
+    [duel, isOnline, onlineGame]
+  );
 
   const handleDuelClose = useCallback(() => {
     // Résoudre l'événement de duel
@@ -449,8 +527,9 @@ export default function PlayScreen() {
     const reward = isWinner ? (duel.result?.challengerReward || duel.result?.opponentReward || 0) : 0;
     actions.resolveEvent({ ok: isWinner, reward });
 
-    // Reset duel state
     setDuelTriggered(false);
+    setSpectatorDuelChallengerId(null);
+    setSpectatorDuelOpponentId(null);
     duel.resetDuel();
     handleEventResolve();
   }, [duel.result, currentPlayer?.id, actions, handleEventResolve, duel]);
@@ -663,9 +742,18 @@ export default function PlayScreen() {
             <Pressable
               style={[styles.testPopupButton, { backgroundColor: COLORS.success }]}
               onPress={() => {
+                if (!currentPlayer) return;
                 setIsEventSpectator(false);
                 setDuelTriggered(true);
-                if (currentPlayer) {
+                const otherPlayers = game?.players?.filter((p) => p.id !== currentPlayer.id) ?? [];
+                if (otherPlayers.length === 1) {
+                  const opponentId = otherPlayers[0]!.id;
+                  const questions = getRandomDuelQuestions(3);
+                  duel.startDuelWithQuestions(currentPlayer.id, opponentId, questions);
+                  if (isOnline) {
+                    onlineGame.broadcastDuelStart(currentPlayer.id, opponentId, questions as unknown as Record<string, unknown>[]);
+                  }
+                } else {
                   duel.startDuel(currentPlayer.id);
                 }
               }}
@@ -761,32 +849,74 @@ export default function PlayScreen() {
         />
       )}
 
-      <DuelPreparePopup
-        visible={duel.currentPhase === 'intro' || duel.currentPhase === 'opponent_prepare'}
-        phase={duel.currentPhase === 'intro' ? 'intro' : 'opponent_prepare'}
-        challenger={duel.challenger}
-        opponent={duel.opponent}
-        currentPlayerId={userId || currentPlayer?.id || ''}
-        onStart={duel.currentPhase === 'intro' ? handleDuelStartChallenger : handleDuelStartOpponent}
-      />
+      {(() => {
+        const showPrepare = (duel.currentPhase === 'intro' || duel.currentPhase === 'opponent_prepare') && !!duel.challenger && !!duel.opponent;
+        const showQuestion = (duel.currentPhase === 'challenger_turn' || duel.currentPhase === 'opponent_turn') && duel.questions.length > 0;
+        if (__DEV__ && duel.isActive) {
+          console.log('[PlayScreen] Duel popups', {
+            currentPhase: duel.currentPhase,
+            questionsLength: duel.questions.length,
+            showPrepare,
+            showQuestion,
+            hasChallenger: !!duel.challenger,
+            hasOpponent: !!duel.opponent,
+          });
+        }
+        return (
+          <>
+            {showPrepare && (
+              <DuelPreparePopup
+                visible
+                phase={duel.currentPhase === 'intro' ? 'intro' : 'opponent_prepare'}
+                challenger={duel.challenger}
+                opponent={duel.opponent}
+                currentPlayerId={userId || currentPlayer?.id || ''}
+                isOnline={isOnline}
+                onStart={duel.currentPhase === 'intro' ? handleDuelStartChallenger : handleDuelStartOpponent}
+              />
+            )}
 
-      <DuelQuestionPopup
-        visible={duel.currentPhase === 'challenger_turn' || duel.currentPhase === 'opponent_turn'}
-        questions={duel.questions}
-        onComplete={duel.currentPhase === 'challenger_turn' ? handleDuelChallengerComplete : handleDuelOpponentComplete}
-        onClose={() => {
-          setDuelTriggered(false);
-          duel.resetDuel();
-        }}
-      />
+            {showQuestion && (
+              <DuelQuestionPopup
+                visible
+                questions={duel.questions}
+                onComplete={duel.currentPhase === 'challenger_turn' ? handleDuelChallengerComplete : handleDuelOpponentComplete}
+                onClose={() => {
+                  setDuelTriggered(false);
+                  duel.resetDuel();
+                }}
+              />
+            )}
+          </>
+        );
+      })()}
 
-      {duel.challenger && duel.opponent && (
-        <DuelSpectatorPopup
-          visible={duelTriggered && isEventSpectator && duel.currentPhase !== 'result'}
-          challenger={duel.challenger}
-          opponent={duel.opponent}
-        />
-      )}
+      {(() => {
+        const spectatorChallenger =
+          spectatorDuelChallengerId && game
+            ? game.players.find((p) => p.id === spectatorDuelChallengerId) ?? null
+            : duel.challenger;
+        const spectatorOpponent =
+          spectatorDuelOpponentId && game
+            ? game.players.find((p) => p.id === spectatorDuelOpponentId) ?? null
+            : duel.opponent;
+        const challengerForPopup = spectatorChallenger ?? duel.challenger;
+        const opponentForPopup = spectatorOpponent ?? duel.opponent;
+        const showSpectator =
+          duelTriggered &&
+          isEventSpectator &&
+          duel.currentPhase !== 'result' &&
+          challengerForPopup != null &&
+          opponentForPopup != null;
+        if (!challengerForPopup || !opponentForPopup) return null;
+        return (
+          <DuelSpectatorPopup
+            visible={!!showSpectator}
+            challenger={challengerForPopup}
+            opponent={opponentForPopup}
+          />
+        );
+      })()}
 
       <DuelResultPopup
         visible={duel.currentPhase === 'result'}
