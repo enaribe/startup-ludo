@@ -1,0 +1,13 @@
+{
+  "id": "classic",
+  "name": "Édition Classique",
+  "description": "L'édition de base avec des questions générales sur l'entrepreneuriat",
+  "icon": "briefcase-outline",
+  "color": "#FFBC40",
+  "quizzes": [],
+  "duels": [],
+  "fundings": [],
+  "opportunities": [],
+  "challenges": [],
+  "startupIdeas": []
+}

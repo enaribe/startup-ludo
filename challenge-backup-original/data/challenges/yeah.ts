@@ -1,0 +1,311 @@
+/**
+ * Configuration du Challenge YEAH (Young Entrepreneur Academy Hub)
+ * Programme Mastercard Foundation
+ */
+
+import type { Challenge, ChallengeLevel, ChallengeSector } from '@/types/challenge';
+
+// ===== SECTEURS =====
+
+export const YEAH_SECTORS: ChallengeSector[] = [
+  {
+    id: 'yeah_sector_vegetal',
+    challengeId: 'yeah',
+    name: 'Production végétale',
+    description: 'Cultures maraîchères, céréales, fruits et légumes. Apprenez les techniques agricoles modernes.',
+    iconName: 'leaf-outline',
+    category: 'agriculture',
+    homeNames: ['Semences', 'Irrigation', 'Récolte', 'Stockage'],
+    color: '#4CAF50',
+  },
+  {
+    id: 'yeah_sector_elevage',
+    challengeId: 'yeah',
+    name: 'Élevage',
+    description: 'Bovins, ovins, volailles et aquaculture. Maîtrisez la gestion d\'un cheptel rentable.',
+    iconName: 'paw-outline',
+    category: 'agriculture',
+    homeNames: ['Alimentation', 'Santé', 'Reproduction', 'Commercialisation'],
+    color: '#8B4513',
+  },
+  {
+    id: 'yeah_sector_transformation',
+    challengeId: 'yeah',
+    name: 'Transformation',
+    description: 'Agroalimentaire, conservation, conditionnement. Créez de la valeur ajoutée.',
+    iconName: 'construct-outline',
+    category: 'agriculture',
+    homeNames: ['Matières premières', 'Process', 'Qualité', 'Distribution'],
+    color: '#FF9800',
+  },
+  {
+    id: 'yeah_sector_services',
+    challengeId: 'yeah',
+    name: 'Services agricoles',
+    description: 'Conseil, mécanisation, logistique, fintech agricole. Innovez dans l\'écosystème.',
+    iconName: 'settings-outline',
+    category: 'services',
+    homeNames: ['Conseil', 'Équipement', 'Logistique', 'Digital'],
+    color: '#2196F3',
+  },
+];
+
+// ===== NIVEAUX =====
+
+export const YEAH_LEVELS: ChallengeLevel[] = [
+  {
+    id: 'yeah_level_1',
+    challengeId: 'yeah',
+    number: 1,
+    name: 'Découverte',
+    description: 'Explorez les 4 secteurs agricoles et découvrez votre passion entrepreneuriale.',
+    xpRequired: 6000,
+    deliverableType: 'sector_choice',
+    posture: 'Curieux',
+    iconName: 'compass-outline',
+    subLevels: [
+      {
+        id: 'yeah_level_1_sub_1',
+        levelId: 'yeah_level_1',
+        number: 1,
+        name: 'Production végétale',
+        description: 'Découvrez le monde des cultures et du maraîchage.',
+        xpRequired: 1500,
+        cardCategories: ['quiz', 'opportunity', 'funding'],
+        rules: { captureEnabled: false, sequentialRequired: true },
+      },
+      {
+        id: 'yeah_level_1_sub_2',
+        levelId: 'yeah_level_1',
+        number: 2,
+        name: 'Élevage',
+        description: 'Explorez les opportunités de l\'élevage moderne.',
+        xpRequired: 3000,
+        cardCategories: ['quiz', 'opportunity', 'funding'],
+        rules: { captureEnabled: false, sequentialRequired: true },
+      },
+      {
+        id: 'yeah_level_1_sub_3',
+        levelId: 'yeah_level_1',
+        number: 3,
+        name: 'Transformation',
+        description: 'Apprenez à créer de la valeur ajoutée.',
+        xpRequired: 4500,
+        cardCategories: ['quiz', 'opportunity', 'funding'],
+        rules: { captureEnabled: false, sequentialRequired: true },
+      },
+      {
+        id: 'yeah_level_1_sub_4',
+        levelId: 'yeah_level_1',
+        number: 4,
+        name: 'Services agricoles',
+        description: 'Découvrez l\'écosystème de services.',
+        xpRequired: 6000,
+        cardCategories: ['quiz', 'opportunity', 'funding'],
+        rules: { captureEnabled: false, sequentialRequired: true },
+      },
+    ],
+  },
+  {
+    id: 'yeah_level_2',
+    challengeId: 'yeah',
+    number: 2,
+    name: 'Idéation',
+    description: 'Structurez votre idée d\'entreprise et définissez votre proposition de valeur.',
+    xpRequired: 10000,
+    deliverableType: 'pitch',
+    posture: 'Porteur de projet',
+    iconName: 'bulb-outline',
+    subLevels: [
+      {
+        id: 'yeah_level_2_sub_1',
+        levelId: 'yeah_level_2',
+        number: 1,
+        name: 'Problème / Besoin',
+        description: 'Identifiez un problème réel à résoudre.',
+        xpRequired: 2500,
+        cardCategories: ['quiz', 'challenge', 'opportunity'],
+        rules: { captureEnabled: true, sequentialRequired: true },
+      },
+      {
+        id: 'yeah_level_2_sub_2',
+        levelId: 'yeah_level_2',
+        number: 2,
+        name: 'Solution',
+        description: 'Définissez votre solution unique.',
+        xpRequired: 5000,
+        cardCategories: ['quiz', 'challenge', 'opportunity'],
+        rules: { captureEnabled: true, sequentialRequired: true },
+      },
+      {
+        id: 'yeah_level_2_sub_3',
+        levelId: 'yeah_level_2',
+        number: 3,
+        name: 'Cible et Marché',
+        description: 'Identifiez vos clients et votre marché.',
+        xpRequired: 7500,
+        cardCategories: ['quiz', 'challenge', 'duel'],
+        rules: { captureEnabled: true, sequentialRequired: true },
+      },
+      {
+        id: 'yeah_level_2_sub_4',
+        levelId: 'yeah_level_2',
+        number: 4,
+        name: 'Faisabilité et Impact',
+        description: 'Validez la viabilité de votre projet.',
+        xpRequired: 10000,
+        cardCategories: ['quiz', 'challenge', 'duel'],
+        rules: { captureEnabled: true, sequentialRequired: true },
+      },
+    ],
+  },
+  {
+    id: 'yeah_level_3',
+    challengeId: 'yeah',
+    number: 3,
+    name: 'Démarrage',
+    description: 'Lancez votre activité et construisez les bases de votre entreprise.',
+    xpRequired: 20000,
+    deliverableType: 'business_plan_simple',
+    posture: 'Entrepreneur',
+    iconName: 'rocket-outline',
+    subLevels: [
+      {
+        id: 'yeah_level_3_sub_1',
+        levelId: 'yeah_level_3',
+        number: 1,
+        name: 'Modèle économique',
+        description: 'Définissez comment vous allez gagner de l\'argent.',
+        xpRequired: 5000,
+        cardCategories: ['quiz', 'challenge', 'funding'],
+        rules: { captureEnabled: true, sequentialRequired: true },
+      },
+      {
+        id: 'yeah_level_3_sub_2',
+        levelId: 'yeah_level_3',
+        number: 2,
+        name: 'Organisation',
+        description: 'Structurez votre équipe et vos opérations.',
+        xpRequired: 10000,
+        cardCategories: ['quiz', 'challenge', 'opportunity'],
+        rules: { captureEnabled: true, sequentialRequired: true },
+      },
+      {
+        id: 'yeah_level_3_sub_3',
+        levelId: 'yeah_level_3',
+        number: 3,
+        name: 'Finances',
+        description: 'Maîtrisez vos chiffres et votre trésorerie.',
+        xpRequired: 15000,
+        cardCategories: ['quiz', 'challenge', 'funding'],
+        rules: { captureEnabled: true, sequentialRequired: true },
+      },
+      {
+        id: 'yeah_level_3_sub_4',
+        levelId: 'yeah_level_3',
+        number: 4,
+        name: 'Formalisation',
+        description: 'Officialisez votre entreprise.',
+        xpRequired: 20000,
+        cardCategories: ['quiz', 'challenge', 'duel'],
+        rules: { captureEnabled: true, sequentialRequired: true },
+      },
+    ],
+  },
+  {
+    id: 'yeah_level_4',
+    challengeId: 'yeah',
+    number: 4,
+    name: 'Réussite',
+    description: 'Consolidez votre entreprise et visez l\'excellence.',
+    xpRequired: 40000,
+    deliverableType: 'business_plan_full',
+    posture: 'Champion',
+    iconName: 'trophy-outline',
+    subLevels: [
+      {
+        id: 'yeah_level_4_sub_1',
+        levelId: 'yeah_level_4',
+        number: 1,
+        name: 'Croissance',
+        description: 'Développez votre activité.',
+        xpRequired: 10000,
+        cardCategories: ['quiz', 'challenge', 'duel'],
+        rules: { captureEnabled: true, sequentialRequired: false },
+      },
+      {
+        id: 'yeah_level_4_sub_2',
+        levelId: 'yeah_level_4',
+        number: 2,
+        name: 'Innovation',
+        description: 'Innovez pour rester compétitif.',
+        xpRequired: 20000,
+        cardCategories: ['quiz', 'opportunity', 'duel'],
+        rules: { captureEnabled: true, sequentialRequired: false },
+      },
+      {
+        id: 'yeah_level_4_sub_3',
+        levelId: 'yeah_level_4',
+        number: 3,
+        name: 'Impact',
+        description: 'Mesurez et amplifiez votre impact.',
+        xpRequired: 30000,
+        cardCategories: ['quiz', 'challenge', 'opportunity'],
+        rules: { captureEnabled: true, sequentialRequired: false },
+      },
+      {
+        id: 'yeah_level_4_sub_4',
+        levelId: 'yeah_level_4',
+        number: 4,
+        name: 'Leadership',
+        description: 'Devenez un leader inspirant.',
+        xpRequired: 40000,
+        cardCategories: ['quiz', 'duel', 'funding'],
+        rules: { captureEnabled: true, sequentialRequired: false },
+      },
+    ],
+  },
+];
+
+// ===== CHALLENGE YEAH =====
+
+export const YEAH_CHALLENGE: Challenge = {
+  id: 'yeah',
+  slug: 'yeah',
+  name: 'YEAH',
+  organization: 'Mastercard Foundation',
+  description:
+    'Programme d\'accompagnement pour jeunes entrepreneurs agricoles. Développez vos compétences entrepreneuriales à travers 4 niveaux de progression et obtenez votre certification Champion.',
+
+  // Visuels
+  logoUrl: 'https://example.com/yeah-logo.png', // À remplacer par l'URL réelle
+  bannerUrl: 'https://example.com/yeah-banner.png', // À remplacer par l'URL réelle
+  primaryColor: '#FFBC40',
+  secondaryColor: '#EB001B',
+
+  // Configuration
+  totalLevels: 4,
+  totalXpRequired: 76000, // 6000 + 10000 + 20000 + 40000
+  levels: YEAH_LEVELS,
+  sectors: YEAH_SECTORS,
+
+  // Règles
+  rules: {
+    sequentialProgression: true,
+    captureEnabled: true,
+    maxEnrollmentsPerUser: 5,
+    allowLevelSkip: false,
+  },
+
+  // Métadonnées
+  isActive: true,
+  startDate: null, // Toujours ouvert
+  endDate: null,
+  version: 'v1',
+  createdAt: Date.now(),
+  updatedAt: Date.now(),
+};
+
+// ===== EXPORT PAR DÉFAUT =====
+
+export default YEAH_CHALLENGE;
