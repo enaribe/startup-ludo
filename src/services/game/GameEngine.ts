@@ -20,7 +20,6 @@ import {
   DEFAULT_PAWNS_COUNT,
   isSafePosition,
   getEventAtCircuitPosition,
-  getCircuitDistance,
   type Coordinate,
 } from '@/config/boardConfig';
 
@@ -75,7 +74,8 @@ export class GameEngine {
     const startPosition = config.startIndex;
     const startCoords = MAIN_CIRCUIT[startPosition]!;
 
-    const newState: PawnState = { status: 'circuit', position: startPosition };
+    // Initialiser avec distanceTraveled = 0 (le pion vient de sortir)
+    const newState: PawnState = { status: 'circuit', position: startPosition, distanceTraveled: 0 };
 
     // Vérifier capture à la case de départ
     const capturedPawn = this.checkCapture(
@@ -147,6 +147,18 @@ export class GameEngine {
 
   /**
    * Déplacement sur le circuit principal
+   *
+   * Nouvelle logique avec distanceTraveled :
+   * - Un pion doit parcourir au moins FULL_LAP_DISTANCE (43 cases) avant de pouvoir entrer dans le final path
+   * - distanceTraveled accumule la distance totale parcourue depuis la sortie de la maison
+   * - Quand distanceTraveled + diceValue >= FULL_LAP_DISTANCE ET tokens >= TOKENS_TO_FINISH,
+   *   le pion peut entrer dans le final path
+   *
+   * Exemple pour vert (startIndex=34, exitIndex=33, FULL_LAP_DISTANCE=43) :
+   * - Pion sort à position 34, distanceTraveled=0
+   * - Après plusieurs mouvements, distanceTraveled=40, position=30
+   * - Lance 6 → distanceTraveled devient 46 (>= 43) → peut entrer dans final path
+   * - Position dans final = (46 - 43) - 1 = 2
    */
   private static moveOnCircuit(
     player: Player,
@@ -156,39 +168,67 @@ export class GameEngine {
   ): MoveResult {
     const config = PLAYER_CONFIG[player.color];
     const currentPos = pawn.position;
+    const currentDistance = pawn.distanceTraveled;
     const exitPos = config.exitIndex;
 
-    // Calculer la distance jusqu'à la sortie (sens horaire)
-    const stepsToExit = getCircuitDistance(currentPos, exitPos);
+    // Distance totale après ce mouvement
+    const newTotalDistance = currentDistance + diceValue;
 
-    // Vérifier si le mouvement passe par ou dépasse la case de sortie
-    // ET si le joueur a assez de jetons pour finir
-    if (diceValue > stepsToExit && player.tokens >= TOKENS_TO_FINISH) {
-      // Entrer dans le chemin final
-      const stepsIntoFinal = diceValue - stepsToExit - 1;
+    // Distance requise pour un tour complet (de startIndex à exitIndex)
+    // C'est CIRCUIT_LENGTH - 1 = 43 cases
+    const FULL_LAP_DISTANCE = CIRCUIT_LENGTH - 1;
 
-      if (stepsIntoFinal === FINAL_PATH_LENGTH - 1) {
-        // Atteint exactement la dernière case → VICTOIRE
-        const path = this.buildPathToFinal(player.color, currentPos, FINAL_PATH_LENGTH - 1);
+    // Vérifier si le pion peut entrer dans le final path :
+    // 1. A parcouru au moins un tour complet (newTotalDistance >= FULL_LAP_DISTANCE)
+    // 2. A assez de jetons (>= TOKENS_TO_FINISH)
+    const canEnterFinal = newTotalDistance >= FULL_LAP_DISTANCE && player.tokens >= TOKENS_TO_FINISH;
 
-        return {
-          canMove: true,
-          newState: { status: 'finished' },
-          path: [...path, CENTER_COORDS],
-          isFinished: true,
-        };
-      } else if (stepsIntoFinal < FINAL_PATH_LENGTH - 1) {
-        // Position valide dans le chemin final (avant la dernière case)
-        const path = this.buildPathToFinal(player.color, currentPos, stepsIntoFinal);
-        const newState: PawnState = { status: 'final', position: stepsIntoFinal };
+    if (canEnterFinal) {
+      // Calculer combien de cases le pion avance DANS le final path
+      // stepsIntoFinal = distance au-delà du tour complet
+      const stepsIntoFinal = newTotalDistance - FULL_LAP_DISTANCE;
+      // Position dans le final path (0-indexed)
+      const finalPosition = stepsIntoFinal;
 
-        return {
-          canMove: true,
-          newState,
-          path,
-        };
-      } else {
+      console.log('[GameEngine.moveOnCircuit] Checking final path entry:', {
+        color: player.color,
+        currentPos,
+        exitPos,
+        diceValue,
+        currentDistance,
+        newTotalDistance,
+        FULL_LAP_DISTANCE,
+        stepsIntoFinal,
+        finalPosition,
+        FINAL_PATH_LENGTH,
+        tokens: player.tokens,
+      });
+
+      if (finalPosition >= 0 && finalPosition < FINAL_PATH_LENGTH) {
+        if (finalPosition === FINAL_PATH_LENGTH - 1) {
+          // Atteint exactement la dernière case → VICTOIRE
+          const path = this.buildPathToFinalWithDistance(player.color, currentPos, currentDistance, newTotalDistance);
+
+          return {
+            canMove: true,
+            newState: { status: 'finished' },
+            path: [...path, CENTER_COORDS],
+            isFinished: true,
+          };
+        } else {
+          // Position valide dans le chemin final (avant la dernière case)
+          const path = this.buildPathToFinalWithDistance(player.color, currentPos, currentDistance, newTotalDistance);
+          const newState: PawnState = { status: 'final', position: finalPosition };
+
+          return {
+            canMove: true,
+            newState,
+            path,
+          };
+        }
+      } else if (finalPosition >= FINAL_PATH_LENGTH) {
         // Dépasse le centre → ne peut pas bouger
+        console.log('[GameEngine.moveOnCircuit] Overshoots center, cannot move. finalPosition:', finalPosition);
         return {
           canMove: false,
           newState: pawn,
@@ -197,21 +237,27 @@ export class GameEngine {
       }
     }
 
-    // Mouvement normal sur le circuit (wrap-around naturel avec modulo)
-    const newPos = (currentPos + diceValue) % CIRCUIT_LENGTH;
-    const path = this.buildCircuitPath(currentPos, newPos);
-    const newState: PawnState = { status: 'circuit', position: newPos };
+    // Mouvement normal sur le circuit
+    const newPosWrapped = (currentPos + diceValue) % CIRCUIT_LENGTH;
+    const path = this.buildCircuitPath(currentPos, newPosWrapped);
+
+    // Mettre à jour distanceTraveled
+    const newState: PawnState = {
+      status: 'circuit',
+      position: newPosWrapped,
+      distanceTraveled: newTotalDistance
+    };
 
     // Vérifier capture
     const capturedPawn = this.checkCapture(
       player.id,
       player.color,
-      newPos,
+      newPosWrapped,
       allPlayers
     );
 
     // Vérifier événement
-    const eventType = getEventAtCircuitPosition(newPos);
+    const eventType = getEventAtCircuitPosition(newPosWrapped);
     const triggeredEvent = eventType !== 'normal' && eventType !== 'start' && eventType !== 'safe'
       ? eventType as EventType
       : undefined;
@@ -223,6 +269,54 @@ export class GameEngine {
       capturedPawn,
       triggeredEvent,
     };
+  }
+
+  /**
+   * Construit le chemin d'animation vers le final path en utilisant distanceTraveled
+   */
+  private static buildPathToFinalWithDistance(
+    color: PlayerColor,
+    fromCircuitPos: number,
+    fromDistance: number,
+    toDistance: number
+  ): Coordinate[] {
+    const FULL_LAP_DISTANCE = CIRCUIT_LENGTH - 1;
+    const path: Coordinate[] = [];
+
+    let currentPos = fromCircuitPos;
+    let currentDist = fromDistance;
+
+    // Avancer sur le circuit jusqu'à atteindre FULL_LAP_DISTANCE
+    while (currentDist < FULL_LAP_DISTANCE && currentDist < toDistance) {
+      currentPos = (currentPos + 1) % CIRCUIT_LENGTH;
+      currentDist++;
+      const coord = MAIN_CIRCUIT[currentPos];
+      if (coord) {
+        path.push(coord);
+      }
+    }
+
+    // Entrer dans le final path
+    const finalPath = FINAL_PATHS[color];
+    if (finalPath) {
+      const stepsInFinal = toDistance - FULL_LAP_DISTANCE;
+      for (let i = 0; i < stepsInFinal && i < FINAL_PATH_LENGTH; i++) {
+        const coord = finalPath[i];
+        if (coord) {
+          path.push(coord);
+        }
+      }
+    }
+
+    console.log('[GameEngine.buildPathToFinalWithDistance]', {
+      color,
+      fromCircuitPos,
+      fromDistance,
+      toDistance,
+      pathLength: path.length,
+    });
+
+    return path;
   }
 
   /**
@@ -292,64 +386,6 @@ export class GameEngine {
     }
 
     console.log('[GameEngine.buildCircuitPath] Path built with', path.length, 'steps');
-    return path;
-  }
-
-  /**
-   * Construit le chemin d'animation vers le chemin final
-   */
-  private static buildPathToFinal(
-    color: PlayerColor,
-    fromCircuit: number,
-    toFinalPos: number
-  ): Coordinate[] {
-    console.log('[GameEngine.buildPathToFinal]', { color, fromCircuit, toFinalPos });
-    
-    const config = PLAYER_CONFIG[color];
-    if (!config) {
-      console.error('[GameEngine.buildPathToFinal] No config for color:', color);
-      return [];
-    }
-    
-    const path: Coordinate[] = [];
-    let iterations = 0;
-    const maxIterations = CIRCUIT_LENGTH + 1;
-
-    // D'abord, aller jusqu'à la case de sortie
-    let current = fromCircuit;
-    while (current !== config.exitIndex && iterations < maxIterations) {
-      current = (current + 1) % CIRCUIT_LENGTH;
-      const coord = MAIN_CIRCUIT[current];
-      if (coord) {
-        path.push(coord);
-      } else {
-        console.warn('[GameEngine.buildPathToFinal] Missing circuit coord at:', current);
-      }
-      iterations++;
-    }
-
-    if (iterations >= maxIterations) {
-      console.error('[GameEngine.buildPathToFinal] Max iterations reached for circuit!');
-      return path;
-    }
-
-    // Puis entrer dans le chemin final
-    const finalPath = FINAL_PATHS[color];
-    if (!finalPath) {
-      console.error('[GameEngine.buildPathToFinal] No final path for color:', color);
-      return path;
-    }
-    
-    for (let i = 0; i <= toFinalPos; i++) {
-      const coord = finalPath[i];
-      if (coord) {
-        path.push(coord);
-      } else {
-        console.warn('[GameEngine.buildPathToFinal] Missing final coord at:', i);
-      }
-    }
-
-    console.log('[GameEngine.buildPathToFinal] Path built with', path.length, 'steps');
     return path;
   }
 
@@ -517,7 +553,9 @@ export class GameEngine {
         return CENTER_COORDS;
       }
 
-      console.warn('[GameEngine.getPawnCoordinates] Unknown pawn status:', pawn.status);
+      // Exhaustive check - ne devrait jamais arriver
+      const _exhaustive: never = pawn;
+      console.warn('[GameEngine.getPawnCoordinates] Unknown pawn status:', _exhaustive);
       return null;
     } catch (error) {
       console.error('[GameEngine.getPawnCoordinates] Error:', error, { color, pawn });

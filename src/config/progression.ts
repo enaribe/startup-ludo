@@ -151,6 +151,28 @@ export function getLevelFromXP(totalXP: number): { level: number; currentXP: num
   };
 }
 
+// ===== MULTIPLICATEURS XP CHALLENGE PAR NIVEAU =====
+
+/**
+ * En mode Challenge, les XP sont multipliés selon le niveau actuel.
+ * Cela permet de progresser plus vite dans les niveaux supérieurs
+ * qui demandent beaucoup plus d'XP.
+ */
+export const CHALLENGE_XP_MULTIPLIERS: Record<number, number> = {
+  1: 10,   // Niveau 1 (6 000 XP) : x10 → ~12 victoires pour compléter
+  2: 16,   // Niveau 2 (10 000 XP) : x16 → ~12 victoires pour compléter
+  3: 30,   // Niveau 3 (20 000 XP) : x30 → ~13 victoires pour compléter
+  4: 50,   // Niveau 4 (40 000 XP) : x50 → ~16 victoires pour compléter
+};
+
+/**
+ * Applique le multiplicateur de niveau Challenge aux XP gagnés
+ */
+export function getChallengeXP(baseXP: number, challengeLevel: number): number {
+  const multiplier = CHALLENGE_XP_MULTIPLIERS[challengeLevel] ?? 1;
+  return Math.round(baseXP * multiplier);
+}
+
 // ===== RÉCOMPENSES XP =====
 
 export const XP_REWARDS: Record<string, XPReward> = {

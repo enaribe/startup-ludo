@@ -13,20 +13,13 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Avatar, DynamicGradientBorder, GradientBorder, RadialBackground } from '@/components/ui';
+import { ChallengeHomeCard } from '@/components/challenges';
 import { formatXP, getLevelFromXP, getRankFromXP, getRankProgress } from '@/config/progression';
-import { useAuthStore, useUserStore } from '@/stores';
+import { ALL_CHALLENGES } from '@/data/challenges';
+import { useAuthStore, useUserStore, useChallengeStore } from '@/stores';
 import { FONTS } from '@/styles/typography';
 
 const { width } = Dimensions.get('window');
-
-/** Formate un nombre en version courte (k, M, B) pour gagner de l'espace */
-function formatShortValue(value: number): string {
-  const abs = Math.abs(value);
-  if (abs >= 1e9) return (value / 1e9).toFixed(1).replace(/\.0$/, '') + 'B';
-  if (abs >= 1e6) return (value / 1e6).toFixed(1).replace(/\.0$/, '') + 'M';
-  if (abs >= 1e3) return (value / 1e3).toFixed(1).replace(/\.0$/, '') + 'k';
-  return String(Math.round(value));
-}
 
 // Rayons tournants sous le logo
 const SpinningRays = memo(function SpinningRays() {
@@ -57,6 +50,23 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const user = useAuthStore((state) => state.user);
   const profile = useUserStore((state) => state.profile);
+
+  // Charger les challenges au démarrage
+  const setChallenges = useChallengeStore((state) => state.setChallenges);
+  const challenges = useChallengeStore((state) => state.challenges);
+  const enrollments = useChallengeStore((state) => state.enrollments);
+
+  useEffect(() => {
+    if (challenges.length === 0) {
+      setChallenges(ALL_CHALLENGES);
+    }
+  }, [challenges.length, setChallenges]);
+
+  // Challenge à la une (premier challenge actif)
+  const featuredChallenge = challenges.find((c) => c.isActive) || null;
+  const featuredEnrollment = featuredChallenge
+    ? enrollments.find((e) => e.challengeId === featuredChallenge.id)
+    : null;
 
   // Calculs de progression
   const totalXP = profile?.xp ?? 0;
@@ -133,7 +143,7 @@ export default function HomeScreen() {
           <Animated.View entering={FadeInDown.delay(300).duration(500)}>
             <GradientBorder boxHeight={78} boxWidth={(width - 36 - 20) / 3} borderRadius={15} fill="rgba(0, 0, 0, 0.15)">
               <View style={styles.statBoxContent}>
-                <Text style={styles.statValueLuckiest}>{formatShortValue(portfolioValue)}€</Text>
+                <Text style={styles.statValueLuckiest}>{portfolioValue}M€</Text>
                 <Text style={styles.statLabel}>Valorisation</Text>
               </View>
             </GradientBorder>
@@ -184,19 +194,38 @@ export default function HomeScreen() {
         </View>
 
         <Animated.View entering={FadeInDown.delay(600).duration(500)} style={styles.challengeCardWrapper}>
-          <DynamicGradientBorder borderRadius={16} fill="rgba(0, 0, 0, 0.35)">
-            <View style={styles.challengeCardContent}>
-              <View style={{ alignItems: 'center', paddingVertical: 20 }}>
-                <Ionicons name="trophy-outline" size={40} color="rgba(255, 255, 255, 0.2)" />
-                <Text style={[styles.challengeNameText, { marginTop: 12, opacity: 0.5 }]}>
-                  BIENTOT DISPONIBLE
-                </Text>
-                <Text style={[styles.challengeDescText, { textAlign: 'center', marginTop: 6 }]}>
-                  Les challenges arrivent bientot !
-                </Text>
+          {featuredChallenge ? (
+            <ChallengeHomeCard
+              challenge={featuredChallenge}
+              enrollment={featuredEnrollment}
+              onContinue={() => {
+                router.push({
+                  pathname: '/(challenges)/challenge-hub',
+                  params: { challengeId: featuredChallenge.id },
+                });
+              }}
+              onEnroll={() => {
+                router.push({
+                  pathname: '/(challenges)/[challengeId]',
+                  params: { challengeId: featuredChallenge.id },
+                });
+              }}
+            />
+          ) : (
+            <DynamicGradientBorder borderRadius={16} fill="rgba(0, 0, 0, 0.35)">
+              <View style={styles.challengeCardContent}>
+                <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+                  <Ionicons name="trophy-outline" size={40} color="rgba(255, 255, 255, 0.2)" />
+                  <Text style={[styles.challengeNameText, { marginTop: 12, opacity: 0.5 }]}>
+                    BIENTOT DISPONIBLE
+                  </Text>
+                  <Text style={[styles.challengeDescText, { textAlign: 'center', marginTop: 6 }]}>
+                    Les challenges arrivent bientot !
+                  </Text>
+                </View>
               </View>
-            </View>
-          </DynamicGradientBorder>
+            </DynamicGradientBorder>
+          )}
         </Animated.View>
       </ScrollView>
     </View>

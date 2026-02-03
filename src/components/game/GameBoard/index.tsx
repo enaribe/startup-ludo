@@ -21,14 +21,12 @@ import { GameEngine } from '@/services/game/GameEngine';
 import { useGameStore } from '@/stores';
 import type { Player, PlayerColor } from '@/types';
 import { memo, useMemo } from 'react';
-import { Dimensions, StyleSheet, View } from 'react-native';
+import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { CenterZone } from './CenterZone';
 import { HomeZone } from './HomeZone';
 import { PathCell } from './PathCell';
 import { Pawn } from './Pawn';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 interface GameBoardProps {
   players: Player[];
@@ -37,6 +35,8 @@ interface GameBoardProps {
   highlightedPositions: { type: 'circuit' | 'final'; position: number; color?: PlayerColor }[];
   onPawnPress?: (playerId: string, pawnIndex: number) => void;
   onPawnMoveComplete?: () => void;
+  /** External board size (pixels). If omitted, auto-computed from window width. */
+  size?: number;
 }
 
 export const GameBoard = memo(function GameBoard({
@@ -46,10 +46,12 @@ export const GameBoard = memo(function GameBoard({
   highlightedPositions,
   onPawnPress,
   onPawnMoveComplete,
+  size,
 }: GameBoardProps) {
-  // Dimensions - le plateau prend presque toute la largeur
+  // Dimensions réactives — s'adapte aux tablettes et à la rotation
+  const { width: windowWidth } = useWindowDimensions();
   const boardPadding = 4;
-  const boardSize = Math.min(SCREEN_WIDTH - 16, 400);
+  const boardSize = size ?? Math.min(windowWidth - 16, 400);
   const cellSize = (boardSize - boardPadding * 2) / BOARD_SIZE;
 
   // Taille des zones maison (5 cellules pour grille 13x13)

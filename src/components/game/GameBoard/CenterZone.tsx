@@ -40,6 +40,8 @@ export const CenterZone = memo(function CenterZone({
 
         const angle = (index * 90) - 45;
         const radius = size * 0.38;
+        // Scale indicator with board size (proportional to center zone)
+        const indicatorSize = Math.max(size * 0.2, 22);
 
         return (
           <View
@@ -47,6 +49,9 @@ export const CenterZone = memo(function CenterZone({
             style={[
               styles.finishedPawn,
               {
+                width: indicatorSize,
+                height: indicatorSize,
+                borderRadius: indicatorSize / 2,
                 backgroundColor: COLORS.players[pawn.color],
                 transform: [
                   {
@@ -59,7 +64,7 @@ export const CenterZone = memo(function CenterZone({
               },
             ]}
           >
-            <Text style={styles.pawnCountText}>{pawn.count}</Text>
+            <Text style={[styles.pawnCountText, { fontSize: Math.max(indicatorSize * 0.45, 10) }]}>{pawn.count}</Text>
           </View>
         );
       })}

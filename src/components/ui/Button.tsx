@@ -1,25 +1,25 @@
+import { useSettingsStore } from '@/stores';
+import { COLORS } from '@/styles/colors';
+import * as Haptics from 'expo-haptics';
 import { memo, useCallback } from 'react';
 import {
-  Pressable,
-  Text,
-  ActivityIndicator,
-  type PressableProps,
-  type ViewStyle,
-  type TextStyle,
+    ActivityIndicator,
+    Pressable,
+    Text,
+    type PressableProps,
+    type TextStyle,
+    type ViewStyle,
 } from 'react-native';
 import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  runOnJS,
+    runOnJS,
+    useAnimatedStyle,
+    useSharedValue,
+    withSpring,
 } from 'react-native-reanimated';
-import * as Haptics from 'expo-haptics';
-import { COLORS } from '@/styles/colors';
-import { useSettingsStore } from '@/stores';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
+type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'success';
 type ButtonSize = 'sm' | 'md' | 'lg';
 
 interface ButtonProps extends Omit<PressableProps, 'style'> {
@@ -94,6 +94,17 @@ const VARIANT_STYLES: Record<
     },
     pressed: {
       backgroundColor: '#D32F2F',
+    },
+  },
+  success: {
+    container: {
+      backgroundColor: COLORS.success,
+    },
+    text: {
+      color: COLORS.white,
+    },
+    pressed: {
+      backgroundColor: '#388E3C',
     },
   },
 };

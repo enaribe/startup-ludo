@@ -1,22 +1,26 @@
-import { memo, useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withSequence,
-  SlideInUp,
-} from 'react-native-reanimated';
+import { PopupQuizIcon } from '@/components/game/popups/PopupIcons';
+import { Modal } from '@/components/ui/Modal';
+import { useSettingsStore } from '@/stores';
+import { COLORS } from '@/styles/colors';
+import { SPACING } from '@/styles/spacing';
+import { FONTS, FONT_SIZES } from '@/styles/typography';
+import type { QuizEvent } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Modal } from '@/components/ui/Modal';
-import { PopupQuizIcon } from '@/components/game/popups/PopupIcons';
-import { COLORS } from '@/styles/colors';
-import { FONTS, FONT_SIZES } from '@/styles/typography';
-import { SPACING, BORDER_RADIUS, SHADOWS } from '@/styles/spacing';
-import { useSettingsStore } from '@/stores';
-import type { QuizEvent } from '@/types';
+import { memo, useCallback, useEffect, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  FadeIn,
+  FadeInDown,
+  SlideInUp,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withSequence,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 
 interface QuizPopupProps {
   visible: boolean;
@@ -27,6 +31,22 @@ interface QuizPopupProps {
   spectatorResult?: { ok: boolean; reward: number };
 }
 
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+const CARD_STYLE = {
+  backgroundColor: '#FFFFFF',
+  borderRadius: 24,
+  padding: SPACING[6],
+  maxWidth: 340,
+  width: '90%' as const,
+  alignItems: 'center' as const,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 8 },
+  shadowOpacity: 0.15,
+  shadowRadius: 16,
+  elevation: 12,
+  overflow: 'hidden' as const,
+};
 
 export const QuizPopup = memo(function QuizPopup({
   visible,
@@ -57,9 +77,15 @@ export const QuizPopup = memo(function QuizPopup({
       badgeBounce.value = 0;
       iconScale.value = withSequence(
         withTiming(0, { duration: 0 }),
-        withTiming(1, { duration: 280 })
+        withSpring(1.2, { damping: 8, stiffness: 140 }),
+        withSpring(1, { damping: 12 })
       );
-      iconRotate.value = 0;
+      iconRotate.value = withSequence(
+        withTiming(-8, { duration: 100 }),
+        withTiming(8, { duration: 100 }),
+        withTiming(-4, { duration: 80 }),
+        withTiming(0, { duration: 80 })
+      );
     }
   }, [visible, quiz, timerProgress, resultScale, iconScale, iconRotate, badgeBounce]);
 
@@ -83,15 +109,15 @@ export const QuizPopup = memo(function QuizPopup({
     if (!isSpectator || !spectatorResult || !quiz) return;
     setHasAnswered(true);
     setSelectedAnswer(spectatorResult.ok ? quiz.correctAnswer : -1);
-    resultScale.value = withTiming(1, { duration: 220 });
-    badgeBounce.value = withTiming(1, { duration: 220 });
+    resultScale.value = withSpring(1);
+    badgeBounce.value = withDelay(200, withSpring(1, { damping: 6 }));
   }, [isSpectator, spectatorResult, quiz, resultScale, badgeBounce]);
 
   const handleTimeUp = useCallback(() => {
     if (hasAnswered) return;
     setHasAnswered(true);
-    resultScale.value = withTiming(1, { duration: 220 });
-    badgeBounce.value = withTiming(1, { duration: 220 });
+    resultScale.value = withSpring(1);
+    badgeBounce.value = withDelay(200, withSpring(1, { damping: 6 }));
     if (hapticsEnabled) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     setTimeout(() => onAnswer(false, 0), 2000);
   }, [hasAnswered, hapticsEnabled, onAnswer, resultScale, badgeBounce]);
@@ -103,8 +129,8 @@ export const QuizPopup = memo(function QuizPopup({
       setHasAnswered(true);
       const isCorrect = index === quiz.correctAnswer;
       const reward = isCorrect ? quiz.reward : 0;
-      resultScale.value = withTiming(1, { duration: 220 });
-      badgeBounce.value = withTiming(1, { duration: 220 });
+      resultScale.value = withSpring(1);
+      badgeBounce.value = withDelay(200, withSpring(1, { damping: 6 }));
       if (hapticsEnabled) {
         if (isCorrect) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         else Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -142,129 +168,103 @@ export const QuizPopup = memo(function QuizPopup({
 
   return (
     <Modal visible={visible} onClose={onClose} closeOnBackdrop={false} showCloseButton={false} bareContent>
-      <Animated.View entering={SlideInUp.springify().damping(18)} style={styles.card}>
-        <View style={styles.content}>
-          {isSpectator && (
-            <View style={styles.spectatorBanner}>
-              <Ionicons name="eye" size={14} color={COLORS.white} />
-              <Text style={styles.spectatorText}>L'adversaire répond au quiz...</Text>
-            </View>
-          )}
-
-          {/* Icon avec animation */}
-          <Animated.View style={[styles.iconWrap, iconAnimStyle]}>
-            <View style={styles.iconCircle}>
-              <PopupQuizIcon size={48} />
-            </View>
-          </Animated.View>
-
-          {/* Titre */}
-          <Text style={styles.title}>QUIZ</Text>
-
-          {/* Question dans une box */}
-          <View style={styles.questionBox}>
-            <Text style={styles.question}>{quiz.question}</Text>
+      <Animated.View entering={SlideInUp.springify().damping(18)} style={[styles.card, CARD_STYLE]}>
+        {isSpectator && (
+          <View style={styles.spectatorBanner}>
+            <Ionicons name="eye" size={14} color={COLORS.white} />
+            <Text style={styles.spectatorText}>L'adversaire répond au quiz...</Text>
           </View>
+        )}
 
-          {/* Timer bar - visible seulement avant réponse */}
-          {!hasAnswered && (
-            <View style={styles.timerContainer}>
-              <Ionicons name="time-outline" size={16} color={COLORS.events.quiz} />
-              <View style={styles.timerTrack}>
-                <Animated.View style={[styles.timerFillWrap, timerAnimStyle]}>
-                  <LinearGradient
-                    colors={[COLORS.events.quiz, COLORS.primary]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={StyleSheet.absoluteFill}
-                  />
-                </Animated.View>
-              </View>
+        <Animated.View style={[styles.iconWrap, iconAnimStyle]}>
+          <PopupQuizIcon size={56} />
+        </Animated.View>
+
+        <Text style={styles.title}>QUIZZ</Text>
+        <Text style={styles.question}>{quiz.question}</Text>
+
+        {!hasAnswered && (
+          <>
+            <View style={styles.timerTrack}>
+              <Animated.View style={[styles.timerFillWrap, timerAnimStyle]}>
+                <LinearGradient
+                  colors={['#FFBC40', '#90CAF9']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={StyleSheet.absoluteFill}
+                />
+              </Animated.View>
             </View>
-          )}
-
-          {/* Options de réponse - structure unique */}
-          <View style={styles.options}>
-            {quiz.options.map((option, index) => {
-              const isCorrectOption = index === quiz.correctAnswer;
-              const isSelected = selectedAnswer === index;
-              const isSelectedWrong = isSelected && !isCorrectOption;
-              const showAsCorrect = hasAnswered && isCorrectOption;
-
-              // Styles conditionnels
-              const pillStyle = !hasAnswered
-                ? undefined
-                : showAsCorrect
-                  ? styles.optionPillCorrect
-                  : isSelectedWrong
-                    ? styles.optionPillWrong
-                    : styles.optionPillDisabled;
-
-              const prefixStyle = !hasAnswered
-                ? styles.optionPrefixBadge
-                : showAsCorrect
-                  ? styles.optionPrefixBadgeCorrect
-                  : isSelectedWrong
-                    ? styles.optionPrefixBadgeWrong
-                    : styles.optionPrefixBadge;
-
-              const showCheckmark = hasAnswered && showAsCorrect;
-              const showCross = hasAnswered && isSelectedWrong;
-
-              return (
-                <Pressable
+            <View style={styles.options}>
+              {quiz.options.map((option, index) => (
+                <AnimatedPressable
                   key={index}
+                  entering={FadeInDown.delay(index * 80).springify()}
                   onPress={() => handleSelectAnswer(index)}
-                  disabled={isSpectator || hasAnswered}
+                  disabled={isSpectator}
+                  style={({ pressed }) => [
+                    styles.optionPill,
+                    pressed && styles.optionPillPressed,
+                  ]}
                 >
-                  {({ pressed }) => (
-                    <View
+                  <Text style={styles.optionPrefix}>{String.fromCharCode(65 + index)}. </Text>
+                  <Text style={styles.optionLabel}>{option}</Text>
+                </AnimatedPressable>
+              ))}
+            </View>
+          </>
+        )}
+
+        {hasAnswered && (
+          <>
+            <View style={styles.options}>
+              {quiz.options.map((option, index) => {
+                const isCorrectOption = index === quiz.correctAnswer;
+                const isSelectedWrong = selectedAnswer === index && !isCorrectOption;
+                const isSelectedCorrect = index === quiz.correctAnswer;
+                const pillStyle =
+                  isSelectedCorrect && isCorrect
+                    ? styles.optionPillCorrect
+                    : isSelectedWrong
+                      ? styles.optionPillWrong
+                      : isCorrectOption && !isCorrect
+                        ? styles.optionPillCorrectBorder
+                        : styles.optionPillDisabled;
+                const textStyle =
+                  isSelectedCorrect && isCorrect
+                    ? styles.optionTextCorrect
+                    : isSelectedWrong
+                      ? styles.optionTextWrong
+                      : styles.optionLabel;
+                return (
+                  <Animated.View
+                    key={index}
+                    entering={FadeIn.delay(index * 60)}
+                    style={[styles.optionPill, pillStyle]}
+                  >
+                    <Text
                       style={[
-                        styles.optionPill,
-                        pressed && !hasAnswered && styles.optionPillPressed,
-                        pillStyle,
+                        styles.optionPrefix,
+                        (isSelectedCorrect && isCorrect) || isSelectedWrong
+                          ? styles.optionTextCorrect
+                          : undefined,
                       ]}
                     >
-                      <View style={prefixStyle}>
-                        {showCheckmark ? (
-                          <Ionicons name="checkmark" size={16} color={COLORS.white} />
-                        ) : showCross ? (
-                          <Ionicons name="close" size={16} color={COLORS.white} />
-                        ) : (
-                          <Text style={[
-                            styles.optionPrefixText,
-                            (showAsCorrect || isSelectedWrong) && styles.optionPrefixTextLight
-                          ]}>
-                            {String.fromCharCode(65 + index)}
-                          </Text>
-                        )}
+                      {String.fromCharCode(65 + index)}.{' '}
+                    </Text>
+                    <Text style={[styles.optionLabel, textStyle]}>{option}</Text>
+                    {isSelectedCorrect && isCorrect && (
+                      <View style={styles.optionRewardBadge}>
+                        <Text style={styles.optionRewardText}>+{quiz.reward}</Text>
                       </View>
-                      <Text
-                        style={[
-                          styles.optionLabel,
-                          showAsCorrect && styles.optionLabelCorrect,
-                          isSelectedWrong && styles.optionLabelWrong,
-                        ]}
-                        numberOfLines={2}
-                      >
-                        {option}
-                      </Text>
-                      {showAsCorrect && isCorrect && (
-                        <View style={styles.optionRewardBadge}>
-                          <Text style={styles.optionRewardText}>+{quiz.reward}</Text>
-                        </View>
-                      )}
-                    </View>
-                  )}
-                </Pressable>
-              );
-            })}
-          </View>
+                    )}
+                  </Animated.View>
+                );
+              })}
+            </View>
 
-          {/* Résultat - visible après réponse */}
-          {hasAnswered && (
             <Animated.View style={[styles.resultWrap, resultAnimStyle]}>
-              <Text style={[styles.resultTitle, !isCorrect && styles.resultTitleLoss]}>
+              <Text style={styles.resultTitle}>
                 {isCorrect ? 'VOUS GAGNEZ' : 'VOUS PERDEZ'}
               </Text>
               <Animated.View
@@ -279,94 +279,62 @@ export const QuizPopup = memo(function QuizPopup({
                 </Text>
               </Animated.View>
             </Animated.View>
-          )}
-        </View>
+          </>
+        )}
       </Animated.View>
     </Modal>
   );
 });
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: COLORS.white,
-    borderRadius: BORDER_RADIUS['3xl'],
-    maxWidth: 360,
-    width: '92%',
-    ...SHADOWS.xl,
-    overflow: 'hidden',
-  },
-  content: {
-    paddingTop: SPACING[5],
-    paddingBottom: SPACING[8],
-    paddingHorizontal: SPACING[5],
-    alignItems: 'center',
-  },
+  card: {},
   spectatorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: SPACING[2],
     backgroundColor: COLORS.info,
-    borderRadius: BORDER_RADIUS.full,
-    paddingVertical: SPACING[1],
+    borderRadius: 8,
+    paddingVertical: SPACING[2],
     paddingHorizontal: SPACING[3],
-    marginBottom: SPACING[4],
+    marginBottom: SPACING[3],
   },
   spectatorText: {
     fontFamily: FONTS.bodySemiBold,
-    fontSize: FONT_SIZES.xs,
+    fontSize: FONT_SIZES.sm,
     color: COLORS.white,
   },
   iconWrap: {
     marginBottom: SPACING[3],
   },
-  iconCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: 'rgba(74, 144, 226, 0.12)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   title: {
     fontFamily: FONTS.title,
     fontSize: FONT_SIZES['2xl'],
-    color: COLORS.events.quiz,
-    letterSpacing: 2,
-    marginBottom: SPACING[3],
-  },
-  questionBox: {
-    backgroundColor: '#F8F9FA',
-    borderRadius: BORDER_RADIUS.xl,
-    paddingVertical: SPACING[3],
-    paddingHorizontal: SPACING[4],
-    width: '100%',
+    color: '#4CAF50',
+    textShadowColor: '#2E7D32',
+    textShadowOffset: { width: 2, height: 2 },
+    textShadowRadius: 0,
     marginBottom: SPACING[4],
   },
   question: {
-    fontFamily: FONTS.bodyMedium,
-    fontSize: FONT_SIZES.base,
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.md,
     color: '#2C3E50',
     textAlign: 'center',
-    lineHeight: 22,
-  },
-  timerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING[2],
-    width: '100%',
+    lineHeight: 24,
     marginBottom: SPACING[4],
   },
   timerTrack: {
-    flex: 1,
-    height: 6,
-    backgroundColor: '#E8EEF4',
-    borderRadius: BORDER_RADIUS.full,
+    height: 8,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 4,
+    width: '100%',
     overflow: 'hidden',
+    marginBottom: SPACING[4],
   },
   timerFillWrap: {
     height: '100%',
-    borderRadius: BORDER_RADIUS.full,
+    borderRadius: 4,
     overflow: 'hidden',
   },
   options: {
@@ -376,130 +344,95 @@ const styles = StyleSheet.create({
   optionPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F5F7FA',
-    borderRadius: BORDER_RADIUS.xl,
-    paddingVertical: SPACING[3],
-    paddingHorizontal: SPACING[4],
-    minHeight: 56,
-    ...SHADOWS.sm,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E0E0E0',
+    borderRadius: 28,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
   },
   optionPillPressed: {
-    backgroundColor: 'rgba(74, 144, 226, 0.12)',
-    transform: [{ scale: 0.98 }],
+    borderColor: '#4CAF50',
+    backgroundColor: 'rgba(76, 175, 80, 0.08)',
   },
   optionPillCorrect: {
-    backgroundColor: COLORS.success,
+    backgroundColor: '#4CAF50',
+    borderColor: '#4CAF50',
   },
   optionPillWrong: {
-    backgroundColor: COLORS.error,
+    backgroundColor: '#E57373',
+    borderColor: '#E57373',
+  },
+  optionPillCorrectBorder: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#4CAF50',
+    borderWidth: 2,
   },
   optionPillDisabled: {
-    backgroundColor: '#EAEEF2',
-    opacity: 0.6,
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E0E0E0',
+    opacity: 0.85,
   },
-  optionPrefixBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: COLORS.white,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: SPACING[3],
-    ...SHADOWS.sm,
-  },
-  optionPrefixBadgeCorrect: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: SPACING[3],
-  },
-  optionPrefixBadgeWrong: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: SPACING[3],
-  },
-  optionPrefixText: {
+  optionPrefix: {
     fontFamily: FONTS.bodySemiBold,
-    fontSize: FONT_SIZES.base,
-    color: COLORS.events.quiz,
-  },
-  optionPrefixTextLight: {
-    color: COLORS.white,
+    fontSize: FONT_SIZES.md,
+    color: '#546E7A',
   },
   optionLabel: {
-    fontFamily: FONTS.bodyMedium,
-    fontSize: FONT_SIZES.base,
-    color: '#2C3E50',
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.md,
+    color: '#546E7A',
     flex: 1,
-    lineHeight: 22,
   },
-  optionLabelCorrect: {
-    color: COLORS.white,
-    fontFamily: FONTS.bodySemiBold,
+  optionTextCorrect: {
+    color: '#FFFFFF',
   },
-  optionLabelWrong: {
-    color: COLORS.white,
-    fontFamily: FONTS.bodySemiBold,
+  optionTextWrong: {
+    color: '#FFFFFF',
   },
   optionRewardBadge: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.white,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: SPACING[2],
-    ...SHADOWS.sm,
   },
   optionRewardText: {
     fontFamily: FONTS.title,
     fontSize: FONT_SIZES.sm,
-    color: COLORS.success,
+    color: '#4CAF50',
   },
   resultWrap: {
     alignItems: 'center',
-    marginTop: SPACING[5],
-    paddingTop: SPACING[4],
-    borderTopWidth: 1,
-    borderTopColor: '#E8EEF4',
-    width: '100%',
+    marginTop: SPACING[4],
   },
   resultTitle: {
     fontFamily: FONTS.title,
-    fontSize: FONT_SIZES.lg,
-    color: COLORS.success,
+    fontSize: FONT_SIZES.xl,
+    color: '#1B2A4A',
     marginBottom: SPACING[3],
   },
-  resultTitleLoss: {
-    color: COLORS.error,
-  },
   badge: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     borderWidth: 3,
     justifyContent: 'center',
     alignItems: 'center',
-    ...SHADOWS.md,
   },
   badgeGain: {
-    backgroundColor: COLORS.success,
+    backgroundColor: '#4CAF50',
     borderColor: '#2E7D32',
   },
   badgeLoss: {
-    backgroundColor: COLORS.error,
+    backgroundColor: '#E57373',
     borderColor: '#C62828',
   },
   badgeText: {
     fontFamily: FONTS.title,
-    fontSize: FONT_SIZES.xl,
-    color: COLORS.white,
+    fontSize: FONT_SIZES.lg,
+    color: '#FFFFFF',
   },
 });

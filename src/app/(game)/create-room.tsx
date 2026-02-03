@@ -345,7 +345,7 @@ export default function CreateRoomScreen() {
           }}
           showsVerticalScrollIndicator={false}
         >
-          {/* Carte de confirmation — même largeur que le bouton en bas (contentWidth) */}
+          {/* Carte de confirmation — même largeur que les autres vues (code, etc.) */}
           <Animated.View
             entering={FadeInDown.delay(100).duration(500)}
             style={styles.confirmationCardWrapper}
@@ -353,7 +353,8 @@ export default function CreateRoomScreen() {
             <DynamicGradientBorder
               borderRadius={24}
               fill="rgba(0, 0, 0, 0.35)"
-              boxWidth={contentWidth}
+              boxWidth={screenWidth}
+              style={styles.confirmationCardBorder}
             >
               <View style={styles.confirmationCard}>
                 {/* Icône globe */}
@@ -446,11 +447,11 @@ export default function CreateRoomScreen() {
         }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Room Code — design system: fill rgba(0,0,0,0.35) */}
+        {/* Room Code */}
         <Animated.View entering={FadeInDown.delay(100).duration(500)}>
           <DynamicGradientBorder
             borderRadius={20}
-            fill="rgba(0, 0, 0, 0.35)"
+            fill="rgba(10, 25, 41, 0.6)"
             boxWidth={contentWidth}
           >
             <View style={styles.codeSection}>
@@ -470,69 +471,74 @@ export default function CreateRoomScreen() {
           </DynamicGradientBorder>
         </Animated.View>
 
-        {/* Liste des joueurs — même design que local-setup (CONFIGURATION DES JOUEURS) */}
-        <Animated.View entering={FadeInDown.delay(200).duration(500)} style={styles.lobbySectionWrapper}>
-          <DynamicGradientBorder
-            borderRadius={20}
-            fill="rgba(0, 0, 0, 0.35)"
-            boxWidth={contentWidth}
-            style={styles.lobbyPlayersBlock}
-          >
-            <Text style={styles.lobbySectionTitle}>
-              JOUEURS ({playersList.length}/{maxPlayers})
-            </Text>
+        {/* Players list */}
+        <Animated.View entering={FadeInDown.delay(200).duration(500)} style={{ marginTop: SPACING[5] }}>
+          <Text style={styles.playersLabel}>
+            JOUEURS ({playersList.length}/{maxPlayers})
+          </Text>
+
+          <View style={{ gap: SPACING[3] }}>
             {playersList.length === 0 ? (
-              <View style={styles.emptyPlayers}>
-                <Ionicons name="hourglass-outline" size={24} color="rgba(255,255,255,0.3)" />
-                <Text style={styles.emptyText}>En attente de joueurs...</Text>
-              </View>
+              <DynamicGradientBorder
+                borderRadius={16}
+                fill="rgba(10, 25, 41, 0.6)"
+                boxWidth={contentWidth}
+              >
+                <View style={styles.emptyPlayers}>
+                  <Ionicons name="hourglass-outline" size={24} color="rgba(255,255,255,0.3)" />
+                  <Text style={styles.emptyText}>En attente de joueurs...</Text>
+                </View>
+              </DynamicGradientBorder>
             ) : (
-              <View style={styles.playersList}>
-                {playersList.map((player, index) => (
-                  <Animated.View
-                    key={player.playerId}
-                    entering={FadeIn.delay(280 + index * 80).duration(400)}
-                    style={styles.playerCardWrapper}
+              playersList.map((player, index) => (
+                <Animated.View
+                  key={player.playerId}
+                  entering={FadeIn.delay(300 + index * 100).duration(300)}
+                >
+                  <DynamicGradientBorder
+                    borderRadius={16}
+                    fill={player.isHost ? 'rgba(255, 188, 64, 0.08)' : 'rgba(10, 25, 41, 0.6)'}
+                    boxWidth={contentWidth}
                   >
-                    <DynamicGradientBorder
-                      borderRadius={14}
-                      fill="rgba(0, 0, 0, 0.35)"
-                      boxWidth={contentWidth - 24}
-                      style={styles.lobbyPlayerCardBorder}
-                    >
-                      <View style={styles.lobbyPlayerCard}>
-                        <View style={styles.lobbyPlayerAvatar}>
-                          <Avatar
-                            name={player.displayName ?? player.name ?? 'Joueur'}
-                            playerColor={player.color}
-                            size="sm"
-                          />
-                        </View>
-                        <View style={styles.lobbyPlayerInfo}>
-                          <Text style={styles.lobbyPlayerName} numberOfLines={1}>
-                            {player.displayName ?? player.name ?? 'Joueur'}
-                          </Text>
-                          <Text style={styles.lobbyPlayerStatus}>
-                            {player.isHost ? 'Hôte' : player.isReady ? 'Prêt' : 'En attente'}
-                          </Text>
-                        </View>
-                        <View style={[
-                          styles.lobbyReadyBadge,
-                          (player.isReady || player.isHost) && styles.lobbyReadyBadgeActive,
-                        ]}>
-                          <Ionicons
-                            name={player.isReady || player.isHost ? 'checkmark' : 'time'}
-                            size={14}
-                            color={player.isReady || player.isHost ? '#4CAF50' : 'rgba(255,255,255,0.5)'}
-                          />
-                        </View>
+                    <View style={styles.playerCard}>
+                      <Avatar
+                        name={player.displayName ?? player.name ?? 'Joueur'}
+                        playerColor={player.color}
+                        size="md"
+                      />
+                      <View style={{ flex: 1, marginLeft: SPACING[3] }}>
+                        <Text style={styles.playerName}>
+                          {player.displayName ?? player.name}
+                        </Text>
+                        {player.isHost && (
+                          <View style={styles.hostBadge}>
+                            <Ionicons name="star" size={10} color="#FFBC40" />
+                            <Text style={styles.hostText}>Hote</Text>
+                          </View>
+                        )}
                       </View>
-                    </DynamicGradientBorder>
-                  </Animated.View>
-                ))}
-              </View>
+                      <View style={[
+                        styles.readyBadge,
+                        (player.isReady || player.isHost) && styles.readyBadgeActive,
+                      ]}>
+                        <Ionicons
+                          name={player.isReady || player.isHost ? 'checkmark' : 'time'}
+                          size={14}
+                          color={player.isReady || player.isHost ? '#4CAF50' : 'rgba(255,255,255,0.5)'}
+                        />
+                        <Text style={[
+                          styles.readyText,
+                          (player.isReady || player.isHost) && styles.readyTextActive,
+                        ]}>
+                          {player.isHost ? 'Hote' : player.isReady ? 'Pret' : 'En attente'}
+                        </Text>
+                      </View>
+                    </View>
+                  </DynamicGradientBorder>
+                </Animated.View>
+              ))
             )}
-          </DynamicGradientBorder>
+          </View>
         </Animated.View>
       </ScrollView>
 
@@ -618,7 +624,11 @@ const styles = StyleSheet.create({
   },
   confirmationCardWrapper: {
     alignSelf: 'stretch',
-    width: contentWidth,
+    minWidth: 280,
+    marginHorizontal: -SPACING[4],
+  },
+  confirmationCardBorder: {
+    width: '100%',
   },
   confirmationCard: {
     padding: SPACING[6],
@@ -782,69 +792,11 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.sm,
     color: '#FFBC40',
   },
-  // Salle d'attente — même design que local-setup (liste joueurs)
-  lobbySectionWrapper: {
-    marginTop: SPACING[5],
-  },
-  lobbyPlayersBlock: {
-    width: '100%',
-    overflow: 'hidden',
-    padding: SPACING[3],
-  },
-  lobbySectionTitle: {
+  playersLabel: {
     fontFamily: FONTS.title,
-    fontSize: FONT_SIZES.md,
-    color: '#FFFFFF',
-    marginBottom: SPACING[4],
-  },
-  playersList: {
-    gap: 0,
-  },
-  playerCardWrapper: {
-    marginBottom: 8,
-  },
-  lobbyPlayerCardBorder: {
-    width: '100%',
-    overflow: 'hidden',
-  },
-  lobbyPlayerCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-  },
-  lobbyPlayerAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  lobbyPlayerInfo: {
-    flex: 1,
-  },
-  lobbyPlayerName: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: 14,
-    color: '#FFFFFF',
-  },
-  lobbyPlayerStatus: {
-    fontFamily: FONTS.body,
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.45)',
-    marginTop: 2,
-  },
-  lobbyReadyBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  lobbyReadyBadgeActive: {
-    backgroundColor: 'rgba(76, 175, 80, 0.2)',
+    fontSize: 16,
+    color: 'white',
+    marginBottom: SPACING[3],
   },
   emptyPlayers: {
     alignItems: 'center',
@@ -855,6 +807,47 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.body,
     fontSize: FONT_SIZES.sm,
     color: 'rgba(255, 255, 255, 0.4)',
+  },
+  playerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SPACING[3],
+  },
+  playerName: {
+    fontFamily: FONTS.title,
+    fontSize: 15,
+    color: 'white',
+  },
+  hostBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    marginTop: 2,
+  },
+  hostText: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.xs,
+    color: '#FFBC40',
+  },
+  readyBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[1],
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: SPACING[3],
+    paddingVertical: SPACING[1],
+    borderRadius: 12,
+  },
+  readyBadgeActive: {
+    backgroundColor: 'rgba(76, 175, 80, 0.2)',
+  },
+  readyText: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.xs,
+    color: 'rgba(255, 255, 255, 0.5)',
+  },
+  readyTextActive: {
+    color: '#4CAF50',
   },
   waitingText: {
     fontFamily: FONTS.body,

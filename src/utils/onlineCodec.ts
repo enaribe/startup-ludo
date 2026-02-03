@@ -37,7 +37,7 @@ export interface CheckpointData {
 /**
  * Encode un PawnState en string compact :
  * - home:     "h0" .. "h3"   (h + slotIndex)
- * - circuit:  "c0" .. "c43"  (c + position)
+ * - circuit:  "c0:5" .. "c43:43"  (c + position + ":" + distanceTraveled)
  * - final:    "f0" .. "f4"   (f + position)
  * - finished: "F"
  */
@@ -46,7 +46,7 @@ export function encodePawn(pawn: PawnState): string {
     case 'home':
       return `h${pawn.slotIndex}`;
     case 'circuit':
-      return `c${pawn.position}`;
+      return `c${pawn.position}:${pawn.distanceTraveled}`;
     case 'final':
       return `f${pawn.position}`;
     case 'finished':
@@ -63,15 +63,21 @@ export function decodePawn(s: string): PawnState {
   }
 
   const prefix = s[0];
-  const value = parseInt(s.slice(1), 10);
+  const rest = s.slice(1);
 
   switch (prefix) {
     case 'h':
-      return { status: 'home', slotIndex: value };
-    case 'c':
-      return { status: 'circuit', position: value };
+      return { status: 'home', slotIndex: parseInt(rest, 10) };
+    case 'c': {
+      // Format: "c{position}:{distanceTraveled}" ou ancien format "c{position}"
+      const parts = rest.split(':');
+      const position = parseInt(parts[0] ?? '0', 10);
+      // Rétrocompatibilité: si pas de distanceTraveled, utiliser position comme approximation
+      const distanceTraveled = parts.length > 1 ? parseInt(parts[1] ?? '0', 10) : position;
+      return { status: 'circuit', position, distanceTraveled };
+    }
     case 'f':
-      return { status: 'final', position: value };
+      return { status: 'final', position: parseInt(rest, 10) };
     default:
       // Fallback safe
       return { status: 'home', slotIndex: 0 };

@@ -1,20 +1,20 @@
-import { memo, useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  SlideInUp,
-  FadeIn,
-} from 'react-native-reanimated';
-import * as Haptics from 'expo-haptics';
-import { Modal } from '@/components/ui/Modal';
 import { PopupDuelIcon } from '@/components/game/popups/PopupIcons';
-import { COLORS } from '@/styles/colors';
-import { FONTS, FONT_SIZES } from '@/styles/typography';
-import { SPACING, BORDER_RADIUS, SHADOWS } from '@/styles/spacing';
+import { Modal } from '@/components/ui/Modal';
 import { useSettingsStore } from '@/stores';
+import { COLORS } from '@/styles/colors';
+import { BORDER_RADIUS, SHADOWS, SPACING } from '@/styles/spacing';
+import { FONTS, FONT_SIZES } from '@/styles/typography';
 import type { DuelQuestion } from '@/types';
+import * as Haptics from 'expo-haptics';
+import { memo, useCallback, useEffect, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated, {
+    FadeIn,
+    SlideInUp,
+    useAnimatedStyle,
+    useSharedValue,
+    withTiming,
+} from 'react-native-reanimated';
 
 interface DuelQuestionPopupProps {
   visible: boolean;
@@ -88,16 +88,6 @@ export const DuelQuestionPopup = memo(function DuelQuestionPopup({
   }, [selectedAnswer, currentIndex, questions, answers, totalScore, hapticsEnabled, onComplete]);
 
   const currentQuestion = questions[currentIndex];
-
-  if (__DEV__) {
-    console.log('[DuelQuestionPopup] render', {
-      visible,
-      questionsLength: questions.length,
-      currentIndex,
-      hasCurrentQuestion: !!currentQuestion,
-      willReturnNull: !visible || questions.length === 0 || !currentQuestion,
-    });
-  }
 
   if (!visible || questions.length === 0 || !currentQuestion) return null;
 

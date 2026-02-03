@@ -52,7 +52,11 @@ export default function RootLayout() {
 
   const onLayoutRootView = useCallback(async () => {
     if (fontsLoaded || fontError) {
-      await SplashScreen.hideAsync();
+      try {
+        await SplashScreen.hideAsync();
+      } catch {
+        // Splash screen may already be hidden
+      }
     }
   }, [fontsLoaded, fontError]);
 

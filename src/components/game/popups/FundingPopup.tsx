@@ -1,27 +1,27 @@
-import { memo, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withSequence,
-  withTiming,
-  withRepeat,
-  withDelay,
-  SlideInUp,
-  FadeInDown,
-  Easing,
-} from 'react-native-reanimated';
+import { PopupFundingIcon } from '@/components/game/popups/PopupIcons';
+import { Button } from '@/components/ui/Button';
+import { Modal } from '@/components/ui/Modal';
+import { useSettingsStore } from '@/stores';
+import { COLORS } from '@/styles/colors';
+import { BORDER_RADIUS, SHADOWS, SPACING } from '@/styles/spacing';
+import { FONTS, FONT_SIZES } from '@/styles/typography';
+import type { FundingEvent } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { Modal } from '@/components/ui/Modal';
-import { GameButton } from '@/components/ui/GameButton';
-import { PopupFundingIcon } from '@/components/game/popups/PopupIcons';
-import { COLORS } from '@/styles/colors';
-import { FONTS, FONT_SIZES } from '@/styles/typography';
-import { SPACING, BORDER_RADIUS, SHADOWS } from '@/styles/spacing';
-import { useSettingsStore } from '@/stores';
-import type { FundingEvent } from '@/types';
+import { memo, useEffect } from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import Animated, {
+    Easing,
+    FadeInDown,
+    SlideInUp,
+    useAnimatedStyle,
+    useSharedValue,
+    withDelay,
+    withRepeat,
+    withSequence,
+    withSpring,
+    withTiming,
+} from 'react-native-reanimated';
 
 interface FundingPopupProps {
   visible: boolean;
@@ -47,10 +47,11 @@ export const FundingPopup = memo(function FundingPopup({
 
   useEffect(() => {
     if (visible && funding) {
-      // Icon entrance: simple fade-in scale
+      // Icon entrance: pop in with bounce
       iconScale.value = withSequence(
         withTiming(0, { duration: 0 }),
-        withTiming(1, { duration: 280 })
+        withSpring(1.15, { damping: 8, stiffness: 150 }),
+        withSpring(1, { damping: 12 })
       );
 
       // Gentle floating animation
@@ -63,8 +64,11 @@ export const FundingPopup = memo(function FundingPopup({
         true
       );
 
-      // Badge: simple apparition
-      badgeBounce.value = withTiming(1, { duration: 250 });
+      // Badge bounce in delayed
+      badgeBounce.value = withDelay(
+        400,
+        withSpring(1, { damping: 6, stiffness: 120 })
+      );
 
       // Shimmer effect
       shimmer.value = withRepeat(
@@ -121,7 +125,9 @@ export const FundingPopup = memo(function FundingPopup({
 
           {/* Icon avec animation flottante */}
           <Animated.View style={[styles.iconWrap, iconStyle]}>
-            <PopupFundingIcon size={56} />
+            <View style={styles.iconCircle}>
+              <PopupFundingIcon size={56} />
+            </View>
           </Animated.View>
 
           {/* Titre */}
@@ -143,7 +149,14 @@ export const FundingPopup = memo(function FundingPopup({
           {/* Bouton */}
           {!isSpectator && (
             <Animated.View entering={FadeInDown.delay(500).springify()} style={styles.buttonWrap}>
-              <GameButton title="Collecter" onPress={handleAccept} variant="green" fullWidth />
+              <Button
+                title="Collecter"
+                onPress={handleAccept}
+                variant="primary"
+                size="lg"
+                leftIcon={<Ionicons name="checkmark-circle" size={20} color={COLORS.white} />}
+                style={styles.button}
+              />
             </Animated.View>
           )}
         </ScrollView>
@@ -158,6 +171,7 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS['3xl'],
     maxWidth: 360,
     width: '92%',
+    maxHeight: '85%',
     ...SHADOWS.xl,
     overflow: 'hidden',
   },
@@ -227,7 +241,7 @@ const styles = StyleSheet.create({
   resultTitle: {
     fontFamily: FONTS.title,
     fontSize: FONT_SIZES.lg,
-    color: COLORS.success,
+    color: COLORS.events.funding,
     marginBottom: SPACING[3],
   },
   badge: {
@@ -247,6 +261,9 @@ const styles = StyleSheet.create({
     color: COLORS.white,
   },
   buttonWrap: {
+    width: '100%',
+  },
+  button: {
     width: '100%',
   },
 });

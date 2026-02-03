@@ -2,30 +2,30 @@
  * VictoryPopup - Popup de victoire avec animations de célébration
  */
 
-import { memo, useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withSequence,
-  withDelay,
-  withRepeat,
-  withTiming,
-  FadeIn,
-  ZoomIn,
-  SlideInUp,
-} from 'react-native-reanimated';
+import { Avatar } from '@/components/ui/Avatar';
+import { Button } from '@/components/ui/Button';
+import { Modal } from '@/components/ui/Modal';
+import { useSettingsStore } from '@/stores';
+import { COLORS } from '@/styles/colors';
+import { SPACING } from '@/styles/spacing';
+import { FONTS, FONT_SIZES } from '@/styles/typography';
+import type { Player } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { Modal } from '@/components/ui/Modal';
-import { Button } from '@/components/ui/Button';
-import { Avatar } from '@/components/ui/Avatar';
-import { COLORS } from '@/styles/colors';
-import { FONTS, FONT_SIZES } from '@/styles/typography';
-import { SPACING } from '@/styles/spacing';
-import { useSettingsStore } from '@/stores';
-import type { Player } from '@/types';
+import { memo, useEffect } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import Animated, {
+    FadeIn,
+    SlideInUp,
+    ZoomIn,
+    useAnimatedStyle,
+    useSharedValue,
+    withDelay,
+    withRepeat,
+    withSequence,
+    withSpring,
+    withTiming,
+} from 'react-native-reanimated';
 
 interface VictoryPopupProps {
   visible: boolean;

@@ -1,13 +1,13 @@
-import { memo } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
-import Animated, { SlideInUp, FadeIn } from 'react-native-reanimated';
-import { Modal } from '@/components/ui/Modal';
-import { Avatar } from '@/components/ui/Avatar';
 import { PopupDuelIcon } from '@/components/game/popups/PopupIcons';
+import { Avatar } from '@/components/ui/Avatar';
+import { Modal } from '@/components/ui/Modal';
 import { COLORS } from '@/styles/colors';
+import { BORDER_RADIUS, SHADOWS, SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
-import { SPACING, BORDER_RADIUS, SHADOWS } from '@/styles/spacing';
 import type { Player } from '@/types';
+import { memo } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeIn, SlideInUp } from 'react-native-reanimated';
 
 interface DuelSelectOpponentPopupProps {
   visible: boolean;

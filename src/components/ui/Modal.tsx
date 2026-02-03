@@ -1,27 +1,27 @@
-import { memo, useCallback, useEffect } from 'react';
-import {
-  View,
-  Text,
-  Pressable,
-  Modal as RNModal,
-  type ModalProps as RNModalProps,
-  type ViewStyle,
-  Dimensions,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withSpring,
-  Easing,
-} from 'react-native-reanimated';
-import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '@/styles/colors';
 import { BORDER_RADIUS, SPACING, Z_INDEX } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
+import { Ionicons } from '@expo/vector-icons';
+import { memo, useCallback, useEffect } from 'react';
+import {
+    Dimensions,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    Modal as RNModal,
+    Text,
+    View,
+    type ModalProps as RNModalProps,
+    type ViewStyle,
+} from 'react-native';
+import Animated, {
+    Easing,
+    useAnimatedStyle,
+    useSharedValue,
+    withSpring,
+    withTiming,
+} from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 

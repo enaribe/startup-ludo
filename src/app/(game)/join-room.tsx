@@ -5,20 +5,20 @@
  * Phase 2: Salle d'attente avec liste joueurs, bouton Pret
  */
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
-import { View, Text, Pressable, ScrollView, TextInput, Alert, Dimensions, StyleSheet } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Alert, Dimensions, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { DynamicGradientBorder, GameButton, RadialBackground } from '@/components/ui';
+import { Avatar } from '@/components/ui/Avatar';
+import { useMultiplayer } from '@/hooks/useMultiplayer';
+import { useAuthStore } from '@/stores';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
-import { useAuthStore } from '@/stores';
-import { useMultiplayer } from '@/hooks/useMultiplayer';
-import { Avatar } from '@/components/ui/Avatar';
-import { RadialBackground, DynamicGradientBorder, GameButton } from '@/components/ui';
 
 const { width: screenWidth } = Dimensions.get('window');
 const contentWidth = screenWidth - SPACING[4] * 2;
@@ -333,88 +333,82 @@ export default function JoinRoomScreen() {
         }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Code du salon — même design que salle d'attente hôte (create-room) */}
+        {/* Room info */}
         <Animated.View entering={FadeInDown.delay(100).duration(500)}>
           <DynamicGradientBorder
-            borderRadius={20}
-            fill="rgba(0, 0, 0, 0.35)"
+            borderRadius={16}
+            fill="rgba(10, 25, 41, 0.6)"
             boxWidth={contentWidth}
           >
-            <View style={styles.codeSection}>
-              <Text style={styles.codeLabel}>CODE DU SALON</Text>
-              <Text style={styles.codeText}>
-                {room?.code ? formatRoomCode(room.code) : joinedRoomCode || code}
-              </Text>
+            <View style={styles.roomInfo}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Ionicons name="game-controller" size={20} color="#FFBC40" />
+                <Text style={styles.roomCode}>
+                  {room?.code ? formatRoomCode(room.code) : joinedRoomCode || code}
+                </Text>
+              </View>
               <Text style={styles.roomDetails}>
-                {room?.edition || 'Classic'} — {room?.maxPlayers || 4} joueurs max
+                {room?.edition || 'Classic'} - {room?.maxPlayers || 4} joueurs max
               </Text>
             </View>
           </DynamicGradientBorder>
         </Animated.View>
 
-        {/* Liste des joueurs — même design que local-setup (CONFIGURATION DES JOUEURS) */}
-        <Animated.View entering={FadeInDown.delay(200).duration(500)} style={styles.lobbySectionWrapper}>
-          <DynamicGradientBorder
-            borderRadius={20}
-            fill="rgba(0, 0, 0, 0.35)"
-            boxWidth={contentWidth}
-            style={styles.lobbyPlayersBlock}
-          >
-            <Text style={styles.lobbySectionTitle}>
-              JOUEURS ({playersList.length}/{room?.maxPlayers || 4})
-            </Text>
-            {playersList.length === 0 ? (
-              <View style={styles.emptyPlayers}>
-                <Ionicons name="hourglass-outline" size={24} color="rgba(255,255,255,0.3)" />
-                <Text style={styles.emptyText}>En attente de joueurs...</Text>
-              </View>
-            ) : (
-              <View style={styles.playersList}>
-                {playersList.map((player, index) => (
-                  <Animated.View
-                    key={player.playerId}
-                    entering={FadeIn.delay(280 + index * 80).duration(400)}
-                    style={styles.playerCardWrapper}
-                  >
-                    <DynamicGradientBorder
-                      borderRadius={14}
-                      fill="rgba(0, 0, 0, 0.35)"
-                      boxWidth={contentWidth - 24}
-                      style={styles.lobbyPlayerCardBorder}
-                    >
-                      <View style={styles.lobbyPlayerCard}>
-                        <View style={styles.lobbyPlayerAvatar}>
-                          <Avatar
-                            name={player.displayName ?? player.name ?? 'Joueur'}
-                            playerColor={player.color}
-                            size="sm"
-                          />
+        {/* Players list */}
+        <Animated.View entering={FadeInDown.delay(200).duration(500)} style={{ marginTop: SPACING[5] }}>
+          <Text style={styles.playersLabel}>
+            JOUEURS ({playersList.length}/{room?.maxPlayers || 4})
+          </Text>
+
+          <View style={{ gap: SPACING[3] }}>
+            {playersList.map((player, index) => (
+              <Animated.View
+                key={player.playerId}
+                entering={FadeIn.delay(300 + index * 100).duration(300)}
+              >
+                <DynamicGradientBorder
+                  borderRadius={16}
+                  fill={player.isHost ? 'rgba(255, 188, 64, 0.08)' : 'rgba(10, 25, 41, 0.6)'}
+                  boxWidth={contentWidth}
+                >
+                  <View style={styles.playerCard}>
+                    <Avatar
+                      name={player.displayName ?? player.name ?? 'Joueur'}
+                      playerColor={player.color}
+                      size="md"
+                    />
+                    <View style={{ flex: 1, marginLeft: SPACING[3] }}>
+                      <Text style={styles.playerName}>
+                        {player.displayName ?? player.name}
+                      </Text>
+                      {player.isHost && (
+                        <View style={styles.hostBadge}>
+                          <Ionicons name="star" size={10} color="#FFBC40" />
+                          <Text style={styles.hostText}>Hote</Text>
                         </View>
-                        <View style={styles.lobbyPlayerInfo}>
-                          <Text style={styles.lobbyPlayerName} numberOfLines={1}>
-                            {player.displayName ?? player.name ?? 'Joueur'}
-                          </Text>
-                          <Text style={styles.lobbyPlayerStatus}>
-                            {player.isHost ? 'Hôte' : player.isReady ? 'Prêt' : 'En attente'}
-                          </Text>
-                        </View>
-                        <View style={[
-                          styles.lobbyReadyBadge,
-                          (player.isReady || player.isHost) && styles.lobbyReadyBadgeActive,
-                        ]}>
-                          <Ionicons
-                            name={player.isReady || player.isHost ? 'checkmark' : 'time'}
-                            size={14}
-                            color={player.isReady || player.isHost ? '#4CAF50' : 'rgba(255,255,255,0.5)'}
-                          />
-                        </View>
-                      </View>
-                    </DynamicGradientBorder>
-                  </Animated.View>
-                ))}
-              </View>
-            )}
-          </DynamicGradientBorder>
+                      )}
+                    </View>
+                    <View style={[
+                      styles.readyBadge,
+                      (player.isReady || player.isHost) && styles.readyBadgeActive,
+                    ]}>
+                      <Ionicons
+                        name={player.isReady || player.isHost ? 'checkmark' : 'time'}
+                        size={14}
+                        color={player.isReady || player.isHost ? '#4CAF50' : 'rgba(255,255,255,0.5)'}
+                      />
+                      <Text style={[
+                        styles.readyText,
+                        (player.isReady || player.isHost) && styles.readyTextActive,
+                      ]}>
+                        {player.isHost ? 'Hote' : player.isReady ? 'Pret' : 'En attente'}
+                      </Text>
+                    </View>
+                  </View>
+                </DynamicGradientBorder>
+              </Animated.View>
+            ))}
+          </View>
         </Animated.View>
       </ScrollView>
 
@@ -542,104 +536,70 @@ const styles = StyleSheet.create({
     color: '#4CAF50',
     letterSpacing: 2,
   },
-  // Bloc code salle d'attente invité — aligné sur create-room (design system)
-  codeSection: {
-    alignItems: 'center',
-    padding: SPACING[5],
+  roomInfo: {
+    padding: SPACING[4],
     minWidth: 280,
     alignSelf: 'stretch',
+    marginHorizontal: -SPACING[4],
   },
-  codeLabel: {
-    fontFamily: FONTS.body,
-    fontSize: FONT_SIZES.sm,
-    color: 'rgba(255, 255, 255, 0.5)',
-    marginBottom: SPACING[2],
-  },
-  codeText: {
+  roomCode: {
     fontFamily: FONTS.title,
-    fontSize: 32,
+    fontSize: FONT_SIZES.xl,
     color: '#FFBC40',
-    letterSpacing: 4,
+    marginLeft: SPACING[2],
   },
   roomDetails: {
     fontFamily: FONTS.body,
     fontSize: FONT_SIZES.sm,
     color: 'rgba(255, 255, 255, 0.5)',
-    marginTop: SPACING[3],
+    marginTop: SPACING[1],
   },
-  // Salle d'attente — même design que local-setup (liste joueurs)
-  lobbySectionWrapper: {
-    marginTop: SPACING[5],
-  },
-  lobbyPlayersBlock: {
-    width: '100%',
-    overflow: 'hidden',
-    padding: SPACING[3],
-  },
-  lobbySectionTitle: {
+  playersLabel: {
     fontFamily: FONTS.title,
-    fontSize: FONT_SIZES.md,
-    color: '#FFFFFF',
-    marginBottom: SPACING[4],
+    fontSize: 16,
+    color: 'white',
+    marginBottom: SPACING[3],
   },
-  playersList: {
-    gap: 0,
-  },
-  playerCardWrapper: {
-    marginBottom: 8,
-  },
-  lobbyPlayerCardBorder: {
-    width: '100%',
-    overflow: 'hidden',
-  },
-  lobbyPlayerCard: {
+  playerCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 10,
+    padding: SPACING[3],
   },
-  lobbyPlayerAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
+  playerName: {
+    fontFamily: FONTS.title,
+    fontSize: 15,
+    color: 'white',
+  },
+  hostBadge: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 10,
-  },
-  lobbyPlayerInfo: {
-    flex: 1,
-  },
-  lobbyPlayerName: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: 14,
-    color: '#FFFFFF',
-  },
-  lobbyPlayerStatus: {
-    fontFamily: FONTS.body,
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.45)',
+    gap: 2,
     marginTop: 2,
   },
-  lobbyReadyBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    justifyContent: 'center',
-    alignItems: 'center',
+  hostText: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.xs,
+    color: '#FFBC40',
   },
-  lobbyReadyBadgeActive: {
+  readyBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[1],
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: SPACING[3],
+    paddingVertical: SPACING[1],
+    borderRadius: 12,
+  },
+  readyBadgeActive: {
     backgroundColor: 'rgba(76, 175, 80, 0.2)',
   },
-  emptyPlayers: {
-    alignItems: 'center',
-    padding: SPACING[5],
-    gap: SPACING[2],
-  },
-  emptyText: {
+  readyText: {
     fontFamily: FONTS.body,
-    fontSize: FONT_SIZES.sm,
-    color: 'rgba(255, 255, 255, 0.4)',
+    fontSize: FONT_SIZES.xs,
+    color: 'rgba(255, 255, 255, 0.5)',
+  },
+  readyTextActive: {
+    color: '#4CAF50',
   },
   bottomBar: {
     position: 'absolute',

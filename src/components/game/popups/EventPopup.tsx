@@ -1,27 +1,27 @@
-import { memo, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withSequence,
-  withTiming,
-  withRepeat,
-  withDelay,
-  SlideInUp,
-  FadeInDown,
-  Easing,
-} from 'react-native-reanimated';
+import { PopupChallengeIcon, PopupOpportunityIcon } from '@/components/game/popups/PopupIcons';
+import { Button } from '@/components/ui/Button';
+import { Modal } from '@/components/ui/Modal';
+import { useSettingsStore } from '@/stores';
+import { COLORS } from '@/styles/colors';
+import { BORDER_RADIUS, SHADOWS, SPACING } from '@/styles/spacing';
+import { FONTS, FONT_SIZES } from '@/styles/typography';
+import type { ChallengeEvent, OpportunityEvent } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { Modal } from '@/components/ui/Modal';
-import { GameButton } from '@/components/ui/GameButton';
-import { PopupOpportunityIcon, PopupChallengeIcon } from '@/components/game/popups/PopupIcons';
-import { COLORS } from '@/styles/colors';
-import { FONTS, FONT_SIZES } from '@/styles/typography';
-import { SPACING, BORDER_RADIUS, SHADOWS } from '@/styles/spacing';
-import { useSettingsStore } from '@/stores';
-import type { OpportunityEvent, ChallengeEvent } from '@/types';
+import { memo, useEffect } from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import Animated, {
+    Easing,
+    FadeInDown,
+    SlideInUp,
+    useAnimatedStyle,
+    useSharedValue,
+    withDelay,
+    withRepeat,
+    withSequence,
+    withSpring,
+    withTiming,
+} from 'react-native-reanimated';
 
 type EventData = OpportunityEvent | ChallengeEvent;
 
@@ -58,7 +58,8 @@ export const EventPopup = memo(function EventPopup({
 
       iconScale.value = withSequence(
         withTiming(0, { duration: 0 }),
-        withTiming(1, { duration: 280 })
+        withSpring(1.25, { damping: 7, stiffness: 140 }),
+        withSpring(1, { damping: 12 })
       );
 
       if (isOpportunity) {
@@ -91,7 +92,10 @@ export const EventPopup = memo(function EventPopup({
         iconFloat.value = 0;
       }
 
-      badgeBounce.value = withTiming(1, { duration: 250 });
+      badgeBounce.value = withDelay(
+        400,
+        withSpring(1, { damping: 6, stiffness: 120 })
+      );
 
       if (hapticsEnabled) {
         if (isOpportunity) {
@@ -161,7 +165,7 @@ export const EventPopup = memo(function EventPopup({
           <Text
             style={[
               styles.title,
-              !isOpportunity && styles.titleChallenge,
+              isOpportunity ? styles.titleOpportunity : styles.titleChallenge,
             ]}
           >
             {isOpportunity ? 'OPPORTUNITÉ' : 'CHALLENGE'}
@@ -193,11 +197,23 @@ export const EventPopup = memo(function EventPopup({
           {/* Bouton */}
           {!isSpectator && (
             <Animated.View entering={FadeInDown.delay(500).springify()} style={styles.buttonWrap}>
-              <GameButton
+              <Button
                 title={isOpportunity ? 'Profiter' : 'Continuer'}
                 onPress={handleAccept}
-                variant={isOpportunity ? 'green' : 'red'}
-                fullWidth
+                variant={isOpportunity ? 'primary' : 'secondary'}
+                size="lg"
+                leftIcon={
+                  <Ionicons
+                    name={isOpportunity ? 'checkmark-circle' : 'arrow-forward-circle'}
+                    size={20}
+                    color={isOpportunity ? COLORS.white : COLORS.error}
+                  />
+                }
+                style={
+                  !isOpportunity
+                    ? styles.buttonChallenge
+                    : styles.button
+                }
               />
             </Animated.View>
           )}
@@ -213,6 +229,7 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS['3xl'],
     maxWidth: 360,
     width: '92%',
+    maxHeight: '85%',
     ...SHADOWS.xl,
     overflow: 'hidden',
   },
@@ -241,15 +258,33 @@ const styles = StyleSheet.create({
   iconWrap: {
     marginBottom: SPACING[3],
   },
+  opportunityIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255, 179, 71, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  challengeIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(155, 89, 182, 0.12)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   title: {
     fontFamily: FONTS.title,
     fontSize: FONT_SIZES['2xl'],
-    color: COLORS.success,
     letterSpacing: 2,
     marginBottom: SPACING[3],
   },
+  titleOpportunity: {
+    color: COLORS.events.opportunity,
+  },
   titleChallenge: {
-    color: COLORS.error,
+    color: COLORS.events.challenge,
   },
   descriptionBox: {
     backgroundColor: '#F8F9FA',
@@ -309,5 +344,14 @@ const styles = StyleSheet.create({
   },
   buttonWrap: {
     width: '100%',
+  },
+  button: {
+    width: '100%',
+  },
+  buttonChallenge: {
+    width: '100%',
+    borderColor: COLORS.error,
+    borderWidth: 2,
+    backgroundColor: 'rgba(244, 67, 54, 0.08)',
   },
 });

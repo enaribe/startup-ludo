@@ -1,28 +1,28 @@
+import { useSettingsStore } from '@/stores';
+import { FONTS } from '@/styles/typography';
+import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
 import { memo, useCallback } from 'react';
 import {
-  Pressable,
-  Text,
-  ActivityIndicator,
-  StyleSheet,
-  type GestureResponderEvent,
-  type PressableProps,
-  type ViewStyle,
-  type TextStyle,
+    ActivityIndicator,
+    Pressable,
+    StyleSheet,
+    Text,
+    type GestureResponderEvent,
+    type PressableProps,
+    type TextStyle,
+    type ViewStyle,
 } from 'react-native';
 import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  runOnJS,
+    runOnJS,
+    useAnimatedStyle,
+    useSharedValue,
+    withSpring,
 } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
-import * as Haptics from 'expo-haptics';
-import { FONTS } from '@/styles/typography';
-import { useSettingsStore } from '@/stores';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-type GameButtonVariant = 'green' | 'yellow' | 'blue' | 'red';
+type GameButtonVariant = 'green' | 'yellow' | 'blue';
 type GameButtonSize = 'default' | 'sm';
 
 interface GameButtonProps extends Omit<PressableProps, 'style'> {
@@ -82,7 +82,6 @@ export const GameButton = memo(function GameButton({
   const isDisabled = disabled || loading;
   const isYellow = variant === 'yellow';
   const isBlue = variant === 'blue';
-  const isRed = variant === 'red';
   const isSmall = size === 'sm';
 
   // Bleu proche du conteneur / fond (radial #0F3A6B, background #0C243E, backgroundLight #194F8A)
@@ -91,11 +90,9 @@ export const GameButton = memo(function GameButton({
       ? ['#FFDC64', '#F0B432']
       : isBlue
         ? (['#2A5A8A', '#1A3A5E'] as [string, string])
-        : isRed
-          ? (['#E57373', '#C62828'] as [string, string])
-          : (['rgba(255, 255, 255, 0.2)', 'rgba(255, 255, 255, 0)'] as [string, string]);
+        : (['rgba(255, 255, 255, 0.2)', 'rgba(255, 255, 255, 0)'] as [string, string]);
 
-  const textColor = isYellow ? '#1E325A' : isBlue || isRed ? '#FFFFFF' : '#FFFFFF';
+  const textColor = isYellow ? '#1E325A' : isBlue ? '#FFFFFF' : '#FFFFFF';
 
   return (
     <AnimatedPressable
@@ -107,7 +104,6 @@ export const GameButton = memo(function GameButton({
         styles.container,
         isYellow && styles.containerYellow,
         isBlue && styles.containerBlue,
-        isRed && styles.containerRed,
         fullWidth && { width: '100%' },
         isDisabled && { opacity: 0.7 },
         animatedStyle,
@@ -130,7 +126,7 @@ export const GameButton = memo(function GameButton({
               styles.text,
               isSmall && styles.textSm,
               isYellow && styles.textYellow,
-              (isBlue || isRed) && styles.textLight,
+              isBlue && styles.textBlue,
               { color: textColor },
               textStyle,
             ]}
@@ -163,11 +159,6 @@ const styles = StyleSheet.create({
   },
   containerBlue: {
     backgroundColor: 'transparent',
-    borderColor: '#FFFFFF',
-    shadowOpacity: 0.15,
-  },
-  containerRed: {
-    backgroundColor: '#E57373',
     borderColor: '#FFFFFF',
     shadowOpacity: 0.15,
   },
@@ -205,11 +196,6 @@ const styles = StyleSheet.create({
     textShadowRadius: 2,
   },
   textBlue: {
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  textLight: {
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,

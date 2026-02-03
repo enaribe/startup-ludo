@@ -13,7 +13,7 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
-import type { GameState, GameMode, Player, GameEvent, PlayerColor, PawnState, EventType } from '@/types';
+import type { GameState, GameMode, Player, GameEvent, PlayerColor, PawnState, EventType, ChallengeContext } from '@/types';
 import { GameEngine, type MoveResult, type ValidMove } from '@/services/game/GameEngine';
 import { eventManager, type GeneratedGameEvent } from '@/services/game/EventManager';
 import type { EditionId } from '@/data';
@@ -59,7 +59,7 @@ interface GameStoreState {
 
 interface GameStoreActions {
   // Cycle de vie du jeu
-  initGame: (mode: GameMode, edition: string, players: Omit<Player, 'tokens' | 'pawns'>[]) => void;
+  initGame: (mode: GameMode, edition: string, players: Omit<Player, 'tokens' | 'pawns'>[], challengeContext?: ChallengeContext) => void;
   resetGame: () => void;
   endGame: (winnerId: string) => void;
 
@@ -143,7 +143,7 @@ export const useGameStore = create<GameStore>()(
 
       // ===== CYCLE DE VIE =====
 
-      initGame: (mode, edition, players) => {
+      initGame: (mode, edition, players, challengeContext) => {
         const gameId = `game_${Date.now()}`;
 
         // Configurer l'EventManager avec l'édition
@@ -170,6 +170,7 @@ export const useGameStore = create<GameStore>()(
             winner: null,
             createdAt: Date.now(),
             updatedAt: Date.now(),
+            challengeContext, // Ajouter le contexte Challenge si fourni
           };
           state.isLoading = false;
           state.error = null;
@@ -500,10 +501,16 @@ export const useGameStore = create<GameStore>()(
               if (state.game) {
                 const player = state.game.players.find((p) => p.id === playerId);
                 if (player) {
-                  const activePawn = player.pawns.find((p) => p.status === 'circuit');
+                  const activePawnIndex = player.pawns.findIndex((p) => p.status === 'circuit');
+                  const activePawn = player.pawns[activePawnIndex];
                   if (activePawn && activePawn.status === 'circuit') {
                     const newPos = Math.max(0, activePawn.position - value);
-                    activePawn.position = newPos;
+                    const newDistance = Math.max(0, activePawn.distanceTraveled - value);
+                    player.pawns[activePawnIndex] = {
+                      status: 'circuit',
+                      position: newPos,
+                      distanceTraveled: newDistance,
+                    };
                   }
                 }
               }

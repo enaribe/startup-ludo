@@ -1,74 +1,26 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import * as Haptics from 'expo-haptics';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GameBoard } from '@/components/game/GameBoard';
 import { PlayerCard } from '@/components/game/PlayerCard';
-import {
-  EventPopup,
-  FundingPopup,
-  QuizPopup,
-  QuitConfirmPopup,
-  DuelSelectOpponentPopup,
-  DuelPreparePopup,
-  DuelSpectatorPopup,
-  DuelQuestionPopup,
-  DuelResultPopup,
-} from '@/components/game/popups';
+import { EventPopup, FundingPopup, QuitConfirmPopup, QuizPopup } from '@/components/game/popups';
+import { RadialBackground } from '@/components/ui';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
-import { RadialBackground } from '@/components/ui';
-import { GameEngine } from '@/services/game/GameEngine';
-import { useGameStore, useSettingsStore, useAuthStore } from '@/stores';
 import { useOnlineGame } from '@/hooks/useOnlineGame';
-import { useTurnMachine, type TurnActions } from '@/hooks/useTurnMachine';
-import { useDuel } from '@/hooks/useDuel';
+import { AIPlayer } from '@/services/game/AIPlayer';
+import { GameEngine } from '@/services/game/GameEngine';
+import { useAuthStore, useGameStore, useSettingsStore } from '@/stores';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
-import { getRandomDuelQuestions } from '@/data/duelQuestions';
-import type { ChallengeEvent, FundingEvent, OpportunityEvent, Player, QuizEvent, DuelResult, DuelQuestion } from '@/types';
+import type { ChallengeEvent, DuelEvent, FundingEvent, OpportunityEvent, Player, PlayerColor, QuizEvent } from '@/types';
 
-// Données de test pour afficher les popups rapidement
-const MOCK_QUIZ: QuizEvent = {
-  id: 'test-quiz',
-  category: 'business',
-  question: "Quel document décrit la stratégie et le modèle économique d'une entreprise ?",
-  options: ['Business Plan', 'Statut juridique', 'Contrat de travail'],
-  correctAnswer: 0,
-  difficulty: 'medium',
-  reward: 2,
-  timeLimit: 30,
-};
-
-const MOCK_FUNDING: FundingEvent = {
-  id: 'test-funding',
-  name: 'Subvention BPI',
-  description: "Quel document décrit la stratégie et le modèle économique d'une entreprise ?",
-  type: 'subvention',
-  amount: 2,
-  rarity: 'common',
-};
-
-const MOCK_OPPORTUNITY: OpportunityEvent = {
-  id: 'test-opp',
-  title: 'Partenaire stratégique',
-  description: "Quel document décrit la stratégie et le modèle économique d'une entreprise ?",
-  effect: 'tokens',
-  value: 2,
-  rarity: 'common',
-};
-
-const MOCK_CHALLENGE: ChallengeEvent = {
-  id: 'test-challenge',
-  title: 'Imprévu fiscal',
-  description: "Quel document décrit la stratégie et le modèle économique d'une entreprise ?",
-  effect: 'loseTokens',
-  value: 2,
-  rarity: 'common',
-};
+const PAWN_STEP_MS = 80; // Doit correspondre à STEP_DURATION dans Pawn.tsx
 
 export default function PlayScreen() {
   const router = useRouter();
@@ -81,73 +33,50 @@ export default function PlayScreen() {
   // Online game hook (only active in online mode)
   const onlineGame = useOnlineGame(isOnline ? userId : null);
 
-  // Game store — actions
-  const storeRollDice = useGameStore((s) => s.rollDice);
-  const storeExecuteMove = useGameStore((s) => s.executeMove);
-  const storeExitHome = useGameStore((s) => s.exitHome);
-  const storeHandleCapture = useGameStore((s) => s.handleCapture);
-  const storeCheckWinCondition = useGameStore((s) => s.checkWinCondition);
-  const storeGetValidMoves = useGameStore((s) => s.getValidMoves);
-  const triggerEvent = useGameStore((s) => s.triggerEvent);
-  const storeResolveEvent = useGameStore((s) => s.resolveEvent);
-  const addTokens = useGameStore((s) => s.addTokens);
-  const removeTokens = useGameStore((s) => s.removeTokens);
-  const storeNextTurn = useGameStore((s) => s.nextTurn);
-  const storeGrantExtraTurn = useGameStore((s) => s.grantExtraTurn);
-  const storeEndGame = useGameStore((s) => s.endGame);
-  const clearSelection = useGameStore((s) => s.clearSelection);
-  const setAnimating = useGameStore((s) => s.setAnimating);
-  const getCurrentPlayer = useGameStore((s) => s.getCurrentPlayer);
-
-  // Game store — reactive state (re-renders when these change)
-  const game = useGameStore((s) => s.game);
-  const selectedPawnIndex = useGameStore((s) => s.selectedPawnIndex);
-  const highlightedPositions = useGameStore((s) => s.highlightedPositions);
-
-  // Reactive current player — this MUST re-render when currentPlayerIndex changes
-  const currentPlayer = useGameStore(
-    (s) => s.game ? s.game.players[s.game.currentPlayerIndex] ?? null : null
-  );
+  // Game store
+  const {
+    game,
+    selectedPawnIndex,
+    highlightedPositions,
+    isAnimating,
+    rollDice,
+    getCurrentPlayer,
+    canRollDice,
+    canMove,
+    selectPawn,
+    setHighlightedPositions,
+    clearSelection,
+    setAnimating,
+    executeMove,
+    exitHome,
+    handleCapture,
+    checkWinCondition,
+    getValidMoves,
+    triggerEvent,
+    resolveEvent,
+    addTokens,
+    removeTokens,
+    nextTurn,
+    grantExtraTurn,
+    endGame,
+  } = useGameStore();
 
   // Local state
   const [showQuitConfirm, setShowQuitConfirm] = useState(false);
+  const [diceValue, setDiceValue] = useState<number | null>(null);
+  const [isRolling, setIsRolling] = useState(false);
+  const [_aiMessage, _setAiMessage] = useState<string | null>(null);
 
   // Event popups state
   const [quizData, setQuizData] = useState<QuizEvent | null>(null);
   const [fundingData, setFundingData] = useState<FundingEvent | null>(null);
   const [opportunityData, setOpportunityData] = useState<OpportunityEvent | null>(null);
   const [challengeData, setChallengeData] = useState<ChallengeEvent | null>(null);
-  const [duelTriggered, setDuelTriggered] = useState(false);
+  const [duelData, setDuelData] = useState<DuelEvent | null>(null);
+  const [duelOpponent, setDuelOpponent] = useState<Player | null>(null);
   const [isEventSpectator, setIsEventSpectator] = useState(false);
-  const [spectatorDuelChallengerId, setSpectatorDuelChallengerId] = useState<string | null>(null);
-  const [spectatorDuelOpponentId, setSpectatorDuelOpponentId] = useState<string | null>(null);
 
-  // Duel system hook
-  const duel = useDuel({
-    players: game?.players || [],
-    isOnline,
-    onDuelComplete: useCallback((result: DuelResult) => {
-      // Appliquer les récompenses aux joueurs
-      if (result.challengerReward > 0) {
-        addTokens(result.challengerId, result.challengerReward);
-      }
-      if (result.opponentReward > 0) {
-        addTokens(result.opponentId, result.opponentReward);
-      }
-      // Broadcaster le résultat aux spectateurs en mode online
-      if (isOnline) {
-        onlineGame.broadcastDuelResult({
-          challengerId: result.challengerId,
-          opponentId: result.opponentId,
-          challengerScore: result.challengerScore,
-          opponentScore: result.opponentScore,
-          winnerId: result.winnerId,
-        });
-      }
-    }, [addTokens, isOnline, onlineGame]),
-  });
-
-  // Remote dice animation tracking
+  // Remote dice animation tracking: which player is currently rolling remotely
   const [remoteRollingPlayerId, setRemoteRollingPlayerId] = useState<string | null>(null);
   const [remoteDiceValue, setRemoteDiceValue] = useState<number | null>(null);
 
@@ -155,77 +84,422 @@ export default function PlayScreen() {
   const [showDisconnectPopup, setShowDisconnectPopup] = useState(false);
   const disconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ===== UNIFIED ACTIONS (resolve online/local split once) =====
+  // Deferred event: when player rolls 6 and lands on event, defer until 6-chain ends
+  const deferredEventRef = useRef<string | null>(null);
 
-  const actions: TurnActions = useMemo(() => {
-    if (isOnline) {
-      return {
-        rollDice: onlineGame.rollDice,
-        executeMove: onlineGame.movePawn,
-        exitHome: onlineGame.exitHome,
-        nextTurn: () => onlineGame.endTurn(false),
-        grantExtraTurn: () => onlineGame.endTurn(true),
-        handleCapture: onlineGame.broadcastCapture,
-        endGame: onlineGame.broadcastWin,
-        resolveEvent: onlineGame.resolveEvent,
-        broadcastEvent: onlineGame.broadcastEvent,
-        getValidMoves: storeGetValidMoves,
-        checkWinCondition: storeCheckWinCondition,
-      };
+  // Refs to break circular dependencies between callbacks
+  const handleTriggeredEventRef = useRef<(eventType: string) => void>(() => {});
+  const handlePawnPressRef = useRef<(playerId: string, pawnIndex: number) => void>(() => {});
+
+  // AI Player ref
+  const aiPlayerRef = useRef<AIPlayer | null>(null);
+
+  const currentPlayer = getCurrentPlayer() ?? null;
+
+  // Initialize AI player
+  useEffect(() => {
+    if (game && game.mode === 'local') {
+      const hasAI = game.players.some((p) => p.isAI);
+      if (hasAI && !aiPlayerRef.current) {
+        aiPlayerRef.current = new AIPlayer('medium');
+      }
     }
-    return {
-      rollDice: storeRollDice,
-      executeMove: storeExecuteMove,
-      exitHome: storeExitHome,
-      nextTurn: storeNextTurn,
-      grantExtraTurn: storeGrantExtraTurn,
-      handleCapture: storeHandleCapture,
-      endGame: storeEndGame,
-      resolveEvent: (r: { ok: boolean; reward: number }) => {
-        const cp = getCurrentPlayer();
-        if (cp) {
-          if (r.ok && r.reward > 0) {
-            addTokens(cp.id, r.reward);
-          } else if (!r.ok && r.reward > 0) {
-            removeTokens(cp.id, r.reward);
-          }
-        }
-        storeResolveEvent();
-      },
-      broadcastEvent: () => {},
-      getValidMoves: storeGetValidMoves,
-      checkWinCondition: storeCheckWinCondition,
-    };
+  }, [game]);
+
+  // AI turn handler — AI only needs to trigger the dice roll.
+  // The auto-move in handleDiceComplete handles movement automatically.
+  useEffect(() => {
+    if (!game || !currentPlayer?.isAI || isAnimating || game.pendingEvent) return;
+    if (game.status !== 'playing') return;
+
+    // Only trigger dice roll — handleDiceComplete will auto-move
+    if (!game.diceRolled) {
+      const timer = setTimeout(() => {
+        handleRollDice();
+      }, 1200);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
   }, [
-    isOnline,
-    onlineGame,
-    storeRollDice,
-    storeExecuteMove,
-    storeExitHome,
-    storeNextTurn,
-    storeGrantExtraTurn,
-    storeHandleCapture,
-    storeEndGame,
-    storeResolveEvent,
-    storeGetValidMoves,
-    storeCheckWinCondition,
-    getCurrentPlayer,
-    addTokens,
-    removeTokens,
+    game?.currentPlayerIndex,
+    game?.diceRolled,
+    game?.pendingEvent,
+    game?.status,
+    currentPlayer?.isAI,
+    isAnimating,
   ]);
 
-  // ===== EVENT HANDLER (called by turn machine when phase enters 'event') =====
+  // Get valid moves when dice is rolled
+  const validMoves = useMemo(() => {
+    if (!game || !game.diceRolled) return [];
+    return getValidMoves();
+  }, [game, game?.diceRolled, getValidMoves]);
 
+  // Check if player can exit home
+  const canExitHome = useMemo(() => {
+    if (!currentPlayer || !game?.diceValue) return false;
+    return GameEngine.canExitHome(currentPlayer, game.diceValue);
+  }, [currentPlayer, game?.diceValue]);
+
+  // ===== ONLINE: React to remote dice rolls =====
+  useEffect(() => {
+    if (!isOnline || !onlineGame.remoteDiceRoll) return;
+
+    const { playerId, value } = onlineGame.remoteDiceRoll;
+    setRemoteRollingPlayerId(playerId);
+    setRemoteDiceValue(value);
+
+    // Clear rolling state after dice animation time (~1200ms)
+    const timer = setTimeout(() => {
+      setRemoteRollingPlayerId(null);
+      // Keep remoteDiceValue visible until next turn
+    }, 1200);
+
+    return () => clearTimeout(timer);
+  }, [isOnline, onlineGame.remoteDiceRoll]);
+
+  // ===== ONLINE: React to remote event triggers =====
+  useEffect(() => {
+    if (!isOnline || !onlineGame.remoteEvent) return;
+
+    const { eventType, eventData } = onlineGame.remoteEvent;
+    setIsEventSpectator(true);
+
+    switch (eventType) {
+      case 'quiz':
+        setQuizData(eventData as unknown as QuizEvent);
+        break;
+      case 'funding':
+        setFundingData(eventData as unknown as FundingEvent);
+        break;
+      case 'opportunity':
+        setOpportunityData(eventData as unknown as OpportunityEvent);
+        break;
+      case 'challenge':
+        setChallengeData(eventData as unknown as ChallengeEvent);
+        break;
+      case 'duel':
+        setDuelData(eventData as unknown as DuelEvent);
+        break;
+    }
+  }, [isOnline, onlineGame.remoteEvent]);
+
+  // ===== ONLINE: React to remote event result (close popup) =====
+  useEffect(() => {
+    if (!isOnline || !onlineGame.remoteEventResult) return;
+
+    // Close all spectator popups after a short delay to show the result
+    const timer = setTimeout(() => {
+      setQuizData(null);
+      setFundingData(null);
+      setOpportunityData(null);
+      setChallengeData(null);
+      setDuelData(null);
+      setDuelOpponent(null);
+      setIsEventSpectator(false);
+      onlineGame.clearRemoteEvent();
+      onlineGame.clearRemoteEventResult();
+    }, 2500);
+
+    return () => clearTimeout(timer);
+  }, [isOnline, onlineGame.remoteEventResult]);
+
+  // Clear remote dice value on turn change
+  useEffect(() => {
+    setRemoteDiceValue(null);
+    setRemoteRollingPlayerId(null);
+  }, [game?.currentPlayerIndex]);
+
+  // ===== ONLINE: Detect opponent disconnect → forfeit after 30s =====
+  useEffect(() => {
+    if (!isOnline) return;
+
+    if (onlineGame.opponentDisconnected) {
+      setShowDisconnectPopup(true);
+      // Auto-win after 30 seconds if opponent doesn't reconnect
+      disconnectTimerRef.current = setTimeout(() => {
+        if (userId) {
+          onlineGame.broadcastWin(userId);
+          router.push(`/(game)/results/${game?.id}`);
+        }
+      }, 30000);
+    } else {
+      // Opponent reconnected
+      setShowDisconnectPopup(false);
+      if (disconnectTimerRef.current) {
+        clearTimeout(disconnectTimerRef.current);
+        disconnectTimerRef.current = null;
+      }
+    }
+
+    return () => {
+      if (disconnectTimerRef.current) {
+        clearTimeout(disconnectTimerRef.current);
+      }
+    };
+  }, [isOnline, onlineGame.opponentDisconnected, userId, game?.id, router, onlineGame]);
+
+  // ===== ONLINE: Detect game ended (forfeit from remote) =====
+  useEffect(() => {
+    if (!isOnline || !game) return;
+    if (game.status === 'finished' && game.winner) {
+      // Game ended — navigate to results
+      const timer = setTimeout(() => {
+        router.push(`/(game)/results/${game.id}`);
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [isOnline, game?.status, game?.winner, game?.id, router]);
+
+  // End turn — defined early so all callbacks can reference it
+  const handleEndTurn = useCallback((extra = false) => {
+    setAnimating(false);
+    clearSelection();
+    setDiceValue(null);
+    setIsRolling(false);
+
+    // If we have a deferred event (from landing on event square after rolling 6)
+    // and the 6-chain just ended (extra=false), trigger it now
+    if (!extra && deferredEventRef.current) {
+      const eventType = deferredEventRef.current;
+      deferredEventRef.current = null;
+      // Use ref to avoid circular dependency with handleTriggeredEvent
+      handleTriggeredEventRef.current(eventType);
+      return;
+    }
+
+    if (isOnline) {
+      onlineGame.endTurn(extra);
+    } else if (extra) {
+      grantExtraTurn();
+    } else {
+      nextTurn();
+    }
+  }, [clearSelection, nextTurn, grantExtraTurn, setAnimating, isOnline, onlineGame]);
+
+  // Handle dice roll
+  const handleRollDice = useCallback((): number => {
+    if (!canRollDice()) return 0;
+    if (isOnline && !onlineGame.isMyTurn) return 0;
+
+    setIsRolling(true);
+    const value = isOnline ? onlineGame.rollDice() : rollDice();
+    setDiceValue(value);
+
+    if (hapticsEnabled) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+    return value;
+  }, [canRollDice, rollDice, hapticsEnabled, isOnline, onlineGame]);
+
+  // Handle exiting a pawn from home
+  const handleExitHome = useCallback((pawnIndex: number) => {
+    if (!currentPlayer || !canExitHome) return;
+
+    // Capture dice value NOW before any async operations
+    const rolledSix = game?.diceValue === 6;
+
+    setAnimating(true);
+    const result = isOnline ? onlineGame.exitHome(pawnIndex) : exitHome(pawnIndex);
+
+    const animDelay = result?.path?.length
+      ? result.path.length * PAWN_STEP_MS + 150
+      : 400;
+
+    if (result) {
+      // Handle capture at start position (after animation)
+      if (result.capturedPawn) {
+        setTimeout(() => {
+          if (isOnline) {
+            onlineGame.broadcastCapture(result.capturedPawn!.playerId, result.capturedPawn!.pawnIndex);
+          } else {
+            handleCapture(result.capturedPawn!.playerId, result.capturedPawn!.pawnIndex);
+          }
+          if (hapticsEnabled) {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          }
+        }, animDelay);
+      }
+
+      // Handle triggered event (after animation)
+      // If rolled 6, defer event until the extra turn chain ends
+      if (result.triggeredEvent) {
+        if (rolledSix) {
+          deferredEventRef.current = result.triggeredEvent;
+        } else {
+          setTimeout(() => {
+            handleTriggeredEventRef.current(result.triggeredEvent!);
+            setAnimating(false);
+          }, animDelay);
+          return;
+        }
+      }
+    }
+
+    setTimeout(() => {
+      handleEndTurn(rolledSix);
+    }, animDelay);
+  }, [currentPlayer, canExitHome, exitHome, game, handleCapture, hapticsEnabled, handleEndTurn, setAnimating, isOnline, onlineGame]);
+
+  // Handle dice roll complete
+  const handleDiceComplete = useCallback(
+    (value: number) => {
+      setIsRolling(false);
+      setDiceValue(value);
+
+      // Check for rolled 6
+      if (value === 6 && hapticsEnabled) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+
+      // With 1 pawn per player, auto-execute the move
+      const moves = getValidMoves();
+      if (moves.length >= 1) {
+        const move = moves[0]!;
+        if (move.type === 'exit') {
+          setTimeout(() => handleExitHome(move.pawnIndex), 500);
+        } else if (move.type === 'move') {
+          // Auto-execute: select then immediately move via ref
+          selectPawn(move.pawnIndex);
+          setTimeout(() => handlePawnPressRef.current(currentPlayer?.id || '', move.pawnIndex), 500);
+        }
+      } else {
+        // No valid moves - end turn
+        setTimeout(() => handleEndTurn(), 1500);
+      }
+    },
+    [getValidMoves, hapticsEnabled, selectPawn, handleEndTurn, handleExitHome, currentPlayer]
+  );
+
+  // Handle pawn selection/movement
+  const handlePawnPress = useCallback(
+    (playerId: string, pawnIndex: number) => {
+      if (!game || !currentPlayer || playerId !== currentPlayer.id || !canMove()) return;
+
+      // Check if this pawn can move
+      const move = validMoves.find((m) => m.pawnIndex === pawnIndex);
+      if (!move) return;
+
+      // If it's an exit move
+      if (move.type === 'exit') {
+        handleExitHome(pawnIndex);
+        return;
+      }
+
+      if (selectedPawnIndex === pawnIndex) {
+        // Capture dice value NOW before any async operations
+        const rolledSix = game.diceValue === 6;
+
+        // Execute move (online or local)
+        setAnimating(true);
+        const result = isOnline ? onlineGame.movePawn(pawnIndex) : executeMove(pawnIndex);
+
+        // Step-by-step animation duration
+        const animDelay = result?.path?.length
+          ? result.path.length * PAWN_STEP_MS + 150
+          : 400;
+
+        if (result) {
+          // Handle capture (after animation)
+          if (result.capturedPawn) {
+            setTimeout(() => {
+              if (isOnline) {
+                onlineGame.broadcastCapture(result.capturedPawn!.playerId, result.capturedPawn!.pawnIndex);
+              } else {
+                handleCapture(result.capturedPawn!.playerId, result.capturedPawn!.pawnIndex);
+              }
+              if (hapticsEnabled) {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              }
+            }, animDelay);
+          }
+
+          // Handle finish - no extra turn even on 6
+          if (result.isFinished) {
+            setTimeout(() => {
+              if (checkWinCondition(playerId)) {
+                if (isOnline) {
+                  onlineGame.broadcastWin(playerId);
+                } else {
+                  endGame(playerId);
+                }
+                router.push(`/(game)/results/${game.id}`);
+              }
+            }, animDelay);
+            return;
+          }
+
+          // Handle triggered event (after animation)
+          // If rolled 6, defer event until the extra turn chain ends
+          if (result.triggeredEvent) {
+            if (rolledSix) {
+              deferredEventRef.current = result.triggeredEvent;
+            } else {
+              setTimeout(() => {
+                handleTriggeredEventRef.current(result.triggeredEvent!);
+                setAnimating(false);
+              }, animDelay);
+              return;
+            }
+          }
+        }
+
+        setTimeout(() => {
+          handleEndTurn(rolledSix && !result?.isFinished);
+        }, animDelay);
+      } else {
+        // Select pawn and highlight destination
+        selectPawn(pawnIndex);
+
+        // Build highlighted positions
+        if (move.result.newState.status === 'circuit') {
+          setHighlightedPositions([{
+            type: 'circuit',
+            position: move.result.newState.position,
+          }]);
+        } else if (move.result.newState.status === 'final') {
+          setHighlightedPositions([{
+            type: 'final',
+            position: move.result.newState.position,
+            color: currentPlayer.color,
+          }]);
+        }
+      }
+    },
+    [
+      game,
+      currentPlayer,
+      canMove,
+      validMoves,
+      selectedPawnIndex,
+      executeMove,
+      handleCapture,
+      checkWinCondition,
+      endGame,
+      selectPawn,
+      setHighlightedPositions,
+      hapticsEnabled,
+      handleExitHome,
+      handleEndTurn,
+      setAnimating,
+      isOnline,
+      onlineGame,
+      router,
+    ]
+  );
+
+  // Handle triggered events
   const handleTriggeredEvent = useCallback(
     (eventType: string) => {
       const event = GameEngine.generateEvent(eventType as any, game?.edition || 'startup');
       if (!event) {
-        // No event generated — skip directly
+        handleEndTurn();
         return;
       }
 
       triggerEvent(event);
-      setIsEventSpectator(false);
+      setIsEventSpectator(false); // Active player, not spectator
 
       // Broadcast event to other players in online mode
       if (isOnline) {
@@ -245,349 +519,105 @@ export default function PlayScreen() {
         case 'challenge':
           setChallengeData(event.data as ChallengeEvent);
           break;
-        case 'duel': {
-          setDuelTriggered(true);
-          if (!currentPlayer) break;
-          const otherPlayers = game?.players?.filter((p) => p.id !== currentPlayer.id) ?? [];
-          if (otherPlayers.length === 1) {
-            const opponentId = otherPlayers[0]!.id;
-            const questions = getRandomDuelQuestions(3);
-            duel.startDuelWithQuestions(currentPlayer.id, opponentId, questions);
-            if (isOnline) {
-              onlineGame.broadcastDuelStart(currentPlayer.id, opponentId, questions as unknown as Record<string, unknown>[]);
+        case 'duel':
+          setDuelData(event.data as DuelEvent);
+          // Select random opponent for duel
+          const opponents = game?.players.filter((p) => p.id !== currentPlayer?.id) || [];
+          if (opponents.length > 0) {
+            const randomOpponent = opponents[Math.floor(Math.random() * opponents.length)];
+            if (randomOpponent) {
+              setDuelOpponent(randomOpponent);
             }
-          } else {
-            duel.startDuel(currentPlayer.id);
           }
           break;
-        }
       }
     },
-    [game, currentPlayer, triggerEvent, isOnline, onlineGame, duel]
+    [game, currentPlayer, triggerEvent, handleEndTurn, isOnline, onlineGame]
   );
 
-  // ===== WIN HANDLER =====
+  // Keep refs in sync with the latest callback versions
+  useEffect(() => { handleTriggeredEventRef.current = handleTriggeredEvent; }, [handleTriggeredEvent]);
+  useEffect(() => { handlePawnPressRef.current = handlePawnPress; }, [handlePawnPress]);
 
-  const handleWin = useCallback(
-    (playerId: string) => {
-      if (isOnline) {
-        onlineGame.broadcastWin(playerId);
-      } else {
-        storeEndGame(playerId);
-      }
-      router.push(`/(game)/results/${game?.id}`);
-    },
-    [isOnline, onlineGame, storeEndGame, router, game?.id]
-  );
-
-  // ===== TURN MACHINE =====
-
-  const { turnState, diceProps, handleEventResolve } = useTurnMachine({
-    game,
-    currentPlayer,
-    isOnline,
-    userId,
-    actions,
-    onEvent: handleTriggeredEvent,
-    onWin: handleWin,
-    hapticsEnabled,
-    setAnimating,
-    clearSelection,
-  });
-
-  // ===== ONLINE: React to remote dice rolls =====
-
-  useEffect(() => {
-    if (!isOnline || !onlineGame.remoteDiceRoll) return;
-
-    const { playerId, value } = onlineGame.remoteDiceRoll;
-    setRemoteRollingPlayerId(playerId);
-    setRemoteDiceValue(value);
-
-    const timer = setTimeout(() => {
-      setRemoteRollingPlayerId(null);
-    }, 1200);
-
-    return () => clearTimeout(timer);
-  }, [isOnline, onlineGame.remoteDiceRoll]);
-
-  // ===== ONLINE: React to remote event triggers =====
-
-  useEffect(() => {
-    if (!isOnline || !onlineGame.remoteEvent) return;
-
-    const { eventType, eventData } = onlineGame.remoteEvent;
-    console.log('[PlayScreen] Affichage popup événement distant (spectateur):', {
-      eventType,
-      hasEventData: !!eventData && Object.keys(eventData).length > 0,
-      eventData,
-    });
-
-    // Ne montrer le popup "Duel en cours" que pour un vrai duel ; pour quiz/funding/opportunity/challenge, s'assurer que duelTriggered est false
-    if (eventType === 'duel') {
-      setDuelTriggered(true);
-      // Extraire les données du duel
-      const duelData = eventData as { challengerId?: string; opponentId?: string; questions?: DuelQuestion[] };
-      const { challengerId, opponentId, questions } = duelData;
-
-      console.log('[PlayScreen] Duel distant reçu:', { challengerId, opponentId, questionsCount: questions?.length, myId: userId });
-
-      if (challengerId && opponentId && questions && questions.length > 0) {
-        // Si je suis l'adversaire (opponent), je rejoins le duel avec les mêmes questions
-        if (userId === opponentId) {
-          console.log('[PlayScreen] Je suis l\'adversaire, je rejoins le duel');
-          setIsEventSpectator(false);
-          duel.joinDuel(challengerId, opponentId, questions);
-        } else if (userId === challengerId) {
-          // Je suis le challenger (ne devrait pas arriver car c'est moi qui ai envoyé)
-          console.log('[PlayScreen] Je suis le challenger (ignoré)');
-        } else {
-          // Je suis spectateur (3-4 joueurs)
-          console.log('[PlayScreen] Je suis spectateur du duel');
-          setIsEventSpectator(true);
-          setSpectatorDuelChallengerId(challengerId);
-          setSpectatorDuelOpponentId(opponentId);
-        }
-      } else {
-        // Données incomplètes, mode spectateur par défaut
-        setIsEventSpectator(true);
-      }
-    } else {
-      setDuelTriggered(false);
-      setIsEventSpectator(true);
-    }
-
-    switch (eventType) {
-      case 'quiz':
-        setQuizData(eventData as unknown as QuizEvent);
-        break;
-      case 'funding':
-        setFundingData(eventData as unknown as FundingEvent);
-        break;
-      case 'opportunity':
-        setOpportunityData(eventData as unknown as OpportunityEvent);
-        break;
-      case 'challenge':
-        setChallengeData(eventData as unknown as ChallengeEvent);
-        break;
-      case 'duel':
-        // Duel : déjà géré ci-dessus
-        break;
-      default:
-        console.warn('[PlayScreen] Type d\'événement distant inconnu:', eventType);
-    }
-  }, [isOnline, onlineGame.remoteEvent, userId, duel]);
-
-  // ===== ONLINE: React to remote event result (close popup) =====
-
-  useEffect(() => {
-    if (!isOnline || !onlineGame.remoteEventResult) return;
-
-    const timer = setTimeout(() => {
-      setQuizData(null);
-      setFundingData(null);
-      setOpportunityData(null);
-      setChallengeData(null);
-      setDuelTriggered(false);
-      setSpectatorDuelChallengerId(null);
-      setSpectatorDuelOpponentId(null);
-      duel.resetDuel();
-      setIsEventSpectator(false);
-      onlineGame.clearRemoteEvent();
-      onlineGame.clearRemoteEventResult();
-    }, 2500);
-
-    return () => clearTimeout(timer);
-  }, [isOnline, onlineGame.remoteEventResult, onlineGame]);
-
-  // Clear remote dice value on turn change
-  useEffect(() => {
-    setRemoteDiceValue(null);
-    setRemoteRollingPlayerId(null);
-  }, [game?.currentPlayerIndex]);
-
-  // ===== ONLINE: Réception du score duel de l'adversaire =====
-  useEffect(() => {
-    if (!isOnline || !onlineGame.remoteDuelScore) return;
-    const { playerId, score } = onlineGame.remoteDuelScore;
-    duel.receiveRemoteScore(playerId, score);
-    onlineGame.clearRemoteDuelScore();
-  }, [isOnline, onlineGame.remoteDuelScore, duel, onlineGame]);
-
-  // ===== ONLINE: Réception du résultat du duel (pour spectateurs) =====
-  useEffect(() => {
-    if (!isOnline || !onlineGame.remoteDuelResult) return;
-
-    const result = onlineGame.remoteDuelResult;
-    console.log('[PlayScreen] Résultat duel reçu (spectateur):', result);
-
-    // Si je suis spectateur, fermer le popup spectateur après un délai
-    if (isEventSpectator) {
-      const timer = setTimeout(() => {
-        setDuelTriggered(false);
-        setIsEventSpectator(false);
-        setSpectatorDuelChallengerId(null);
-        setSpectatorDuelOpponentId(null);
-        onlineGame.clearRemoteDuelResult();
-        onlineGame.clearRemoteEvent();
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-
-    onlineGame.clearRemoteDuelResult();
-    return undefined;
-  }, [isOnline, onlineGame.remoteDuelResult, isEventSpectator, onlineGame]);
-
-  // ===== ONLINE: Detect opponent disconnect → forfeit after 30s =====
-
-  useEffect(() => {
-    if (!isOnline) return;
-
-    if (onlineGame.opponentDisconnected) {
-      if (__DEV__) {
-        console.log('[PlayScreen] Popup "Adversaire déconnecté" déclenché:', {
-          opponentDisconnected: onlineGame.opponentDisconnected,
-          disconnectedPlayerName: onlineGame.disconnectedPlayerName,
-          timestamp: Date.now(),
-        });
-      }
-      setShowDisconnectPopup(true);
-      disconnectTimerRef.current = setTimeout(() => {
-        if (userId) {
-          onlineGame.broadcastWin(userId);
-          router.push(`/(game)/results/${game?.id}`);
-        }
-      }, 30000);
-    } else {
-      setShowDisconnectPopup(false);
-      if (disconnectTimerRef.current) {
-        clearTimeout(disconnectTimerRef.current);
-        disconnectTimerRef.current = null;
-      }
-    }
-
-    return () => {
-      if (disconnectTimerRef.current) {
-        clearTimeout(disconnectTimerRef.current);
-      }
-    };
-  }, [isOnline, onlineGame.opponentDisconnected, userId, game?.id, router, onlineGame]);
-
-  // ===== ONLINE: Detect game ended (forfeit from remote) =====
-
-  useEffect(() => {
-    if (!isOnline || !game) return;
-    if (game.status === 'finished' && game.winner) {
-      const timer = setTimeout(() => {
-        router.push(`/(game)/results/${game.id}`);
-      }, 1500);
-      return () => clearTimeout(timer);
-    }
-    return undefined;
-  }, [isOnline, game?.status, game?.winner, game?.id, router, game]);
-
-  // ===== EVENT POPUP HANDLERS =====
-
+  // Event handlers — resolve locally and broadcast result in online mode
   const handleQuizAnswer = useCallback(
     (correct: boolean, reward: number) => {
-      actions.resolveEvent({ ok: correct, reward });
+      if (isOnline) {
+        onlineGame.resolveEvent({ ok: correct, reward });
+      } else {
+        if (currentPlayer && correct) {
+          addTokens(currentPlayer.id, reward);
+        }
+        resolveEvent();
+      }
       setQuizData(null);
-      handleEventResolve();
+      handleEndTurn();
     },
-    [actions, handleEventResolve]
+    [currentPlayer, addTokens, resolveEvent, handleEndTurn, isOnline, onlineGame]
   );
 
   const handleFundingAccept = useCallback(
     (amount: number) => {
-      actions.resolveEvent({ ok: true, reward: amount });
+      if (isOnline) {
+        onlineGame.resolveEvent({ ok: true, reward: amount });
+      } else {
+        if (currentPlayer) {
+          addTokens(currentPlayer.id, amount);
+        }
+        resolveEvent();
+      }
       setFundingData(null);
-      handleEventResolve();
+      handleEndTurn();
     },
-    [actions, handleEventResolve]
+    [currentPlayer, addTokens, resolveEvent, handleEndTurn, isOnline, onlineGame]
   );
 
   const handleEventAccept = useCallback(
     (value: number, effect: string) => {
+      if (!currentPlayer) return;
+
       const isPositive = effect === 'tokens';
-      actions.resolveEvent({ ok: isPositive, reward: value });
+      if (isOnline) {
+        onlineGame.resolveEvent({ ok: isPositive, reward: value });
+      } else {
+        if (isPositive) {
+          addTokens(currentPlayer.id, value);
+        } else {
+          removeTokens(currentPlayer.id, value);
+        }
+        resolveEvent();
+      }
+
       setOpportunityData(null);
       setChallengeData(null);
-      handleEventResolve();
+      handleEndTurn();
     },
-    [actions, handleEventResolve]
+    [currentPlayer, addTokens, removeTokens, resolveEvent, handleEndTurn, isOnline, onlineGame]
   );
 
-  // Duel handlers
-  const handleDuelSelectOpponent = useCallback(
-    (opponent: Player) => {
-      if (!duel.challenger) return;
-      duel.selectOpponent(opponent.id);
-      const questions = getRandomDuelQuestions(3);
-      duel.startDuelWithQuestions(duel.challenger.id, opponent.id, questions);
+  const handleDuelAnswer = useCallback(
+    (won: boolean, stake: number) => {
+      if (!currentPlayer) return;
+
       if (isOnline) {
-        onlineGame.broadcastDuelStart(duel.challenger.id, opponent.id, questions as unknown as Record<string, unknown>[]);
+        onlineGame.resolveEvent({ ok: won, reward: stake });
+      } else {
+        if (won) {
+          addTokens(currentPlayer.id, stake);
+        } else {
+          removeTokens(currentPlayer.id, stake);
+        }
+        resolveEvent();
       }
+
+      setDuelData(null);
+      setDuelOpponent(null);
+      handleEndTurn();
     },
-    [duel, isOnline, onlineGame]
+    [currentPlayer, addTokens, removeTokens, resolveEvent, handleEndTurn, isOnline, onlineGame]
   );
 
-  const handleDuelStartChallenger = useCallback(() => {
-    duel.startChallengerTurn();
-  }, [duel]);
-
-  const handleDuelChallengerComplete = useCallback(
-    (answers: number[], score: number) => {
-      duel.submitChallengerAnswers(answers, score);
-      if (isOnline) onlineGame.broadcastDuelScore(score);
-    },
-    [duel, isOnline, onlineGame]
-  );
-
-  const handleDuelStartOpponent = useCallback(() => {
-    duel.startOpponentTurn();
-  }, [duel]);
-
-  const handleDuelOpponentComplete = useCallback(
-    (answers: number[], score: number) => {
-      duel.submitOpponentAnswers(answers, score);
-      if (isOnline) onlineGame.broadcastDuelScore(score);
-    },
-    [duel, isOnline, onlineGame]
-  );
-
-  const handleDuelClose = useCallback(() => {
-    // Identifier si je suis le challenger ou l'opponent
-    const myId = userId || currentPlayer?.id;
-    const amChallenger = myId === duel.result?.challengerId;
-    const isWinner = duel.result?.winnerId === myId;
-
-    // Calculer la récompense selon mon rôle
-    let reward = 0;
-    if (isWinner) {
-      reward = amChallenger ? (duel.result?.challengerReward || 0) : (duel.result?.opponentReward || 0);
-    }
-
-    // En mode online, seul le joueur dont c'est le tour (challenger) résout l'événement
-    // En mode local, le challenger résout aussi l'événement
-    const shouldResolveEvent = amChallenger || (!isOnline && currentPlayer?.id === duel.result?.challengerId);
-
-    if (shouldResolveEvent) {
-      actions.resolveEvent({ ok: isWinner, reward });
-    }
-
-    setDuelTriggered(false);
-    setSpectatorDuelChallengerId(null);
-    setSpectatorDuelOpponentId(null);
-    duel.resetDuel();
-
-    // Seul le challenger déclenche handleEventResolve (pour passer au tour suivant)
-    if (shouldResolveEvent) {
-      handleEventResolve();
-    }
-  }, [duel.result, currentPlayer?.id, userId, isOnline, actions, handleEventResolve, duel]);
-
-  // ===== QUIT HANDLER =====
-
+  // Handle quit
   const handleQuit = useCallback(() => {
     setShowQuitConfirm(false);
     if (isOnline) {
@@ -596,69 +626,76 @@ export default function PlayScreen() {
     router.replace('/(tabs)/home');
   }, [router, isOnline, onlineGame]);
 
-  // ===== PAWN MOVE ANIMATION COMPLETE (kept for GameBoard) =====
-
+  // Handle pawn move animation complete
   const handlePawnMoveComplete = useCallback(() => {
-    // No-op: movement is handled by the turn machine
+    console.log('[PlayScreen] Pawn animation completed');
   }, []);
 
-  // ===== PAWN PRESS (kept for GameBoard but simplified) =====
+  // ===== RESPONSIVE: Tablet + rotation support =====
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const isLandscape = windowWidth > windowHeight;
+  const isTablet = Math.min(windowWidth, windowHeight) >= 600;
 
-  const handlePawnPress = useCallback(
-    (_playerId: string, _pawnIndex: number) => {
-      // Auto-move is handled by the turn machine
-      // This is kept for GameBoard's onPawnPress prop compatibility
-    },
-    []
-  );
+  // Calculate optimal board size based on available space
+  const headerHeight = insets.top + 72;
+  const sideColumnWidth = isTablet ? 180 : 130;
+  let computedBoardSize: number;
 
-  // ===== RENDER HELPER: get dice props for a specific player card =====
+  if (isLandscape) {
+    // Landscape: board height-constrained, players on sides
+    const availableHeight = windowHeight - headerHeight - insets.bottom - SPACING[4] * 2;
+    const availableWidth = windowWidth - sideColumnWidth * 2 - SPACING[3] * 4;
+    computedBoardSize = Math.min(availableHeight, availableWidth);
+  } else {
+    // Portrait: board fills width, height constrained by player rows
+    const playerRowHeight = isTablet ? 72 : 60;
+    const verticalChrome = headerHeight + insets.bottom + playerRowHeight * 2 + SPACING[4] * 2;
+    const availableHeight = windowHeight - verticalChrome;
+    const availableWidth = windowWidth - SPACING[2] * 2 - SPACING[1] * 2;
+    computedBoardSize = Math.min(availableWidth, availableHeight);
+  }
+  // Ensure minimum playable size
+  computedBoardSize = Math.max(computedBoardSize, 280);
 
-  const getPlayerCardDiceProps = useCallback(
-    (pl: Player) => {
-      const isMe = isOnline ? pl.id === userId : !pl.isAI;
-      const isTurn = pl.id === currentPlayer?.id;
-      const isRemoteRolling = remoteRollingPlayerId === pl.id;
+  // Helper: render a PlayerCard for a given color (avoids 4x copy-paste)
+  const renderPlayerCard = (playerColor: PlayerColor) => {
+    const pl = game?.players.find(p => p.color === playerColor);
+    if (!pl) return null;
 
-      let diceValue: number | null = null;
-      let isDiceRolling = false;
-      let isDiceDisabled = true;
-      let onRollDice: (() => number) | undefined;
-      let onDiceComplete: ((value: number) => void) | undefined;
+    const isTurn = pl.id === currentPlayer?.id;
+    const isRemoteRolling = remoteRollingPlayerId === pl.id;
+    // En solo/local: tout joueur humain peut interagir
+    // En online: seul le joueur authentifié peut interagir
+    const canInteract = isOnline ? (pl.id === userId) : !pl.isAI;
 
-      if (isMe && isTurn) {
-        // My turn (human, local): use turn machine state + wire up dice controls
-        diceValue = turnState.diceValue;
-        isDiceRolling = turnState.isRolling;
-        isDiceDisabled = turnState.phase !== 'idle' || (isOnline && !onlineGame.isMyTurn);
-        onRollDice = diceProps.onRoll;
-        onDiceComplete = diceProps.onDiceComplete;
-      } else if (isRemoteRolling) {
-        // Remote online player rolling (opponent's device)
-        diceValue = remoteDiceValue;
-        isDiceRolling = true;
-      } else if (isTurn) {
-        // AI or non-local player's turn: show turn machine dice state
-        // This gives the AI rolling animation + dice value display
-        diceValue = turnState.diceValue;
-        isDiceRolling = turnState.isRolling;
-      }
+    return (
+      <PlayerCard
+        player={pl}
+        isCurrentTurn={isTurn}
+        diceValue={canInteract && isTurn ? diceValue : isRemoteRolling ? remoteDiceValue : isTurn ? (game?.diceValue ?? null) : null}
+        isDiceRolling={canInteract && isTurn ? isRolling : isRemoteRolling}
+        isDiceDisabled={!canInteract || !isTurn || !canRollDice()}
+        onRollDice={canInteract && isTurn ? handleRollDice : undefined}
+        onDiceComplete={canInteract && isTurn ? handleDiceComplete : undefined}
+      />
+    );
+  };
 
-      return { diceValue, isDiceRolling, isDiceDisabled, onRollDice, onDiceComplete };
-    },
-    [
-      isOnline,
-      userId,
-      currentPlayer,
-      remoteRollingPlayerId,
-      remoteDiceValue,
-      turnState.diceValue,
-      turnState.isRolling,
-      turnState.phase,
-      onlineGame.isMyTurn,
-      diceProps,
-    ]
-  );
+  // Pre-build GameBoard element (same in both layouts)
+  const gameBoardElement = game ? (
+    <GameBoard
+      size={computedBoardSize}
+      players={game.players}
+      currentPlayerId={currentPlayer?.id || ''}
+      selectedPawnIndex={selectedPawnIndex}
+      highlightedPositions={highlightedPositions.filter(
+        (hp): hp is { type: 'circuit' | 'final'; position: number; color?: typeof hp.color } =>
+          hp.type !== 'home'
+      )}
+      onPawnPress={handlePawnPress}
+      onPawnMoveComplete={handlePawnMoveComplete}
+    />
+  ) : null;
 
   if (!game) {
     return (
@@ -674,32 +711,11 @@ export default function PlayScreen() {
     );
   }
 
-  // Helper to render a player card for a given color slot
-  const renderPlayerCard = (color: string) => {
-    const pl = game.players.find((p) => p.color === color);
-    if (!pl) return null;
-
-    const isTurn = pl.id === currentPlayer?.id;
-    const dp = getPlayerCardDiceProps(pl);
-
-    return (
-      <PlayerCard
-        player={pl}
-        isCurrentTurn={isTurn}
-        diceValue={dp.diceValue}
-        isDiceRolling={dp.isDiceRolling}
-        isDiceDisabled={dp.isDiceDisabled}
-        onRollDice={dp.onRollDice}
-        onDiceComplete={dp.onDiceComplete}
-      />
-    );
-  };
-
   return (
     <View style={styles.container}>
       <RadialBackground />
       <View style={[styles.content, { paddingTop: insets.top + 72, paddingBottom: insets.bottom }]}>
-        {/* Fixed Header */}
+        {/* Fixed Header: Back, Logo Startupludo, Settings (design system: bg #0A1929) */}
         <View style={[styles.fixedHeader, { paddingTop: insets.top + SPACING[2] }]}>
           <Pressable onPress={() => setShowQuitConfirm(true)} hitSlop={8} style={styles.headerButton}>
             <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
@@ -716,107 +732,48 @@ export default function PlayScreen() {
           </Pressable>
         </View>
 
-        {/* Board + PlayerCards */}
-        <View style={styles.boardWrapper}>
-          {/* Top Players Row — yellow (top-left) and blue (top-right) */}
-          <View style={styles.playersRow}>
-            <View style={styles.playerSlot}>
-              {renderPlayerCard('yellow')}
+        {/* Board + Players — responsive layout */}
+        {isLandscape ? (
+          /* LANDSCAPE: players on left/right, board centered */
+          <View style={styles.landscapeContainer}>
+            {/* Left column: Yellow (top-left) + Green (bottom-left) */}
+            <View style={[styles.landscapeSide, { width: sideColumnWidth }]}>
+              <View style={styles.landscapePlayerSlot}>{renderPlayerCard('yellow')}</View>
+              <View style={styles.landscapePlayerSlot}>{renderPlayerCard('green')}</View>
             </View>
-            <View style={styles.playerSlot}>
-              {renderPlayerCard('blue')}
-            </View>
-          </View>
 
-          {/* Game Board */}
-          <View style={styles.boardContainer}>
-            <GameBoard
-              players={game.players}
-              currentPlayerId={currentPlayer?.id || ''}
-              selectedPawnIndex={selectedPawnIndex}
-              highlightedPositions={highlightedPositions.filter(
-                (hp): hp is { type: 'circuit' | 'final'; position: number; color?: typeof hp.color } =>
-                  hp.type !== 'home'
-              )}
-              onPawnPress={handlePawnPress}
-              onPawnMoveComplete={handlePawnMoveComplete}
-            />
-          </View>
-
-          {/* Bottom Players Row — green (bottom-left) and red (bottom-right) */}
-          <View style={styles.playersRow}>
-            <View style={styles.playerSlot}>
-              {renderPlayerCard('green')}
+            {/* Board */}
+            <View style={styles.boardContainer}>
+              {gameBoardElement}
             </View>
-            <View style={styles.playerSlot}>
-              {renderPlayerCard('red')}
+
+            {/* Right column: Blue (top-right) + Red (bottom-right) */}
+            <View style={[styles.landscapeSide, { width: sideColumnWidth }]}>
+              <View style={styles.landscapePlayerSlot}>{renderPlayerCard('blue')}</View>
+              <View style={styles.landscapePlayerSlot}>{renderPlayerCard('red')}</View>
             </View>
           </View>
+        ) : (
+          /* PORTRAIT: players above/below board */
+          <View style={styles.boardWrapper}>
+            <View style={styles.playersRow}>
+              <View style={styles.playerSlot}>{renderPlayerCard('yellow')}</View>
+              <View style={styles.playerSlot}>{renderPlayerCard('blue')}</View>
+            </View>
 
-          {/* Boutons de test des popups (sous le gameboard) */}
-          <View style={styles.testPopupsRow}>
-            <Pressable
-              style={styles.testPopupButton}
-              onPress={() => {
-                setIsEventSpectator(false);
-                setQuizData(MOCK_QUIZ);
-              }}
-            >
-              <Text style={styles.testPopupLabel}>Quiz</Text>
-            </Pressable>
-            <Pressable
-              style={styles.testPopupButton}
-              onPress={() => {
-                setIsEventSpectator(false);
-                setFundingData(MOCK_FUNDING);
-              }}
-            >
-              <Text style={styles.testPopupLabel}>Financement</Text>
-            </Pressable>
-            <Pressable
-              style={styles.testPopupButton}
-              onPress={() => {
-                setIsEventSpectator(false);
-                setOpportunityData(MOCK_OPPORTUNITY);
-              }}
-            >
-              <Text style={styles.testPopupLabel}>Opportunité</Text>
-            </Pressable>
-            <Pressable
-              style={styles.testPopupButton}
-              onPress={() => {
-                setIsEventSpectator(false);
-                setChallengeData(MOCK_CHALLENGE);
-              }}
-            >
-              <Text style={styles.testPopupLabel}>Challenge</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.testPopupButton, { backgroundColor: COLORS.success }]}
-              onPress={() => {
-                if (!currentPlayer) return;
-                setIsEventSpectator(false);
-                setDuelTriggered(true);
-                const otherPlayers = game?.players?.filter((p) => p.id !== currentPlayer.id) ?? [];
-                if (otherPlayers.length === 1) {
-                  const opponentId = otherPlayers[0]!.id;
-                  const questions = getRandomDuelQuestions(3);
-                  duel.startDuelWithQuestions(currentPlayer.id, opponentId, questions);
-                  if (isOnline) {
-                    onlineGame.broadcastDuelStart(currentPlayer.id, opponentId, questions as unknown as Record<string, unknown>[]);
-                  }
-                } else {
-                  duel.startDuel(currentPlayer.id);
-                }
-              }}
-            >
-              <Text style={[styles.testPopupLabel, { color: COLORS.white }]}>Duel</Text>
-            </Pressable>
+            <View style={styles.boardContainer}>
+              {gameBoardElement}
+            </View>
+
+            <View style={styles.playersRow}>
+              <View style={styles.playerSlot}>{renderPlayerCard('green')}</View>
+              <View style={styles.playerSlot}>{renderPlayerCard('red')}</View>
+            </View>
           </View>
-        </View>
+        )}
       </View>
 
-      {/* Quit Confirmation Modal */}
+      {/* Quit Confirmation Popup (design system) */}
       <QuitConfirmPopup
         visible={showQuitConfirm}
         onCancel={() => setShowQuitConfirm(false)}
@@ -886,98 +843,12 @@ export default function PlayScreen() {
         isSpectator={isEventSpectator}
       />
 
-      {/* New Duel System Popups */}
-      {duel.challenger && (
-        <DuelSelectOpponentPopup
-          visible={duel.currentPhase === 'select_opponent'}
-          opponents={duel.spectators}
-          currentPlayer={duel.challenger}
-          onSelectOpponent={handleDuelSelectOpponent}
-          onClose={() => {
-            setDuelTriggered(false);
-            duel.resetDuel();
-            handleEventResolve();
-          }}
-        />
+      {/* Duel popups - temporairement désactivé jusqu'à implémentation complète */}
+      {duelData && currentPlayer && duelOpponent && (
+        <View>
+          {/* TODO: Implémenter les popups de duel appropriés selon l'état */}
+        </View>
       )}
-
-      {(() => {
-        const showPrepare = (duel.currentPhase === 'intro' || duel.currentPhase === 'opponent_prepare') && !!duel.challenger && !!duel.opponent;
-        const showQuestion = (duel.currentPhase === 'challenger_turn' || duel.currentPhase === 'opponent_turn') && duel.questions.length > 0;
-        if (__DEV__ && duel.isActive) {
-          console.log('[PlayScreen] Duel popups', {
-            currentPhase: duel.currentPhase,
-            questionsLength: duel.questions.length,
-            showPrepare,
-            showQuestion,
-            hasChallenger: !!duel.challenger,
-            hasOpponent: !!duel.opponent,
-          });
-        }
-        return (
-          <>
-            {showPrepare && (
-              <DuelPreparePopup
-                visible
-                phase={duel.currentPhase === 'intro' ? 'intro' : 'opponent_prepare'}
-                challenger={duel.challenger}
-                opponent={duel.opponent}
-                currentPlayerId={userId || currentPlayer?.id || ''}
-                isOnline={isOnline}
-                onStart={duel.currentPhase === 'intro' ? handleDuelStartChallenger : handleDuelStartOpponent}
-              />
-            )}
-
-            {showQuestion && (
-              <DuelQuestionPopup
-                visible
-                questions={duel.questions}
-                onComplete={duel.currentPhase === 'challenger_turn' ? handleDuelChallengerComplete : handleDuelOpponentComplete}
-                onClose={() => {
-                  setDuelTriggered(false);
-                  duel.resetDuel();
-                }}
-              />
-            )}
-          </>
-        );
-      })()}
-
-      {(() => {
-        const spectatorChallenger =
-          spectatorDuelChallengerId && game
-            ? game.players.find((p) => p.id === spectatorDuelChallengerId) ?? null
-            : duel.challenger;
-        const spectatorOpponent =
-          spectatorDuelOpponentId && game
-            ? game.players.find((p) => p.id === spectatorDuelOpponentId) ?? null
-            : duel.opponent;
-        const challengerForPopup = spectatorChallenger ?? duel.challenger;
-        const opponentForPopup = spectatorOpponent ?? duel.opponent;
-        const showSpectator =
-          duelTriggered &&
-          isEventSpectator &&
-          duel.currentPhase !== 'result' &&
-          challengerForPopup != null &&
-          opponentForPopup != null;
-        if (!challengerForPopup || !opponentForPopup) return null;
-        return (
-          <DuelSpectatorPopup
-            visible={!!showSpectator}
-            challenger={challengerForPopup}
-            opponent={opponentForPopup}
-          />
-        );
-      })()}
-
-      <DuelResultPopup
-        visible={duel.currentPhase === 'result'}
-        result={duel.result}
-        challenger={duel.challenger}
-        opponent={duel.opponent}
-        currentPlayerId={userId || currentPlayer?.id || ''}
-        onClose={handleDuelClose}
-      />
     </View>
   );
 }
@@ -1020,6 +891,7 @@ const styles = StyleSheet.create({
     width: 120,
     height: 48,
   },
+  // Portrait layout
   boardWrapper: {
     backgroundColor: 'rgba(0, 0, 0, 0.25)',
     borderRadius: 20,
@@ -1042,28 +914,23 @@ const styles = StyleSheet.create({
     position: 'relative',
     marginVertical: SPACING[1],
   },
-  testPopupsRow: {
+  // Landscape layout (tablets + rotation)
+  landscapeContainer: {
+    flex: 1,
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: SPACING[3],
+    gap: SPACING[2],
+  },
+  landscapeSide: {
     justifyContent: 'center',
     gap: SPACING[2],
-    paddingHorizontal: SPACING[2],
-    paddingVertical: SPACING[3],
-    marginTop: SPACING[2],
   },
-  testPopupButton: {
-    backgroundColor: COLORS.card,
-    paddingVertical: SPACING[2],
-    paddingHorizontal: SPACING[3],
-    borderRadius: 12,
-    minWidth: 80,
-    alignItems: 'center',
+  landscapePlayerSlot: {
+    width: '100%',
   },
-  testPopupLabel: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.text,
-  },
+  // Keep existing modal styles
   modalContent: {
     alignItems: 'center',
     padding: SPACING[4],
@@ -1088,6 +955,23 @@ const styles = StyleSheet.create({
   },
   modalButton: {
     minWidth: 100,
+  },
+  // Missing styles from original file to avoid errors
+  aiMessageContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING[2],
+    paddingVertical: SPACING[2],
+    backgroundColor: `${COLORS.info}20`,
+    marginHorizontal: SPACING[4],
+    borderRadius: 8,
+    marginBottom: SPACING[2],
+  },
+  aiMessageText: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.info,
   },
   noGame: {
     flex: 1,

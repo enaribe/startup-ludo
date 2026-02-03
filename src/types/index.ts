@@ -4,7 +4,7 @@ export type PlayerColor = 'yellow' | 'blue' | 'green' | 'red';
 // État d'un pion selon la nouvelle architecture
 export type PawnState =
   | { status: 'home'; slotIndex: number }           // À la maison (slot 0-3)
-  | { status: 'circuit'; position: number }         // Sur le circuit principal (0-35)
+  | { status: 'circuit'; position: number; distanceTraveled: number } // Sur le circuit principal (0-35)
   | { status: 'final'; position: number }           // Sur le chemin final (0-3)
   | { status: 'finished' };                         // A atteint le centre
 
@@ -45,6 +45,15 @@ export type GameMode = 'solo' | 'local' | 'online';
 export type GameStatus = 'waiting' | 'playing' | 'paused' | 'finished';
 export type EventType = 'quiz' | 'funding' | 'duel' | 'opportunity' | 'challenge' | 'safe' | 'start' | 'finish';
 
+// ===== CHALLENGE CONTEXT (pont jeu ↔ programme) =====
+export interface ChallengeContext {
+  challengeId: string;
+  enrollmentId: string;
+  levelNumber: number;
+  subLevelNumber: number;
+  sectorId: string | null;
+}
+
 export interface GameState {
   id: string;
   mode: GameMode;
@@ -58,6 +67,7 @@ export interface GameState {
   selectedPawnIndex: number | null; // Index du pion sélectionné (0-3)
   pendingEvent: GameEvent | null;
   winner: string | null;
+  challengeContext?: ChallengeContext; // Contexte Challenge si partie lancée depuis le hub
   createdAt: number;
   updatedAt: number;
 }
@@ -132,19 +142,6 @@ export interface DuelResult {
   opponentScore: number;
   challengerReward: number;
   opponentReward: number;
-}
-
-/** Payload pour démarrer un duel en ligne (mêmes questions pour les deux joueurs) */
-export interface DuelStartPayload {
-  challengerId: string;
-  opponentId: string;
-  questions: DuelQuestion[];
-}
-
-/** Payload pour envoyer son score en duel en ligne */
-export interface DuelScorePayload {
-  playerId: string;
-  score: number;
 }
 
 export interface OpportunityEvent {

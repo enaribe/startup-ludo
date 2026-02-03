@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import Animated, { SlideInUp } from 'react-native-reanimated';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { Modal } from '@/components/ui/Modal';
 import { GameButton } from '@/components/ui/GameButton';
@@ -29,7 +29,7 @@ export const QuitConfirmPopup = memo(function QuitConfirmPopup({
       showCloseButton={false}
       bareContent
     >
-      <Animated.View entering={SlideInUp.springify().damping(18)} style={styles.card}>
+      <Animated.View entering={FadeIn.duration(280)} style={styles.card}>
         <View style={styles.content}>
           {/* Icône */}
           <View style={styles.iconCircle}>

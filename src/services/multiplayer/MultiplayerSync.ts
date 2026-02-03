@@ -13,31 +13,31 @@
  *   └── chat/{messageId} (ChatMessage)
  */
 
-import {
-  ref,
-  set,
-  get,
-  update,
-  remove,
-  push,
-  onValue,
-  onChildAdded,
-  onDisconnect,
-  type Unsubscribe,
-} from 'firebase/database';
-import {
-  database,
-  firebaseLog,
-  getFirebaseErrorMessage,
-  REALTIME_PATHS,
-} from '@/services/firebase/config';
-import type { PlayerColor, PawnState } from '@/types';
 import type {
-  RealtimeRoom,
-  RealtimePlayer,
-  RealtimeGameState,
-  RealtimeAction,
+    RealtimeAction,
+    RealtimeGameState,
+    RealtimePlayer,
+    RealtimeRoom,
 } from '@/services/firebase/config';
+import {
+    database,
+    firebaseLog,
+    getFirebaseErrorMessage,
+    REALTIME_PATHS,
+} from '@/services/firebase/config';
+import type { PawnState, PlayerColor } from '@/types';
+import {
+    get,
+    onChildAdded,
+    onDisconnect,
+    onValue,
+    push,
+    ref,
+    remove,
+    set,
+    update,
+    type Unsubscribe,
+} from 'firebase/database';
 
 // ===== TYPES =====
 
@@ -109,15 +109,12 @@ function generateRoomCode(): string {
 
 // ===== CLASSE PRINCIPALE =====
 
-const PRESENCE_HEARTBEAT_MS = 10000; // Réaffirmer la présence toutes les 10s (évite fausses déconnexions après onDisconnect)
-
 export class MultiplayerSync {
   private roomId: string | null = null;
   private playerId: string | null = null;
   private listeners: Map<string, Unsubscribe | (() => void)> = new Map();
   private eventCallbacks: Set<EventCallback> = new Set();
   private isConnected = false;
-  private heartbeatIntervalId: ReturnType<typeof setInterval> | null = null;
 
   /**
    * Crée une nouvelle room dans Firebase RTDB
@@ -166,10 +163,6 @@ export class MultiplayerSync {
       this.roomId = roomId;
       this.playerId = config.hostId;
       this.isConnected = true;
-
-      // Setup presence detection and heartbeat
-      this.setupPresence();
-      this.startPresenceHeartbeat();
 
       firebaseLog('Room created successfully', { roomId, code });
 
@@ -256,10 +249,6 @@ export class MultiplayerSync {
       this.roomId = foundRoomId;
       this.playerId = data.playerId;
       this.isConnected = true;
-
-      // Setup presence detection and heartbeat
-      this.setupPresence();
-      this.startPresenceHeartbeat();
 
       // Emit event
       this.emit({
@@ -427,9 +416,6 @@ export class MultiplayerSync {
         ts: Date.now(),
       });
 
-      // Réaffirmer la présence à chaque action (évite fausse déconnexion si onDisconnect a été déclenché)
-      this.updateMyPresence().catch(() => {});
-
       console.log('[MultiplayerSync.sendAction] OK:', action.t);
       firebaseLog('Action sent', { type: action.t });
     } catch (error) {
@@ -564,20 +550,11 @@ export class MultiplayerSync {
 
     const unsubscribe = onValue(playersRef, (snapshot) => {
       const players: Record<string, RealtimePlayer> = {};
-      const rawPresence: Record<string, { isConnected?: boolean; lastSeen?: number }> = {};
       if (snapshot.exists()) {
         snapshot.forEach((child) => {
           const player = child.val() as RealtimePlayer;
           const key = child.key ?? player.id;
           players[key] = player;
-          rawPresence[key] = { isConnected: player.isConnected, lastSeen: player.lastSeen };
-        });
-      }
-      if (__DEV__) {
-        console.log('[Presence] État joueurs RTDB (MultiplayerSync):', {
-          timestamp: Date.now(),
-          rawData: snapshot.exists() ? snapshot.val() : null,
-          presenceByPlayer: rawPresence,
         });
       }
       callback(players);
@@ -761,25 +738,6 @@ export class MultiplayerSync {
   // ===== PRÉSENCE =====
 
   /**
-   * Réaffirme la présence du joueur local (isConnected: true, lastSeen).
-   * Appelée après chaque action et par le heartbeat pour éviter les fausses déconnexions.
-   */
-  async updateMyPresence(): Promise<void> {
-    if (!this.roomId || !this.playerId) return;
-
-    try {
-      const playerRef = ref(database, REALTIME_PATHS.roomPlayer(this.roomId, this.playerId));
-      const now = Date.now();
-      await update(playerRef, { isConnected: true, lastSeen: now });
-      if (__DEV__) {
-        console.log('[Presence] updateMyPresence:', { playerId: this.playerId, lastSeen: now });
-      }
-    } catch (error) {
-      firebaseLog('Failed to update my presence', error);
-    }
-  }
-
-  /**
    * Configure la gestion de présence (déconnexion automatique)
    */
   setupPresence(): void {
@@ -793,14 +751,6 @@ export class MultiplayerSync {
         isConnected: false,
         lastSeen: Date.now(),
       });
-      if (__DEV__) {
-        console.log('[Presence] onDisconnect enregistré (room player):', {
-          playerId: this.playerId,
-          roomId: this.roomId,
-          path: REALTIME_PATHS.roomPlayer(this.roomId, this.playerId),
-          timestamp: Date.now(),
-        });
-      }
 
       // Also set user-level presence
       const presenceRef = ref(database, REALTIME_PATHS.userPresence(this.playerId));
@@ -815,13 +765,6 @@ export class MultiplayerSync {
         lastSeen: Date.now(),
         currentRoom: null,
       });
-      if (__DEV__) {
-        console.log('[Presence] onDisconnect enregistré (user presence):', {
-          playerId: this.playerId,
-          path: REALTIME_PATHS.userPresence(this.playerId),
-          timestamp: Date.now(),
-        });
-      }
 
       firebaseLog('Presence setup complete');
     } catch (error) {
@@ -875,41 +818,9 @@ export class MultiplayerSync {
   // ===== CLEANUP =====
 
   /**
-   * Démarre le heartbeat de présence pour éviter les fausses déconnexions
-   */
-  startPresenceHeartbeat(): void {
-    if (this.heartbeatIntervalId) return;
-
-    this.heartbeatIntervalId = setInterval(() => {
-      this.updateMyPresence().catch(() => {});
-    }, PRESENCE_HEARTBEAT_MS);
-
-    // Aussi mettre à jour immédiatement
-    this.updateMyPresence().catch(() => {});
-
-    if (__DEV__) {
-      console.log('[Presence] Heartbeat démarré (intervalle:', PRESENCE_HEARTBEAT_MS, 'ms)');
-    }
-  }
-
-  /**
-   * Arrête le heartbeat de présence
-   */
-  stopPresenceHeartbeat(): void {
-    if (this.heartbeatIntervalId) {
-      clearInterval(this.heartbeatIntervalId);
-      this.heartbeatIntervalId = null;
-      if (__DEV__) {
-        console.log('[Presence] Heartbeat arrêté');
-      }
-    }
-  }
-
-  /**
-   * Nettoie tous les listeners et le heartbeat de présence
+   * Nettoie tous les listeners
    */
   cleanup(): void {
-    this.stopPresenceHeartbeat();
     this.listeners.forEach((unsubscribe) => {
       try {
         unsubscribe();

@@ -28,7 +28,8 @@ import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { Avatar } from '@/components/ui/Avatar';
 import { RadialBackground, DynamicGradientBorder, GameButton } from '@/components/ui';
 import { useGameStore, useAuthStore, useUserStore } from '@/stores';
-import { XP_REWARDS } from '@/config/progression';
+import { useChallengeStore } from '@/stores/useChallengeStore';
+import { XP_REWARDS, getChallengeXP } from '@/config/progression';
 import { updateUserStats } from '@/services/firebase/firestore';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -48,7 +49,8 @@ function computeXP(
   playerTokens: number,
   playerRank: number,
   totalPlayers: number,
-): { total: number; breakdown: XPBreakdown[] } {
+  challengeLevel?: number,
+): { total: number; challengeTotal: number; breakdown: XPBreakdown[] } {
   const breakdown: XPBreakdown[] = [];
 
   // Always: game played
@@ -96,7 +98,13 @@ function computeXP(
   }
 
   const total = breakdown.reduce((sum, b) => sum + b.amount, 0);
-  return { total, breakdown };
+
+  // En mode Challenge, appliquer le multiplicateur de niveau pour l'XP challenge
+  const challengeTotal = challengeLevel != null
+    ? getChallengeXP(total, challengeLevel)
+    : total;
+
+  return { total, challengeTotal, breakdown };
 }
 
 // ===== COMPONENT =====
@@ -118,11 +126,27 @@ export default function ResultsScreen() {
   const incrementGamesWon = useUserStore((s) => s.incrementGamesWon);
   const addTokensEarned = useUserStore((s) => s.addTokensEarned);
 
+  // Challenge store
+  const getChallengeById = useChallengeStore((s) => s.getChallengeById);
+  const getEnrollmentForChallenge = useChallengeStore((s) => s.getEnrollmentForChallenge);
+  const addChallengeXp = useChallengeStore((s) => s.addXp);
+  const checkAndUnlockNextSubLevel = useChallengeStore((s) => s.checkAndUnlockNextSubLevel);
+  const checkAndUnlockNextLevel = useChallengeStore((s) => s.checkAndUnlockNextLevel);
+
   const isGuest = user?.isGuest ?? true;
   const isOnline = params.isOnline === 'true' || params.mode === 'online';
   const hasAppliedRewards = useRef(false);
 
+  // Challenge mode detection
+  const challengeContext = game?.challengeContext;
+  const isChallengeMode = !!challengeContext;
+  const challenge = challengeContext ? getChallengeById(challengeContext.challengeId) : null;
+  const enrollment = challengeContext ? getEnrollmentForChallenge(challengeContext.challengeId) : null;
+
   const [showConvertPopup, setShowConvertPopup] = useState(false);
+  const [showProgressionPopup, setShowProgressionPopup] = useState(false);
+  const [progressionType, setProgressionType] = useState<'sublevel' | 'level' | null>(null);
+  const [newLevelNumber, setNewLevelNumber] = useState<number | null>(null);
 
   // Animations
   const xpAnimValue = useSharedValue(0);
@@ -141,12 +165,13 @@ export default function ResultsScreen() {
   const isWinner = userId != null && game?.winner === userId;
 
   // XP calculation
-  const { total: xpGained, breakdown: xpBreakdown } = computeXP(
+  const { total: xpGained, challengeTotal: challengeXpGained, breakdown: xpBreakdown } = computeXP(
     userId,
     game?.winner,
     myPlayer?.tokens ?? 0,
     myRank,
     sortedPlayers.length,
+    isChallengeMode ? enrollment?.currentLevel : undefined,
   );
 
   // Valorisation
@@ -163,13 +188,47 @@ export default function ResultsScreen() {
     if (!game || game.status !== 'finished') return;
     hasAppliedRewards.current = true;
 
-    // 1. Local store updates
+    // 1. Local store updates (profil utilisateur)
     incrementGamesPlayed();
     if (isWinner) incrementGamesWon();
     if (xpGained > 0) addXP(xpGained);
     if (myPlayer) addTokensEarned(myPlayer.tokens);
 
-    // 2. Firestore update (non-blocking, guests excluded)
+    // 2. Challenge XP + Progression (si mode Challenge)
+    if (isChallengeMode && enrollment && challengeXpGained > 0) {
+      console.log('[Results] Mode Challenge - Attribution XP:', {
+        enrollmentId: enrollment.id,
+        baseXP: xpGained,
+        challengeXP: challengeXpGained,
+        multiplier: `x${Math.round(challengeXpGained / xpGained)}`,
+        currentLevel: enrollment.currentLevel,
+        currentSubLevel: enrollment.currentSubLevel,
+      });
+
+      // Ajouter les XP multipliés au Challenge enrollment
+      addChallengeXp(enrollment.id, challengeXpGained);
+
+      // Vérifier progression sous-niveau
+      const subLevelUnlocked = checkAndUnlockNextSubLevel(enrollment.id);
+      if (subLevelUnlocked) {
+        console.log('[Results] Sous-niveau débloqué !');
+        setProgressionType('sublevel');
+        setShowProgressionPopup(true);
+      } else {
+        // Vérifier progression niveau (si tous les sous-niveaux complétés)
+        const levelUnlocked = checkAndUnlockNextLevel(enrollment.id);
+        if (levelUnlocked) {
+          console.log('[Results] Niveau débloqué !');
+          setProgressionType('level');
+          // Obtenir le nouveau numéro de niveau après le déblocage
+          const updatedEnrollment = getEnrollmentForChallenge(challengeContext!.challengeId);
+          setNewLevelNumber(updatedEnrollment?.currentLevel ?? null);
+          setShowProgressionPopup(true);
+        }
+      }
+    }
+
+    // 3. Firestore update (non-blocking, guests excluded)
     if (userId && !isGuest) {
       updateUserStats(userId, {
         xpGained,
@@ -218,7 +277,15 @@ export default function ResultsScreen() {
   // ===== ACTIONS =====
   const handlePlayAgain = () => {
     resetGame();
-    router.replace('/(game)/mode-selection');
+    if (isChallengeMode && challengeContext) {
+      // Retourner au Challenge Hub pour rejouer
+      router.replace({
+        pathname: '/(challenges)/challenge-hub',
+        params: { challengeId: challengeContext.challengeId },
+      });
+    } else {
+      router.replace('/(game)/mode-selection');
+    }
   };
 
   const handleGoHome = () => {
@@ -227,6 +294,16 @@ export default function ResultsScreen() {
     } else {
       resetGame();
       router.replace('/(tabs)/home');
+    }
+  };
+
+  const handleContinueChallenge = () => {
+    resetGame();
+    if (challengeContext) {
+      router.replace({
+        pathname: '/(challenges)/challenge-hub',
+        params: { challengeId: challengeContext.challengeId },
+      });
     }
   };
 
@@ -240,6 +317,12 @@ export default function ResultsScreen() {
     setShowConvertPopup(false);
     resetGame();
     router.replace('/(tabs)/home');
+  };
+
+  const handleCloseProgressionPopup = () => {
+    setShowProgressionPopup(false);
+    setProgressionType(null);
+    setNewLevelNumber(null);
   };
 
   return (
@@ -264,8 +347,20 @@ export default function ResultsScreen() {
           </Animated.View>
           <Text style={styles.title}>Partie terminee !</Text>
           <Text style={styles.subtitle}>
-            {isOnline ? 'Multijoueur en ligne' : 'Partie locale'}
+            {isChallengeMode && challenge
+              ? `Challenge ${challenge.name}`
+              : isOnline
+                ? 'Multijoueur en ligne'
+                : 'Partie locale'}
           </Text>
+          {isChallengeMode && enrollment && (
+            <View style={styles.challengeBadge}>
+              <Ionicons name="school-outline" size={14} color={COLORS.primary} />
+              <Text style={styles.challengeBadgeText}>
+                Niveau {enrollment.currentLevel} - Sous-niveau {enrollment.currentSubLevel}
+              </Text>
+            </View>
+          )}
         </Animated.View>
 
         {/* Winner Card */}
@@ -281,23 +376,23 @@ export default function ResultsScreen() {
                   <Ionicons name="trophy" size={14} color={COLORS.primary} />
                   <Text style={styles.winnerBadgeText}>VAINQUEUR</Text>
                 </View>
-                <Avatar
-                  name={winner.name}
-                  playerColor={winner.color}
-                  size="lg"
-                  showBorder
-                />
+            <Avatar
+              name={winner.name}
+              playerColor={winner.color}
+              size="lg"
+              showBorder
+            />
                 <Text style={[styles.winnerName, { color: COLORS.players[winner.color] }]}>
-                  {winner.name}
-                </Text>
-                {winner.startupName && (
+              {winner.name}
+            </Text>
+            {winner.startupName && (
                   <Text style={styles.winnerStartup}>{winner.startupName}</Text>
                 )}
                 <View style={styles.winnerTokensRow}>
                   <Ionicons name="cash" size={18} color={COLORS.primary} />
                   <Text style={styles.winnerTokensText}>{winner.tokens} jetons</Text>
                 </View>
-              </View>
+            </View>
             </DynamicGradientBorder>
           </Animated.View>
         )}
@@ -317,8 +412,17 @@ export default function ResultsScreen() {
                 </View>
                 <View style={styles.xpTotalBadge}>
                   <Text style={styles.xpTotalText}>+{xpGained}</Text>
+            </View>
+          </View>
+              {isChallengeMode && challengeXpGained > xpGained && (
+                <View style={styles.challengeXpRow}>
+                  <Ionicons name="school-outline" size={14} color={COLORS.primary} />
+                  <Text style={styles.challengeXpLabel}>
+                    Bonus Challenge (x{Math.round(challengeXpGained / xpGained)})
+                  </Text>
+                  <Text style={styles.challengeXpValue}>+{challengeXpGained} XP</Text>
                 </View>
-              </View>
+              )}
               <View style={styles.xpDivider} />
               <View style={styles.xpRows}>
                 {xpBreakdown.map((item, i) => (
@@ -352,21 +456,21 @@ export default function ResultsScreen() {
                   <Text style={styles.valorisationLabel}>Avant</Text>
                   <Text style={styles.valorisationValue}>
                     {valorisationBefore.toLocaleString('fr-FR')} C
-                  </Text>
-                </View>
+              </Text>
+            </View>
                 <View style={styles.valorisationArrow}>
                   <Ionicons name="arrow-forward" size={20} color={COLORS.success} />
                   <Text style={styles.valorisationGain}>
                     +{valorisationGain.toLocaleString('fr-FR')}
-                  </Text>
-                </View>
+              </Text>
+            </View>
                 <View style={styles.valorisationCol}>
                   <Text style={styles.valorisationLabel}>Apres</Text>
                   <Text style={styles.valorisationAfterText}>
                     {valorisationAfter.toLocaleString('fr-FR')} C
-                  </Text>
-                </View>
-              </View>
+              </Text>
+            </View>
+          </View>
             </View>
           </DynamicGradientBorder>
         </Animated.View>
@@ -405,8 +509,8 @@ export default function ResultsScreen() {
                 const isMe = player.id === userId;
 
                 return (
-                  <View
-                    key={player.id}
+              <View
+                key={player.id}
                     style={[
                       styles.rankingRow,
                       isMe && styles.rankingRowMe,
@@ -416,43 +520,60 @@ export default function ResultsScreen() {
                     {/* Rank number */}
                     <View style={[styles.rankBadge, { backgroundColor: isFirst ? COLORS.primary : 'rgba(255,255,255,0.08)' }]}>
                       <Text style={[styles.rankNumber, isFirst && { color: COLORS.background }]}>
-                        {index + 1}
-                      </Text>
+                  {index + 1}
+                </Text>
                     </View>
 
                     {/* Avatar */}
-                    <Avatar name={player.name} playerColor={player.color} size="sm" />
+                <Avatar name={player.name} playerColor={player.color} size="sm" />
 
                     {/* Player info */}
                     <View style={styles.rankPlayerInfo}>
                       <Text style={[styles.rankPlayerName, { color: isFirst ? playerColor : COLORS.text }]}>
-                        {player.name}
-                      </Text>
-                      {player.startupName && (
+                    {player.name}
+                  </Text>
+                  {player.startupName && (
                         <Text style={styles.rankPlayerStartup}>{player.startupName}</Text>
-                      )}
-                    </View>
+                  )}
+                </View>
 
                     {/* Tokens */}
                     <View style={styles.rankTokens}>
                       <Text style={styles.rankTokenValue}>{player.tokens}</Text>
                       <Text style={styles.rankTokenLabel}>jetons</Text>
-                    </View>
-                  </View>
+                </View>
+              </View>
                 );
               })}
-            </View>
+          </View>
           </DynamicGradientBorder>
         </Animated.View>
 
         {/* Action Buttons */}
         <Animated.View entering={FadeInUp.delay(900).duration(500)} style={styles.actionsBlock}>
-          <GameButton
-            variant="yellow"
-            fullWidth
-            title="NOUVELLE PARTIE"
-            onPress={handlePlayAgain}
-          />
+          {isChallengeMode ? (
+            <>
+              <GameButton
+                variant="green"
+                fullWidth
+                title="CONTINUER LE CHALLENGE"
+                onPress={handleContinueChallenge}
+              />
+              <GameButton
+                variant="yellow"
+                fullWidth
+                title="REJOUER CE NIVEAU"
+                onPress={handlePlayAgain}
+              />
+            </>
+          ) : (
+            <GameButton
+              variant="yellow"
+              fullWidth
+              title="NOUVELLE PARTIE"
+              onPress={handlePlayAgain}
+            />
+          )}
           <Pressable style={styles.backButton} onPress={handleGoHome}>
             <Text style={styles.backButtonText}>Retour a l'accueil</Text>
           </Pressable>
@@ -489,6 +610,48 @@ export default function ResultsScreen() {
               <Pressable style={styles.modalSkip} onPress={handleSkipConvert}>
                 <Text style={styles.modalSkipText}>Plus tard</Text>
               </Pressable>
+            </View>
+          </DynamicGradientBorder>
+        </View>
+      </Modal>
+
+      {/* Progression Popup (Challenge mode) */}
+      <Modal
+        visible={showProgressionPopup}
+        transparent
+        animationType="fade"
+        onRequestClose={handleCloseProgressionPopup}
+      >
+        <View style={styles.modalBackdrop}>
+          <DynamicGradientBorder
+            borderRadius={20}
+            fill="rgba(12, 36, 62, 0.98)"
+            boxWidth={Math.min(screenWidth - SPACING[4] * 2, 340)}
+          >
+            <View style={styles.modalCard}>
+              <View style={[styles.modalIconCircle, { backgroundColor: 'rgba(76, 175, 80, 0.15)' }]}>
+                <Ionicons
+                  name={progressionType === 'level' ? 'star' : 'checkmark-circle'}
+                  size={32}
+                  color={COLORS.success}
+                />
+              </View>
+              <Text style={styles.modalTitle}>
+                {progressionType === 'level'
+                  ? `Niveau ${newLevelNumber} debloque !`
+                  : 'Sous-niveau debloque !'}
+              </Text>
+              <Text style={styles.modalBody}>
+                {progressionType === 'level'
+                  ? 'Felicitations ! Tu as atteint un nouveau niveau dans le Challenge. Continue ainsi !'
+                  : 'Bravo ! Tu progresses dans le Challenge. Continue a jouer pour debloquer la suite !'}
+              </Text>
+              <GameButton
+                variant="green"
+                fullWidth
+                title="CONTINUER"
+                onPress={handleCloseProgressionPopup}
+              />
             </View>
           </DynamicGradientBorder>
         </View>
@@ -542,6 +705,21 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     textAlign: 'center',
     marginTop: SPACING[1],
+  },
+  challengeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 188, 64, 0.15)',
+    paddingHorizontal: SPACING[3],
+    paddingVertical: SPACING[1],
+    borderRadius: 12,
+    gap: SPACING[1],
+    marginTop: SPACING[2],
+  },
+  challengeBadgeText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.primary,
   },
 
   // Sections
@@ -626,6 +804,27 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.bodyBold,
     fontSize: FONT_SIZES.lg,
     color: COLORS.success,
+  },
+  challengeXpRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 188, 64, 0.1)',
+    paddingHorizontal: SPACING[3],
+    paddingVertical: SPACING[2],
+    borderRadius: 10,
+    marginTop: SPACING[2],
+    gap: SPACING[2],
+  },
+  challengeXpLabel: {
+    flex: 1,
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.primary,
+  },
+  challengeXpValue: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.primary,
   },
   xpDivider: {
     height: 1,
@@ -814,45 +1013,45 @@ const styles = StyleSheet.create({
 
   // Modal
   modalBackdrop: {
-    flex: 1,
+            flex: 1,
     backgroundColor: COLORS.overlayDark,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: SPACING[4],
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: SPACING[4],
   },
   modalCard: {
-    padding: SPACING[6],
-    alignItems: 'center',
+              padding: SPACING[6],
+              alignItems: 'center',
   },
   modalIconCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+                width: 64,
+                height: 64,
+                borderRadius: 32,
     backgroundColor: 'rgba(255, 188, 64, 0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: SPACING[4],
+                justifyContent: 'center',
+                alignItems: 'center',
+                marginBottom: SPACING[4],
   },
   modalTitle: {
-    fontFamily: FONTS.title,
-    fontSize: FONT_SIZES.xl,
-    color: COLORS.text,
-    textAlign: 'center',
-    marginBottom: SPACING[2],
+                fontFamily: FONTS.title,
+                fontSize: FONT_SIZES.xl,
+                color: COLORS.text,
+                textAlign: 'center',
+                marginBottom: SPACING[2],
   },
   modalBody: {
-    fontFamily: FONTS.body,
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.textSecondary,
-    textAlign: 'center',
-    marginBottom: SPACING[5],
+                fontFamily: FONTS.body,
+                fontSize: FONT_SIZES.sm,
+                color: COLORS.textSecondary,
+                textAlign: 'center',
+                marginBottom: SPACING[5],
   },
   modalSkip: {
     marginTop: SPACING[3],
   },
   modalSkipText: {
-    fontFamily: FONTS.body,
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.textSecondary,
+                  fontFamily: FONTS.body,
+                  fontSize: FONT_SIZES.sm,
+                  color: COLORS.textSecondary,
   },
 });
