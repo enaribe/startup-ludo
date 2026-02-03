@@ -69,7 +69,7 @@ export function decodePawn(s: string): PawnState {
     case 'h':
       return { status: 'home', slotIndex: value };
     case 'c':
-      return { status: 'circuit', position: value };
+      return { status: 'circuit', position: value, distanceTraveled: 0 };
     case 'f':
       return { status: 'final', position: value };
     default:

@@ -72,7 +72,7 @@ export const DuelResultPopup = memo(function DuelResultPopup({
 
   return (
     <Modal visible={visible} onClose={onClose} closeOnBackdrop={false} showCloseButton={false} bareContent>
-      <Animated.View entering={SlideInUp.springify().damping(18)} style={styles.card}>
+      <Animated.View entering={SlideInUp.duration(280)} style={styles.card}>
         <View style={styles.content}>
           {/* Header: icône + titre (même style que DuelPreparePopup) */}
           <View style={styles.header}>
@@ -81,7 +81,7 @@ export const DuelResultPopup = memo(function DuelResultPopup({
           </View>
 
           {/* Carte challenger */}
-          <Animated.View entering={SlideInLeft.springify()} style={styles.playerCardRow}>
+          <Animated.View entering={SlideInLeft.duration(280)} style={styles.playerCardRow}>
             <View style={styles.avatarWrap}>
               <Avatar name={challenger.name} playerColor={challenger.color} size="md" showBorder />
             </View>
@@ -97,7 +97,7 @@ export const DuelResultPopup = memo(function DuelResultPopup({
           </View>
 
           {/* Carte opponent */}
-          <Animated.View entering={SlideInRight.springify()} style={styles.playerCardRow}>
+          <Animated.View entering={SlideInRight.duration(280)} style={styles.playerCardRow}>
             <View style={styles.avatarWrap}>
               <Avatar name={opponent.name} playerColor={opponent.color} size="md" showBorder />
             </View>

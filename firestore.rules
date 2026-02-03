@@ -84,5 +84,12 @@ service cloud.firestore {
       allow create: if isAuthenticated();
       allow update, delete: if false; // Only admins
     }
+    
+    // Challenge enrollments (doc id = userId_challengeId)
+    match /challengeEnrollments/{enrollmentId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
   }
 }

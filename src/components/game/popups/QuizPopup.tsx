@@ -142,7 +142,7 @@ export const QuizPopup = memo(function QuizPopup({
 
   return (
     <Modal visible={visible} onClose={onClose} closeOnBackdrop={false} showCloseButton={false} bareContent>
-      <Animated.View entering={SlideInUp.springify().damping(18)} style={styles.card}>
+      <Animated.View entering={SlideInUp.duration(280)} style={styles.card}>
         <View style={styles.content}>
           {isSpectator && (
             <View style={styles.spectatorBanner}>

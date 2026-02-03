@@ -1,5 +1,6 @@
 // Firebase Firestore Service
 import { DEFAULT_RANK, getRankFromXP } from '@/config/progression';
+import type { ChallengeEnrollment } from '@/types/challenge';
 import type { Startup, UserProfile } from '@/types';
 import {
     collection,
@@ -185,13 +186,31 @@ export const updateUserStats = async (
     const statsRef = doc(firestore, FIRESTORE_COLLECTIONS.userStats, userId);
     const statsSnap = await getDoc(statsRef);
 
+    const now = Timestamp.now();
+
     if (!statsSnap.exists()) {
-      throw new Error('User stats not found');
+      // Créer le document stats s'il n'existe pas encore
+      firebaseLog('User stats not found, creating document', { userId });
+      const newStats: FirestoreUserStats = {
+        id: userId,
+        xp: stats.xpGained ?? 0,
+        level: 1,
+        totalGames: 1,
+        gamesWon: stats.won ? 1 : 0,
+        totalTokensEarned: stats.tokensEarned ?? 0,
+        weeklyXP: stats.xpGained ?? 0,
+        monthlyXP: stats.xpGained ?? 0,
+        lastGameAt: now,
+        updatedAt: now,
+      };
+      await setDoc(statsRef, newStats);
+      firebaseLog('User stats document created successfully');
+      return;
     }
 
     const currentStats = statsSnap.data() as FirestoreUserStats;
     const newXP = currentStats.xp + (stats.xpGained ?? 0);
-    const newLevel = Math.floor(newXP / 100) + 1; // Simple level calculation
+    const newLevel = Math.floor(newXP / 100) + 1;
 
     const updates: Partial<FirestoreUserStats> = {
       totalGames: currentStats.totalGames + 1,
@@ -200,8 +219,8 @@ export const updateUserStats = async (
       weeklyXP: currentStats.weeklyXP + (stats.xpGained ?? 0),
       monthlyXP: currentStats.monthlyXP + (stats.xpGained ?? 0),
       totalTokensEarned: currentStats.totalTokensEarned + (stats.tokensEarned ?? 0),
-      lastGameAt: Timestamp.now(),
-      updatedAt: Timestamp.now(),
+      lastGameAt: now,
+      updatedAt: now,
     };
 
     if (stats.won) {
@@ -399,6 +418,113 @@ export const getGameHistory = async (
     firebaseLog('Failed to fetch game history', error);
     throw new Error(getFirebaseErrorMessage(error));
   }
+};
+
+// ===== CHALLENGE ENROLLMENTS =====
+
+function enrollmentDocId(userId: string, challengeId: string): string {
+  return `${userId}_${challengeId}`;
+}
+
+/** Crée ou écrase une inscription à un challenge dans Firestore */
+export const setChallengeEnrollment = async (
+  enrollment: ChallengeEnrollment
+): Promise<void> => {
+  try {
+    firebaseLog('Setting challenge enrollment', { enrollmentId: enrollment.id });
+
+    const docId = enrollmentDocId(enrollment.userId, enrollment.challengeId);
+    const ref = doc(firestore, FIRESTORE_COLLECTIONS.challengeEnrollments, docId);
+    await setDoc(ref, {
+      ...enrollment,
+      updatedAt: serverTimestamp(),
+    });
+
+    firebaseLog('Challenge enrollment set successfully');
+  } catch (error) {
+    firebaseLog('Failed to set challenge enrollment', error);
+    throw new Error(getFirebaseErrorMessage(error));
+  }
+};
+
+/** Met à jour partiellement une inscription (crée le doc si absent) */
+export const updateChallengeEnrollment = async (
+  userId: string,
+  challengeId: string,
+  updates: Partial<Omit<ChallengeEnrollment, 'id' | 'userId' | 'challengeId'>>
+): Promise<void> => {
+  try {
+    firebaseLog('Updating challenge enrollment', { userId, challengeId });
+
+    const ref = doc(
+      firestore,
+      FIRESTORE_COLLECTIONS.challengeEnrollments,
+      enrollmentDocId(userId, challengeId)
+    );
+    // setDoc + merge pour créer le doc s'il n'existe pas encore
+    // userId et challengeId inclus pour satisfaire les règles Firestore
+    await setDoc(ref, {
+      ...updates,
+      userId,
+      challengeId,
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+
+    firebaseLog('Challenge enrollment updated successfully');
+  } catch (error) {
+    firebaseLog('Failed to update challenge enrollment', error);
+    throw new Error(getFirebaseErrorMessage(error));
+  }
+};
+
+/** Récupère toutes les inscriptions d'un utilisateur */
+export const getChallengeEnrollmentsForUser = async (
+  userId: string
+): Promise<ChallengeEnrollment[]> => {
+  try {
+    firebaseLog('Fetching challenge enrollments', { userId });
+
+    const ref = collection(firestore, FIRESTORE_COLLECTIONS.challengeEnrollments);
+    const q = query(ref, where('userId', '==', userId));
+    const snapshot = await getDocs(q);
+    const enrollments = snapshot.docs.map((d) => {
+      const data = d.data();
+      return { ...data, id: (data as { id?: string }).id ?? d.id } as ChallengeEnrollment;
+    });
+
+    firebaseLog('Challenge enrollments fetched', { count: enrollments.length });
+    return enrollments;
+  } catch (error) {
+    firebaseLog('Failed to fetch challenge enrollments', error);
+    throw new Error(getFirebaseErrorMessage(error));
+  }
+};
+
+/** Abonnement temps réel aux inscriptions de l'utilisateur */
+export const subscribeToChallengeEnrollments = (
+  userId: string,
+  callback: (enrollments: ChallengeEnrollment[]) => void
+): (() => void) => {
+  firebaseLog('Subscribing to challenge enrollments', { userId });
+
+  const ref = collection(firestore, FIRESTORE_COLLECTIONS.challengeEnrollments);
+  const q = query(ref, where('userId', '==', userId));
+
+  const unsubscribe = onSnapshot(
+    q,
+    (snapshot) => {
+      const enrollments = snapshot.docs.map((d) => {
+        const data = d.data();
+        return { ...data, id: (data as { id?: string }).id ?? d.id } as ChallengeEnrollment;
+      });
+      callback(enrollments);
+    },
+    (error) => {
+      firebaseLog('Challenge enrollments subscription error', error);
+    }
+  );
+
+  return unsubscribe;
 };
 
 // ===== REAL-TIME SUBSCRIPTIONS =====

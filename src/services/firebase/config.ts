@@ -109,6 +109,8 @@ export const FIRESTORE_COLLECTIONS = {
   gameSessions: 'gameSessions',
   achievements: 'achievements',
   reports: 'reports',
+  challenges: 'challenges',
+  challengeEnrollments: 'challengeEnrollments',
 } as const;
 
 // ===== ERROR HANDLING =====

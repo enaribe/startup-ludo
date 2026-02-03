@@ -13,7 +13,7 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
-import type { GameState, GameMode, Player, GameEvent, PlayerColor, PawnState, EventType } from '@/types';
+import type { GameState, GameMode, Player, GameEvent, PlayerColor, PawnState, EventType, ChallengeContext } from '@/types';
 import { GameEngine, type MoveResult, type ValidMove } from '@/services/game/GameEngine';
 import { eventManager, type GeneratedGameEvent } from '@/services/game/EventManager';
 import type { EditionId } from '@/data';
@@ -59,7 +59,7 @@ interface GameStoreState {
 
 interface GameStoreActions {
   // Cycle de vie du jeu
-  initGame: (mode: GameMode, edition: string, players: Omit<Player, 'tokens' | 'pawns'>[]) => void;
+  initGame: (mode: GameMode, edition: string, players: Omit<Player, 'tokens' | 'pawns'>[], challengeContext?: ChallengeContext) => void;
   resetGame: () => void;
   endGame: (winnerId: string) => void;
 
@@ -143,7 +143,7 @@ export const useGameStore = create<GameStore>()(
 
       // ===== CYCLE DE VIE =====
 
-      initGame: (mode, edition, players) => {
+      initGame: (mode, edition, players, challengeContext) => {
         const gameId = `game_${Date.now()}`;
 
         // Configurer l'EventManager avec l'édition
@@ -168,6 +168,7 @@ export const useGameStore = create<GameStore>()(
             selectedPawnIndex: null,
             pendingEvent: null,
             winner: null,
+            challengeContext,
             createdAt: Date.now(),
             updatedAt: Date.now(),
           };

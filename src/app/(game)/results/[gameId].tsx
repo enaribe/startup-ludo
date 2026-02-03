@@ -27,9 +27,9 @@ import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { Avatar } from '@/components/ui/Avatar';
 import { RadialBackground, DynamicGradientBorder, GameButton } from '@/components/ui';
-import { useGameStore, useAuthStore, useUserStore } from '@/stores';
-import { XP_REWARDS } from '@/config/progression';
-import { updateUserStats } from '@/services/firebase/firestore';
+import { useGameStore, useAuthStore, useUserStore, useChallengeStore } from '@/stores';
+import { XP_REWARDS, getChallengeXPReward } from '@/config/progression';
+import { updateUserStats, updateChallengeEnrollment } from '@/services/firebase/firestore';
 
 const { width: screenWidth } = Dimensions.get('window');
 const contentWidth = screenWidth - SPACING[4] * 2;
@@ -118,6 +118,11 @@ export default function ResultsScreen() {
   const incrementGamesWon = useUserStore((s) => s.incrementGamesWon);
   const addTokensEarned = useUserStore((s) => s.addTokensEarned);
 
+  // Challenge progression
+  const challengeAddXp = useChallengeStore((s) => s.addXp);
+  const checkAndUnlockNextSubLevel = useChallengeStore((s) => s.checkAndUnlockNextSubLevel);
+  const checkAndUnlockNextLevel = useChallengeStore((s) => s.checkAndUnlockNextLevel);
+
   const isGuest = user?.isGuest ?? true;
   const isOnline = params.isOnline === 'true' || params.mode === 'online';
   const hasAppliedRewards = useRef(false);
@@ -169,7 +174,34 @@ export default function ResultsScreen() {
     if (xpGained > 0) addXP(xpGained);
     if (myPlayer) addTokensEarned(myPlayer.tokens);
 
-    // 2. Firestore update (non-blocking, guests excluded)
+    // 2. Challenge XP (si c'est une partie challenge)
+    const ctx = game.challengeContext;
+    if (ctx?.enrollmentId) {
+      const challengeXp = getChallengeXPReward(ctx.levelNumber, isWinner);
+      console.log('[Results] Challenge XP:', { levelNumber: ctx.levelNumber, isWinner, challengeXp, enrollmentId: ctx.enrollmentId });
+      challengeAddXp(ctx.enrollmentId, challengeXp);
+      checkAndUnlockNextSubLevel(ctx.enrollmentId);
+      checkAndUnlockNextLevel(ctx.enrollmentId);
+
+      // Sync challenge progression to Firestore
+      if (userId && !isGuest) {
+        const enrollment = useChallengeStore.getState().enrollments.find((e) => e.id === ctx.enrollmentId);
+        if (enrollment) {
+          updateChallengeEnrollment(userId, enrollment.challengeId, {
+            totalXp: enrollment.totalXp,
+            xpByLevel: enrollment.xpByLevel,
+            currentLevel: enrollment.currentLevel,
+            currentSubLevel: enrollment.currentSubLevel,
+            lastPlayedAt: enrollment.lastPlayedAt,
+            status: enrollment.status,
+          }).catch((err) => {
+            console.warn('[Results] Failed to sync challenge progression:', err);
+          });
+        }
+      }
+    }
+
+    // 3. Firestore user stats update (non-blocking, guests excluded)
     if (userId && !isGuest) {
       updateUserStats(userId, {
         xpGained,

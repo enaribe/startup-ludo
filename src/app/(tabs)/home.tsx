@@ -12,9 +12,11 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ChallengeHomeCard } from '@/components/challenges';
 import { Avatar, DynamicGradientBorder, GradientBorder, RadialBackground } from '@/components/ui';
+import { getActiveChallenges } from '@/data/challenges';
 import { formatXP, getLevelFromXP, getRankFromXP, getRankProgress } from '@/config/progression';
-import { useAuthStore, useUserStore } from '@/stores';
+import { useAuthStore, useChallengeStore, useUserStore } from '@/stores';
 import { FONTS } from '@/styles/typography';
 
 const { width } = Dimensions.get('window');
@@ -57,6 +59,15 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const user = useAuthStore((state) => state.user);
   const profile = useUserStore((state) => state.profile);
+  const activeChallenges = getActiveChallenges();
+  const featuredChallenge = activeChallenges[0] ?? null;
+  const enrollInChallenge = useChallengeStore((s) => s.enrollInChallenge);
+  const setActiveChallenge = useChallengeStore((s) => s.setActiveChallenge);
+  const getEnrollmentForChallenge = useChallengeStore((s) => s.getEnrollmentForChallenge);
+  const enrollment = featuredChallenge
+    ? getEnrollmentForChallenge(featuredChallenge.id)
+    : undefined;
+  const userId = user?.id ?? '';
 
   // Calculs de progression
   const totalXP = profile?.xp ?? 0;
@@ -183,21 +194,40 @@ export default function HomeScreen() {
           <Text style={styles.challengeHeaderTitle}>CHALLENGE A LA UNE</Text>
         </View>
 
-        <Animated.View entering={FadeInDown.delay(600).duration(500)} style={styles.challengeCardWrapper}>
-          <DynamicGradientBorder borderRadius={16} fill="rgba(0, 0, 0, 0.35)">
-            <View style={styles.challengeCardContent}>
-              <View style={{ alignItems: 'center', paddingVertical: 20 }}>
-                <Ionicons name="trophy-outline" size={40} color="rgba(255, 255, 255, 0.2)" />
-                <Text style={[styles.challengeNameText, { marginTop: 12, opacity: 0.5 }]}>
-                  BIENTOT DISPONIBLE
-                </Text>
-                <Text style={[styles.challengeDescText, { textAlign: 'center', marginTop: 6 }]}>
-                  Les challenges arrivent bientot !
-                </Text>
-              </View>
-            </View>
-          </DynamicGradientBorder>
-        </Animated.View>
+        <View style={styles.challengeCardWrapper}>
+          {featuredChallenge ? (
+            <ChallengeHomeCard
+              challenge={featuredChallenge}
+              enrollment={enrollment ?? null}
+              onEnroll={() => {
+                if (!userId) return;
+                enrollInChallenge(featuredChallenge.id, userId);
+                setActiveChallenge(featuredChallenge.id);
+                router.push('/(challenges)/challenge-hub');
+              }}
+              onContinue={() => {
+                setActiveChallenge(featuredChallenge.id);
+                router.push('/(challenges)/challenge-hub');
+              }}
+            />
+          ) : (
+            <Animated.View entering={FadeInDown.delay(600).duration(500)}>
+              <DynamicGradientBorder borderRadius={16} fill="rgba(0, 0, 0, 0.35)">
+                <View style={styles.challengeCardContent}>
+                  <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+                    <Ionicons name="trophy-outline" size={40} color="rgba(255, 255, 255, 0.2)" />
+                    <Text style={[styles.challengeNameText, { marginTop: 12, opacity: 0.5 }]}>
+                      BIENTOT DISPONIBLE
+                    </Text>
+                    <Text style={[styles.challengeDescText, { textAlign: 'center', marginTop: 6 }]}>
+                      Les challenges arrivent bientot !
+                    </Text>
+                  </View>
+                </View>
+              </DynamicGradientBorder>
+            </Animated.View>
+          )}
+        </View>
       </ScrollView>
     </View>
   );

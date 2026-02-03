@@ -131,7 +131,7 @@ export const EventPopup = memo(function EventPopup({
 
   return (
     <Modal visible={visible} onClose={onClose} closeOnBackdrop={false} showCloseButton={false} bareContent>
-      <Animated.View entering={SlideInUp.springify().damping(18)} style={styles.card}>
+      <Animated.View entering={SlideInUp.duration(280)} style={styles.card}>
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
@@ -192,7 +192,7 @@ export const EventPopup = memo(function EventPopup({
 
           {/* Bouton */}
           {!isSpectator && (
-            <Animated.View entering={FadeInDown.delay(500).springify()} style={styles.buttonWrap}>
+            <Animated.View entering={FadeInDown.delay(500).duration(220)} style={styles.buttonWrap}>
               <GameButton
                 title={isOpportunity ? 'Profiter' : 'Continuer'}
                 onPress={handleAccept}

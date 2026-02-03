@@ -29,7 +29,7 @@ export const QuitConfirmPopup = memo(function QuitConfirmPopup({
       showCloseButton={false}
       bareContent
     >
-      <Animated.View entering={SlideInUp.springify().damping(18)} style={styles.card}>
+      <Animated.View entering={SlideInUp.duration(280)} style={styles.card}>
         <View style={styles.content}>
           {/* Icône */}
           <View style={styles.iconCircle}>

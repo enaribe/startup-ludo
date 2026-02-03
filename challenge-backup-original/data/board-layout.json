@@ -1,0 +1,67 @@
+{
+  "gridSize": 13,
+  "circuitLength": 44,
+  "finalPathLength": 5,
+  "homeZones": {
+    "yellow": {
+      "position": "top-left",
+      "startRow": 0,
+      "startCol": 0,
+      "size": 5
+    },
+    "blue": {
+      "position": "top-right",
+      "startRow": 0,
+      "startCol": 8,
+      "size": 5
+    },
+    "red": {
+      "position": "bottom-right",
+      "startRow": 8,
+      "startCol": 8,
+      "size": 5
+    },
+    "green": {
+      "position": "bottom-left",
+      "startRow": 8,
+      "startCol": 0,
+      "size": 5
+    }
+  },
+  "centerZone": {
+    "row": 5,
+    "col": 5,
+    "size": 3
+  },
+  "eventDistribution": {
+    "quiz": [4, 15, 26, 37],
+    "funding": [7, 18, 29, 40],
+    "duel": [6, 17, 28, 39],
+    "opportunity": [3, 14, 25, 36],
+    "challenge": [9, 20, 31, 42],
+    "start": [1, 12, 23, 34],
+    "safe": [1, 12, 23, 34]
+  },
+  "playerConfig": {
+    "yellow": {
+      "startIndex": 1,
+      "exitIndex": 43,
+      "finalPathDirection": "right"
+    },
+    "blue": {
+      "startIndex": 12,
+      "exitIndex": 11,
+      "finalPathDirection": "down"
+    },
+    "red": {
+      "startIndex": 23,
+      "exitIndex": 22,
+      "finalPathDirection": "left"
+    },
+    "green": {
+      "startIndex": 34,
+      "exitIndex": 33,
+      "finalPathDirection": "up"
+    }
+  }
+}

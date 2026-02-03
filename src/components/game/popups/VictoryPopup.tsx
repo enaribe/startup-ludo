@@ -107,7 +107,7 @@ export const VictoryPopup = memo(function VictoryPopup({
 
   return (
     <Modal visible={visible} onClose={() => {}} closeOnBackdrop={false}>
-      <Animated.View entering={ZoomIn.springify()} style={styles.container}>
+      <Animated.View entering={ZoomIn.duration(300)} style={styles.container}>
         {/* Confetti background */}
         <Animated.View style={[styles.confettiContainer, confettiStyle]}>
           {[...Array(12)].map((_, i) => (
@@ -147,7 +147,7 @@ export const VictoryPopup = memo(function VictoryPopup({
 
         {/* Title */}
         <Animated.Text
-          entering={SlideInUp.delay(200).springify()}
+          entering={SlideInUp.delay(200).duration(280)}
           style={styles.title}
         >
           Victoire !

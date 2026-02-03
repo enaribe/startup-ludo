@@ -3,10 +3,19 @@ export type PlayerColor = 'yellow' | 'blue' | 'green' | 'red';
 
 // État d'un pion selon la nouvelle architecture
 export type PawnState =
-  | { status: 'home'; slotIndex: number }           // À la maison (slot 0-3)
-  | { status: 'circuit'; position: number }         // Sur le circuit principal (0-35)
-  | { status: 'final'; position: number }           // Sur le chemin final (0-3)
-  | { status: 'finished' };                         // A atteint le centre
+  | { status: 'home'; slotIndex: number }
+  | { status: 'circuit'; position: number; distanceTraveled: number }
+  | { status: 'final'; position: number }
+  | { status: 'finished' };
+
+// Contexte partie Challenge (programme d'accompagnement)
+export interface ChallengeContext {
+  challengeId: string;
+  enrollmentId: string;
+  levelNumber: number;
+  subLevelNumber: number;
+  sectorId: string | null;
+}
 
 export interface Player {
   id: string;
@@ -55,9 +64,10 @@ export interface GameState {
   currentTurn: number;
   diceValue: number | null;
   diceRolled: boolean;
-  selectedPawnIndex: number | null; // Index du pion sélectionné (0-3)
+  selectedPawnIndex: number | null;
   pendingEvent: GameEvent | null;
   winner: string | null;
+  challengeContext?: ChallengeContext;
   createdAt: number;
   updatedAt: number;
 }
@@ -308,11 +318,40 @@ export type RootStackParamList = {
   '(game)/mode-selection': undefined;
   '(game)/local-setup': undefined;
   '(game)/online-setup': undefined;
+  '(game)/challenge-game': { challengeId: string };
   '(game)/lobby/[roomId]': { roomId: string };
   '(game)/play/[gameId]': { gameId: string };
   '(game)/results/[gameId]': { gameId: string };
+  '(challenges)/challenge-hub': undefined;
+  '(challenges)/[challengeId]': { challengeId: string };
+  '(challenges)/my-programs': undefined;
   '(startup)/inspiration-cards': undefined;
   '(startup)/creation': undefined;
   '(startup)/confirmation': undefined;
   settings: undefined;
 };
+
+// Re-export challenge types
+export type {
+  Challenge,
+  ChallengeLevel,
+  ChallengeSubLevel,
+  ChallengeSector,
+  ChallengeEnrollment,
+  ChallengeDeliverables,
+  ChallengeRules,
+  ChallengeCard,
+  ChallengeCardOption,
+  ChallengeCardType,
+  DeliverableType,
+  EnrollmentStatus,
+  ChampionStatus,
+  SectorCategory,
+  SubLevelRules,
+} from './challenge';
+export {
+  getLevelProgress,
+  getChallengeProgress,
+  isLevelUnlocked,
+  isSubLevelUnlocked,
+} from './challenge';

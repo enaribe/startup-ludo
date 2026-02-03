@@ -265,3 +265,22 @@ export function formatXP(xp: number): string {
   }
   return xp.toString();
 }
+
+// ===== RECOMPENSES XP CHALLENGE PAR PARTIE =====
+
+export interface ChallengeXPReward {
+  win: number;    // XP gagnes en cas de victoire
+  loss: number;   // XP gagnes en cas de defaite
+}
+
+export const CHALLENGE_XP_REWARDS: Record<number, ChallengeXPReward> = {
+  1: { win: 500,  loss: 150 },
+  2: { win: 800,  loss: 250 },
+  3: { win: 1500, loss: 500 },
+  4: { win: 3000, loss: 1000 },
+};
+
+export function getChallengeXPReward(levelNumber: number, won: boolean): number {
+  const reward = CHALLENGE_XP_REWARDS[levelNumber] ?? CHALLENGE_XP_REWARDS[1]!;
+  return won ? reward.win : reward.loss;
+}
