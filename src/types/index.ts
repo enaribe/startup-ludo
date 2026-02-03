@@ -1,12 +1,43 @@
+// Re-export challenge types
+export type {
+  Challenge,
+  ChallengeLevel,
+  ChallengeSubLevel,
+  ChallengeSector,
+  ChallengeEnrollment,
+  ChallengeDeliverables,
+  ChallengeRules,
+  DeliverableType,
+  EnrollmentStatus,
+  ChampionStatus,
+  SectorCategory,
+  SubLevelRules,
+} from './challenge';
+export {
+  getLevelProgress,
+  getChallengeProgress,
+  isLevelUnlocked,
+  isSubLevelUnlocked,
+} from './challenge';
+
 // ===== PLAYER TYPES =====
 export type PlayerColor = 'yellow' | 'blue' | 'green' | 'red';
 
 // État d'un pion selon la nouvelle architecture
 export type PawnState =
   | { status: 'home'; slotIndex: number }           // À la maison (slot 0-3)
-  | { status: 'circuit'; position: number }         // Sur le circuit principal (0-35)
+  | { status: 'circuit'; position: number; distanceTraveled: number } // Circuit (progression challenge)
   | { status: 'final'; position: number }           // Sur le chemin final (0-3)
   | { status: 'finished' };                         // A atteint le centre
+
+// Contexte partie Challenge (programme d'accompagnement)
+export interface ChallengeContext {
+  challengeId: string;
+  enrollmentId: string;
+  levelNumber: number;
+  subLevelNumber: number;
+  sectorId: string | null;
+}
 
 export interface Player {
   id: string;
@@ -58,6 +89,7 @@ export interface GameState {
   selectedPawnIndex: number | null; // Index du pion sélectionné (0-3)
   pendingEvent: GameEvent | null;
   winner: string | null;
+  challengeContext?: ChallengeContext; // Présent si partie lancée depuis le hub Challenge
   createdAt: number;
   updatedAt: number;
 }

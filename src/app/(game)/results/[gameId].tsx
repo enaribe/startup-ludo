@@ -27,8 +27,8 @@ import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { Avatar } from '@/components/ui/Avatar';
 import { RadialBackground, DynamicGradientBorder, GameButton } from '@/components/ui';
-import { useGameStore, useAuthStore, useUserStore } from '@/stores';
-import { XP_REWARDS } from '@/config/progression';
+import { useGameStore, useAuthStore, useUserStore, useChallengeStore } from '@/stores';
+import { XP_REWARDS, getChallengeXP } from '@/config/progression';
 import { updateUserStats } from '@/services/firebase/firestore';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -168,6 +168,17 @@ export default function ResultsScreen() {
     if (isWinner) incrementGamesWon();
     if (xpGained > 0) addXP(xpGained);
     if (myPlayer) addTokensEarned(myPlayer.tokens);
+
+    // 1b. Challenge programme: add XP to enrollment and check unlocks
+    const ctx = game.challengeContext;
+    if (ctx && xpGained > 0) {
+      const multiplier = getChallengeXP(ctx.levelNumber);
+      const challengeXp = Math.floor(xpGained * multiplier);
+      const { addXp, checkAndUnlockNextSubLevel, checkAndUnlockNextLevel } = useChallengeStore.getState();
+      addXp(ctx.enrollmentId, challengeXp);
+      checkAndUnlockNextSubLevel(ctx.enrollmentId);
+      checkAndUnlockNextLevel(ctx.enrollmentId);
+    }
 
     // 2. Firestore update (non-blocking, guests excluded)
     if (userId && !isGuest) {

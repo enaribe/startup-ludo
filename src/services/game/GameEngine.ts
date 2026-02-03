@@ -75,7 +75,7 @@ export class GameEngine {
     const startPosition = config.startIndex;
     const startCoords = MAIN_CIRCUIT[startPosition]!;
 
-    const newState: PawnState = { status: 'circuit', position: startPosition };
+    const newState: PawnState = { status: 'circuit', position: startPosition, distanceTraveled: 0 };
 
     // Vérifier capture à la case de départ
     const capturedPawn = this.checkCapture(
@@ -200,7 +200,8 @@ export class GameEngine {
     // Mouvement normal sur le circuit (wrap-around naturel avec modulo)
     const newPos = (currentPos + diceValue) % CIRCUIT_LENGTH;
     const path = this.buildCircuitPath(currentPos, newPos);
-    const newState: PawnState = { status: 'circuit', position: newPos };
+    const prevDistance = 'distanceTraveled' in pawn ? pawn.distanceTraveled : 0;
+    const newState: PawnState = { status: 'circuit', position: newPos, distanceTraveled: prevDistance + diceValue };
 
     // Vérifier capture
     const capturedPawn = this.checkCapture(

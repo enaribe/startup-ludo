@@ -12,9 +12,11 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Avatar, DynamicGradientBorder, GradientBorder, RadialBackground } from '@/components/ui';
+import { Avatar, GradientBorder, RadialBackground } from '@/components/ui';
+import { ChallengeHomeCard } from '@/components/challenges';
 import { formatXP, getLevelFromXP, getRankFromXP, getRankProgress } from '@/config/progression';
-import { useAuthStore, useUserStore } from '@/stores';
+import { useAuthStore, useUserStore, useChallengeStore } from '@/stores';
+import { getChallengeById } from '@/data/challenges';
 import { FONTS } from '@/styles/typography';
 
 const { width } = Dimensions.get('window');
@@ -57,6 +59,12 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const user = useAuthStore((state) => state.user);
   const profile = useUserStore((state) => state.profile);
+  const featuredChallenge = getChallengeById('yeah');
+  const enrollment = featuredChallenge
+    ? useChallengeStore((s) => s.getEnrollmentForChallenge(featuredChallenge.id))
+    : undefined;
+  const enrollInChallenge = useChallengeStore((s) => s.enrollInChallenge);
+  const setActiveChallenge = useChallengeStore((s) => s.setActiveChallenge);
 
   // Calculs de progression
   const totalXP = profile?.xp ?? 0;
@@ -183,21 +191,22 @@ export default function HomeScreen() {
           <Text style={styles.challengeHeaderTitle}>CHALLENGE A LA UNE</Text>
         </View>
 
-        <Animated.View entering={FadeInDown.delay(600).duration(500)} style={styles.challengeCardWrapper}>
-          <DynamicGradientBorder borderRadius={16} fill="rgba(0, 0, 0, 0.35)">
-            <View style={styles.challengeCardContent}>
-              <View style={{ alignItems: 'center', paddingVertical: 20 }}>
-                <Ionicons name="trophy-outline" size={40} color="rgba(255, 255, 255, 0.2)" />
-                <Text style={[styles.challengeNameText, { marginTop: 12, opacity: 0.5 }]}>
-                  BIENTOT DISPONIBLE
-                </Text>
-                <Text style={[styles.challengeDescText, { textAlign: 'center', marginTop: 6 }]}>
-                  Les challenges arrivent bientot !
-                </Text>
-              </View>
-            </View>
-          </DynamicGradientBorder>
-        </Animated.View>
+        {featuredChallenge && (
+          <ChallengeHomeCard
+            challenge={featuredChallenge}
+            enrollment={enrollment ?? null}
+            onEnroll={() => {
+              const userId = user?.id ?? 'guest';
+              enrollInChallenge(featuredChallenge.id, userId);
+              setActiveChallenge(featuredChallenge.id);
+              router.push('/(challenges)/challenge-hub');
+            }}
+            onContinue={() => {
+              setActiveChallenge(featuredChallenge.id);
+              router.push('/(challenges)/challenge-hub');
+            }}
+          />
+        )}
       </ScrollView>
     </View>
   );

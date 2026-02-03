@@ -265,3 +265,20 @@ export function formatXP(xp: number): string {
   }
   return xp.toString();
 }
+
+// ===== MULTIPLICATEURS XP CHALLENGE =====
+
+/** Multiplicateur XP par niveau du programme (partie Challenge) */
+export const CHALLENGE_XP_MULTIPLIERS: Record<number, number> = {
+  1: 10,  // Niveau 1 (6 000 XP) : x10 -> ~12 victoires
+  2: 16,  // Niveau 2 (10 000 XP) : x16 -> ~12 victoires
+  3: 30,  // Niveau 3 (20 000 XP) : x30 -> ~13 victoires
+  4: 50,  // Niveau 4 (40 000 XP) : x50 -> ~16 victoires
+};
+
+/**
+ * Retourne le multiplicateur XP pour une partie Challenge selon le niveau actuel
+ */
+export function getChallengeXP(levelNumber: number): number {
+  return CHALLENGE_XP_MULTIPLIERS[levelNumber] ?? 10;
+}

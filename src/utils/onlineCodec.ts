@@ -46,7 +46,7 @@ export function encodePawn(pawn: PawnState): string {
     case 'home':
       return `h${pawn.slotIndex}`;
     case 'circuit':
-      return `c${pawn.position}`;
+      return `c${pawn.position}`; // distanceTraveled non encodé pour compat sync
     case 'final':
       return `f${pawn.position}`;
     case 'finished':
@@ -69,7 +69,7 @@ export function decodePawn(s: string): PawnState {
     case 'h':
       return { status: 'home', slotIndex: value };
     case 'c':
-      return { status: 'circuit', position: value };
+      return { status: 'circuit', position: value, distanceTraveled: 0 };
     case 'f':
       return { status: 'final', position: value };
     default:

@@ -13,6 +13,7 @@ export default function GameLayout() {
     >
       {/* Mode Selection */}
       <Stack.Screen name="mode-selection" />
+      <Stack.Screen name="challenge-game" />
 
       {/* Local Game Flow */}
       <Stack.Screen name="local-setup" />
