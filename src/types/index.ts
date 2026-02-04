@@ -129,7 +129,7 @@ export interface DuelState {
   opponentAnswers: number[];
   challengerScore: number;
   opponentScore: number;
-  phase: 'select_opponent' | 'intro' | 'challenger_turn' | 'opponent_prepare' | 'opponent_turn' | 'waiting' | 'result';
+  phase: 'select_opponent' | 'intro' | 'challenger_turn' | 'opponent_prepare' | 'opponent_turn' | 'answering' | 'waiting' | 'result';
   currentQuestionIndex: number;
 }
 

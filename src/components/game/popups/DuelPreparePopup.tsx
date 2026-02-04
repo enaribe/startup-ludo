@@ -41,11 +41,14 @@ export const DuelPreparePopup = memo(function DuelPreparePopup({
     onStart();
   };
 
-  // En phase intro, c'est le challenger qui joue
-  // En phase opponent_prepare, c'est l'opponent qui joue
-  // En mode local, tous les joueurs partagent le même écran → le bouton s'affiche toujours
+  // En phase intro:
+  //   - Online: BOTH players see "Commencer" (they answer in parallel)
+  //   - Local: only challenger sees it
+  // En phase opponent_prepare (local only): opponent sees the button
   const activePlayer = isIntroPhase ? challenger : opponent;
-  const isMyTurn = !isOnline || (isIntroPhase ? isCurrentPlayerChallenger : isCurrentPlayerOpponent);
+  const isMyTurn = isIntroPhase
+    ? (!isOnline ? true : (isCurrentPlayerChallenger || isCurrentPlayerOpponent))
+    : (!isOnline || isCurrentPlayerOpponent);
 
   const title = isIntroPhase ? 'DUEL' : 'À TON TOUR';
   const message = isMyTurn

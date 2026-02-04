@@ -573,13 +573,7 @@ export class MultiplayerSync {
           rawPresence[key] = { isConnected: player.isConnected, lastSeen: player.lastSeen };
         });
       }
-      if (__DEV__) {
-        console.log('[Presence] État joueurs RTDB (MultiplayerSync):', {
-          timestamp: Date.now(),
-          rawData: snapshot.exists() ? snapshot.val() : null,
-          presenceByPlayer: rawPresence,
-        });
-      }
+      // Presence logs suppressed (heartbeat every 10s is too verbose)
       callback(players);
     });
 
@@ -771,9 +765,7 @@ export class MultiplayerSync {
       const playerRef = ref(database, REALTIME_PATHS.roomPlayer(this.roomId, this.playerId));
       const now = Date.now();
       await update(playerRef, { isConnected: true, lastSeen: now });
-      if (__DEV__) {
-        console.log('[Presence] updateMyPresence:', { playerId: this.playerId, lastSeen: now });
-      }
+      // updateMyPresence log suppressed (heartbeat every 10s)
     } catch (error) {
       firebaseLog('Failed to update my presence', error);
     }

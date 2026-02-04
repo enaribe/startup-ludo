@@ -276,19 +276,6 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
     if (!userId) return;
 
     const unsub = multiplayerSync.subscribeToPlayers((players) => {
-      const rawData = Object.fromEntries(
-        Object.entries(players).map(([k, p]) => [
-          k,
-          { id: p.id, isConnected: p.isConnected, lastSeen: p.lastSeen, displayName: p.displayName, name: p.name },
-        ])
-      );
-      if (__DEV__) {
-        console.log('[Presence] Données brutes RTDB joueurs:', {
-          timestamp: Date.now(),
-          rawData,
-          myId: userId,
-        });
-      }
 
       const otherPlayers = Object.values(players).filter((p) => p.id !== userId);
       const now = Date.now();

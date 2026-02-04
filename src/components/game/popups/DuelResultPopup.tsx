@@ -1,5 +1,5 @@
 import { memo, useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import Animated, {
   SlideInUp,
   SlideInLeft,
@@ -26,6 +26,10 @@ interface DuelResultPopupProps {
   challenger: Player | null;
   opponent: Player | null;
   currentPlayerId: string;
+  /** True when this player finished but waiting for opponent's score */
+  isWaitingForOpponent?: boolean;
+  /** Name of the opponent we're waiting for */
+  waitingForName?: string;
   onClose: () => void;
 }
 
@@ -35,6 +39,8 @@ export const DuelResultPopup = memo(function DuelResultPopup({
   challenger,
   opponent,
   currentPlayerId,
+  isWaitingForOpponent = false,
+  waitingForName,
   onClose,
 }: DuelResultPopupProps) {
   const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
@@ -51,14 +57,72 @@ export const DuelResultPopup = memo(function DuelResultPopup({
         else if (isDraw) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         else Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
+    } else if (visible && isWaitingForOpponent) {
+      contentOpacity.value = withDelay(100, withTiming(1, { duration: 280 }));
     } else {
       contentOpacity.value = 0;
     }
-  }, [visible, result, hapticsEnabled, currentPlayerId, contentOpacity]);
+  }, [visible, result, isWaitingForOpponent, hapticsEnabled, currentPlayerId, contentOpacity]);
 
   const contentStyle = useAnimatedStyle(() => ({ opacity: contentOpacity.value }));
 
-  if (!result || !challenger || !opponent) return null;
+  if (!challenger || !opponent) return null;
+
+  // ===== WAITING STATE: show "waiting for opponent" =====
+  if (isWaitingForOpponent && !result) {
+    const opponentName = currentPlayerId === challenger.id
+      ? (waitingForName || opponent.name)
+      : (waitingForName || challenger.name);
+
+    return (
+      <Modal visible={visible} onClose={() => {}} closeOnBackdrop={false} showCloseButton={false} bareContent>
+        <Animated.View entering={SlideInUp.duration(280)} style={styles.card}>
+          <View style={styles.content}>
+            <View style={styles.header}>
+              <PopupDuelIcon size={32} />
+              <Text style={[styles.title, { color: COLORS.warning }]}>EN ATTENTE</Text>
+            </View>
+
+            <Animated.View entering={SlideInLeft.duration(280)} style={styles.playerCardRow}>
+              <View style={styles.avatarWrap}>
+                <Avatar name={challenger.name} playerColor={challenger.color} size="md" showBorder />
+              </View>
+              <View style={styles.playerCardText}>
+                <Text style={styles.playerCardName} numberOfLines={1}>{challenger.startupName || 'Startup'}</Text>
+                <Text style={styles.playerCardSubtitle}>{challenger.name}</Text>
+              </View>
+            </Animated.View>
+
+            <View style={styles.vsCircle}>
+              <PopupDuelIcon size={28} />
+            </View>
+
+            <Animated.View entering={SlideInRight.duration(280)} style={styles.playerCardRow}>
+              <View style={styles.avatarWrap}>
+                <Avatar name={opponent.name} playerColor={opponent.color} size="md" showBorder />
+              </View>
+              <View style={styles.playerCardText}>
+                <Text style={styles.playerCardName} numberOfLines={1}>{opponent.startupName || 'Startup'}</Text>
+                <Text style={styles.playerCardSubtitle}>{opponent.name}</Text>
+              </View>
+            </Animated.View>
+
+            <Animated.View style={[styles.messageBox, contentStyle]}>
+              <View style={styles.waitingRow}>
+                <ActivityIndicator size="small" color={COLORS.warning} />
+                <Text style={styles.message}>
+                  {opponentName} est en train de répondre...
+                </Text>
+              </View>
+            </Animated.View>
+          </View>
+        </Animated.View>
+      </Modal>
+    );
+  }
+
+  // ===== RESULT STATE: show final scores =====
+  if (!result) return null;
 
   const isDraw = result.winnerId === null;
   const isCurrentPlayerWinner = result.winnerId === currentPlayerId;
@@ -74,13 +138,11 @@ export const DuelResultPopup = memo(function DuelResultPopup({
     <Modal visible={visible} onClose={onClose} closeOnBackdrop={false} showCloseButton={false} bareContent>
       <Animated.View entering={SlideInUp.duration(280)} style={styles.card}>
         <View style={styles.content}>
-          {/* Header: icône + titre (même style que DuelPreparePopup) */}
           <View style={styles.header}>
             <PopupDuelIcon size={32} />
             <Text style={[styles.title, { color: statusColor }]}>{statusText}</Text>
           </View>
 
-          {/* Carte challenger */}
           <Animated.View entering={SlideInLeft.duration(280)} style={styles.playerCardRow}>
             <View style={styles.avatarWrap}>
               <Avatar name={challenger.name} playerColor={challenger.color} size="md" showBorder />
@@ -96,7 +158,6 @@ export const DuelResultPopup = memo(function DuelResultPopup({
             <PopupDuelIcon size={28} />
           </View>
 
-          {/* Carte opponent */}
           <Animated.View entering={SlideInRight.duration(280)} style={styles.playerCardRow}>
             <View style={styles.avatarWrap}>
               <Avatar name={opponent.name} playerColor={opponent.color} size="md" showBorder />
@@ -108,7 +169,6 @@ export const DuelResultPopup = memo(function DuelResultPopup({
             </View>
           </Animated.View>
 
-          {/* Récompense — même boîte que le message du popup préparation */}
           <Animated.View style={[styles.messageBox, contentStyle]}>
             {currentPlayerReward > 0 ? (
               <Text style={styles.message}>+{currentPlayerReward} jetons gagnés</Text>
@@ -117,7 +177,6 @@ export const DuelResultPopup = memo(function DuelResultPopup({
             )}
           </Animated.View>
 
-          {/* Bouton — même style que DuelPreparePopup: variant yellow */}
           <View style={styles.buttonWrapper}>
             <GameButton title="Continuer" onPress={onClose} variant="yellow" fullWidth />
           </View>
@@ -220,6 +279,12 @@ const styles = StyleSheet.create({
     color: '#2C3E50',
     textAlign: 'center',
     lineHeight: 24,
+  },
+  waitingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING[3],
   },
   buttonWrapper: {
     width: '100%',
