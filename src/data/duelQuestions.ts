@@ -1,5 +1,6 @@
 import type { DuelQuestion } from '@/types';
 
+// Questions de duel par défaut (fallback si l'édition n'a pas de duels)
 export const DUEL_QUESTIONS: DuelQuestion[] = [
   {
     id: 'duel-q1',
@@ -124,11 +125,31 @@ export const DUEL_QUESTIONS: DuelQuestion[] = [
 ];
 
 /**
- * Retourne un ensemble aléatoire de questions pour un duel
+ * Retourne un ensemble aléatoire de questions pour un duel.
+ * Utilise les duels de l'édition si disponibles, sinon fallback sur les questions par défaut.
  * @param count Nombre de questions (par défaut 3)
+ * @param editionId Edition dont on veut les duels (optionnel)
  */
-export function getRandomDuelQuestions(count: number = 3): DuelQuestion[] {
-  const shuffled = [...DUEL_QUESTIONS].sort(() => Math.random() - 0.5);
+export function getRandomDuelQuestions(count: number = 3, editionId?: string): DuelQuestion[] {
+  let pool: DuelQuestion[] = DUEL_QUESTIONS;
+
+  // Si une édition est fournie, essayer d'utiliser ses duels
+  if (editionId) {
+    try {
+      // Import dynamique pour éviter les dépendances circulaires
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { EDITIONS } = require('@/data');
+      const edition = EDITIONS[editionId];
+      if (edition && edition.duels && edition.duels.length >= count) {
+        // Les duels de l'édition sont au format DuelQuestion (question/options/category)
+        pool = edition.duels as DuelQuestion[];
+      }
+    } catch {
+      // Fallback silencieux sur les questions par défaut
+    }
+  }
+
+  const shuffled = [...pool].sort(() => Math.random() - 0.5);
   return shuffled.slice(0, count);
 }
 

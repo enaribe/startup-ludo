@@ -22,6 +22,9 @@ import '../../global.css';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { COLORS } from '@/styles/colors';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { refreshEditionsFromFirestore } from '@/data';
+import { refreshDefaultProjectsFromFirestore } from '@/data/defaultProjects';
+import { refreshChallengesFromFirestore } from '@/data/challenges';
 
 // Keep splash screen visible while loading resources
 SplashScreen.preventAutoHideAsync();
@@ -41,12 +44,25 @@ export default function RootLayout() {
   });
 
   const authInitialized = useRef(false);
+  const editionsLoaded = useRef(false);
 
-  // Initialize auth listener on app start
+  // Initialize auth listener and load editions from Firestore on app start
   useEffect(() => {
     if (authInitialized.current) return;
     authInitialized.current = true;
     const unsubscribe = useAuthStore.getState().initializeAuth();
+    // Load editions from Firestore (priority) or fallback to local JSONs
+    refreshEditionsFromFirestore()
+      .then(() => {
+        editionsLoaded.current = true;
+        console.log('[App] Editions loaded successfully');
+      })
+      .catch((error) => {
+        console.warn('[App] Failed to load editions, using local fallback:', error);
+        editionsLoaded.current = true;
+      });
+    refreshDefaultProjectsFromFirestore();
+    refreshChallengesFromFirestore();
     return () => unsubscribe();
   }, []);
 

@@ -2,97 +2,128 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
+
     // Helper functions
     function isAuthenticated() {
       return request.auth != null;
     }
-    
+
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
-    
+
+    // Admin: vérifie l'email ou le custom claim "admin"
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.email == 'startupludo@concree.com' ||
+        request.auth.token.admin == true
+      );
+    }
+
     function isValidUser() {
-      return isAuthenticated() && 
+      return isAuthenticated() &&
              request.resource.data.keys().hasAll(['email', 'displayName', 'createdAt']) &&
              request.resource.data.email is string &&
              request.resource.data.displayName is string;
     }
-    
+
     // Users collection
     match /users/{userId} {
-      // Allow read if authenticated
       allow read: if isAuthenticated();
-      
-      // Allow create only for own user document
       allow create: if isOwner(userId) && isValidUser();
-      
-      // Allow update/delete only for own user document
-      allow update, delete: if isOwner(userId);
-      
-      // User's startups subcollection (path-based)
+      allow update, delete: if isOwner(userId) || isAdmin();
+
+      // User's startups subcollection
       match /startups/{startupId} {
         allow read: if isAuthenticated();
         allow write: if isOwner(userId);
       }
     }
-    
-    // Collection group: allow reading all "startups" subcollections (for classement getAllStartups)
+
+    // Collection group: allow reading all "startups" subcollections (for classement)
     match /{path=**}/startups/{startupId} {
       allow read: if isAuthenticated();
     }
-    
+
     // User Stats collection
     match /userStats/{userId} {
       allow read: if isAuthenticated();
       allow write: if isOwner(userId);
     }
-    
-    // Editions collection (read-only for users)
+
+    // Editions collection (read for all auth users, write for admins)
     match /editions/{editionId} {
       allow read: if isAuthenticated();
-      allow write: if false; // Only admins via Firebase Console
+      allow write: if isAdmin();
     }
-    
+
+    // Challenge programs (read for all auth, write for admins)
+    match /challenges/{challengeId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Ideation cards/decks (read for all auth, write for admins)
+    match /ideationCards/{deckId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Game data (progression, board config — admin managed)
+    match /gameData/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
     // Leaderboards collection
     match /leaderboards/{leaderboardId} {
       allow read: if isAuthenticated();
-      allow write: if false; // Updated by Cloud Functions only
+      allow write: if isAdmin(); // Admin peut reset/modifier
     }
-    
+
     // Game Sessions collection
     match /gameSessions/{sessionId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
-      allow update: if isAuthenticated() && 
+      allow update: if isAuthenticated() &&
                       resource.data.players[request.auth.uid] != null;
-      allow delete: if isAuthenticated() && 
-                      resource.data.hostId == request.auth.uid;
+      allow delete: if isAuthenticated() &&
+                      (resource.data.hostId == request.auth.uid || isAdmin());
     }
-    
+
     // Achievements collection
     match /achievements/{achievementId} {
       allow read: if isAuthenticated();
-      allow write: if false; // Updated by Cloud Functions only
+      allow write: if isAdmin();
     }
-    
+
     // Reports collection
     match /reports/{reportId} {
-      allow read: if isAuthenticated() && 
-                    (resource.data.reportedBy == request.auth.uid || 
-                     resource.data.userId == request.auth.uid);
+      allow read: if isAuthenticated() &&
+                    (resource.data.reportedBy == request.auth.uid ||
+                     resource.data.userId == request.auth.uid ||
+                     isAdmin());
       allow create: if isAuthenticated();
-      allow update, delete: if false; // Only admins
+      allow update, delete: if isAdmin();
     }
-    
+
     // Challenge enrollments (doc id = userId_challengeId)
     match /challengeEnrollments/{enrollmentId} {
-      // Lecture: l'utilisateur ne voit que ses propres inscriptions
-      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      // get: lecture d'un doc spécifique — propre inscription ou admin
+      allow get: if isAuthenticated() &&
+                   (resource.data.userId == request.auth.uid || isAdmin());
+      // list: queries (where userId == uid) — authentifié suffit, le filtre where protège
+      allow list: if isAuthenticated();
 
-      // Écriture: l'utilisateur ne peut écrire que ses propres inscriptions
-      // Couvre create (setChallengeEnrollment) et update/set-merge (updateChallengeEnrollment)
-      allow write: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      // Écriture: propres inscriptions OU admin
+      allow write: if isAuthenticated() &&
+                     (request.resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    // Default projects (read for all auth users, write for admins)
+    match /defaultProjects/{projectId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
     }
   }
 }

@@ -85,7 +85,7 @@ export interface QuizEvent {
   question: string;
   options: string[];
   correctAnswer: number;
-  difficulty: 'easy' | 'medium' | 'hard';
+  difficulty: 'facile' | 'moyen' | 'difficile' | 'easy' | 'medium' | 'hard';
   reward: number;
   timeLimit: number;
 }
@@ -94,10 +94,10 @@ export interface FundingEvent {
   id: string;
   name: string;
   description: string;
-  type: 'subvention' | 'pret' | 'investisseur' | 'crowdfunding';
+  type: 'subvention' | 'pret' | 'investisseur' | 'crowdfunding' | 'concours' | 'partenariat';
   amount: number;
   condition?: string;
-  rarity: 'common' | 'rare' | 'legendary';
+  rarity: 'common' | 'rare' | 'epic' | 'legendary';
 }
 
 // Option de réponse pour un duel (toutes sont "correctes" mais avec des points différents)
@@ -162,18 +162,18 @@ export interface OpportunityEvent {
   id: string;
   title: string;
   description: string;
-  effect: 'advance' | 'tokens' | 'protection' | 'special';
+  effect: 'advance' | 'tokens' | 'protection' | 'special' | 'extraTurn' | 'shield' | 'boost';
   value: number;
-  rarity: 'common' | 'rare' | 'legendary';
+  rarity: 'common' | 'rare' | 'epic' | 'legendary';
 }
 
 export interface ChallengeEvent {
   id: string;
   title: string;
   description: string;
-  effect: 'retreat' | 'loseTokens' | 'skipTurn' | 'special';
+  effect: 'retreat' | 'loseTokens' | 'skipTurn' | 'special' | 'returnBase';
   value: number;
-  rarity: 'common' | 'rare' | 'legendary';
+  rarity: 'common' | 'rare' | 'epic' | 'legendary';
 }
 
 // ===== BOARD TYPES =====

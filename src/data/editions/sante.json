@@ -64,39 +64,43 @@
   "duels": [
     {
       "id": "duel_1",
-      "title": "Consultation partagée",
-      "description": "Simulation consultation : 1 patient, 1 praticien. Si succès, +2 jetons chacun.",
-      "rewards": {
-        "success": 2,
-        "fail": -1
-      }
+      "question": "Quelle mesure est la plus efficace pour prévenir les infections nosocomiales dans un centre de santé?",
+      "options": [
+        { "text": "L'hygiène des mains systématique du personnel", "points": 30 },
+        { "text": "La désinfection quotidienne des sols", "points": 20 },
+        { "text": "La ventilation intensive des locaux", "points": 10 }
+      ],
+      "category": "santé"
     },
     {
       "id": "duel_2",
-      "title": "Gestion de crise sanitaire",
-      "description": "Face à un scénario de crise, chaque joueur propose une solution. Le gagnant remporte 3 jetons.",
-      "rewards": {
-        "win": 3,
-        "lose": 0
-      }
+      "question": "Quel est le principal avantage de la télémédecine pour les zones rurales africaines?",
+      "options": [
+        { "text": "Réduire les coûts de déplacement", "points": 20 },
+        { "text": "L'accès à des spécialistes distants sans déplacement", "points": 30 },
+        { "text": "Automatiser les prescriptions médicales", "points": 10 }
+      ],
+      "category": "tech"
     },
     {
       "id": "duel_3",
-      "title": "Partenariat thérapeutique",
-      "description": "Élaborer un protocole de soins partagé. Si validé, +2 jetons chacun.",
-      "rewards": {
-        "approved": 2,
-        "rejected": 0
-      }
+      "question": "Comment convaincre un investisseur de financer une startup HealthTech?",
+      "options": [
+        { "text": "Montrer un business plan détaillé sur 10 ans", "points": 10 },
+        { "text": "Présenter des métriques d'impact et de traction", "points": 30 },
+        { "text": "Mettre en avant les diplômes de l'équipe", "points": 20 }
+      ],
+      "category": "pitch"
     },
     {
       "id": "duel_4",
-      "title": "Projet d'investissement santé",
-      "description": "Plan de financement d'équipement médical. Le plan le plus réaliste gagne 3 jetons.",
-      "rewards": {
-        "win": 3,
-        "tie": 1
-      }
+      "question": "Quelle stratégie de pricing est la plus adaptée pour un service de santé en Afrique?",
+      "options": [
+        { "text": "Un modèle freemium avec consultations de base gratuites", "points": 20 },
+        { "text": "Des tarifs ajustés au pouvoir d'achat local avec mobile money", "points": 30 },
+        { "text": "S'aligner sur les prix des cliniques privées existantes", "points": 10 }
+      ],
+      "category": "pricing"
     }
   ],
   "fundings": [

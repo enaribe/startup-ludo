@@ -1,17 +1,17 @@
 import { Stack } from 'expo-router';
 import { useEffect } from 'react';
 import { useChallengeStore } from '@/stores';
-import { ALL_CHALLENGES } from '@/data/challenges';
+import { ALL_CHALLENGES, refreshChallengesFromFirestore } from '@/data/challenges';
 
 export default function ChallengesLayout() {
   const setChallenges = useChallengeStore((state) => state.setChallenges);
-  const challenges = useChallengeStore((state) => state.challenges);
 
   useEffect(() => {
-    if (challenges.length === 0) {
+    (async () => {
+      await refreshChallengesFromFirestore();
       setChallenges(ALL_CHALLENGES);
-    }
-  }, [challenges.length, setChallenges]);
+    })();
+  }, [setChallenges]);
 
   return (
     <Stack

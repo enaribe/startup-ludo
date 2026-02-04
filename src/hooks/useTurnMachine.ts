@@ -339,6 +339,7 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
           canMove: result?.canMove,
           newStatus: result?.newState?.status,
           pathLength: result?.path?.length,
+          triggeredEvent: result?.triggeredEvent || 'none',
         });
       }
 

@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { memo, useEffect } from 'react';
-import { Dimensions, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { Dimensions, FlatList, Image, Pressable, ScrollView, StyleSheet, Text, View, type ViewToken } from 'react-native';
 import Animated, {
   Easing,
   FadeInDown,
@@ -18,6 +18,7 @@ import { getActiveChallenges } from '@/data/challenges';
 import { formatXP, getLevelFromXP, getRankFromXP, getRankProgress } from '@/config/progression';
 import { useAuthStore, useChallengeStore, useUserStore } from '@/stores';
 import { FONTS } from '@/styles/typography';
+import type { Challenge } from '@/types/challenge';
 
 const { width } = Dimensions.get('window');
 
@@ -60,14 +61,31 @@ export default function HomeScreen() {
   const user = useAuthStore((state) => state.user);
   const profile = useUserStore((state) => state.profile);
   const activeChallenges = getActiveChallenges();
-  const featuredChallenge = activeChallenges[0] ?? null;
   const enrollInChallenge = useChallengeStore((s) => s.enrollInChallenge);
   const setActiveChallenge = useChallengeStore((s) => s.setActiveChallenge);
   const getEnrollmentForChallenge = useChallengeStore((s) => s.getEnrollmentForChallenge);
-  const enrollment = featuredChallenge
-    ? getEnrollmentForChallenge(featuredChallenge.id)
-    : undefined;
   const userId = user?.id ?? '';
+
+  // Horizontal challenge carousel
+  const challengeListRef = useRef<FlatList<Challenge>>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const CARD_WIDTH = width - 36; // full width minus horizontal padding
+
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      const first = viewableItems[0];
+      if (first && first.index != null) {
+        setActiveIndex(first.index);
+      }
+    }
+  ).current;
+
+  const scrollToIndex = useCallback((index: number) => {
+    if (index >= 0 && index < activeChallenges.length) {
+      challengeListRef.current?.scrollToIndex({ index, animated: true });
+      setActiveIndex(index);
+    }
+  }, [activeChallenges.length]);
 
   // Calculs de progression
   const totalXP = profile?.xp ?? 0;
@@ -191,26 +209,79 @@ export default function HomeScreen() {
 
         {/* Challenge Section */}
         <View style={styles.challengeHeader}>
-          <Text style={styles.challengeHeaderTitle}>CHALLENGE A LA UNE</Text>
+          <Text style={styles.challengeHeaderTitle}>
+            {activeChallenges.length > 1 ? 'PROGRAMMES' : 'CHALLENGE A LA UNE'}
+          </Text>
+          {activeChallenges.length > 1 && (
+            <View style={styles.challengeNav}>
+              <Pressable
+                style={[styles.challengeNavBtn, activeIndex > 0 && styles.challengeNavBtnActive]}
+                onPress={() => scrollToIndex(activeIndex - 1)}
+                disabled={activeIndex === 0}
+              >
+                <Ionicons name="chevron-back" size={14} color={activeIndex > 0 ? '#FFBC40' : 'rgba(255,255,255,0.2)'} />
+              </Pressable>
+              <Pressable
+                style={[styles.challengeNavBtn, activeIndex < activeChallenges.length - 1 && styles.challengeNavBtnActive]}
+                onPress={() => scrollToIndex(activeIndex + 1)}
+                disabled={activeIndex === activeChallenges.length - 1}
+              >
+                <Ionicons name="chevron-forward" size={14} color={activeIndex < activeChallenges.length - 1 ? '#FFBC40' : 'rgba(255,255,255,0.2)'} />
+              </Pressable>
+            </View>
+          )}
         </View>
 
-        <View style={styles.challengeCardWrapper}>
-          {featuredChallenge ? (
-            <ChallengeHomeCard
-              challenge={featuredChallenge}
-              enrollment={enrollment ?? null}
-              onEnroll={() => {
-                if (!userId) return;
-                enrollInChallenge(featuredChallenge.id, userId);
-                setActiveChallenge(featuredChallenge.id);
-                router.push('/(challenges)/challenge-hub');
-              }}
-              onContinue={() => {
-                setActiveChallenge(featuredChallenge.id);
-                router.push('/(challenges)/challenge-hub');
+        {activeChallenges.length > 0 ? (
+          <View style={styles.challengeCardWrapper}>
+            <FlatList
+              ref={challengeListRef}
+              data={activeChallenges}
+              keyExtractor={(item) => item.id}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              snapToInterval={CARD_WIDTH}
+              decelerationRate="fast"
+              onViewableItemsChanged={onViewableItemsChanged}
+              viewabilityConfig={{ viewAreaCoveragePercentThreshold: 50 }}
+              getItemLayout={(_, index) => ({
+                length: CARD_WIDTH,
+                offset: CARD_WIDTH * index,
+                index,
+              })}
+              renderItem={({ item: challenge }) => {
+                const enrollment = getEnrollmentForChallenge(challenge.id);
+                return (
+                  <View style={{ width: CARD_WIDTH }}>
+                    <ChallengeHomeCard
+                      challenge={challenge}
+                      enrollment={enrollment ?? null}
+                      onEnroll={() => {
+                        if (!userId) return;
+                        enrollInChallenge(challenge.id, userId);
+                        setActiveChallenge(challenge.id);
+                        router.push('/(challenges)/challenge-hub');
+                      }}
+                      onContinue={() => {
+                        setActiveChallenge(challenge.id);
+                        router.push('/(challenges)/challenge-hub');
+                      }}
+                    />
+                  </View>
+                );
               }}
             />
-          ) : (
+            {activeChallenges.length > 1 && (
+              <View style={styles.pagination}>
+                {activeChallenges.map((c, i) => (
+                  <View key={c.id} style={[styles.dot, i === activeIndex && styles.dotActive]} />
+                ))}
+              </View>
+            )}
+          </View>
+        ) : (
+          <View style={styles.challengeCardWrapper}>
             <Animated.View entering={FadeInDown.delay(600).duration(500)}>
               <DynamicGradientBorder borderRadius={16} fill="rgba(0, 0, 0, 0.35)">
                 <View style={styles.challengeCardContent}>
@@ -226,8 +297,8 @@ export default function HomeScreen() {
                 </View>
               </DynamicGradientBorder>
             </Animated.View>
-          )}
-        </View>
+          </View>
+        )}
       </ScrollView>
     </View>
   );

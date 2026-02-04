@@ -17,6 +17,7 @@ import { useGameStore, useAuthStore, useUserStore } from '@/stores';
 import { RadialBackground, DynamicGradientBorder, GameButton } from '@/components/ui';
 import { StartupSelectionModal } from '@/components/game/StartupSelectionModal';
 import { getDefaultProjectsForEdition, getMatchingUserStartups } from '@/data/defaultProjects';
+import { getEditionList } from '@/data';
 import type { PlayerColor } from '@/types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -37,13 +38,15 @@ const COLORS_BY_PLAYER_COUNT: Record<number, PlayerColor[]> = {
   4: ['yellow', 'blue', 'green', 'red'],
 };
 
-// Éditions disponibles
-const EDITIONS = [
-  { id: 'classic', name: 'Classic', description: 'Tous les secteurs', icon: 'rocket' as const, color: '#FFBC40' },
-  { id: 'agriculture', name: 'Agriculture', description: 'AgriTech & Fermes', icon: 'leaf' as const, color: '#4CAF50' },
-  { id: 'education', name: 'Éducation', description: 'EdTech & Formation', icon: 'school' as const, color: '#1F91D0' },
-  { id: 'sante', name: 'Santé', description: 'HealthTech & Médical', icon: 'medkit' as const, color: '#FF6B6B' },
-];
+// Icône fallback par edition id (pour les editions qui n'ont pas d'icône valide)
+const EDITION_ICON_FALLBACK: Record<string, string> = {
+  classic: 'rocket',
+  agriculture: 'leaf',
+  education: 'school',
+  sante: 'medkit',
+  tourisme: 'airplane',
+  culture: 'color-palette',
+};
 
 interface StartupSelection {
   startupId: string;
@@ -468,8 +471,9 @@ export default function LocalSetupScreen() {
             </Text>
 
             <View style={styles.editionsList}>
-              {EDITIONS.map((edition, index) => {
+              {getEditionList().map((edition, index) => {
                 const isSelected = selectedEdition === edition.id;
+                const iconName = (EDITION_ICON_FALLBACK[edition.id] || edition.icon || 'game-controller') as keyof typeof Ionicons.glyphMap;
                 return (
                   <Animated.View
                     key={edition.id}
@@ -485,7 +489,7 @@ export default function LocalSetupScreen() {
                           {/* Icon */}
                           <View style={[styles.editionIcon, { backgroundColor: `${edition.color}20` }]}>
                             <Ionicons
-                              name={edition.icon as keyof typeof Ionicons.glyphMap}
+                              name={iconName}
                               size={24}
                               color={edition.color}
                             />

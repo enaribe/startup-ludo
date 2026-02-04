@@ -3,8 +3,12 @@
  *
  * Chaque edition a 4 startups fictives (templates) que les joueurs
  * peuvent choisir s'ils n'ont pas de startup personnelle du bon secteur.
+ *
+ * Supporte le hot-swap depuis Firestore via refreshDefaultProjectsFromFirestore().
  */
 
+import { collection, getDocs } from 'firebase/firestore';
+import { firestore, FIRESTORE_COLLECTIONS, firebaseLog } from '@/services/firebase/config';
 import type { Startup } from '@/types';
 
 // ===== TYPES =====
@@ -38,7 +42,7 @@ export const EDITION_SECTORS: Record<EditionId, string[]> = {
 
 // ===== PROJETS PAR DEFAUT (4 par edition) =====
 
-export const DEFAULT_PROJECTS: Record<EditionId, DefaultProject[]> = {
+const LOCAL_DEFAULT_PROJECTS: Record<EditionId, DefaultProject[]> = {
   classic: [
     {
       id: 'default_classic_1',
@@ -226,6 +230,48 @@ export const DEFAULT_PROJECTS: Record<EditionId, DefaultProject[]> = {
   ],
 };
 
+// Mutable — commence avec les données locales, mis à jour par Firestore
+// eslint-disable-next-line import/no-mutable-exports
+export let DEFAULT_PROJECTS: Record<EditionId, DefaultProject[]> = { ...LOCAL_DEFAULT_PROJECTS };
+
+/**
+ * Rafraîchit les projets par défaut depuis Firestore.
+ * Les projets Firestore sont regroupés par edition.
+ */
+export async function refreshDefaultProjectsFromFirestore(): Promise<void> {
+  try {
+    const snapshot = await getDocs(collection(firestore, FIRESTORE_COLLECTIONS.defaultProjects));
+    if (snapshot.empty) return;
+
+    const remoteByEdition: Record<string, DefaultProject[]> = {};
+    snapshot.docs.forEach((doc) => {
+      const data = doc.data() as DefaultProject;
+      const proj: DefaultProject = {
+        id: doc.id,
+        name: data.name || '',
+        sector: data.sector || '',
+        description: data.description || '',
+        edition: (data.edition || 'classic') as EditionId,
+      };
+      if (!remoteByEdition[proj.edition]) {
+        remoteByEdition[proj.edition] = [];
+      }
+      remoteByEdition[proj.edition]!.push(proj);
+    });
+
+    // Merge: remote prend la priorité par édition, local est fallback
+    DEFAULT_PROJECTS = { ...LOCAL_DEFAULT_PROJECTS };
+    for (const [editionId, projects] of Object.entries(remoteByEdition)) {
+      if (projects.length > 0) {
+        DEFAULT_PROJECTS[editionId as EditionId] = projects;
+      }
+    }
+    firebaseLog(`Refreshed default projects from Firestore (${snapshot.docs.length} total)`);
+  } catch (error) {
+    console.warn('[Data] Default projects Firestore fetch failed, using local data:', error);
+  }
+}
+
 // ===== HELPERS =====
 
 /**
@@ -233,7 +279,7 @@ export const DEFAULT_PROJECTS: Record<EditionId, DefaultProject[]> = {
  * Fallback sur 'classic' si l'edition n'existe pas.
  */
 export function getDefaultProjectsForEdition(edition: string): DefaultProject[] {
-  return DEFAULT_PROJECTS[edition as EditionId] ?? DEFAULT_PROJECTS.classic;
+  return DEFAULT_PROJECTS[edition as EditionId] ?? DEFAULT_PROJECTS.classic ?? [];
 }
 
 /**

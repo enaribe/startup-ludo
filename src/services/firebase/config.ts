@@ -105,6 +105,7 @@ export const FIRESTORE_COLLECTIONS = {
   userStats: 'userStats',
   userStartups: (userId: string) => `users/${userId}/startups`,
   editions: 'editions',
+  defaultProjects: 'defaultProjects',
   leaderboards: 'leaderboards',
   gameSessions: 'gameSessions',
   achievements: 'achievements',

@@ -22,7 +22,9 @@ import type {
   StartupIdea,
 } from './types';
 
-// Import des éditions JSON
+import { fetchEditionsFromFirestore } from '@/services/firebase/editionService';
+
+// Import des éditions JSON (fallback local)
 import classicData from './editions/classic.json';
 import agricultureData from './editions/agriculture.json';
 import educationData from './editions/education.json';
@@ -35,7 +37,8 @@ import boardLayoutData from './board-layout.json';
 
 // ===== ÉDITIONS =====
 
-export const EDITIONS: Record<EditionId, Edition> = {
+// Données locales (fallback offline uniquement)
+const LOCAL_EDITIONS: Record<EditionId, Edition> = {
   classic: classicData as Edition,
   agriculture: agricultureData as Edition,
   education: educationData as Edition,
@@ -44,14 +47,48 @@ export const EDITIONS: Record<EditionId, Edition> = {
   culture: cultureData as Edition,
 };
 
-export const EDITION_LIST: Edition[] = Object.values(EDITIONS);
+// Mutable — commence vide, rempli par Firestore ou fallback local
+// eslint-disable-next-line import/no-mutable-exports
+export let EDITIONS: Record<EditionId, Edition> = {};
+
+/**
+ * Rafraîchit les éditions depuis Firestore.
+ * Firestore est la source de vérité principale.
+ * Les données locales ne sont utilisées qu'en fallback si Firestore échoue ou est vide.
+ */
+export async function refreshEditionsFromFirestore(): Promise<void> {
+  try {
+    const remote = await fetchEditionsFromFirestore();
+    // Si Firestore retourne des éditions, les utiliser directement (priorité absolue)
+    if (Object.keys(remote).length > 0) {
+      EDITIONS = remote;
+      console.log('[Data] Editions loaded from Firestore:', Object.keys(remote).length, 'editions');
+    } else {
+      // Firestore vide, utiliser le fallback local
+      console.warn('[Data] Firestore returned no editions, using local fallback');
+      EDITIONS = { ...LOCAL_EDITIONS };
+    }
+  } catch (error) {
+    // Erreur Firestore, utiliser le fallback local
+    console.warn('[Data] Firestore fetch failed, using local fallback:', error);
+    EDITIONS = { ...LOCAL_EDITIONS };
+  }
+}
 
 export function getEdition(id: EditionId): Edition {
-  return EDITIONS[id];
+  // Si EDITIONS est vide, utiliser le fallback local
+  if (Object.keys(EDITIONS).length === 0) {
+    return LOCAL_EDITIONS[id] ?? LOCAL_EDITIONS['classic']!;
+  }
+  return EDITIONS[id] ?? EDITIONS['classic'] ?? LOCAL_EDITIONS['classic']!;
 }
 
 export function getEditionList(): Edition[] {
-  return EDITION_LIST;
+  // Si EDITIONS est vide, utiliser le fallback local
+  if (Object.keys(EDITIONS).length === 0) {
+    return Object.values(LOCAL_EDITIONS);
+  }
+  return Object.values(EDITIONS);
 }
 
 // ===== BOARD LAYOUT =====
@@ -71,6 +108,7 @@ function getRandomItem<T>(items: T[]): T | null {
  */
 export function getRandomQuiz(editionId: EditionId, difficulty?: DifficultyLevel): Quiz | null {
   const edition = EDITIONS[editionId];
+  if (!edition) return null;
   const quizzes = difficulty
     ? edition.quizzes.filter(q => q.difficulty === difficulty)
     : edition.quizzes;
@@ -84,6 +122,7 @@ export function getRandomQuiz(editionId: EditionId, difficulty?: DifficultyLevel
  */
 export function getRandomDuel(editionId: EditionId): Duel | null {
   const edition = EDITIONS[editionId];
+  if (!edition) return null;
   return getRandomItem(edition.duels);
 }
 
@@ -93,6 +132,7 @@ export function getRandomDuel(editionId: EditionId): Duel | null {
  */
 export function getRandomFunding(editionId: EditionId): Funding | null {
   const edition = EDITIONS[editionId];
+  if (!edition) return null;
   return getRandomItem(edition.fundings);
 }
 
@@ -103,6 +143,7 @@ export function getRandomFunding(editionId: EditionId): Funding | null {
  */
 export function getRandomEvent(editionId: EditionId): GameEvent | null {
   const edition = EDITIONS[editionId];
+  if (!edition) return null;
   const { opportunities, challenges } = edition;
 
   // Si les deux tableaux sont vides, retourner null
@@ -144,6 +185,7 @@ export function getRandomEvent(editionId: EditionId): GameEvent | null {
  */
 export function getRandomOpportunity(editionId: EditionId): Opportunity | null {
   const edition = EDITIONS[editionId];
+  if (!edition) return null;
   return getRandomItem(edition.opportunities);
 }
 
@@ -152,6 +194,7 @@ export function getRandomOpportunity(editionId: EditionId): Opportunity | null {
  */
 export function getRandomChallenge(editionId: EditionId): Challenge | null {
   const edition = EDITIONS[editionId];
+  if (!edition) return null;
   return getRandomItem(edition.challenges);
 }
 
@@ -161,6 +204,7 @@ export function getRandomChallenge(editionId: EditionId): Challenge | null {
  */
 export function getRandomStartupIdea(editionId: EditionId): StartupIdea | null {
   const edition = EDITIONS[editionId];
+  if (!edition) return null;
   return getRandomItem(edition.startupIdeas ?? []);
 }
 

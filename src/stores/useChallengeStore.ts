@@ -267,7 +267,7 @@ export const useChallengeStore = create<ChallengeStoreState & ChallengeStoreActi
     {
       name: 'challenge-storage',
       storage: createJSONStorage(() => AsyncStorage),
-      partialize: (state) => ({ enrollments: state.enrollments, activeChallengeId: state.activeChallengeId }),
+      partialize: (state) => ({ challenges: state.challenges, enrollments: state.enrollments, activeChallengeId: state.activeChallengeId }),
     }
   )
 );

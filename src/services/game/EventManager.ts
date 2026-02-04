@@ -15,8 +15,22 @@ import {
   getRandomChallenge,
   type EditionId,
   type Quiz,
+  type Duel,
+  type Funding,
+  type Opportunity,
+  type Challenge as ChallengeEventData,
   type DifficultyLevel,
 } from '@/data';
+
+// ===== CONTENT PACK (sous-niveau challenge) =====
+
+export interface SubLevelContentPack {
+  quizzes: Quiz[];
+  duels: Duel[];
+  fundings: Funding[];
+  opportunities: Opportunity[];
+  challengeEvents: ChallengeEventData[];
+}
 
 // ===== TYPES =====
 
@@ -51,16 +65,9 @@ export interface GeneratedDuelEvent {
   type: 'duel';
   data: {
     id: string;
-    title: string;
-    description: string;
-    stake: number;
-    rewards: {
-      win?: number;
-      lose?: number;
-      success?: number;
-      fail?: number;
-      tie?: number;
-    };
+    question: string;
+    options: { text: string; points: number }[];
+    category: string;
   };
 }
 
@@ -116,6 +123,7 @@ export class EventManager {
   private usedFundingIds: Set<string> = new Set();
   private usedOpportunityIds: Set<string> = new Set();
   private usedChallengeIds: Set<string> = new Set();
+  private subLevelContent: SubLevelContentPack | null = null;
 
   constructor(private editionId: EditionId = 'classic') {}
 
@@ -125,6 +133,21 @@ export class EventManager {
   setEdition(editionId: EditionId): void {
     this.editionId = editionId;
     this.reset();
+  }
+
+  /**
+   * Définit le contenu d'un sous-niveau challenge (prioritaire sur l'édition)
+   */
+  setSubLevelContent(content: SubLevelContentPack): void {
+    this.subLevelContent = content;
+    this.reset();
+  }
+
+  /**
+   * Efface le contenu du sous-niveau (retour au mode édition)
+   */
+  clearSubLevelContent(): void {
+    this.subLevelContent = null;
   }
 
   /**
@@ -159,10 +182,25 @@ export class EventManager {
   }
 
   /**
+   * Sélectionne un élément aléatoire d'un tableau
+   */
+  private pickRandom<T>(items: T[]): T | null {
+    if (items.length === 0) return null;
+    return items[Math.floor(Math.random() * items.length)] ?? null;
+  }
+
+  /**
    * Génère un quiz aléatoire
    */
   generateQuizEvent(difficulty?: DifficultyLevel): GeneratedQuizEvent | null {
-    const quiz = getRandomQuiz(this.editionId, difficulty);
+    // Priorité : contenu du sous-niveau, puis édition
+    const quiz = this.subLevelContent?.quizzes.length
+      ? this.pickRandom(
+          difficulty
+            ? this.subLevelContent.quizzes.filter(q => q.difficulty === difficulty)
+            : this.subLevelContent.quizzes
+        )
+      : getRandomQuiz(this.editionId, difficulty);
 
     if (!quiz) {
       return this.getFallbackQuiz();
@@ -195,7 +233,9 @@ export class EventManager {
    * Génère un financement aléatoire
    */
   generateFundingEvent(): GeneratedFundingEvent | null {
-    const funding = getRandomFunding(this.editionId);
+    const funding = this.subLevelContent?.fundings.length
+      ? this.pickRandom(this.subLevelContent.fundings)
+      : getRandomFunding(this.editionId);
 
     if (!funding) {
       return this.getFallbackFunding();
@@ -217,10 +257,12 @@ export class EventManager {
   }
 
   /**
-   * Génère un duel aléatoire
+   * Génère un duel aléatoire (format DuelQuestion : question + 3 options avec points)
    */
   generateDuelEvent(): GeneratedDuelEvent | null {
-    const duel = getRandomDuel(this.editionId);
+    const duel = this.subLevelContent?.duels.length
+      ? this.pickRandom(this.subLevelContent.duels)
+      : getRandomDuel(this.editionId);
 
     if (!duel) {
       return this.getFallbackDuel();
@@ -232,10 +274,9 @@ export class EventManager {
       type: 'duel',
       data: {
         id: duel.id,
-        title: duel.title,
-        description: duel.description,
-        stake: duel.rewards.win ?? duel.rewards.success ?? 3,
-        rewards: duel.rewards,
+        question: duel.question,
+        options: duel.options,
+        category: duel.category,
       },
     };
   }
@@ -244,7 +285,9 @@ export class EventManager {
    * Génère une opportunité aléatoire
    */
   generateOpportunityEvent(): GeneratedOpportunityEvent | null {
-    const opportunity = getRandomOpportunity(this.editionId);
+    const opportunity = this.subLevelContent?.opportunities.length
+      ? this.pickRandom(this.subLevelContent.opportunities)
+      : getRandomOpportunity(this.editionId);
 
     if (!opportunity) {
       return this.getFallbackOpportunity();
@@ -269,7 +312,9 @@ export class EventManager {
    * Génère un challenge aléatoire
    */
   generateChallengeEvent(): GeneratedChallengeEvent | null {
-    const challenge = getRandomChallenge(this.editionId);
+    const challenge = this.subLevelContent?.challengeEvents.length
+      ? this.pickRandom(this.subLevelContent.challengeEvents)
+      : getRandomChallenge(this.editionId);
 
     if (!challenge) {
       return this.getFallbackChallenge();
@@ -294,6 +339,34 @@ export class EventManager {
    * Génère un événement aléatoire (50% opportunité, 50% challenge)
    */
   generateRandomEvent(): GeneratedOpportunityEvent | GeneratedChallengeEvent | null {
+    // Si contenu sous-niveau, tirer de là
+    if (this.subLevelContent) {
+      const hasOpp = this.subLevelContent.opportunities.length > 0;
+      const hasChal = this.subLevelContent.challengeEvents.length > 0;
+      if (!hasOpp && !hasChal) {
+        return Math.random() < 0.5 ? this.getFallbackOpportunity() : this.getFallbackChallenge();
+      }
+      const pickOpp = hasOpp && (!hasChal || Math.random() < 0.5);
+      if (pickOpp) {
+        const opp = this.pickRandom(this.subLevelContent.opportunities);
+        if (opp) {
+          this.usedOpportunityIds.add(opp.id);
+          return {
+            type: 'opportunity',
+            data: { id: opp.id, title: opp.title, description: opp.description, effect: 'tokens', value: opp.tokens, rarity: this.inferRarity(opp.tokens) },
+          };
+        }
+      }
+      const chal = this.pickRandom(this.subLevelContent.challengeEvents);
+      if (chal) {
+        this.usedChallengeIds.add(chal.id);
+        return {
+          type: 'challenge',
+          data: { id: chal.id, title: chal.title, description: chal.description, effect: 'loseTokens', value: Math.abs(chal.tokens), rarity: this.inferRarity(Math.abs(chal.tokens)) },
+        };
+      }
+    }
+
     const event = getRandomEvent(this.editionId);
 
     if (!event) {
@@ -400,10 +473,13 @@ export class EventManager {
       type: 'duel',
       data: {
         id: `fallback_duel_${Date.now()}`,
-        title: 'Pitch Battle',
-        description: 'Affrontez-vous dans un pitch de 30 secondes !',
-        stake: 3,
-        rewards: { win: 3, lose: -1 },
+        question: 'Quelle est la meilleure stratégie pour convaincre un investisseur ?',
+        options: [
+          { text: 'Présenter des métriques de traction solides', points: 30 },
+          { text: 'Montrer un business plan détaillé sur 5 ans', points: 20 },
+          { text: 'Mettre en avant les diplômes de l\'équipe', points: 10 },
+        ],
+        category: 'pitch',
       },
     };
   }

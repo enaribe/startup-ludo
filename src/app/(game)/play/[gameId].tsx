@@ -20,7 +20,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { RadialBackground } from '@/components/ui';
-import { GameEngine } from '@/services/game/GameEngine';
+import { eventManager } from '@/services/game/EventManager';
 import { useGameStore, useSettingsStore, useAuthStore } from '@/stores';
 import { useOnlineGame } from '@/hooks/useOnlineGame';
 import { useTurnMachine, type TurnActions } from '@/hooks/useTurnMachine';
@@ -38,7 +38,7 @@ const MOCK_QUIZ: QuizEvent = {
   question: "Quel document décrit la stratégie et le modèle économique d'une entreprise ?",
   options: ['Business Plan', 'Statut juridique', 'Contrat de travail'],
   correctAnswer: 0,
-  difficulty: 'medium',
+  difficulty: 'moyen',
   reward: 2,
   timeLimit: 30,
 };
@@ -226,68 +226,106 @@ export default function PlayScreen() {
 
   const handleTriggeredEvent = useCallback(
     (eventType: string) => {
-      const event = GameEngine.generateEvent(eventType as any, game?.edition || 'startup');
+      // Utilise EventManager pour générer des événements depuis les données de l'édition
+      if (game?.edition) {
+        eventManager.setEdition(game.edition);
+      }
+      const event = eventManager.generateEvent(eventType as any);
       if (!event) {
         // No event generated — skip directly
         return;
       }
 
-      // ===== AI AUTO-RESOLUTION =====
-      // When an AI player triggers an event, auto-resolve it instead of showing popups to the human.
-      if (currentPlayer?.isAI) {
-        triggerEvent(event);
+      // Cast pour compatibilité avec le type GameEvent du store
+      const gameEvent = event as unknown as import('@/types').GameEvent;
 
+      // ===== AI: show popup in spectator mode, then auto-resolve after delay =====
+      // So the human sees what event the AI landed on before points are applied.
+      if (currentPlayer?.isAI) {
+        triggerEvent(gameEvent);
+        setIsEventSpectator(true);
+
+        const resolveAndClose = () => {
+          switch (event.type) {
+            case 'quiz': {
+              const aiCorrect = Math.random() < 0.6;
+              const quizEv = event.data as QuizEvent;
+              const reward = quizEv.reward;
+              actions.resolveEvent({ ok: aiCorrect, reward });
+              break;
+            }
+            case 'duel': {
+              const aiDuelScore = Math.floor(Math.random() * 4) + 1;
+              actions.resolveEvent({ ok: true, reward: aiDuelScore });
+              break;
+            }
+            case 'funding': {
+              const fundingEv = event.data as FundingEvent;
+              actions.resolveEvent({ ok: true, reward: fundingEv.amount });
+              break;
+            }
+            case 'opportunity': {
+              const oppEv = event.data as OpportunityEvent;
+              actions.resolveEvent({ ok: oppEv.effect === 'tokens', reward: oppEv.value });
+              break;
+            }
+            case 'challenge': {
+              const chalEv = event.data as ChallengeEvent;
+              actions.resolveEvent({ ok: false, reward: chalEv.value });
+              break;
+            }
+            default:
+              actions.resolveEvent({ ok: false, reward: 0 });
+          }
+          setQuizData(null);
+          setFundingData(null);
+          setOpportunityData(null);
+          setChallengeData(null);
+          setDuelTriggered(false);
+          setIsEventSpectator(false);
+          handleEventResolveRef.current();
+        };
+
+        // Show the same popups as for human, then auto-resolve after delay
         switch (event.type) {
-          case 'quiz': {
-            // AI "answers" the quiz: 60% chance of getting it right
-            const aiCorrect = Math.random() < 0.6;
-            const quizEv = event.data as QuizEvent;
-            const reward = quizEv.reward;
-            console.log('[PlayScreen] IA auto-résout quiz:', { aiCorrect, reward });
-            actions.resolveEvent({ ok: aiCorrect, reward });
-            handleEventResolveRef.current();
+          case 'quiz':
+            setQuizData(event.data as QuizEvent);
+            setTimeout(resolveAndClose, 2800);
             break;
-          }
+          case 'funding':
+            setFundingData(event.data as FundingEvent);
+            setTimeout(resolveAndClose, 2500);
+            break;
+          case 'opportunity':
+            setOpportunityData(event.data as OpportunityEvent);
+            setTimeout(resolveAndClose, 2500);
+            break;
+          case 'challenge':
+            setChallengeData(event.data as ChallengeEvent);
+            setTimeout(resolveAndClose, 2500);
+            break;
           case 'duel': {
-            // AI triggered a duel: auto-assign random score (1-6 points)
-            const aiDuelScore = Math.floor(Math.random() * 4) + 1;
-            console.log('[PlayScreen] IA auto-résout duel:', { aiDuelScore });
-            actions.resolveEvent({ ok: true, reward: aiDuelScore });
-            handleEventResolveRef.current();
+            setDuelTriggered(true);
+            const otherPlayers = game?.players?.filter((p) => p.id !== currentPlayer?.id) ?? [];
+            if (otherPlayers.length >= 1) {
+              const opponentId = otherPlayers[0]!.id;
+              const questions = getRandomDuelQuestions(3, game?.edition);
+              duel.startDuelWithQuestions(currentPlayer!.id, opponentId, questions);
+              // Duel: show spectator popup then auto-resolve after a delay (no real Q&A for AI vs AI)
+              setTimeout(resolveAndClose, 2000);
+            } else {
+              resolveAndClose();
+            }
             break;
           }
-          case 'funding': {
-            // AI gets the funding automatically
-            const fundingEv = event.data as FundingEvent;
-            console.log('[PlayScreen] IA auto-résout financement:', { amount: fundingEv.amount });
-            actions.resolveEvent({ ok: true, reward: fundingEv.amount });
-            handleEventResolveRef.current();
-            break;
-          }
-          case 'opportunity': {
-            const oppEv = event.data as OpportunityEvent;
-            console.log('[PlayScreen] IA auto-résout opportunité:', { value: oppEv.value });
-            actions.resolveEvent({ ok: oppEv.effect === 'tokens', reward: oppEv.value });
-            handleEventResolveRef.current();
-            break;
-          }
-          case 'challenge': {
-            const chalEv = event.data as ChallengeEvent;
-            console.log('[PlayScreen] IA auto-résout challenge:', { value: chalEv.value, effect: chalEv.effect });
-            actions.resolveEvent({ ok: false, reward: chalEv.value });
-            handleEventResolveRef.current();
-            break;
-          }
-          default: {
-            actions.resolveEvent({ ok: false, reward: 0 });
-            handleEventResolveRef.current();
-          }
+          default:
+            resolveAndClose();
         }
         return;
       }
 
       // ===== HUMAN PLAYER: show popups as usual =====
-      triggerEvent(event);
+      triggerEvent(gameEvent);
       setIsEventSpectator(false);
 
       // Broadcast event to other players in online mode
@@ -314,7 +352,7 @@ export default function PlayScreen() {
           const otherPlayers = game?.players?.filter((p) => p.id !== currentPlayer.id) ?? [];
           if (otherPlayers.length === 1) {
             const opponentId = otherPlayers[0]!.id;
-            const questions = getRandomDuelQuestions(3);
+            const questions = getRandomDuelQuestions(3, game?.edition);
             duel.startDuelWithQuestions(currentPlayer.id, opponentId, questions);
             if (isOnline) {
               onlineGame.broadcastDuelStart(currentPlayer.id, opponentId, questions as unknown as Record<string, unknown>[]);
@@ -598,13 +636,13 @@ export default function PlayScreen() {
     (opponent: Player) => {
       if (!duel.challenger) return;
       duel.selectOpponent(opponent.id);
-      const questions = getRandomDuelQuestions(3);
+      const questions = getRandomDuelQuestions(3, game?.edition);
       duel.startDuelWithQuestions(duel.challenger.id, opponent.id, questions);
       if (isOnline) {
         onlineGame.broadcastDuelStart(duel.challenger.id, opponent.id, questions as unknown as Record<string, unknown>[]);
       }
     },
-    [duel, isOnline, onlineGame]
+    [duel, isOnline, onlineGame, game?.edition]
   );
 
   // Start answering — universal for online (both players), falls back to challenger for local
@@ -902,7 +940,7 @@ export default function PlayScreen() {
                 const otherPlayers = game?.players?.filter((p) => p.id !== currentPlayer.id) ?? [];
                 if (otherPlayers.length === 1) {
                   const opponentId = otherPlayers[0]!.id;
-                  const questions = getRandomDuelQuestions(3);
+                  const questions = getRandomDuelQuestions(3, game?.edition);
                   duel.startDuelWithQuestions(currentPlayer.id, opponentId, questions);
                   if (isOnline) {
                     onlineGame.broadcastDuelStart(currentPlayer.id, opponentId, questions as unknown as Record<string, unknown>[]);

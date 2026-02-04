@@ -13,7 +13,7 @@ import type { Ionicons } from '@expo/vector-icons';
 
 // ===== TYPES DE BASE =====
 
-export type EditionId = 'classic' | 'agriculture' | 'education' | 'sante' | 'tourisme' | 'culture';
+export type EditionId = string;
 
 export type DifficultyLevel = 'facile' | 'moyen' | 'difficile';
 
@@ -46,20 +46,18 @@ export interface Quiz {
 
 // ===== DUEL =====
 // Case Duel : Affrontement entre 2 joueurs
+// Format aligné avec DuelQuestion (question + 3 options avec points 30/20/10)
+
+export interface DuelOption {
+  text: string;
+  points: number; // 30 (meilleure), 20 (bonne), 10 (acceptable)
+}
 
 export interface Duel {
   id: string;
-  title: string;
-  description: string;
-  rewards: {
-    win?: number;      // Jetons pour le gagnant
-    lose?: number;     // Jetons perdus par le perdant (valeur positive = perte)
-    success?: number;  // Jetons si réussite commune
-    fail?: number;     // Jetons perdus si échec commun
-    tie?: number;      // Jetons si égalité
-    approved?: number; // Jetons si validé
-    rejected?: number; // Jetons si rejeté
-  };
+  question: string;
+  options: DuelOption[];
+  category: string;
 }
 
 // ===== FINANCEMENT =====
@@ -130,8 +128,10 @@ export interface Edition {
 
 // ===== HELPERS POUR VALIDATION =====
 
+const KNOWN_EDITIONS = ['classic', 'agriculture', 'education', 'sante', 'tourisme', 'culture'];
+
 export function isValidEditionId(id: string): id is EditionId {
-  return ['classic', 'agriculture', 'education', 'sante', 'tourisme', 'culture'].includes(id);
+  return KNOWN_EDITIONS.includes(id) || id.length > 0;
 }
 
 /**

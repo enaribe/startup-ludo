@@ -18,6 +18,7 @@ import { GameEngine, type MoveResult, type ValidMove } from '@/services/game/Gam
 import { eventManager, type GeneratedGameEvent } from '@/services/game/EventManager';
 import type { EditionId } from '@/data';
 import type { CheckpointData } from '@/utils/onlineCodec';
+import { useChallengeStore } from '@/stores/useChallengeStore';
 
 /** Action compacte recue d'un joueur distant via RTDB */
 export interface RemoteAction {
@@ -149,6 +150,37 @@ export const useGameStore = create<GameStore>()(
         // Configurer l'EventManager avec l'édition
         eventManager.setEdition(edition as EditionId);
 
+        // Si mode challenge, charger le contenu du sous-niveau
+        eventManager.clearSubLevelContent();
+        if (challengeContext) {
+          const { challenges } = useChallengeStore.getState();
+          console.log('[GameStore] Challenge mode, challenges in store:', challenges.length);
+          const challenge = challenges.find((c) => c.id === challengeContext.challengeId);
+          if (challenge) {
+            const level = challenge.levels.find((l) => l.number === challengeContext.levelNumber);
+            const subLevel = level?.subLevels.find((s) => s.number === challengeContext.subLevelNumber);
+            console.log('[GameStore] SubLevel found:', subLevel?.name, 'quizzes:', subLevel?.quizzes?.length ?? 0, 'duels:', subLevel?.duels?.length ?? 0);
+            if (subLevel) {
+              const hasContent = subLevel.quizzes?.length || subLevel.duels?.length ||
+                subLevel.fundings?.length || subLevel.opportunities?.length || subLevel.challengeEvents?.length;
+              if (hasContent) {
+                eventManager.setSubLevelContent({
+                  quizzes: subLevel.quizzes || [],
+                  duels: subLevel.duels || [],
+                  fundings: subLevel.fundings || [],
+                  opportunities: subLevel.opportunities || [],
+                  challengeEvents: subLevel.challengeEvents || [],
+                });
+                console.log('[GameStore] SubLevel content loaded into EventManager');
+              } else {
+                console.log('[GameStore] SubLevel has no content, using edition fallback');
+              }
+            }
+          } else {
+            console.log('[GameStore] Challenge not found in store:', challengeContext.challengeId);
+          }
+        }
+
         set((state) => {
           state.game = {
             id: gameId,
@@ -187,6 +219,7 @@ export const useGameStore = create<GameStore>()(
       },
 
       resetGame: () => {
+        eventManager.clearSubLevelContent();
         set((state) => {
           state.game = null;
           state.isLoading = false;
@@ -355,6 +388,7 @@ export const useGameStore = create<GameStore>()(
           newStatus: result.newState?.status,
           newPosition: result.newState && 'position' in result.newState ? result.newState.position : undefined,
           pathLength: result.path?.length,
+          triggeredEvent: result.triggeredEvent || 'none',
         });
 
         if (!result.canMove) {
