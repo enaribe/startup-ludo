@@ -212,38 +212,48 @@ export const SAFE_POSITIONS: number[] = [1, 12, 23, 34]; // Les départs
 export type CellEventType = 'quiz' | 'funding' | 'duel' | 'opportunity' | 'challenge' | 'safe' | 'start' | 'normal';
 
 // Distribution des événements sur le circuit (44 cases)
+// Équilibrage : 8 quiz, 4 duels (max), 6 funding, 6 opportunity, 4 challenge, 4 start
+// Les cases non-assignées utilisent le fallback (qui favorise les quiz)
 export const CIRCUIT_EVENTS: Record<number, CellEventType> = {
-  // Cases de départ (safe)
+  // Cases de départ (safe) — 4 cases
   1: 'start',   // Yellow
   12: 'start',  // Blue
   23: 'start',  // Red
   34: 'start',  // Green
 
-  // Quiz
+  // Quiz — 8 cases (doublé pour plus de quiz)
+  2: 'quiz',
   4: 'quiz',
+  10: 'quiz',
   15: 'quiz',
+  21: 'quiz',
   26: 'quiz',
+  32: 'quiz',
   37: 'quiz',
 
-  // Funding
+  // Funding — 6 cases
   7: 'funding',
+  13: 'funding',
   18: 'funding',
+  24: 'funding',
   29: 'funding',
   40: 'funding',
 
-  // Duel
+  // Duel — 4 cases (max)
   6: 'duel',
   17: 'duel',
   28: 'duel',
   39: 'duel',
 
-  // Opportunity
+  // Opportunity — 6 cases
   3: 'opportunity',
+  8: 'opportunity',
   14: 'opportunity',
+  19: 'opportunity',
   25: 'opportunity',
   36: 'opportunity',
 
-  // Challenge
+  // Challenge — 4 cases
   9: 'challenge',
   20: 'challenge',
   31: 'challenge',
@@ -259,11 +269,12 @@ export function isSafePosition(circuitIndex: number): boolean {
   return SAFE_POSITIONS.includes(circuitIndex);
 }
 
-// Types d'événements déclenchables (hors start/normal) — utilisés pour les cases sans événement fixe
-const FALLBACK_EVENTS: Array<'quiz' | 'funding' | 'duel' | 'opportunity' | 'challenge'> = [
+// Types d'événements déclenchables (hors start/normal) — utilisés pour les cases sans événement fixe.
+// Le cycle favorise les quiz et évite les duels (les 4 duels sont déjà placés dans CIRCUIT_EVENTS).
+const FALLBACK_EVENTS: CellEventType[] = [
   'quiz',
   'funding',
-  'duel',
+  'quiz',
   'opportunity',
   'challenge',
 ];
@@ -272,11 +283,12 @@ const FALLBACK_EVENTS: Array<'quiz' | 'funding' | 'duel' | 'opportunity' | 'chal
  * Obtient le type d'événement pour une position du circuit.
  * Les cases sans événement fixe dans CIRCUIT_EVENTS reçoivent un événement par défaut (cycle)
  * pour que l'icône affichée et l'événement déclenché correspondent.
+ * Note: le fallback ne contient PAS de 'duel' — les duels sont limités aux 4 cases fixées.
  */
 export function getEventAtCircuitPosition(circuitIndex: number): CellEventType {
   const fixed = CIRCUIT_EVENTS[circuitIndex];
   if (fixed !== undefined) return fixed;
-  return FALLBACK_EVENTS[circuitIndex % FALLBACK_EVENTS.length];
+  return FALLBACK_EVENTS[circuitIndex % FALLBACK_EVENTS.length] ?? 'quiz';
 }
 
 /**

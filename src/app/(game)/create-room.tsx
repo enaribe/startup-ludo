@@ -1,8 +1,8 @@
 /**
  * create-room - Creer un salon
  *
- * Phase 1: Formulaire de configuration (nom, joueurs, edition, mise)
- * Phase 2: Salle d'attente avec code, liste joueurs, bouton demarrer
+ * Phase 1: Formulaire de configuration (nom, joueurs)
+ * Phase 2: Salle d'attente (lobby) avec code, liste joueurs, bouton demarrer
  */
 
 import { Ionicons } from '@expo/vector-icons';
@@ -118,28 +118,10 @@ export default function CreateRoomScreen() {
           },
         ]
       );
-    } else if (roomCode) {
-      // In confirmation: go back to config (leave room too)
-      Alert.alert(
-        'Annuler',
-        'Cela supprimera le salon cree.',
-        [
-          { text: 'Non', style: 'cancel' },
-          {
-            text: 'Oui',
-            style: 'destructive',
-            onPress: async () => {
-              await leaveRoom();
-              setRoomCode('');
-              setCurrentRoomId('');
-            },
-          },
-        ]
-      );
     } else {
       router.back();
     }
-  }, [showLobby, roomCode, leaveRoom, router]);
+  }, [showLobby, leaveRoom, router]);
 
   const handleCreateRoom = useCallback(async () => {
     if (!user) {
@@ -171,6 +153,7 @@ export default function CreateRoomScreen() {
     if (result) {
       setRoomCode(formatRoomCode(result.code));
       setCurrentRoomId(result.roomId);
+      setShowLobby(true);
     }
   }, [user, selectedEdition, maxPlayers, roomName, betAmount, createRoom]);
 
@@ -218,13 +201,8 @@ export default function CreateRoomScreen() {
     }
   }, [allReady, playersList.length, startGame, router, currentRoomId]);
 
-  const handleContinueToLobby = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setShowLobby(true);
-  }, []);
-
   // Configuration form
-  if (!showLobby && !roomCode) {
+  if (!showLobby) {
     return (
       <View style={styles.container}>
         <RadialBackground />
@@ -316,108 +294,6 @@ export default function CreateRoomScreen() {
             loading={isLoading}
             onPress={handleCreateRoom}
             disabled={!roomName.trim() || !maxPlayers}
-          />
-        </View>
-      </View>
-    );
-  }
-
-  // Confirmation (après création, avant lobby)
-  if (roomCode && !showLobby) {
-    return (
-      <View style={styles.container}>
-        <RadialBackground />
-
-        {/* Fixed Header avec bouton retour */}
-        <View style={[styles.header, { paddingTop: insets.top + SPACING[2] }]}>
-          <Pressable onPress={handleBack} hitSlop={8}>
-            <Ionicons name="arrow-back" size={24} color="white" />
-          </Pressable>
-          <View style={{ flex: 1 }} />
-        </View>
-
-        <ScrollView
-          contentContainerStyle={{
-            paddingTop: insets.top + 60,
-            paddingBottom: insets.bottom + 120,
-            paddingHorizontal: SPACING[4],
-            alignItems: 'center',
-          }}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Carte de confirmation — même largeur que le bouton en bas (contentWidth) */}
-          <Animated.View
-            entering={FadeInDown.delay(100).duration(500)}
-            style={styles.confirmationCardWrapper}
-          >
-            <DynamicGradientBorder
-              borderRadius={24}
-              fill="rgba(0, 0, 0, 0.35)"
-              boxWidth={contentWidth}
-            >
-              <View style={styles.confirmationCard}>
-                {/* Icône globe */}
-                <View style={styles.globeIconContainer}>
-                  <Ionicons name="globe" size={48} color="#FFFFFF" />
-                </View>
-
-                {/* Message de confirmation */}
-                <Text style={styles.confirmationTitle}>
-                  SALON '{roomName.toUpperCase()}' CRÉÉ !
-                </Text>
-
-                {/* Code */}
-                <DynamicGradientBorder
-                  borderRadius={14}
-                  fill="rgba(0, 0, 0, 0.35)"
-                  style={styles.codeBoxWrapper}
-                >
-                  <View style={styles.codeBox}>
-                    <Text style={styles.codeLabelText}>Code:</Text>
-                    <Text style={styles.codeValue}>{roomCode}</Text>
-                  </View>
-                </DynamicGradientBorder>
-
-                {/* Boutons Copier et Partager */}
-                <View style={styles.confirmationActions}>
-                  <Pressable onPress={handleCopyCode} style={styles.confirmationButton}>
-                    <DynamicGradientBorder
-                      borderRadius={14}
-                      fill="rgba(0, 0, 0, 0.35)"
-                      style={styles.actionButtonBorder}
-                    >
-                      <View style={styles.actionButtonInner}>
-                        <Ionicons name="copy-outline" size={18} color="#FFFFFF" />
-                        <Text style={styles.actionButtonText}>Copier</Text>
-                      </View>
-                    </DynamicGradientBorder>
-                  </Pressable>
-
-                  <Pressable onPress={handleShareCode} style={styles.confirmationButton}>
-                    <DynamicGradientBorder
-                      borderRadius={14}
-                      fill="rgba(0, 0, 0, 0.35)"
-                      style={styles.actionButtonBorder}
-                    >
-                      <View style={styles.actionButtonInner}>
-                        <Ionicons name="share-outline" size={18} color="#FFFFFF" />
-                        <Text style={styles.actionButtonText}>Partager</Text>
-                      </View>
-                    </DynamicGradientBorder>
-                  </Pressable>
-                </View>
-              </View>
-            </DynamicGradientBorder>
-          </Animated.View>
-        </ScrollView>
-
-        {/* Bottom button - Continue to lobby */}
-        <View style={[styles.bottomBar, { paddingBottom: insets.bottom + SPACING[4] }]}>
-          <GameButton
-            variant="green"
-            fullWidth
-            title="CONTINUER"
-            onPress={handleContinueToLobby}
           />
         </View>
       </View>
@@ -614,81 +490,6 @@ const styles = StyleSheet.create({
   configInput: {
     fontFamily: FONTS.bodySemiBold,
     fontSize: FONT_SIZES.md,
-    color: '#FFFFFF',
-  },
-  confirmationCardWrapper: {
-    alignSelf: 'stretch',
-    width: contentWidth,
-  },
-  confirmationCard: {
-    padding: SPACING[6],
-    alignItems: 'center',
-    gap: SPACING[5],
-  },
-  globeIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  confirmationTitle: {
-    fontFamily: FONTS.title,
-    fontSize: FONT_SIZES.lg,
-    color: '#FFBC40',
-    textAlign: 'center',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  codeBoxWrapper: {
-    width: '100%',
-    minWidth: 280,
-    alignSelf: 'stretch',
-    marginHorizontal: -SPACING[4],
-    overflow: 'hidden',
-  },
-  codeBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    gap: SPACING[2],
-  },
-  codeLabelText: {
-    fontFamily: FONTS.body,
-    fontSize: FONT_SIZES.md,
-    color: '#4CAF50',
-  },
-  codeValue: {
-    fontFamily: FONTS.title,
-    fontSize: FONT_SIZES.lg,
-    color: '#4CAF50',
-    letterSpacing: 2,
-  },
-  confirmationActions: {
-    flexDirection: 'row',
-    gap: SPACING[3],
-    width: '100%',
-  },
-  confirmationButton: {
-    flex: 1,
-  },
-  actionButtonBorder: {
-    width: '100%',
-    overflow: 'hidden',
-  },
-  actionButtonInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING[2],
-    paddingVertical: 12,
-  },
-  actionButtonText: {
-    fontFamily: FONTS.body,
-    fontSize: FONT_SIZES.sm,
     color: '#FFFFFF',
   },
   label: {

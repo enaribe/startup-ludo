@@ -214,6 +214,9 @@ export default function PlayScreen() {
     removeTokens,
   ]);
 
+  // Ref for handleEventResolve — allows handleTriggeredEvent to call it without circular dependency
+  const handleEventResolveRef = useRef<() => void>(() => {});
+
   // ===== EVENT HANDLER (called by turn machine when phase enters 'event') =====
 
   const handleTriggeredEvent = useCallback(
@@ -224,6 +227,61 @@ export default function PlayScreen() {
         return;
       }
 
+      // ===== AI AUTO-RESOLUTION =====
+      // When an AI player triggers an event, auto-resolve it instead of showing popups to the human.
+      if (currentPlayer?.isAI) {
+        triggerEvent(event);
+
+        switch (event.type) {
+          case 'quiz': {
+            // AI "answers" the quiz: 60% chance of getting it right
+            const aiCorrect = Math.random() < 0.6;
+            const quizEv = event.data as QuizEvent;
+            const reward = quizEv.reward;
+            console.log('[PlayScreen] IA auto-résout quiz:', { aiCorrect, reward });
+            actions.resolveEvent({ ok: aiCorrect, reward });
+            handleEventResolveRef.current();
+            break;
+          }
+          case 'duel': {
+            // AI triggered a duel: auto-assign random score (1-6 points)
+            const aiDuelScore = Math.floor(Math.random() * 4) + 1;
+            console.log('[PlayScreen] IA auto-résout duel:', { aiDuelScore });
+            actions.resolveEvent({ ok: true, reward: aiDuelScore });
+            handleEventResolveRef.current();
+            break;
+          }
+          case 'funding': {
+            // AI gets the funding automatically
+            const fundingEv = event.data as FundingEvent;
+            console.log('[PlayScreen] IA auto-résout financement:', { amount: fundingEv.amount });
+            actions.resolveEvent({ ok: true, reward: fundingEv.amount });
+            handleEventResolveRef.current();
+            break;
+          }
+          case 'opportunity': {
+            const oppEv = event.data as OpportunityEvent;
+            console.log('[PlayScreen] IA auto-résout opportunité:', { value: oppEv.value });
+            actions.resolveEvent({ ok: oppEv.effect === 'tokens', reward: oppEv.value });
+            handleEventResolveRef.current();
+            break;
+          }
+          case 'challenge': {
+            const chalEv = event.data as ChallengeEvent;
+            console.log('[PlayScreen] IA auto-résout challenge:', { value: chalEv.value, effect: chalEv.effect });
+            actions.resolveEvent({ ok: false, reward: chalEv.value });
+            handleEventResolveRef.current();
+            break;
+          }
+          default: {
+            actions.resolveEvent({ ok: false, reward: 0 });
+            handleEventResolveRef.current();
+          }
+        }
+        return;
+      }
+
+      // ===== HUMAN PLAYER: show popups as usual =====
       triggerEvent(event);
       setIsEventSpectator(false);
 
@@ -263,7 +321,7 @@ export default function PlayScreen() {
         }
       }
     },
-    [game, currentPlayer, triggerEvent, isOnline, onlineGame, duel]
+    [game, currentPlayer, triggerEvent, isOnline, onlineGame, duel, actions]
   );
 
   // ===== WIN HANDLER =====
@@ -294,6 +352,9 @@ export default function PlayScreen() {
     setAnimating,
     clearSelection,
   });
+
+  // Keep ref in sync so handleTriggeredEvent (AI path) can call it without circular dependency
+  handleEventResolveRef.current = handleEventResolve;
 
   // ===== ONLINE: React to remote dice rolls =====
 

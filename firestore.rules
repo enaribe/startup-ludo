@@ -87,9 +87,12 @@ service cloud.firestore {
     
     // Challenge enrollments (doc id = userId_challengeId)
     match /challengeEnrollments/{enrollmentId} {
+      // Lecture: l'utilisateur ne voit que ses propres inscriptions
       allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+
+      // Écriture: l'utilisateur ne peut écrire que ses propres inscriptions
+      // Couvre create (setChallengeEnrollment) et update/set-merge (updateChallengeEnrollment)
+      allow write: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
     }
   }
 }

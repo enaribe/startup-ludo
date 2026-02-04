@@ -1,17 +1,19 @@
 import { useState, useEffect } from 'react';
-import { View, Text, Pressable, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, ScrollView, ActivityIndicator, Dimensions, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
-import { Card } from '@/components/ui/Card';
-import { useAuthStore } from '@/stores';
+import { RadialBackground, DynamicGradientBorder } from '@/components/ui';
+import { useAuthStore, useUserStore } from '@/stores';
 import { getGameHistory, type GameSession } from '@/services/firebase/firestore';
+
+const { width: screenWidth } = Dimensions.get('window');
+const contentWidth = screenWidth - SPACING[4] * 2;
 
 // Type pour une partie enregistrée
 interface GameHistory {
@@ -89,210 +91,11 @@ function getModeIcon(mode: GameHistory['mode']): keyof typeof Ionicons.glyphMap 
   }
 }
 
-interface GameHistoryCardProps {
-  game: GameHistory;
-  index: number;
-}
-
-function GameHistoryCard({ game, index }: GameHistoryCardProps) {
-  const isWin = game.result === 'win';
-
-  return (
-    <Animated.View entering={FadeInDown.delay(200 + index * 100).duration(400)}>
-      <Card
-        style={{
-          marginBottom: SPACING[3],
-          borderLeftWidth: 4,
-          borderLeftColor: isWin ? COLORS.success : COLORS.error,
-        }}
-      >
-        {/* Header */}
-        <View
-          style={{
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: SPACING[3],
-          }}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACING[2] }}>
-            <View
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: 18,
-                backgroundColor: isWin ? `${COLORS.success}20` : `${COLORS.error}20`,
-                justifyContent: 'center',
-                alignItems: 'center',
-              }}
-            >
-              <Ionicons
-                name={isWin ? 'trophy' : 'close-circle'}
-                size={18}
-                color={isWin ? COLORS.success : COLORS.error}
-              />
-            </View>
-            <View>
-              <Text
-                style={{
-                  fontFamily: FONTS.bodySemiBold,
-                  fontSize: FONT_SIZES.base,
-                  color: isWin ? COLORS.success : COLORS.error,
-                }}
-              >
-                {isWin ? 'Victoire' : 'Défaite'}
-              </Text>
-              <Text
-                style={{
-                  fontFamily: FONTS.body,
-                  fontSize: FONT_SIZES.xs,
-                  color: COLORS.textSecondary,
-                }}
-              >
-                {formatDate(game.date)}
-              </Text>
-            </View>
-          </View>
-
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: SPACING[1],
-              backgroundColor: COLORS.background,
-              paddingHorizontal: SPACING[2],
-              paddingVertical: SPACING[1],
-              borderRadius: 8,
-            }}
-          >
-            <Ionicons name={getModeIcon(game.mode)} size={14} color={COLORS.textSecondary} />
-            <Text
-              style={{
-                fontFamily: FONTS.body,
-                fontSize: FONT_SIZES.xs,
-                color: COLORS.textSecondary,
-              }}
-            >
-              {getModeLabel(game.mode)}
-            </Text>
-          </View>
-        </View>
-
-        {/* Stats */}
-        <View
-          style={{
-            flexDirection: 'row',
-            justifyContent: 'space-around',
-            paddingTop: SPACING[3],
-            borderTopWidth: 1,
-            borderTopColor: COLORS.border,
-          }}
-        >
-          <View style={{ alignItems: 'center' }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACING[1] }}>
-              <Ionicons name="cash" size={16} color={COLORS.primary} />
-              <Text
-                style={{
-                  fontFamily: FONTS.title,
-                  fontSize: FONT_SIZES.lg,
-                  color: COLORS.primary,
-                }}
-              >
-                +{game.tokensEarned}
-              </Text>
-            </View>
-            <Text
-              style={{
-                fontFamily: FONTS.body,
-                fontSize: FONT_SIZES.xs,
-                color: COLORS.textSecondary,
-              }}
-            >
-              Jetons
-            </Text>
-          </View>
-
-          <View style={{ alignItems: 'center' }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACING[1] }}>
-              <Ionicons name="star" size={16} color={COLORS.warning} />
-              <Text
-                style={{
-                  fontFamily: FONTS.title,
-                  fontSize: FONT_SIZES.lg,
-                  color: COLORS.warning,
-                }}
-              >
-                +{game.xpEarned}
-              </Text>
-            </View>
-            <Text
-              style={{
-                fontFamily: FONTS.body,
-                fontSize: FONT_SIZES.xs,
-                color: COLORS.textSecondary,
-              }}
-            >
-              XP
-            </Text>
-          </View>
-
-          <View style={{ alignItems: 'center' }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACING[1] }}>
-              <Ionicons name="people" size={16} color={COLORS.info} />
-              <Text
-                style={{
-                  fontFamily: FONTS.title,
-                  fontSize: FONT_SIZES.lg,
-                  color: COLORS.info,
-                }}
-              >
-                {game.players}
-              </Text>
-            </View>
-            <Text
-              style={{
-                fontFamily: FONTS.body,
-                fontSize: FONT_SIZES.xs,
-                color: COLORS.textSecondary,
-              }}
-            >
-              Joueurs
-            </Text>
-          </View>
-
-          <View style={{ alignItems: 'center' }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACING[1] }}>
-              <Ionicons name="time" size={16} color={COLORS.textSecondary} />
-              <Text
-                style={{
-                  fontFamily: FONTS.title,
-                  fontSize: FONT_SIZES.lg,
-                  color: COLORS.text,
-                }}
-              >
-                {game.duration}
-              </Text>
-            </View>
-            <Text
-              style={{
-                fontFamily: FONTS.body,
-                fontSize: FONT_SIZES.xs,
-                color: COLORS.textSecondary,
-              }}
-            >
-              min
-            </Text>
-          </View>
-        </View>
-      </Card>
-    </Animated.View>
-  );
-}
-
 export default function HistoryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const userId = useAuthStore((state) => state.user?.id);
+  const profile = useUserStore((state) => state.profile);
   const [history, setHistory] = useState<GameHistory[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -313,182 +116,340 @@ export default function HistoryScreen() {
       .finally(() => setLoading(false));
   }, [userId]);
 
-  const handleBack = () => {
-    router.back();
-  };
-
-  // Calculate stats
-  const totalGames = history.length;
-  const wins = history.filter((g) => g.result === 'win').length;
-  const winRate = totalGames > 0 ? Math.round((wins / totalGames) * 100) : 0;
-  const totalTokens = history.reduce((sum, g) => sum + g.tokensEarned, 0);
+  // Stats from profile (lifetime) + history
+  const totalGames = profile?.gamesPlayed ?? history.length;
+  const totalWins = profile?.gamesWon ?? history.filter((g) => g.result === 'win').length;
+  const winRate = totalGames > 0 ? Math.round((totalWins / totalGames) * 100) : 0;
+  const totalTokens = profile?.totalTokensEarned ?? history.reduce((sum, g) => sum + g.tokensEarned, 0);
+  const totalXP = profile?.xp ?? 0;
 
   return (
-    <LinearGradient
-      colors={COLORS.backgroundGradient}
-      style={{ flex: 1 }}
-      start={{ x: 0.5, y: 0 }}
-      end={{ x: 0.5, y: 1 }}
-    >
+    <View style={styles.container}>
+      <RadialBackground />
+
+      {/* Fixed Header */}
+      <View style={[styles.header, { paddingTop: insets.top + SPACING[2] }]}>
+        <Pressable onPress={() => router.back()} hitSlop={8}>
+          <Ionicons name="arrow-back" size={24} color="white" />
+        </Pressable>
+        <Text style={styles.headerTitle}>STATISTIQUES</Text>
+        <View style={{ width: 24 }} />
+      </View>
+
       <ScrollView
         contentContainerStyle={{
-          flexGrow: 1,
-          paddingTop: insets.top + SPACING[4],
-          paddingBottom: insets.bottom + SPACING[4],
+          paddingTop: insets.top + 80,
+          paddingBottom: insets.bottom + SPACING[8],
           paddingHorizontal: SPACING[4],
         }}
+        showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <Animated.View
-          entering={FadeInDown.delay(100).duration(500)}
-          style={{ marginBottom: SPACING[6] }}
-        >
-          <Pressable
-            onPress={handleBack}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              marginBottom: SPACING[4],
-            }}
-          >
-            <Ionicons name="arrow-back" size={24} color={COLORS.text} />
-            <Text
-              style={{
-                fontFamily: FONTS.body,
-                fontSize: FONT_SIZES.md,
-                color: COLORS.text,
-                marginLeft: SPACING[2],
-              }}
-            >
-              Retour
-            </Text>
-          </Pressable>
-
-          <Text
-            style={{
-              fontFamily: FONTS.title,
-              fontSize: FONT_SIZES['2xl'],
-              color: COLORS.text,
-            }}
-          >
-            Historique des parties
-          </Text>
-        </Animated.View>
-
         {/* Summary Stats */}
-        <Animated.View entering={FadeInDown.delay(150).duration(500)}>
-          <Card style={{ marginBottom: SPACING[4] }}>
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-around',
-              }}
-            >
-              <View style={{ alignItems: 'center' }}>
-                <Text
-                  style={{
-                    fontFamily: FONTS.title,
-                    fontSize: FONT_SIZES['2xl'],
-                    color: COLORS.primary,
-                  }}
-                >
-                  {totalGames}
-                </Text>
-                <Text
-                  style={{
-                    fontFamily: FONTS.body,
-                    fontSize: FONT_SIZES.sm,
-                    color: COLORS.textSecondary,
-                  }}
-                >
-                  Parties
-                </Text>
+        <Animated.View entering={FadeInDown.delay(100).duration(500)}>
+          <DynamicGradientBorder
+            borderRadius={20}
+            fill="rgba(10, 25, 41, 0.6)"
+            boxWidth={contentWidth}
+          >
+            <View style={styles.statsGrid}>
+              <View style={styles.statItem}>
+                <View style={[styles.statIconCircle, { backgroundColor: 'rgba(255, 188, 64, 0.15)' }]}>
+                  <Ionicons name="game-controller" size={20} color={COLORS.primary} />
+                </View>
+                <Text style={[styles.statValue, { color: COLORS.primary }]}>{totalGames}</Text>
+                <Text style={styles.statLabel}>Parties</Text>
               </View>
 
-              <View style={{ alignItems: 'center' }}>
-                <Text
-                  style={{
-                    fontFamily: FONTS.title,
-                    fontSize: FONT_SIZES['2xl'],
-                    color: COLORS.success,
-                  }}
-                >
-                  {winRate}%
-                </Text>
-                <Text
-                  style={{
-                    fontFamily: FONTS.body,
-                    fontSize: FONT_SIZES.sm,
-                    color: COLORS.textSecondary,
-                  }}
-                >
-                  Victoires
-                </Text>
+              <View style={styles.statItem}>
+                <View style={[styles.statIconCircle, { backgroundColor: 'rgba(76, 175, 80, 0.15)' }]}>
+                  <Ionicons name="trophy" size={20} color={COLORS.success} />
+                </View>
+                <Text style={[styles.statValue, { color: COLORS.success }]}>{winRate}%</Text>
+                <Text style={styles.statLabel}>Victoires</Text>
               </View>
 
-              <View style={{ alignItems: 'center' }}>
-                <Text
-                  style={{
-                    fontFamily: FONTS.title,
-                    fontSize: FONT_SIZES['2xl'],
-                    color: COLORS.warning,
-                  }}
-                >
-                  {totalTokens}
-                </Text>
-                <Text
-                  style={{
-                    fontFamily: FONTS.body,
-                    fontSize: FONT_SIZES.sm,
-                    color: COLORS.textSecondary,
-                  }}
-                >
-                  Jetons gagnés
-                </Text>
+              <View style={styles.statItem}>
+                <View style={[styles.statIconCircle, { backgroundColor: 'rgba(255, 152, 0, 0.15)' }]}>
+                  <Ionicons name="cash" size={20} color={COLORS.warning} />
+                </View>
+                <Text style={[styles.statValue, { color: COLORS.warning }]}>{totalTokens}</Text>
+                <Text style={styles.statLabel}>Jetons</Text>
+              </View>
+
+              <View style={styles.statItem}>
+                <View style={[styles.statIconCircle, { backgroundColor: 'rgba(33, 150, 243, 0.15)' }]}>
+                  <Ionicons name="star" size={20} color={COLORS.info} />
+                </View>
+                <Text style={[styles.statValue, { color: COLORS.info }]}>{totalXP}</Text>
+                <Text style={styles.statLabel}>XP Total</Text>
               </View>
             </View>
-          </Card>
+          </DynamicGradientBorder>
+        </Animated.View>
+
+        {/* Section Title */}
+        <Animated.View entering={FadeInDown.delay(200).duration(500)}>
+          <Text style={styles.sectionTitle}>HISTORIQUE DES PARTIES</Text>
         </Animated.View>
 
         {/* History List */}
         {loading ? (
-          <View style={{ alignItems: 'center', paddingVertical: SPACING[8] }}>
+          <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={COLORS.primary} />
           </View>
         ) : history.length > 0 ? (
           history.map((game, index) => (
-            <GameHistoryCard key={game.id} game={game} index={index} />
+            <Animated.View
+              key={game.id}
+              entering={FadeInDown.delay(250 + index * 80).duration(400)}
+            >
+              <DynamicGradientBorder
+                borderRadius={16}
+                fill="rgba(10, 25, 41, 0.6)"
+                boxWidth={contentWidth}
+                style={{ marginBottom: 10 }}
+              >
+                <View style={styles.gameCard}>
+                  {/* Left indicator */}
+                  <View style={[
+                    styles.gameIndicator,
+                    { backgroundColor: game.result === 'win' ? COLORS.success : COLORS.error },
+                  ]} />
+
+                  <View style={styles.gameCardContent}>
+                    {/* Top row: result + date + mode */}
+                    <View style={styles.gameCardHeader}>
+                      <View style={styles.gameResultRow}>
+                        <View style={[
+                          styles.resultBadge,
+                          { backgroundColor: game.result === 'win' ? 'rgba(76,175,80,0.15)' : 'rgba(244,67,54,0.15)' },
+                        ]}>
+                          <Ionicons
+                            name={game.result === 'win' ? 'trophy' : 'close-circle'}
+                            size={14}
+                            color={game.result === 'win' ? COLORS.success : COLORS.error}
+                          />
+                          <Text style={[
+                            styles.resultText,
+                            { color: game.result === 'win' ? COLORS.success : COLORS.error },
+                          ]}>
+                            {game.result === 'win' ? 'Victoire' : 'Defaite'}
+                          </Text>
+                        </View>
+                        <Text style={styles.gameDate}>{formatDate(game.date)}</Text>
+                      </View>
+
+                      <View style={styles.modeBadge}>
+                        <Ionicons name={getModeIcon(game.mode)} size={12} color="rgba(255,255,255,0.5)" />
+                        <Text style={styles.modeText}>{getModeLabel(game.mode)}</Text>
+                      </View>
+                    </View>
+
+                    {/* Bottom row: stats */}
+                    <View style={styles.gameStatsRow}>
+                      <View style={styles.gameStat}>
+                        <Ionicons name="cash" size={14} color={COLORS.primary} />
+                        <Text style={[styles.gameStatValue, { color: COLORS.primary }]}>+{game.tokensEarned}</Text>
+                      </View>
+                      <View style={styles.gameStat}>
+                        <Ionicons name="star" size={14} color={COLORS.warning} />
+                        <Text style={[styles.gameStatValue, { color: COLORS.warning }]}>+{game.xpEarned}</Text>
+                      </View>
+                      <View style={styles.gameStat}>
+                        <Ionicons name="people" size={14} color={COLORS.info} />
+                        <Text style={[styles.gameStatValue, { color: COLORS.info }]}>{game.players}</Text>
+                      </View>
+                      <View style={styles.gameStat}>
+                        <Ionicons name="time" size={14} color="rgba(255,255,255,0.5)" />
+                        <Text style={styles.gameDuration}>{game.duration} min</Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              </DynamicGradientBorder>
+            </Animated.View>
           ))
         ) : (
-          <Animated.View
-            entering={FadeInDown.delay(200).duration(500)}
-            style={{ alignItems: 'center', paddingVertical: SPACING[8] }}
-          >
-            <Ionicons name="game-controller-outline" size={64} color={COLORS.textSecondary} />
-            <Text
-              style={{
-                fontFamily: FONTS.bodySemiBold,
-                fontSize: FONT_SIZES.lg,
-                color: COLORS.text,
-                marginTop: SPACING[4],
-              }}
-            >
-              Aucune partie jouée
-            </Text>
-            <Text
-              style={{
-                fontFamily: FONTS.body,
-                fontSize: FONT_SIZES.base,
-                color: COLORS.textSecondary,
-                textAlign: 'center',
-                marginTop: SPACING[2],
-              }}
-            >
-              Lance ta première partie pour voir ton historique ici !
+          <Animated.View entering={FadeInDown.delay(250).duration(500)} style={styles.emptyContainer}>
+            <View style={styles.emptyIconCircle}>
+              <Ionicons name="game-controller-outline" size={48} color="rgba(255,255,255,0.3)" />
+            </View>
+            <Text style={styles.emptyTitle}>Aucune partie jouee</Text>
+            <Text style={styles.emptySubtitle}>
+              Lance ta premiere partie pour voir ton historique ici !
             </Text>
           </Animated.View>
         )}
       </ScrollView>
-    </LinearGradient>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#0C243E',
+  },
+  header: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    paddingBottom: SPACING[3],
+    paddingHorizontal: SPACING[4],
+    backgroundColor: '#0A1929',
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerTitle: {
+    fontFamily: FONTS.title,
+    fontSize: 20,
+    color: 'white',
+    letterSpacing: 0.5,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    padding: SPACING[4],
+    gap: SPACING[3],
+  },
+  statItem: {
+    width: '46%',
+    alignItems: 'center',
+    paddingVertical: SPACING[3],
+  },
+  statIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: SPACING[2],
+  },
+  statValue: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES['2xl'],
+  },
+  statLabel: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.xs,
+    color: 'rgba(255,255,255,0.5)',
+    marginTop: 2,
+  },
+  sectionTitle: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES.md,
+    color: 'white',
+    marginTop: SPACING[6],
+    marginBottom: SPACING[3],
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: SPACING[8],
+  },
+  gameCard: {
+    flexDirection: 'row',
+    overflow: 'hidden',
+  },
+  gameIndicator: {
+    width: 4,
+    borderTopLeftRadius: 16,
+    borderBottomLeftRadius: 16,
+  },
+  gameCardContent: {
+    flex: 1,
+    padding: SPACING[3],
+    gap: SPACING[2],
+  },
+  gameCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  gameResultRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[2],
+  },
+  resultBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: SPACING[2],
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  resultText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.xs,
+  },
+  gameDate: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.xs,
+    color: 'rgba(255,255,255,0.4)',
+  },
+  modeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    paddingHorizontal: SPACING[2],
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  modeText: {
+    fontFamily: FONTS.body,
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.5)',
+  },
+  gameStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingTop: SPACING[2],
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.06)',
+  },
+  gameStat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  gameStatValue: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES.sm,
+  },
+  gameDuration: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.xs,
+    color: 'rgba(255,255,255,0.5)',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: SPACING[10],
+    gap: SPACING[3],
+  },
+  emptyIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyTitle: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES.lg,
+    color: 'white',
+  },
+  emptySubtitle: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.base,
+    color: 'rgba(255,255,255,0.5)',
+    textAlign: 'center',
+    maxWidth: 260,
+  },
+});

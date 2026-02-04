@@ -90,9 +90,11 @@ export default function ChallengeGameScreen() {
     }
 
     // Configuration automatique: joueur vs IA
+    // Utiliser l'UID Firebase pour que l'écran de résultats identifie le gagnant
+    const playerId = user?.id || 'player_0';
     const gamePlayers = [
       {
-        id: 'player_0',
+        id: playerId,
         name: user?.displayName || 'Vous',
         color: 'green' as const,
         isAI: false,
@@ -100,7 +102,7 @@ export default function ChallengeGameScreen() {
         isConnected: true,
       },
       {
-        id: 'player_1',
+        id: 'ai_challenge',
         name: 'IA Challenge',
         color: 'blue' as const,
         isAI: true,
@@ -121,7 +123,7 @@ export default function ChallengeGameScreen() {
     // Naviguer vers le plateau (utiliser un ID de partie unique)
     const gameId = `challenge_${Date.now()}`;
     router.push(`/(game)/play/${gameId}`);
-  }, [challenge, enrollment, selectedSector, user?.displayName, initGame, router]);
+  }, [challenge, enrollment, selectedSector, user?.id, user?.displayName, initGame, router]);
 
   // Si pas de Challenge ou d'inscription, retour
   if (!challenge || !enrollment) {

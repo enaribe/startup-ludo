@@ -29,7 +29,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { RadialBackground, DynamicGradientBorder, GameButton } from '@/components/ui';
 import { useGameStore, useAuthStore, useUserStore, useChallengeStore } from '@/stores';
 import { XP_REWARDS, getChallengeXPReward } from '@/config/progression';
-import { updateUserStats, updateChallengeEnrollment } from '@/services/firebase/firestore';
+import { updateUserStats, updateChallengeEnrollment, saveGameSession } from '@/services/firebase/firestore';
 
 const { width: screenWidth } = Dimensions.get('window');
 const contentWidth = screenWidth - SPACING[4] * 2;
@@ -154,6 +154,13 @@ export default function ResultsScreen() {
     sortedPlayers.length,
   );
 
+  // Challenge XP (calculé pour affichage + reward)
+  const isChallengeGame = !!game?.challengeContext;
+  const challengeXpGained = isChallengeGame
+    ? getChallengeXPReward(game!.challengeContext!.levelNumber, isWinner)
+    : 0;
+  const challengeLevelNumber = game?.challengeContext?.levelNumber ?? 1;
+
   // Valorisation
   const valorisationBefore = profile?.startups?.[0]?.tokensInvested ?? 50000;
   const valorisationGain = isOnline ? xpGained * 100 : xpGained * 50;
@@ -176,10 +183,9 @@ export default function ResultsScreen() {
 
     // 2. Challenge XP (si c'est une partie challenge)
     const ctx = game.challengeContext;
-    if (ctx?.enrollmentId) {
-      const challengeXp = getChallengeXPReward(ctx.levelNumber, isWinner);
-      console.log('[Results] Challenge XP:', { levelNumber: ctx.levelNumber, isWinner, challengeXp, enrollmentId: ctx.enrollmentId });
-      challengeAddXp(ctx.enrollmentId, challengeXp);
+    if (ctx?.enrollmentId && challengeXpGained > 0) {
+      console.log('[Results] Challenge XP:', { levelNumber: ctx.levelNumber, isWinner, challengeXp: challengeXpGained, enrollmentId: ctx.enrollmentId });
+      challengeAddXp(ctx.enrollmentId, challengeXpGained);
       checkAndUnlockNextSubLevel(ctx.enrollmentId);
       checkAndUnlockNextLevel(ctx.enrollmentId);
 
@@ -209,6 +215,30 @@ export default function ResultsScreen() {
         won: isWinner,
       }).catch((err) => {
         console.warn('[Results] Failed to update Firestore stats:', err);
+      });
+    }
+
+    // 4. Save game session to Firestore (for history)
+    if (game && userId && !isGuest) {
+      const gameMode = game.challengeContext ? 'solo' : (game.mode ?? 'solo');
+      const finalScores: Record<string, number> = {};
+      for (const p of game.players) {
+        finalScores[p.id] = p.tokens;
+      }
+
+      const startTime = game.createdAt ?? Date.now();
+      const durationMinutes = Math.max(1, Math.round((Date.now() - startTime) / 60000));
+
+      saveGameSession({
+        id: game.id,
+        mode: gameMode as 'solo' | 'local' | 'online',
+        playerIds: game.players.map((p) => p.id),
+        winnerId: game.winner ?? null,
+        duration: durationMinutes,
+        finalScores,
+        createdAt: Date.now(),
+      }).catch((err) => {
+        console.warn('[Results] Failed to save game session:', err);
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -366,6 +396,45 @@ export default function ResultsScreen() {
             </View>
           </DynamicGradientBorder>
         </Animated.View>
+
+        {/* Challenge XP (uniquement pour les parties challenge) */}
+        {isChallengeGame && (
+          <Animated.View entering={FadeInDown.delay(600).duration(500)} style={styles.section}>
+            <DynamicGradientBorder
+              borderRadius={20}
+              fill="rgba(0, 0, 0, 0.35)"
+              boxWidth={contentWidth}
+            >
+              <View style={styles.xpBlock}>
+                <View style={styles.xpHeader}>
+                  <View style={styles.xpTitleRow}>
+                    <Ionicons name="ribbon" size={18} color={COLORS.primary} />
+                    <Text style={styles.xpTitle}>XP Challenge (Niveau {challengeLevelNumber})</Text>
+                  </View>
+                  <View style={[styles.xpTotalBadge, { backgroundColor: 'rgba(255, 188, 64, 0.15)' }]}>
+                    <Text style={[styles.xpTotalText, { color: COLORS.primary }]}>+{challengeXpGained}</Text>
+                  </View>
+                </View>
+                <View style={styles.xpDivider} />
+                <View style={styles.xpRows}>
+                  <View style={styles.xpRow}>
+                    <View style={styles.xpRowLeft}>
+                      <Ionicons
+                        name={isWinner ? 'trophy' : 'game-controller'}
+                        size={14}
+                        color={COLORS.textSecondary}
+                      />
+                      <Text style={styles.xpRowLabel}>
+                        {isWinner ? 'Victoire challenge' : 'Participation challenge'}
+                      </Text>
+                    </View>
+                    <Text style={[styles.xpRowValue, { color: COLORS.primary }]}>+{challengeXpGained}</Text>
+                  </View>
+                </View>
+              </View>
+            </DynamicGradientBorder>
+          </Animated.View>
+        )}
 
         {/* Valorisation */}
         <Animated.View style={[styles.section, valorisationStyle]}>

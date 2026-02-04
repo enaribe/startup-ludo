@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { View, Text, ScrollView, Pressable, Dimensions, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,7 +8,6 @@ import { SPACING } from '@/styles/spacing';
 import { FONTS } from '@/styles/typography';
 import { useAuthStore, useUserStore } from '@/stores';
 import { RadialBackground, DynamicGradientBorder } from '@/components/ui';
-import { ACHIEVEMENTS as ALL_ACHIEVEMENTS } from '@/config/achievements';
 import { getRankFromXP, getXPForNextRank } from '@/config/progression';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -17,6 +15,7 @@ const { width: screenWidth } = Dimensions.get('window');
 // Menu items based on image
 const MENU_ITEMS = [
   { id: 'stats', icon: 'stats-chart' as const, title: 'STATISTIQUES DÉTAILLÉES' },
+  { id: 'achievements', icon: 'ribbon' as const, title: 'ACHIEVEMENTS' },
   { id: 'community', icon: 'chatbubbles-outline' as const, title: 'REJOINDRE LA COMMUNAUTÉ' },
   { id: 'network', icon: 'people' as const, title: 'RÉSEAU & AMIS' },
   { id: 'settings', icon: 'settings' as const, title: 'PARAMÈTRE' },
@@ -29,10 +28,6 @@ export default function ProfilScreen() {
   const { user } = useAuthStore();
   const profile = useUserStore((state) => state.profile);
   const levelProgress = useUserStore((state) => state.levelProgress);
-  const unlockedAchievementIds = useMemo(
-    () => profile?.achievements ?? [],
-    [profile?.achievements]
-  );
 
   // Progression XP
   const totalXP = profile?.xp ?? 0;
@@ -48,14 +43,6 @@ export default function ProfilScreen() {
   const displayName = user?.displayName || profile?.displayName || 'Joueur';
   const displayRank = rankInfo.title;
 
-  // Achievements dynamiques : 6 premiers (unlocked first, then locked)
-  const achievementsDisplay = ALL_ACHIEVEMENTS.slice(0, 6).map((a) => ({
-    id: a.id,
-    icon: a.icon as keyof typeof Ionicons.glyphMap,
-    title: a.title.toUpperCase(),
-    unlocked: unlockedAchievementIds.includes(a.id),
-  }));
-
   const handleMenuPress = (itemId: string) => {
     switch (itemId) {
       case 'settings':
@@ -63,6 +50,9 @@ export default function ProfilScreen() {
         break;
       case 'stats':
         router.push('/history' as never);
+        break;
+      case 'achievements':
+        router.push('/achievements' as never);
         break;
       case 'help':
         router.push('/help' as never);
@@ -132,40 +122,6 @@ export default function ProfilScreen() {
                 <Text style={styles.xpText}>{currentXP.toLocaleString()} XP</Text>
                 <Text style={styles.xpText}>{(xpForNextLevel - currentXP).toLocaleString()} XP restants</Text>
               </View>
-            </View>
-          </DynamicGradientBorder>
-        </Animated.View>
-
-        {/* ACHIEVEMENTS SECTION */}
-        <Animated.View entering={FadeInDown.delay(200).duration(500)} style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>ACHIEVEMENTS DÉBLOQUÉS</Text>
-          
-          <DynamicGradientBorder
-            borderRadius={20}
-            fill="rgba(10, 25, 41, 0.6)"
-            boxWidth={contentWidth}
-          >
-            <View style={[styles.cardContent, styles.achievementsGrid]}>
-              {achievementsDisplay.map((item) => (
-                <View key={item.id} style={styles.achievementItem}>
-                  <View style={[
-                    styles.achievementIconBox, 
-                    item.unlocked ? styles.achievementUnlocked : styles.achievementLocked
-                  ]}>
-                    <Ionicons 
-                      name={item.icon}
-                      size={24} 
-                      color={item.unlocked ? '#FFBC40' : '#64748B'} 
-                    />
-                    <Text style={[
-                      styles.achievementText,
-                      item.unlocked ? { color: '#FFBC40' } : { color: '#64748B' }
-                    ]}>
-                      {item.title}
-                    </Text>
-                  </View>
-                </View>
-              ))}
             </View>
           </DynamicGradientBorder>
         </Animated.View>
@@ -313,39 +269,6 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.body,
     fontSize: 12,
     color: '#94A3B8',
-  },
-  achievementsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    justifyContent: 'space-between',
-  },
-  achievementItem: {
-    width: '30%', // Approx 3 columns
-    aspectRatio: 1,
-  },
-  achievementIconBox: {
-    flex: 1,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    padding: 4,
-  },
-  achievementUnlocked: {
-    borderColor: '#FFBC40',
-    backgroundColor: 'rgba(255, 188, 64, 0.1)',
-  },
-  achievementLocked: {
-    borderColor: 'rgba(255,255,255,0.1)',
-    backgroundColor: 'rgba(15, 23, 42, 0.5)',
-  },
-  achievementText: {
-    fontFamily: FONTS.title,
-    fontSize: 9,
-    marginTop: 6,
-    textAlign: 'center',
-    textTransform: 'uppercase',
   },
   menuContainer: {
     gap: 0,

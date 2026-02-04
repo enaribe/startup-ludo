@@ -121,47 +121,60 @@ export const Dice = memo(function Dice({
       }
     }, 100);
 
-    // Rolling animation
+    // Shaking rotation (small angles, like a real dice bouncing)
     rotateX.value = withSequence(
+      withTiming(8, { duration: 60, easing: Easing.inOut(Easing.quad) }),
       withRepeat(
-        withTiming(360, { duration: 200, easing: Easing.linear }),
+        withSequence(
+          withTiming(-12, { duration: 70, easing: Easing.inOut(Easing.quad) }),
+          withTiming(10, { duration: 70, easing: Easing.inOut(Easing.quad) }),
+        ),
         5,
-        false
+        true
       ),
-      withSpring(0, { damping: 10 })
+      withSpring(0, { damping: 12, stiffness: 200 })
     );
 
     rotateY.value = withSequence(
+      withTiming(-10, { duration: 50, easing: Easing.inOut(Easing.quad) }),
       withRepeat(
-        withTiming(360, { duration: 300, easing: Easing.linear }),
-        3,
-        false
+        withSequence(
+          withTiming(15, { duration: 80, easing: Easing.inOut(Easing.quad) }),
+          withTiming(-10, { duration: 80, easing: Easing.inOut(Easing.quad) }),
+        ),
+        4,
+        true
       ),
-      withSpring(0, { damping: 10 })
+      withSpring(0, { damping: 12, stiffness: 200 })
     );
 
     rotateZ.value = withSequence(
       withRepeat(
-        withTiming(360, { duration: 250, easing: Easing.linear }),
-        4,
-        false
+        withSequence(
+          withTiming(-8, { duration: 60, easing: Easing.inOut(Easing.quad) }),
+          withTiming(8, { duration: 60, easing: Easing.inOut(Easing.quad) }),
+        ),
+        6,
+        true
       ),
-      withSpring(0, { damping: 10 })
+      withSpring(0, { damping: 15, stiffness: 200 })
     );
 
-    // Bounce animation
+    // Bounce animation — dice jumping up and landing
     translateY.value = withSequence(
-      withTiming(-30, { duration: 150, easing: Easing.out(Easing.quad) }),
-      withTiming(10, { duration: 100, easing: Easing.in(Easing.quad) }),
-      withTiming(-15, { duration: 100, easing: Easing.out(Easing.quad) }),
-      withTiming(5, { duration: 80, easing: Easing.in(Easing.quad) }),
-      withSpring(0, { damping: 8 })
+      withTiming(-25, { duration: 120, easing: Easing.out(Easing.quad) }),
+      withTiming(4, { duration: 80, easing: Easing.in(Easing.quad) }),
+      withTiming(-18, { duration: 100, easing: Easing.out(Easing.quad) }),
+      withTiming(3, { duration: 70, easing: Easing.in(Easing.quad) }),
+      withTiming(-8, { duration: 80, easing: Easing.out(Easing.quad) }),
+      withSpring(0, { damping: 12, stiffness: 180 })
     );
 
     scale.value = withSequence(
-      withTiming(1.2, { duration: 100 }),
-      withTiming(0.9, { duration: 100 }),
-      withSpring(1, { damping: 10 })
+      withTiming(1.15, { duration: 80 }),
+      withTiming(0.92, { duration: 80 }),
+      withTiming(1.08, { duration: 70 }),
+      withSpring(1, { damping: 12, stiffness: 180 })
     );
   }, [
     disabled,
@@ -203,35 +216,42 @@ export const Dice = memo(function Dice({
       }
     }, 100);
 
-    // Rolling animation
+    // Shaking rotation (small angles, dice-like)
     rotateX.value = withSequence(
       withRepeat(
-        withTiming(360, { duration: 200, easing: Easing.linear }),
+        withSequence(
+          withTiming(-10, { duration: 70, easing: Easing.inOut(Easing.quad) }),
+          withTiming(10, { duration: 70, easing: Easing.inOut(Easing.quad) }),
+        ),
         4,
-        false
+        true
       ),
-      withSpring(0, { damping: 10 })
+      withSpring(0, { damping: 12, stiffness: 200 })
     );
 
     rotateY.value = withSequence(
       withRepeat(
-        withTiming(360, { duration: 300, easing: Easing.linear }),
+        withSequence(
+          withTiming(12, { duration: 80, easing: Easing.inOut(Easing.quad) }),
+          withTiming(-12, { duration: 80, easing: Easing.inOut(Easing.quad) }),
+        ),
         3,
-        false
+        true
       ),
-      withSpring(0, { damping: 10 })
+      withSpring(0, { damping: 12, stiffness: 200 })
     );
 
     translateY.value = withSequence(
-      withTiming(-20, { duration: 150, easing: Easing.out(Easing.quad) }),
-      withTiming(5, { duration: 100, easing: Easing.in(Easing.quad) }),
-      withSpring(0, { damping: 8 })
+      withTiming(-18, { duration: 100, easing: Easing.out(Easing.quad) }),
+      withTiming(3, { duration: 70, easing: Easing.in(Easing.quad) }),
+      withTiming(-8, { duration: 80, easing: Easing.out(Easing.quad) }),
+      withSpring(0, { damping: 12, stiffness: 180 })
     );
 
     scale.value = withSequence(
-      withTiming(1.15, { duration: 100 }),
-      withTiming(0.95, { duration: 100 }),
-      withSpring(1, { damping: 10 })
+      withTiming(1.1, { duration: 80 }),
+      withTiming(0.95, { duration: 80 }),
+      withSpring(1, { damping: 12, stiffness: 180 })
     );
 
     return () => clearInterval(rollInterval);
