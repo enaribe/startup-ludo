@@ -5,7 +5,7 @@
  * Étape 2 (classique): Choix d'édition (secteur)
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { View, Text, Pressable, ScrollView, TextInput, StyleSheet, Dimensions } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,8 +13,10 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 
 import { FONTS } from '@/styles/typography';
-import { useGameStore, useAuthStore } from '@/stores';
+import { useGameStore, useAuthStore, useUserStore } from '@/stores';
 import { RadialBackground, DynamicGradientBorder, GameButton } from '@/components/ui';
+import { StartupSelectionModal } from '@/components/game/StartupSelectionModal';
+import { getDefaultProjectsForEdition, getMatchingUserStartups } from '@/data/defaultProjects';
 import type { PlayerColor } from '@/types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -43,6 +45,12 @@ const EDITIONS = [
   { id: 'sante', name: 'Santé', description: 'HealthTech & Médical', icon: 'medkit' as const, color: '#FF6B6B' },
 ];
 
+interface StartupSelection {
+  startupId: string;
+  startupName: string;
+  isDefaultProject: boolean;
+}
+
 interface PlayerSetup {
   name: string;
   color: PlayerColor;
@@ -54,6 +62,7 @@ export default function LocalSetupScreen() {
   const insets = useSafeAreaInsets();
   const { challenge } = useLocalSearchParams<{ challenge?: string }>();
   const user = useAuthStore((state) => state.user);
+  const profile = useUserStore((state) => state.profile);
   const initGame = useGameStore((state) => state.initGame);
 
   const isAgriMode = challenge === 'agriculture';
@@ -68,7 +77,12 @@ export default function LocalSetupScreen() {
   ]);
   const [selectedEdition, setSelectedEdition] = useState(isAgriMode ? 'agriculture' : 'classic');
 
-  const maxSteps = isAgriMode ? 1 : 2;
+  // Step 3: Ideation
+  const [startupSelections, setStartupSelections] = useState<Record<number, StartupSelection>>({});
+  const [currentSelectingPlayer, setCurrentSelectingPlayer] = useState(0);
+  const [showStartupModal, setShowStartupModal] = useState(false);
+
+  const maxSteps = isAgriMode ? 1 : 3;
 
   const handleBack = () => {
     if (step > 1) {
@@ -136,37 +150,102 @@ export default function LocalSetupScreen() {
     setPlayers(newPlayers);
   };
 
+  // Projets par defaut et startups du joueur 1 filtrees par edition
+  const defaultProjects = useMemo(
+    () => getDefaultProjectsForEdition(selectedEdition),
+    [selectedEdition]
+  );
+  const userStartups = useMemo(
+    () => getMatchingUserStartups(profile?.startups ?? [], selectedEdition),
+    [profile?.startups, selectedEdition]
+  );
+
+  // Auto-select pour les IA quand on entre dans le step 3
+  const autoSelectAI = useCallback(() => {
+    const newSelections: Record<number, StartupSelection> = {};
+    players.forEach((player, index) => {
+      if (player.isAI) {
+        const randomProject = defaultProjects[Math.floor(Math.random() * defaultProjects.length)];
+        if (randomProject) {
+          newSelections[index] = {
+            startupId: randomProject.id,
+            startupName: randomProject.name,
+            isDefaultProject: true,
+          };
+        }
+      }
+    });
+    setStartupSelections(newSelections);
+    // Trouver le premier joueur humain
+    const firstHuman = players.findIndex((p) => !p.isAI);
+    setCurrentSelectingPlayer(firstHuman >= 0 ? firstHuman : 0);
+    setShowStartupModal(true);
+  }, [players, defaultProjects]);
+
+  const handleStartupSelected = (startupId: string, startupName: string, isDefault: boolean) => {
+    setStartupSelections((prev) => ({
+      ...prev,
+      [currentSelectingPlayer]: { startupId, startupName, isDefaultProject: isDefault },
+    }));
+    setShowStartupModal(false);
+
+    // Trouver le prochain joueur humain qui n'a pas encore choisi
+    let next = currentSelectingPlayer + 1;
+    while (next < players.length && players[next]?.isAI) {
+      next++;
+    }
+    if (next < players.length) {
+      setCurrentSelectingPlayer(next);
+      // Petit delai pour que le modal se ferme avant de rouvrir
+      setTimeout(() => setShowStartupModal(true), 350);
+    }
+    // Sinon tous ont choisi => le bouton "Demarrer" devient actif
+  };
+
+  const allPlayersSelected = useMemo(() => {
+    return players.every((_, index) => startupSelections[index] != null);
+  }, [players, startupSelections]);
+
   const handleNext = () => {
     if (step < maxSteps) {
-      setStep(step + 1);
+      const nextStep = step + 1;
+      setStep(nextStep);
+      // Si on entre dans le step 3 (ideation), auto-select IA et ouvrir le modal
+      if (nextStep === 3) {
+        // Reset selections si on revient sur ce step
+        autoSelectAI();
+      }
     } else {
       handleStartGame();
     }
   };
 
   const handleStartGame = () => {
-    const gamePlayers = players.map((p, index) => ({
-      id: `player_${index}`,
-      name: p.name || `Joueur ${index + 1}`,
-      color: p.color,
-      isAI: p.isAI,
-      isHost: index === 0,
-      isConnected: true,
-    }));
+    const gamePlayers = players.map((p, index) => {
+      const selection = startupSelections[index];
+      return {
+        id: `player_${index}`,
+        name: p.name || `Joueur ${index + 1}`,
+        color: p.color,
+        isAI: p.isAI,
+        isHost: index === 0,
+        isConnected: true,
+        startupId: selection?.startupId,
+        startupName: selection?.startupName,
+        isDefaultProject: selection?.isDefaultProject,
+      };
+    });
 
     initGame(gameMode === 'solo' ? 'solo' : 'local', selectedEdition, gamePlayers);
     router.push('/(game)/play/local');
-  };
-
-  const getAvailableColors = (currentIndex: number) => {
-    const usedColors = players.filter((_, i) => i !== currentIndex).map((p) => p.color);
-    return ALL_PLAYER_COLORS.filter((c) => !usedColors.includes(c.color));
   };
 
   const buttonText = useMemo(() => {
     if (step < maxSteps) return 'Suivant';
     return 'Démarrer la partie';
   }, [step, maxSteps]);
+
+  const isNextDisabled = step === 3 && !allPlayersSelected;
 
   const headerTopPadding = insets.top + 10;
 
@@ -440,7 +519,85 @@ export default function LocalSetupScreen() {
             </View>
           </Animated.View>
         )}
+
+        {/* STEP 3: Phase d'Ideation */}
+        {step === 3 && (
+          <Animated.View entering={FadeInDown.delay(100).duration(500)}>
+            <Text style={styles.sectionTitle}>PHASE D'IDÉATION</Text>
+            <Text style={styles.sectionSubtitle}>
+              Chaque joueur choisit un projet avec lequel jouer
+            </Text>
+
+            <View style={styles.ideationList}>
+              {players.map((player, index) => {
+                const selection = startupSelections[index];
+                const isCurrent = currentSelectingPlayer === index && !selection;
+                const playerColor = ALL_PLAYER_COLORS.find((c) => c.color === player.color)?.hex ?? '#FFFFFF';
+
+                return (
+                  <Animated.View
+                    key={`ideation-${index}`}
+                    entering={FadeInDown.delay(150 + index * 80).duration(400)}
+                  >
+                    <DynamicGradientBorder
+                      borderRadius={16}
+                      fill={selection ? 'rgba(255, 188, 64, 0.08)' : 'rgba(0, 0, 0, 0.35)'}
+                      boxWidth={CONTENT_WIDTH}
+                    >
+                      <View style={styles.ideationCard}>
+                        <View style={[styles.ideationAvatar, { borderColor: playerColor }]}>
+                          <Ionicons
+                            name={player.isAI ? 'hardware-chip' : 'person'}
+                            size={18}
+                            color={playerColor}
+                          />
+                        </View>
+                        <View style={styles.ideationInfo}>
+                          <Text style={styles.ideationPlayerName}>{player.name}</Text>
+                          {selection ? (
+                            <Text style={styles.ideationProjectName}>{selection.startupName}</Text>
+                          ) : isCurrent ? (
+                            <Text style={styles.ideationWaiting}>En attente de choix...</Text>
+                          ) : (
+                            <Text style={styles.ideationWaiting}>—</Text>
+                          )}
+                        </View>
+                        {selection ? (
+                          <View style={styles.ideationCheck}>
+                            <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+                          </View>
+                        ) : !player.isAI ? (
+                          <Pressable
+                            style={styles.ideationChooseBtn}
+                            onPress={() => {
+                              setCurrentSelectingPlayer(index);
+                              setShowStartupModal(true);
+                            }}
+                          >
+                            <Ionicons name="rocket-outline" size={16} color="#FFBC40" />
+                            <Text style={styles.ideationChooseText}>Choisir</Text>
+                          </Pressable>
+                        ) : null}
+                      </View>
+                    </DynamicGradientBorder>
+                  </Animated.View>
+                );
+              })}
+            </View>
+          </Animated.View>
+        )}
       </ScrollView>
+
+      {/* Startup Selection Modal */}
+      <StartupSelectionModal
+        visible={showStartupModal}
+        edition={selectedEdition}
+        userStartups={currentSelectingPlayer === 0 ? userStartups : []}
+        defaultProjects={defaultProjects}
+        playerName={players[currentSelectingPlayer]?.name}
+        onSelect={handleStartupSelected}
+        onClose={() => setShowStartupModal(false)}
+      />
 
       {/* Bouton fixe en bas (sans fond) */}
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
@@ -449,6 +606,7 @@ export default function LocalSetupScreen() {
           fullWidth
           title={buttonText.toUpperCase()}
           onPress={handleNext}
+          disabled={isNextDisabled}
         />
       </View>
     </View>
@@ -500,6 +658,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   stepDot: {
+    width: 16,
     height: 4,
     borderRadius: 2,
   },
@@ -741,6 +900,64 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
+  },
+
+  // ── Ideation (Step 3) ──
+  ideationList: {
+    gap: 10,
+  },
+  ideationCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+  },
+  ideationAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  ideationInfo: {
+    flex: 1,
+  },
+  ideationPlayerName: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 14,
+    color: '#FFFFFF',
+  },
+  ideationProjectName: {
+    fontFamily: FONTS.body,
+    fontSize: 12,
+    color: '#FFBC40',
+    marginTop: 2,
+  },
+  ideationWaiting: {
+    fontFamily: FONTS.body,
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.35)',
+    marginTop: 2,
+  },
+  ideationCheck: {
+    marginLeft: 8,
+  },
+  ideationChooseBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255, 188, 64, 0.15)',
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginLeft: 8,
+  },
+  ideationChooseText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 12,
+    color: '#FFBC40',
   },
 
   // ── Bottom Bar (bouton seul, pas de fond) ──

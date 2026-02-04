@@ -75,6 +75,7 @@ export type RoomEventType =
   | 'player_joined'
   | 'player_left'
   | 'player_ready'
+  | 'player_startup_selected'
   | 'game_started'
   | 'game_ended'
   | 'state_updated'
@@ -341,6 +342,34 @@ export class MultiplayerSync {
       firebaseLog('Player ready status updated');
     } catch (error) {
       firebaseLog('Failed to set player ready', error);
+      throw new Error(getFirebaseErrorMessage(error));
+    }
+  }
+
+  /**
+   * Définir la startup sélectionnée pour ce joueur
+   */
+  async setStartupSelection(startupId: string, startupName: string, isDefaultProject: boolean): Promise<void> {
+    if (!this.roomId || !this.playerId) return;
+
+    try {
+      firebaseLog('Setting startup selection', { roomId: this.roomId, startupId, startupName, isDefaultProject });
+
+      await update(ref(database, REALTIME_PATHS.roomPlayer(this.roomId, this.playerId)), {
+        startupId,
+        startupName,
+        isDefaultProject,
+      });
+
+      this.emit({
+        type: 'player_startup_selected',
+        data: { playerId: this.playerId, startupId, startupName, isDefaultProject },
+        timestamp: Date.now(),
+      });
+
+      firebaseLog('Startup selection updated');
+    } catch (error) {
+      firebaseLog('Failed to set startup selection', error);
       throw new Error(getFirebaseErrorMessage(error));
     }
   }

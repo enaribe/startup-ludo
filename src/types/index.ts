@@ -30,6 +30,7 @@ export interface Player {
   pawns: PawnState[]; // 1 à 4 pions par joueur (par défaut 1)
   startupId?: string;
   startupName?: string;
+  isDefaultProject?: boolean;
 }
 
 // Ancien format (pour compatibilité)

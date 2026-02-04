@@ -35,10 +35,13 @@ import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { useUserStore } from '@/stores/useUserStore';
 import { useMultiplayer } from '@/hooks/useMultiplayer';
 import { EmojiChat } from '@/components/game/EmojiChat';
 import { Avatar } from '@/components/ui/Avatar';
 import { RadialBackground, DynamicGradientBorder, GameButton } from '@/components/ui';
+import { StartupSelectionModal } from '@/components/game/StartupSelectionModal';
+import { getDefaultProjectsForEdition, getMatchingUserStartups } from '@/data/defaultProjects';
 import type { PlayerColor } from '@/types';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -57,6 +60,7 @@ export default function LobbyScreen() {
   const insets = useSafeAreaInsets();
 
   const { user } = useAuthStore();
+  const profile = useUserStore((state) => state.profile);
   const {
     room,
     players,
@@ -64,12 +68,32 @@ export default function LobbyScreen() {
     isLoading,
     leaveRoom,
     setReady,
+    setStartupSelection,
     startGame,
     sendEmoji,
   } = useMultiplayer(user?.id ?? null);
 
   const [isReady, setIsReady] = useState(false);
+  const [showStartupModal, setShowStartupModal] = useState(false);
   const isHostPlayer = isHost === 'true';
+
+  // Edition et projets
+  const edition = room?.edition ?? 'classic';
+  const defaultProjects = useMemo(
+    () => getDefaultProjectsForEdition(edition),
+    [edition]
+  );
+  const userStartups = useMemo(
+    () => getMatchingUserStartups(profile?.startups ?? [], edition),
+    [profile?.startups, edition]
+  );
+
+  // Le joueur courant dans la RTDB
+  const myPlayer = useMemo(
+    () => (user?.id ? players[user.id] : null),
+    [players, user?.id]
+  );
+  const hasSelectedStartup = !!myPlayer?.startupId;
 
   // Pulse animation for the waiting indicator
   const pulseOpacity = useSharedValue(0.4);
@@ -116,12 +140,21 @@ export default function LobbyScreen() {
     return playersList.every((p) => p.isReady || p.isHost);
   }, [playersList]);
 
+  const handleStartupSelected = useCallback(async (startupId: string, startupName: string, isDefault: boolean) => {
+    setShowStartupModal(false);
+    await setStartupSelection(startupId, startupName, isDefault);
+  }, [setStartupSelection]);
+
   const handleToggleReady = useCallback(async () => {
+    if (!hasSelectedStartup && !isReady) {
+      setShowStartupModal(true);
+      return;
+    }
     const newReady = !isReady;
     setIsReady(newReady);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await setReady(newReady);
-  }, [isReady, setReady]);
+  }, [isReady, setReady, hasSelectedStartup]);
 
   const handleCopyCode = useCallback(async () => {
     if (code) {
@@ -276,6 +309,21 @@ export default function LobbyScreen() {
                               {slot.player!.displayName ?? slot.player!.name ?? 'Joueur'}
                             </Text>
 
+                            {/* Startup name */}
+                            {slot.player!.startupName ? (
+                              <Text style={styles.startupLabel} numberOfLines={1}>
+                                {slot.player!.startupName}
+                              </Text>
+                            ) : slot.player!.id === user?.id ? (
+                              <Pressable
+                                style={styles.chooseStartupBtn}
+                                onPress={() => setShowStartupModal(true)}
+                              >
+                                <Ionicons name="rocket-outline" size={12} color={COLORS.primary} />
+                                <Text style={styles.chooseStartupText}>Choisir un projet</Text>
+                              </Pressable>
+                            ) : null}
+
                             {/* Role tag */}
                             {slot.player!.isHost && (
                               <View style={[styles.roleTag, { backgroundColor: 'rgba(255, 188, 64, 0.15)' }]}>
@@ -372,18 +420,34 @@ export default function LobbyScreen() {
             />
           )}
 
+          {!hasSelectedStartup && !isHostPlayer && (
+            <Text style={styles.hintText}>
+              Choisis un projet avant de te mettre pret
+            </Text>
+          )}
           {playersList.length < 2 && (
             <Text style={styles.hintText}>
               Minimum 2 joueurs requis pour commencer
             </Text>
           )}
-          {!allReady && playersList.length >= 2 && (
+          {!allReady && playersList.length >= 2 && hasSelectedStartup && (
             <Text style={styles.hintText}>
               En attente que tous les joueurs soient prets...
             </Text>
           )}
         </View>
       </View>
+
+      {/* Startup Selection Modal */}
+      <StartupSelectionModal
+        visible={showStartupModal}
+        edition={edition}
+        userStartups={userStartups}
+        defaultProjects={defaultProjects}
+        playerName={user?.displayName}
+        onSelect={handleStartupSelected}
+        onClose={() => setShowStartupModal(false)}
+      />
 
       {/* Emoji Chat */}
       <EmojiChat
@@ -561,6 +625,29 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.body,
     fontSize: FONT_SIZES.xs,
     color: COLORS.textMuted,
+  },
+
+  // ─── Startup Selection ───
+  startupLabel: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.primary,
+    marginTop: 2,
+  },
+  chooseStartupBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255, 188, 64, 0.12)',
+    borderRadius: 8,
+    paddingHorizontal: SPACING[2],
+    paddingVertical: 3,
+    marginTop: 3,
+  },
+  chooseStartupText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 9,
+    color: COLORS.primary,
   },
 
   // ─── Empty Slot ───

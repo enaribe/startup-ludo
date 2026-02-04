@@ -29,7 +29,8 @@ import { Avatar } from '@/components/ui/Avatar';
 import { RadialBackground, DynamicGradientBorder, GameButton } from '@/components/ui';
 import { useGameStore, useAuthStore, useUserStore, useChallengeStore } from '@/stores';
 import { XP_REWARDS, getChallengeXPReward } from '@/config/progression';
-import { updateUserStats, updateChallengeEnrollment, saveGameSession } from '@/services/firebase/firestore';
+import { updateUserStats, updateChallengeEnrollment, saveGameSession, updateStartupValorisation } from '@/services/firebase/firestore';
+import { isOwnStartup } from '@/data/defaultProjects';
 
 const { width: screenWidth } = Dimensions.get('window');
 const contentWidth = screenWidth - SPACING[4] * 2;
@@ -117,6 +118,7 @@ export default function ResultsScreen() {
   const incrementGamesPlayed = useUserStore((s) => s.incrementGamesPlayed);
   const incrementGamesWon = useUserStore((s) => s.incrementGamesWon);
   const addTokensEarned = useUserStore((s) => s.addTokensEarned);
+  const updateStartup = useUserStore((s) => s.updateStartup);
 
   // Challenge progression
   const challengeAddXp = useChallengeStore((s) => s.addXp);
@@ -161,10 +163,20 @@ export default function ResultsScreen() {
     : 0;
   const challengeLevelNumber = game?.challengeContext?.levelNumber ?? 1;
 
-  // Valorisation
-  const valorisationBefore = profile?.startups?.[0]?.tokensInvested ?? 50000;
-  const valorisationGain = isOnline ? xpGained * 100 : xpGained * 50;
+  // Valorisation : differenciee selon projet perso vs defaut
+  const usedOwnStartup = isOwnStartup(myPlayer?.startupId);
+  const myStartup = usedOwnStartup
+    ? profile?.startups?.find((s) => s.id === myPlayer?.startupId)
+    : null;
+
+  const valorisationBefore = myStartup?.valorisation ?? 0;
+  const valorisationGain = usedOwnStartup
+    ? isWinner
+      ? (myPlayer?.tokens ?? 0) * 5000 * (isOnline ? 2 : 1)
+      : (myPlayer?.tokens ?? 0) * 2000 * (isOnline ? 2 : 1)
+    : 0;
   const valorisationAfter = valorisationBefore + valorisationGain;
+  const defaultProjectXPBonus = !usedOwnStartup && myPlayer?.startupId ? 5 : 0;
 
   // Cagnotte (online only)
   const cagnotte = isOnline ? (game?.players.length ?? 0) * 100 : 0;
@@ -178,8 +190,21 @@ export default function ResultsScreen() {
     // 1. Local store updates
     incrementGamesPlayed();
     if (isWinner) incrementGamesWon();
-    if (xpGained > 0) addXP(xpGained);
+    const totalXP = xpGained + defaultProjectXPBonus;
+    if (totalXP > 0) addXP(totalXP);
     if (myPlayer) addTokensEarned(myPlayer.tokens);
+
+    // 1b. Valorisation de la startup personnelle
+    if (usedOwnStartup && myStartup && valorisationGain > 0) {
+      updateStartup(myStartup.id, { valorisation: valorisationAfter });
+
+      // Sync to Firestore
+      if (userId && !isGuest) {
+        updateStartupValorisation(userId, myStartup.id, valorisationAfter).catch((err) => {
+          console.warn('[Results] Failed to update startup valorisation:', err);
+        });
+      }
+    }
 
     // 2. Challenge XP (si c'est une partie challenge)
     const ctx = game.challengeContext;
@@ -436,41 +461,69 @@ export default function ResultsScreen() {
           </Animated.View>
         )}
 
-        {/* Valorisation */}
-        <Animated.View style={[styles.section, valorisationStyle]}>
-          <DynamicGradientBorder
-            borderRadius={20}
-            fill="rgba(0, 0, 0, 0.35)"
-            boxWidth={contentWidth}
-          >
-            <View style={styles.valorisationBlock}>
-              <View style={styles.valorisationHeader}>
-                <Ionicons name="trending-up" size={18} color={COLORS.success} />
-                <Text style={styles.valorisationTitle}>Valorisation du projet</Text>
+        {/* Valorisation — projet perso uniquement */}
+        {usedOwnStartup && valorisationGain > 0 ? (
+          <Animated.View style={[styles.section, valorisationStyle]}>
+            <DynamicGradientBorder
+              borderRadius={20}
+              fill="rgba(0, 0, 0, 0.35)"
+              boxWidth={contentWidth}
+            >
+              <View style={styles.valorisationBlock}>
+                <View style={styles.valorisationHeader}>
+                  <Ionicons name="trending-up" size={18} color={COLORS.success} />
+                  <Text style={styles.valorisationTitle}>
+                    {myStartup?.name ?? 'Projet'}
+                  </Text>
+                </View>
+                <View style={styles.valorisationRow}>
+                  <View style={styles.valorisationCol}>
+                    <Text style={styles.valorisationLabel}>Avant</Text>
+                    <Text style={styles.valorisationValue}>
+                      {valorisationBefore.toLocaleString('fr-FR')} C
+                    </Text>
+                  </View>
+                  <View style={styles.valorisationArrow}>
+                    <Ionicons name="arrow-forward" size={20} color={COLORS.success} />
+                    <Text style={styles.valorisationGain}>
+                      +{valorisationGain.toLocaleString('fr-FR')}
+                    </Text>
+                  </View>
+                  <View style={styles.valorisationCol}>
+                    <Text style={styles.valorisationLabel}>Apres</Text>
+                    <Text style={styles.valorisationAfterText}>
+                      {valorisationAfter.toLocaleString('fr-FR')} C
+                    </Text>
+                  </View>
+                </View>
               </View>
-              <View style={styles.valorisationRow}>
-                <View style={styles.valorisationCol}>
-                  <Text style={styles.valorisationLabel}>Avant</Text>
-                  <Text style={styles.valorisationValue}>
-                    {valorisationBefore.toLocaleString('fr-FR')} C
-                  </Text>
+            </DynamicGradientBorder>
+          </Animated.View>
+        ) : myPlayer?.startupId ? (
+          <Animated.View style={[styles.section, valorisationStyle]}>
+            <DynamicGradientBorder
+              borderRadius={20}
+              fill="rgba(0, 0, 0, 0.35)"
+              boxWidth={contentWidth}
+            >
+              <View style={styles.valorisationBlock}>
+                <View style={styles.valorisationHeader}>
+                  <Ionicons name="bulb-outline" size={18} color={COLORS.textSecondary} />
+                  <Text style={styles.valorisationTitle}>Projet par defaut</Text>
                 </View>
-                <View style={styles.valorisationArrow}>
-                  <Ionicons name="arrow-forward" size={20} color={COLORS.success} />
-                  <Text style={styles.valorisationGain}>
-                    +{valorisationGain.toLocaleString('fr-FR')}
-                  </Text>
-                </View>
-                <View style={styles.valorisationCol}>
-                  <Text style={styles.valorisationLabel}>Apres</Text>
-                  <Text style={styles.valorisationAfterText}>
-                    {valorisationAfter.toLocaleString('fr-FR')} C
-                  </Text>
-                </View>
+                <Text style={styles.defaultProjectHint}>
+                  Cree ton propre projet pour gagner en valorisation !
+                </Text>
+                {defaultProjectXPBonus > 0 && (
+                  <View style={styles.defaultBonusRow}>
+                    <Ionicons name="star" size={14} color={COLORS.primary} />
+                    <Text style={styles.defaultBonusText}>+{defaultProjectXPBonus} XP bonus</Text>
+                  </View>
+                )}
               </View>
-            </View>
-          </DynamicGradientBorder>
-        </Animated.View>
+            </DynamicGradientBorder>
+          </Animated.View>
+        ) : null}
 
         {/* Cagnotte (online only) */}
         {isOnline && cagnotte > 0 && (
@@ -805,6 +858,30 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.bodyBold,
     fontSize: FONT_SIZES.md,
     color: COLORS.success,
+  },
+  defaultProjectHint: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginTop: SPACING[1],
+  },
+  defaultBonusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING[1],
+    marginTop: SPACING[3],
+    backgroundColor: 'rgba(255, 188, 64, 0.1)',
+    paddingVertical: SPACING[2],
+    paddingHorizontal: SPACING[3],
+    borderRadius: 12,
+    alignSelf: 'center',
+  },
+  defaultBonusText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.primary,
   },
 
   // Cagnotte

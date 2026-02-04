@@ -177,6 +177,9 @@ export default function GamePreparationScreen() {
           name: p.displayName || p.name || 'Joueur',
           color: p.color,
           isAI: false,
+          startupId: p.startupId,
+          startupName: p.startupName,
+          isDefaultProject: p.isDefaultProject,
         }));
 
         if (checkpoint && (checkpoint as unknown as CompactCheckpoint).t) {

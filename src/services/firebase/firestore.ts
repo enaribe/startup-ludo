@@ -260,6 +260,29 @@ export const addStartup = async (userId: string, startup: Startup): Promise<void
   }
 };
 
+// Update startup valorisation
+export const updateStartupValorisation = async (
+  userId: string,
+  startupId: string,
+  newValorisation: number,
+): Promise<void> => {
+  try {
+    firebaseLog('Updating startup valorisation', { userId, startupId, newValorisation });
+
+    const startupRef = doc(
+      firestore,
+      FIRESTORE_COLLECTIONS.userStartups(userId),
+      startupId,
+    );
+    await updateDoc(startupRef, { valorisation: newValorisation });
+
+    firebaseLog('Startup valorisation updated successfully');
+  } catch (error) {
+    firebaseLog('Failed to update startup valorisation', error);
+    throw new Error(getFirebaseErrorMessage(error));
+  }
+};
+
 // Delete a startup
 export const deleteStartup = async (userId: string, startupId: string): Promise<void> => {
   try {

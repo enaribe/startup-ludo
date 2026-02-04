@@ -37,6 +37,7 @@ interface UseMultiplayerActions {
   joinRoom: (code: string, playerName: string) => Promise<{ roomId: string } | null>;
   leaveRoom: () => Promise<void>;
   setReady: (ready: boolean) => Promise<void>;
+  setStartupSelection: (startupId: string, startupName: string, isDefaultProject: boolean) => Promise<void>;
   startGame: () => Promise<string | null>;
   sendAction: (action: Omit<RealtimeAction, 'id' | 'timestamp'>) => Promise<void>;
   updateGameState: (state: Partial<RealtimeGameState>) => Promise<void>;
@@ -262,6 +263,15 @@ export function useMultiplayer(userId: string | null): UseMultiplayerReturn {
     }
   }, []);
 
+  const setStartupSelection = useCallback(async (startupId: string, startupName: string, isDefaultProject: boolean) => {
+    try {
+      await multiplayerSync.setStartupSelection(startupId, startupName, isDefaultProject);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur';
+      setState((prev) => ({ ...prev, error: message }));
+    }
+  }, []);
+
   const startGame = useCallback(async (): Promise<string | null> => {
     setState((prev) => ({ ...prev, isLoading: true }));
 
@@ -338,6 +348,7 @@ export function useMultiplayer(userId: string | null): UseMultiplayerReturn {
     joinRoom,
     leaveRoom,
     setReady,
+    setStartupSelection,
     startGame,
     sendAction,
     updateGameState,

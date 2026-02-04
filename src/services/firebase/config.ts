@@ -218,6 +218,9 @@ export interface RealtimePlayer {
   isConnected?: boolean;
   joinedAt: number;
   lastSeen?: number;
+  startupId?: string;
+  startupName?: string;
+  isDefaultProject?: boolean;
 }
 
 // Compact game state for bandwidth efficiency

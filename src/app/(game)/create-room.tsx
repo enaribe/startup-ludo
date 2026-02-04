@@ -16,10 +16,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DynamicGradientBorder, GameButton, RadialBackground } from '@/components/ui';
 import { Avatar } from '@/components/ui/Avatar';
+import { StartupSelectionModal } from '@/components/game/StartupSelectionModal';
 import { useMultiplayer } from '@/hooks/useMultiplayer';
-import { useAuthStore } from '@/stores';
+import { useAuthStore, useUserStore } from '@/stores';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
+import { getDefaultProjectsForEdition, getMatchingUserStartups } from '@/data/defaultProjects';
 
 const { width: screenWidth } = Dimensions.get('window');
 const contentWidth = screenWidth - SPACING[4] * 2;
@@ -36,18 +38,21 @@ export default function CreateRoomScreen() {
   }>();
 
   const user = useAuthStore((state) => state.user);
+  const profile = useUserStore((state) => state.profile);
   const {
     room,
     players,
     isLoading,
     createRoom,
     leaveRoom,
+    setStartupSelection,
     startGame,
   } = useMultiplayer(user?.id ?? null);
 
   const isWaitingRoom = !!params.roomId;
   const isQuickMatch = params.quickMatch === 'true';
   const [showLobby, setShowLobby] = useState(isWaitingRoom);
+  const [showStartupModal, setShowStartupModal] = useState(false);
 
   // Helper function to format room code
   const formatRoomCode = (code: string) => {
@@ -78,6 +83,29 @@ export default function CreateRoomScreen() {
     if (playersList.length < 2) return false;
     return playersList.every((p) => p.isReady || p.isHost);
   }, [playersList]);
+
+  // Edition et projets
+  const edition = room?.edition ?? selectedEdition;
+  const defaultProjects = useMemo(
+    () => getDefaultProjectsForEdition(edition),
+    [edition]
+  );
+  const userStartups = useMemo(
+    () => getMatchingUserStartups(profile?.startups ?? [], edition),
+    [profile?.startups, edition]
+  );
+
+  // Le joueur courant (host)
+  const myPlayer = useMemo(
+    () => (user?.id ? players[user.id] : null),
+    [players, user?.id]
+  );
+  const hasSelectedStartup = !!myPlayer?.startupId;
+
+  const handleStartupSelected = useCallback(async (startupId: string, startupName: string, isDefault: boolean) => {
+    setShowStartupModal(false);
+    await setStartupSelection(startupId, startupName, isDefault);
+  }, [setStartupSelection]);
 
   // Listen for game start (room status change to 'playing')
   useEffect(() => {
@@ -388,9 +416,15 @@ export default function CreateRoomScreen() {
                           <Text style={styles.lobbyPlayerName} numberOfLines={1}>
                             {player.displayName ?? player.name ?? 'Joueur'}
                           </Text>
-                          <Text style={styles.lobbyPlayerStatus}>
-                            {player.isHost ? 'Hôte' : player.isReady ? 'Prêt' : 'En attente'}
-                          </Text>
+                          {player.startupName ? (
+                            <Text style={styles.lobbyStartupName} numberOfLines={1}>
+                              {player.startupName}
+                            </Text>
+                          ) : (
+                            <Text style={styles.lobbyPlayerStatus}>
+                              {player.isHost ? 'Hôte' : player.isReady ? 'Prêt' : 'En attente'}
+                            </Text>
+                          )}
                         </View>
                         <View style={[
                           styles.lobbyReadyBadge,
@@ -410,7 +444,38 @@ export default function CreateRoomScreen() {
             )}
           </DynamicGradientBorder>
         </Animated.View>
+
+        {/* Startup Selection Button for host */}
+        <Animated.View entering={FadeInDown.delay(300).duration(500)} style={styles.startupBtnWrapper}>
+          <Pressable
+            style={[styles.startupSelectBtn, hasSelectedStartup && styles.startupSelectBtnDone]}
+            onPress={() => setShowStartupModal(true)}
+          >
+            <Ionicons
+              name={hasSelectedStartup ? 'checkmark-circle' : 'rocket-outline'}
+              size={20}
+              color={hasSelectedStartup ? '#4CAF50' : '#FFBC40'}
+            />
+            <Text style={[styles.startupSelectText, hasSelectedStartup && styles.startupSelectTextDone]}>
+              {hasSelectedStartup ? myPlayer?.startupName ?? 'Projet choisi' : 'Choisir mon projet'}
+            </Text>
+            {!hasSelectedStartup && (
+              <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.4)" />
+            )}
+          </Pressable>
+        </Animated.View>
       </ScrollView>
+
+      {/* Startup Selection Modal */}
+      <StartupSelectionModal
+        visible={showStartupModal}
+        edition={edition}
+        userStartups={userStartups}
+        defaultProjects={defaultProjects}
+        playerName={user?.displayName}
+        onSelect={handleStartupSelected}
+        onClose={() => setShowStartupModal(false)}
+      />
 
       {/* Bottom button */}
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + SPACING[4] }]}>
@@ -419,13 +484,16 @@ export default function CreateRoomScreen() {
           fullWidth
           title={isLoading ? 'CHARGEMENT...' : 'DEMARRER LA PARTIE'}
           loading={isLoading}
-          disabled={playersList.length < 2}
+          disabled={playersList.length < 2 || !hasSelectedStartup}
           onPress={handleStartGame}
         />
+        {!hasSelectedStartup && (
+          <Text style={styles.waitingText}>Choisis un projet avant de demarrer</Text>
+        )}
         {playersList.length < 2 && (
           <Text style={styles.waitingText}>Minimum 2 joueurs requis</Text>
         )}
-        {playersList.length >= 2 && !allReady && (
+        {playersList.length >= 2 && !allReady && hasSelectedStartup && (
           <Text style={styles.waitingText}>En attente que tous soient prets...</Text>
         )}
       </View>
@@ -636,6 +704,12 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.45)',
     marginTop: 2,
   },
+  lobbyStartupName: {
+    fontFamily: FONTS.body,
+    fontSize: 11,
+    color: '#FFBC40',
+    marginTop: 2,
+  },
   lobbyReadyBadge: {
     width: 28,
     height: 28,
@@ -656,6 +730,33 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.body,
     fontSize: FONT_SIZES.sm,
     color: 'rgba(255, 255, 255, 0.4)',
+  },
+  startupBtnWrapper: {
+    marginTop: SPACING[4],
+  },
+  startupSelectBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[2],
+    backgroundColor: 'rgba(255, 188, 64, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 188, 64, 0.25)',
+    borderRadius: 14,
+    paddingVertical: SPACING[3],
+    paddingHorizontal: SPACING[4],
+  },
+  startupSelectBtnDone: {
+    borderColor: 'rgba(76, 175, 80, 0.3)',
+    backgroundColor: 'rgba(76, 175, 80, 0.08)',
+  },
+  startupSelectText: {
+    flex: 1,
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.sm,
+    color: '#FFBC40',
+  },
+  startupSelectTextDone: {
+    color: '#4CAF50',
   },
   waitingText: {
     fontFamily: FONTS.body,
