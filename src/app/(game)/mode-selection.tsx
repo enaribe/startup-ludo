@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { View, Text, Pressable, Modal, StyleSheet, Dimensions } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeOut, SlideInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -15,48 +14,24 @@ import { DynamicGradientBorder, GameButton } from '@/components/ui';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// Thèmes disponibles
-const THEMES = {
-  classic: {
-    background: ['#0F3A6B', '#081A2A'],
-    accent: '#FFBC40',
-    cardFill: 'rgba(0, 0, 0, 0.35)', // même fond que le bouton Nouvelle partie (accueil)
-    text: '#FFFFFF',
-    textSecondary: 'rgba(255, 255, 255, 0.6)',
-  },
-  agriculture: {
-    background: ['#F6E8CC', '#FBF8F0'],
-    accent: '#AC700C',
-    cardFill: '#FFFFFF',
-    text: '#8B6A3C',
-    textSecondary: 'rgba(139, 106, 60, 0.7)',
-  },
+const THEME = {
+  accent: '#FFBC40',
+  cardFill: 'rgba(0, 0, 0, 0.35)',
+  text: '#FFFFFF',
+  textSecondary: 'rgba(255, 255, 255, 0.6)',
 };
 
-const Background = ({ isAgriMode }: { isAgriMode: boolean }) => {
-  if (isAgriMode) {
-    return (
-      <LinearGradient
-        colors={THEMES.agriculture.background}
-        style={StyleSheet.absoluteFill}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-      />
-    );
-  }
-
-  return (
-    <Svg style={StyleSheet.absoluteFill} width={SCREEN_WIDTH} height={SCREEN_HEIGHT}>
-      <Defs>
-        <RadialGradient id="radialBg" cx="50%" cy="50%" r="80%">
-          <Stop offset="0%" stopColor="#0F3A6B" stopOpacity="1" />
-          <Stop offset="100%" stopColor="#081A2A" stopOpacity="1" />
-        </RadialGradient>
-      </Defs>
-      <Rect width="100%" height="100%" fill="url(#radialBg)" />
-    </Svg>
-  );
-};
+const Background = () => (
+  <Svg style={StyleSheet.absoluteFill} width={SCREEN_WIDTH} height={SCREEN_HEIGHT}>
+    <Defs>
+      <RadialGradient id="radialBg" cx="50%" cy="50%" r="80%">
+        <Stop offset="0%" stopColor="#0F3A6B" stopOpacity="1" />
+        <Stop offset="100%" stopColor="#081A2A" stopOpacity="1" />
+      </RadialGradient>
+    </Defs>
+    <Rect width="100%" height="100%" fill="url(#radialBg)" />
+  </Svg>
+);
 
 export default function GameModeSelectionScreen() {
   const router = useRouter();
@@ -65,8 +40,6 @@ export default function GameModeSelectionScreen() {
   const user = useAuthStore((state) => state.user);
   const profile = useUserStore((state) => state.profile);
 
-  const isAgriMode = challenge === 'agriculture';
-  const theme = isAgriMode ? THEMES.agriculture : THEMES.classic;
   const isGuest = user?.isGuest || !user;
   const hasProject = (profile?.startups?.length ?? 0) > 0;
   const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
@@ -136,33 +109,25 @@ export default function GameModeSelectionScreen() {
 
   return (
     <View style={styles.container}>
-      <Background isAgriMode={isAgriMode} />
+      <Background />
 
-      {/* Header avec Back Button intégré au style */}
+      {/* Header */}
       <View
         style={[
           styles.headerContainer,
-          { 
+          {
             paddingTop: insets.top + SPACING[2],
-            backgroundColor: isAgriMode ? 'rgba(246, 232, 204, 0.9)' : '#0A1929',
-            borderBottomWidth: isAgriMode ? 1 : 0,
-            borderBottomColor: '#E8E5DF',
-            borderBottomLeftRadius: isAgriMode ? 0 : 24,
-            borderBottomRightRadius: isAgriMode ? 0 : 24,
+            backgroundColor: '#0A1929',
+            borderBottomLeftRadius: 24,
+            borderBottomRightRadius: 24,
           }
         ]}
       >
         <View style={styles.headerContent}>
           <Pressable onPress={handleBack} style={styles.backButton}>
-            <Ionicons
-              name="arrow-back"
-              size={24}
-              color={theme.text}
-            />
+            <Ionicons name="arrow-back" size={24} color={THEME.text} />
           </Pressable>
-          <Text style={[styles.headerTitle, { color: theme.text }]}>
-            {isAgriMode ? 'CHALLENGE AGRI' : 'NOUVELLE PARTIE'}
-          </Text>
+          <Text style={[styles.headerTitle, { color: THEME.text }]}>NOUVELLE PARTIE</Text>
         </View>
       </View>
 
@@ -173,20 +138,20 @@ export default function GameModeSelectionScreen() {
           entering={FadeInDown.delay(100).duration(500)}
           style={{
             alignSelf: 'center',
-            backgroundColor: isAgriMode ? 'rgba(172, 112, 12, 0.1)' : 'rgba(255, 188, 64, 0.15)',
+            backgroundColor: 'rgba(255, 188, 64, 0.15)',
             paddingHorizontal: SPACING[4],
             paddingVertical: SPACING[2],
             borderRadius: 20,
             marginBottom: SPACING[6],
             borderWidth: 1,
-            borderColor: isAgriMode ? 'rgba(172, 112, 12, 0.2)' : 'rgba(255, 188, 64, 0.3)',
+            borderColor: 'rgba(255, 188, 64, 0.3)',
           }}
         >
           <Text
             style={{
               fontFamily: FONTS.bodySemiBold,
               fontSize: FONT_SIZES.sm,
-              color: theme.accent,
+              color: THEME.accent,
             }}
           >
             SÉLECTIONNE LE MODE DE JEU
@@ -198,30 +163,30 @@ export default function GameModeSelectionScreen() {
           <Pressable onPress={handleLocalGame}>
             <DynamicGradientBorder
               borderRadius={24}
-              fill={theme.cardFill}
+              fill={THEME.cardFill}
               boxWidth={contentWidth}
               style={{ marginBottom: SPACING[4] }}
             >
               <View style={styles.cardContent}>
-                <View style={[styles.iconBox, { backgroundColor: isAgriMode ? '#FFF7E6' : 'rgba(255, 188, 64, 0.15)' }]}>
-                  <Ionicons name="people" size={32} color={theme.accent} />
+                <View style={[styles.iconBox, { backgroundColor: 'rgba(255, 188, 64, 0.15)' }]}>
+                  <Ionicons name="people" size={32} color={THEME.accent} />
                 </View>
-                
+
                 <View style={styles.cardTextContainer}>
-                  <Text style={[styles.cardTitle, { color: theme.text }]}>Partie Locale</Text>
-                  <Text style={[styles.cardDescription, { color: theme.textSecondary }]}>
+                  <Text style={[styles.cardTitle, { color: THEME.text }]}>Partie Locale</Text>
+                  <Text style={[styles.cardDescription, { color: THEME.textSecondary }]}>
                     Joue avec tes amis sur le même appareil, chacun son tour.
                   </Text>
-                  
+
                   <View style={styles.tagsRow}>
-                    <View style={[styles.tag, { backgroundColor: isAgriMode ? '#F6E8CC' : 'rgba(255, 255, 255, 0.1)' }]}>
-                      <Ionicons name="people-outline" size={12} color={theme.textSecondary} />
-                      <Text style={[styles.tagText, { color: theme.textSecondary }]}>2-4 Joueurs</Text>
+                    <View style={[styles.tag, { backgroundColor: 'rgba(255, 255, 255, 0.1)' }]}>
+                      <Ionicons name="people-outline" size={12} color={THEME.textSecondary} />
+                      <Text style={[styles.tagText, { color: THEME.textSecondary }]}>2-4 Joueurs</Text>
                     </View>
                   </View>
                 </View>
 
-                <Ionicons name="chevron-forward" size={24} color={theme.textSecondary} />
+                <Ionicons name="chevron-forward" size={24} color={THEME.textSecondary} />
               </View>
             </DynamicGradientBorder>
           </Pressable>
@@ -232,25 +197,25 @@ export default function GameModeSelectionScreen() {
           <Pressable onPress={handleOnlineGame}>
             <DynamicGradientBorder
               borderRadius={24}
-              fill={theme.cardFill}
+              fill={THEME.cardFill}
               boxWidth={contentWidth}
               style={{ opacity: isGuest ? 0.8 : 1 }}
             >
               <View style={styles.cardContent}>
-                <View style={[styles.iconBox, { backgroundColor: isAgriMode ? '#FFF7E6' : 'rgba(31, 145, 208, 0.15)' }]}>
-                  <Ionicons name="globe" size={32} color={isAgriMode ? '#AC700C' : '#1F91D0'} />
+                <View style={[styles.iconBox, { backgroundColor: 'rgba(31, 145, 208, 0.15)' }]}>
+                  <Ionicons name="globe" size={32} color="#1F91D0" />
                 </View>
-                
+
                 <View style={styles.cardTextContainer}>
-                  <Text style={[styles.cardTitle, { color: theme.text }]}>Partie en Ligne</Text>
-                  <Text style={[styles.cardDescription, { color: theme.textSecondary }]}>
+                  <Text style={[styles.cardTitle, { color: THEME.text }]}>Partie en Ligne</Text>
+                  <Text style={[styles.cardDescription, { color: THEME.textSecondary }]}>
                     Affronte des joueurs du monde entier en temps réel.
                   </Text>
-                  
+
                   <View style={styles.tagsRow}>
-                    <View style={[styles.tag, { backgroundColor: isAgriMode ? '#F6E8CC' : 'rgba(255, 255, 255, 0.1)' }]}>
-                      <Ionicons name="trophy-outline" size={12} color={theme.textSecondary} />
-                      <Text style={[styles.tagText, { color: theme.textSecondary }]}>Classement</Text>
+                    <View style={[styles.tag, { backgroundColor: 'rgba(255, 255, 255, 0.1)' }]}>
+                      <Ionicons name="trophy-outline" size={12} color={THEME.textSecondary} />
+                      <Text style={[styles.tagText, { color: THEME.textSecondary }]}>Classement</Text>
                     </View>
                     {isGuest && (
                       <View style={[styles.tag, { backgroundColor: 'rgba(255, 107, 107, 0.2)' }]}>
@@ -261,7 +226,7 @@ export default function GameModeSelectionScreen() {
                   </View>
                 </View>
 
-                <Ionicons name="chevron-forward" size={24} color={theme.textSecondary} />
+                <Ionicons name="chevron-forward" size={24} color={THEME.textSecondary} />
               </View>
             </DynamicGradientBorder>
           </Pressable>

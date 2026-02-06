@@ -31,7 +31,7 @@ export const APP_ICONS = {
 
 // ===== BACKGROUNDS =====
 export const BACKGROUNDS = {
-  radial: require('../../assets/images/background-radial.png'),
+  radial: require('../../assets/images/background-radial.jpg'),
   // Ajouter ici les backgrounds personnalisés:
   // homeBackground: require('../../assets/images/backgrounds/home-bg.png'),
   // gameBackground: require('../../assets/images/backgrounds/game-bg.png'),

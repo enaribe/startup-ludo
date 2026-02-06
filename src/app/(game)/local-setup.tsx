@@ -2,12 +2,13 @@
  * local-game-setup - Configuration partie locale
  *
  * Étape 1: Choix mode (Solo/Tour par tour), nombre de joueurs, noms
- * Étape 2 (classique): Choix d'édition (secteur)
+ * Étape 2: Choix d'édition (secteur)
+ * Étape 3: Phase d'idéation (choix du projet de startup)
  */
 
 import { useState, useMemo, useCallback } from 'react';
 import { View, Text, Pressable, ScrollView, TextInput, StyleSheet, Dimensions } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
@@ -38,16 +39,6 @@ const COLORS_BY_PLAYER_COUNT: Record<number, PlayerColor[]> = {
   4: ['yellow', 'blue', 'green', 'red'],
 };
 
-// Icône fallback par edition id (pour les editions qui n'ont pas d'icône valide)
-const EDITION_ICON_FALLBACK: Record<string, string> = {
-  classic: 'rocket',
-  agriculture: 'leaf',
-  education: 'school',
-  sante: 'medkit',
-  tourisme: 'airplane',
-  culture: 'color-palette',
-};
-
 interface StartupSelection {
   startupId: string;
   startupName: string;
@@ -63,12 +54,9 @@ interface PlayerSetup {
 export default function LocalSetupScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { challenge } = useLocalSearchParams<{ challenge?: string }>();
   const user = useAuthStore((state) => state.user);
   const profile = useUserStore((state) => state.profile);
   const initGame = useGameStore((state) => state.initGame);
-
-  const isAgriMode = challenge === 'agriculture';
 
   // États
   const [step, setStep] = useState(1);
@@ -78,14 +66,14 @@ export default function LocalSetupScreen() {
     { name: user?.displayName || 'Vous', color: 'green', isAI: false },
     { name: 'IA', color: 'blue', isAI: true },
   ]);
-  const [selectedEdition, setSelectedEdition] = useState(isAgriMode ? 'agriculture' : 'classic');
+  const [selectedEdition, setSelectedEdition] = useState('classic');
 
   // Step 3: Ideation
   const [startupSelections, setStartupSelections] = useState<Record<number, StartupSelection>>({});
   const [currentSelectingPlayer, setCurrentSelectingPlayer] = useState(0);
   const [showStartupModal, setShowStartupModal] = useState(false);
 
-  const maxSteps = isAgriMode ? 1 : 3;
+  const maxSteps = 3;
 
   const handleBack = () => {
     if (step > 1) {
@@ -215,7 +203,6 @@ export default function LocalSetupScreen() {
       setStep(nextStep);
       // Si on entre dans le step 3 (ideation), auto-select IA et ouvrir le modal
       if (nextStep === 3) {
-        // Reset selections si on revient sur ce step
         autoSelectAI();
       }
     } else {
@@ -262,9 +249,7 @@ export default function LocalSetupScreen() {
           <Pressable onPress={handleBack} style={styles.backButton}>
             <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
           </Pressable>
-          <Text style={styles.headerTitle}>
-            {isAgriMode ? 'CHALLENGE AGRI' : 'PARTIE LOCALE'}
-          </Text>
+          <Text style={styles.headerTitle}>PARTIE LOCALE</Text>
         </View>
 
         {/* Step indicator inside header */}
@@ -462,58 +447,51 @@ export default function LocalSetupScreen() {
           </>
         )}
 
-        {/* STEP 2: Edition Selection (classic mode only) */}
-        {step === 2 && !isAgriMode && (
+        {/* STEP 2: Edition Selection */}
+        {step === 2 && (
           <Animated.View entering={FadeInDown.delay(100).duration(500)}>
             <Text style={styles.sectionTitle}>CHOIX DE L'ÉDITION</Text>
             <Text style={styles.sectionSubtitle}>
-              Chaque édition propose des quiz et événements thématiques
+              Sélectionnez l'édition thématique pour votre partie
             </Text>
 
-            <View style={styles.editionsList}>
+            <View style={styles.editionList}>
               {getEditionList().map((edition, index) => {
                 const isSelected = selectedEdition === edition.id;
-                const iconName = (EDITION_ICON_FALLBACK[edition.id] || edition.icon || 'game-controller') as keyof typeof Ionicons.glyphMap;
                 return (
                   <Animated.View
                     key={edition.id}
                     entering={FadeInDown.delay(150 + index * 80).duration(400)}
                   >
-                    <Pressable onPress={() => setSelectedEdition(edition.id)}>
+                    <Pressable
+                      onPress={() => setSelectedEdition(edition.id)}
+                    >
                       <DynamicGradientBorder
                         borderRadius={16}
-                        fill={isSelected ? 'rgba(255, 188, 64, 0.1)' : 'rgba(0, 0, 0, 0.35)'}
+                        fill={isSelected ? 'rgba(255, 188, 64, 0.12)' : 'rgba(0, 0, 0, 0.35)'}
                         boxWidth={CONTENT_WIDTH}
                       >
-                        <View style={styles.editionCard}>
-                          {/* Icon */}
-                          <View style={[styles.editionIcon, { backgroundColor: `${edition.color}20` }]}>
+                        <View style={[styles.editionCard, isSelected && styles.editionCardSelected]}>
+                          <View style={styles.editionIcon}>
                             <Ionicons
-                              name={iconName}
+                              name="extension-puzzle"
                               size={24}
-                              color={edition.color}
+                              color={isSelected ? '#FFBC40' : 'rgba(255,255,255,0.6)'}
                             />
                           </View>
-
-                          {/* Text */}
                           <View style={styles.editionInfo}>
-                            <Text style={[styles.editionName, isSelected && { color: edition.color }]}>
+                            <Text style={[styles.editionName, isSelected && styles.editionNameSelected]}>
                               {edition.name}
                             </Text>
-                            <Text style={styles.editionDesc}>{edition.description}</Text>
+                            <Text style={styles.editionDescription}>
+                              {edition.description || 'Édition personnalisée'}
+                            </Text>
                           </View>
-
-                          {/* Selected Indicator */}
-                          <View
-                            style={[
-                              styles.radioOuter,
-                              isSelected && { borderColor: edition.color },
-                            ]}
-                          >
-                            {isSelected && (
-                              <View style={[styles.radioInner, { backgroundColor: edition.color }]} />
-                            )}
-                          </View>
+                          {isSelected && (
+                            <View style={styles.editionCheck}>
+                              <Ionicons name="checkmark-circle" size={24} color="#FFBC40" />
+                            </View>
+                          )}
                         </View>
                       </DynamicGradientBorder>
                     </Pressable>
@@ -860,8 +838,8 @@ const styles = StyleSheet.create({
     opacity: 0.35,
   },
 
-  // ── Editions ──
-  editionsList: {
+  // ── Edition Selection (Step 2) ──
+  editionList: {
     gap: 10,
   },
   editionCard: {
@@ -869,10 +847,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 14,
   },
+  editionCardSelected: {
+    // Additional styles applied when selected
+  },
   editionIcon: {
     width: 48,
     height: 48,
-    borderRadius: 14,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.08)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 14,
@@ -881,29 +863,21 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   editionName: {
-    fontFamily: FONTS.title,
-    fontSize: 16,
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 15,
     color: '#FFFFFF',
-    marginBottom: 2,
   },
-  editionDesc: {
+  editionNameSelected: {
+    color: '#FFBC40',
+  },
+  editionDescription: {
     fontFamily: FONTS.body,
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.5)',
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.4)',
+    marginTop: 3,
   },
-  radioOuter: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  radioInner: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+  editionCheck: {
+    marginLeft: 8,
   },
 
   // ── Ideation (Step 3) ──

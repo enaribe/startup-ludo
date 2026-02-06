@@ -25,6 +25,7 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import { refreshEditionsFromFirestore } from '@/data';
 import { refreshDefaultProjectsFromFirestore } from '@/data/defaultProjects';
 import { refreshChallengesFromFirestore } from '@/data/challenges';
+import { refreshIdeationFromFirestore } from '@/constants/ideation';
 
 // Keep splash screen visible while loading resources
 SplashScreen.preventAutoHideAsync();
@@ -63,6 +64,7 @@ export default function RootLayout() {
       });
     refreshDefaultProjectsFromFirestore();
     refreshChallengesFromFirestore();
+    refreshIdeationFromFirestore();
     return () => unsubscribe();
   }, []);
 

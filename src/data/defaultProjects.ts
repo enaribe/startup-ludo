@@ -8,20 +8,19 @@
  */
 
 import { collection, getDocs } from 'firebase/firestore';
-import { firestore, FIRESTORE_COLLECTIONS, firebaseLog } from '@/services/firebase/config';
+import { firestore, FIRESTORE_COLLECTIONS } from '@/services/firebase/config';
+import { cachedFetch } from '@/services/firebase/cacheHelper';
 import type { Startup } from '@/types';
 
 // ===== TYPES =====
 
-export type EditionId = 'classic' | 'agriculture' | 'education' | 'sante' | 'tourisme' | 'culture';
+export type EditionId = 'classic';
 
-export interface DefaultProject {
-  id: string;
-  name: string;
-  sector: string;
-  description: string;
-  edition: EditionId;
-}
+// Import du type depuis types.ts pour cohérence
+import type { DefaultProject as NewDefaultProject } from './types';
+
+// Re-export le type
+export type DefaultProject = NewDefaultProject;
 
 // ===== EDITION -> SECTEURS =====
 
@@ -33,11 +32,6 @@ export const EDITION_SECTORS: Record<EditionId, string[]> = {
     'mobile-telecommunications', 'logistique-supply-chain', 'edtech',
     'cleantech-environnement',
   ],
-  agriculture: ['agritech', 'foodtech', 'greentech', 'cleantech-environnement'],
-  education: ['edtech'],
-  sante: ['cybersecurite'],
-  tourisme: ['tourisme'],
-  culture: ['entertainment-media'],
 };
 
 // ===== PROJETS PAR DEFAUT (4 par edition) =====
@@ -49,183 +43,32 @@ const LOCAL_DEFAULT_PROJECTS: Record<EditionId, DefaultProject[]> = {
       name: 'MobiPay',
       sector: 'fintech',
       description: 'Paiement mobile pour les marches informels africains',
-      edition: 'classic',
+      target: 'Commerçants et marchands informels',
+      mission: 'Democratiser le paiement digital en Afrique',
     },
     {
       id: 'default_classic_2',
       name: 'TerraConnect',
       sector: 'logistique-supply-chain',
       description: 'Plateforme de livraison du dernier kilometre en Afrique de l\'Ouest',
-      edition: 'classic',
+      target: 'E-commercants et PME',
+      mission: 'Rendre la livraison accessible partout',
     },
     {
       id: 'default_classic_3',
       name: 'SunGrid',
       sector: 'energie-renouvelable',
       description: 'Micro-reseaux solaires pour les communautes rurales',
-      edition: 'classic',
+      target: 'Communautes rurales et villages',
+      mission: 'Electrifier l\'Afrique rurale durablement',
     },
     {
       id: 'default_classic_4',
       name: 'ShopNaija',
       sector: 'e-commerce',
       description: 'Marketplace de produits artisanaux Made in Africa',
-      edition: 'classic',
-    },
-  ],
-
-  agriculture: [
-    {
-      id: 'default_agri_1',
-      name: 'AgroSense',
-      sector: 'agritech',
-      description: 'Capteurs IoT pour le suivi des cultures en temps reel',
-      edition: 'agriculture',
-    },
-    {
-      id: 'default_agri_2',
-      name: 'FarmLink',
-      sector: 'foodtech',
-      description: 'Connexion directe producteurs-restaurateurs sans intermediaires',
-      edition: 'agriculture',
-    },
-    {
-      id: 'default_agri_3',
-      name: 'VerdeStock',
-      sector: 'greentech',
-      description: 'Solution de stockage ecologique pour les recoltes',
-      edition: 'agriculture',
-    },
-    {
-      id: 'default_agri_4',
-      name: 'AquaPure',
-      sector: 'cleantech-environnement',
-      description: 'Systeme de traitement d\'eau pour l\'irrigation agricole',
-      edition: 'agriculture',
-    },
-  ],
-
-  education: [
-    {
-      id: 'default_edu_1',
-      name: 'LearnAfrika',
-      sector: 'edtech',
-      description: 'Cours en ligne adaptes aux programmes scolaires africains',
-      edition: 'education',
-    },
-    {
-      id: 'default_edu_2',
-      name: 'SkillForge',
-      sector: 'edtech',
-      description: 'Formation professionnelle par la realite virtuelle',
-      edition: 'education',
-    },
-    {
-      id: 'default_edu_3',
-      name: 'KidoCode',
-      sector: 'edtech',
-      description: 'Apprentissage du code pour les enfants de 6 a 14 ans',
-      edition: 'education',
-    },
-    {
-      id: 'default_edu_4',
-      name: 'TutorZone',
-      sector: 'edtech',
-      description: 'Mise en relation eleves et tuteurs certifies',
-      edition: 'education',
-    },
-  ],
-
-  sante: [
-    {
-      id: 'default_sante_1',
-      name: 'MediGuard',
-      sector: 'cybersecurite',
-      description: 'Protection des donnees medicales pour les hopitaux',
-      edition: 'sante',
-    },
-    {
-      id: 'default_sante_2',
-      name: 'PharmaSafe',
-      sector: 'cybersecurite',
-      description: 'Tracabilite securisee des medicaments contre la contrefacon',
-      edition: 'sante',
-    },
-    {
-      id: 'default_sante_3',
-      name: 'HealthID',
-      sector: 'cybersecurite',
-      description: 'Identite numerique securisee pour les patients',
-      edition: 'sante',
-    },
-    {
-      id: 'default_sante_4',
-      name: 'CyberClinic',
-      sector: 'cybersecurite',
-      description: 'Audit de securite informatique pour les centres de sante',
-      edition: 'sante',
-    },
-  ],
-
-  tourisme: [
-    {
-      id: 'default_tour_1',
-      name: 'SafariBook',
-      sector: 'tourisme',
-      description: 'Reservation d\'experiences eco-touristiques en Afrique',
-      edition: 'tourisme',
-    },
-    {
-      id: 'default_tour_2',
-      name: 'LocalGuide',
-      sector: 'tourisme',
-      description: 'Plateforme de guides locaux certifies',
-      edition: 'tourisme',
-    },
-    {
-      id: 'default_tour_3',
-      name: 'HeritageMap',
-      sector: 'tourisme',
-      description: 'Circuits immersifs du patrimoine culturel africain',
-      edition: 'tourisme',
-    },
-    {
-      id: 'default_tour_4',
-      name: 'StayLocal',
-      sector: 'tourisme',
-      description: 'Hebergement chez l\'habitant en milieu rural',
-      edition: 'tourisme',
-    },
-  ],
-
-  culture: [
-    {
-      id: 'default_culture_1',
-      name: 'AfroStream',
-      sector: 'entertainment-media',
-      description: 'Plateforme de streaming de contenus africains',
-      edition: 'culture',
-    },
-    {
-      id: 'default_culture_2',
-      name: 'BeatMakers',
-      sector: 'entertainment-media',
-      description: 'Studio de production musicale en ligne pour artistes africains',
-      edition: 'culture',
-    },
-    {
-      id: 'default_culture_3',
-      name: 'StoryTell',
-      sector: 'entertainment-media',
-      description: 'Edition et diffusion de bandes dessinees africaines numeriques',
-      edition: 'culture',
-    },
-    {
-      id: 'default_culture_4',
-      name: 'FestivalHub',
-      sector: 'entertainment-media',
-      description: 'Billetterie et promotion d\'evenements culturels',
-      edition: 'culture',
+      target: 'Artisans et acheteurs internationaux',
+      mission: 'Valoriser l\'artisanat africain mondialement',
     },
   ],
 };
@@ -235,59 +78,114 @@ const LOCAL_DEFAULT_PROJECTS: Record<EditionId, DefaultProject[]> = {
 export let DEFAULT_PROJECTS: Record<EditionId, DefaultProject[]> = { ...LOCAL_DEFAULT_PROJECTS };
 
 /**
- * Rafraîchit les projets par défaut depuis Firestore.
- * Les projets Firestore sont regroupés par edition.
+ * Fetch les projets par défaut depuis Firestore (sans cache).
+ * NOTE: Maintenant les defaultProjects sont intégrés directement dans les éditions,
+ * cette fonction n'est utilisée que pour la backward compatibility.
+ */
+async function fetchDefaultProjectsFromFirestore(): Promise<Record<EditionId, DefaultProject[]>> {
+  const snapshot = await getDocs(collection(firestore, FIRESTORE_COLLECTIONS.defaultProjects));
+  if (snapshot.empty) return { ...LOCAL_DEFAULT_PROJECTS };
+
+  const remoteByEdition: Record<string, DefaultProject[]> = {};
+  snapshot.docs.forEach((doc) => {
+    const data = doc.data();
+    // Récupérer l'édition depuis le champ ou utiliser 'classic' par défaut
+    const edition = (data.edition || 'classic') as string;
+    const proj: DefaultProject = {
+      id: doc.id,
+      name: data.name || '',
+      sector: data.sector || '',
+      description: data.description || '',
+      target: data.target || '',
+      mission: data.mission || '',
+      initialBudget: data.initialBudget,
+    };
+    if (!remoteByEdition[edition]) {
+      remoteByEdition[edition] = [];
+    }
+    remoteByEdition[edition]!.push(proj);
+  });
+
+  // Merge: remote prend la priorité par édition, local est fallback
+  const merged = { ...LOCAL_DEFAULT_PROJECTS };
+  for (const [editionId, projects] of Object.entries(remoteByEdition)) {
+    if (projects.length > 0) {
+      merged[editionId as EditionId] = projects;
+    }
+  }
+  return merged;
+}
+
+/**
+ * Charge les projets par défaut : AsyncStorage d'abord, puis Firestore si stale (>24h).
  */
 export async function refreshDefaultProjectsFromFirestore(): Promise<void> {
   try {
-    const snapshot = await getDocs(collection(firestore, FIRESTORE_COLLECTIONS.defaultProjects));
-    if (snapshot.empty) return;
-
-    const remoteByEdition: Record<string, DefaultProject[]> = {};
-    snapshot.docs.forEach((doc) => {
-      const data = doc.data() as DefaultProject;
-      const proj: DefaultProject = {
-        id: doc.id,
-        name: data.name || '',
-        sector: data.sector || '',
-        description: data.description || '',
-        edition: (data.edition || 'classic') as EditionId,
-      };
-      if (!remoteByEdition[proj.edition]) {
-        remoteByEdition[proj.edition] = [];
+    await cachedFetch<Record<EditionId, DefaultProject[]>>(
+      'defaultProjects',
+      fetchDefaultProjectsFromFirestore,
+      (data) => {
+        DEFAULT_PROJECTS = data;
       }
-      remoteByEdition[proj.edition]!.push(proj);
-    });
-
-    // Merge: remote prend la priorité par édition, local est fallback
-    DEFAULT_PROJECTS = { ...LOCAL_DEFAULT_PROJECTS };
-    for (const [editionId, projects] of Object.entries(remoteByEdition)) {
-      if (projects.length > 0) {
-        DEFAULT_PROJECTS[editionId as EditionId] = projects;
-      }
-    }
-    firebaseLog(`Refreshed default projects from Firestore (${snapshot.docs.length} total)`);
-  } catch (error) {
-    console.warn('[Data] Default projects Firestore fetch failed, using local data:', error);
+    );
+  } catch {
+    console.warn('[Data] Default projects: no data available, using local fallback');
   }
 }
 
 // ===== HELPERS =====
 
 /**
- * Retourne les 4 projets par defaut pour une edition donnee.
- * Fallback sur 'classic' si l'edition n'existe pas.
+ * Retourne les projets par defaut pour une edition donnee.
+ * Priorité : defaultProjects de l'édition > projets Firestore > fallback local
  */
-export function getDefaultProjectsForEdition(edition: string): DefaultProject[] {
-  return DEFAULT_PROJECTS[edition as EditionId] ?? DEFAULT_PROJECTS.classic ?? [];
+export function getDefaultProjectsForEdition(editionId: string): DefaultProject[] {
+  // Import dynamique pour éviter la dépendance circulaire
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { getEdition } = require('./index');
+
+  // Récupérer l'édition depuis la fonction getEdition
+  const editionData = getEdition(editionId);
+
+  // Debug log
+  console.log(`[DefaultProjects] Edition ${editionId}: ${editionData?.defaultProjects?.length || 0} defaultProjects from edition`);
+
+  // Si l'édition a des defaultProjects générés, les utiliser
+  if (editionData?.defaultProjects && editionData.defaultProjects.length > 0) {
+    console.log(`[DefaultProjects] Using ${editionData.defaultProjects.length} projects from edition ${editionId}`);
+    // Mapper vers le format DefaultProject local si nécessaire
+    return editionData.defaultProjects.map((p: DefaultProject) => ({
+      id: p.id,
+      name: p.name,
+      sector: p.sector,
+      description: p.description,
+      target: p.target || '',
+      mission: p.mission || '',
+      initialBudget: p.initialBudget,
+    }));
+  }
+
+  // Sinon fallback : projets Firestore ou locaux
+  console.log(`[DefaultProjects] Fallback to local projects for ${editionId}`);
+  return DEFAULT_PROJECTS[editionId as EditionId] ?? DEFAULT_PROJECTS.classic ?? [];
 }
 
 /**
  * Filtre les startups de l'utilisateur pour ne garder que celles
  * dont le secteur correspond a l'edition choisie.
  */
-export function getMatchingUserStartups(startups: Startup[], edition: string): Startup[] {
-  const sectors = EDITION_SECTORS[edition as EditionId] ?? EDITION_SECTORS.classic;
+export function getMatchingUserStartups(startups: Startup[], editionId: string): Startup[] {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { getEdition } = require('./index');
+
+  // Récupérer l'édition depuis la fonction getEdition
+  const editionData = getEdition(editionId);
+  const sectors = editionData?.sectors || EDITION_SECTORS[editionId as EditionId] || EDITION_SECTORS.classic;
+
+  if (!sectors || sectors.length === 0) {
+    return startups; // Pas de filtre si pas de secteurs
+  }
+
   return startups.filter((s) => sectors.includes(s.sector));
 }
 

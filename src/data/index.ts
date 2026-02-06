@@ -23,14 +23,10 @@ import type {
 } from './types';
 
 import { fetchEditionsFromFirestore } from '@/services/firebase/editionService';
+import { cachedFetch } from '@/services/firebase/cacheHelper';
 
-// Import des éditions JSON (fallback local)
+// Import de l'édition JSON (fallback local)
 import classicData from './editions/classic.json';
-import agricultureData from './editions/agriculture.json';
-import educationData from './editions/education.json';
-import santeData from './editions/sante.json';
-import tourismeData from './editions/tourisme.json';
-import cultureData from './editions/culture.json';
 
 // Import du layout du plateau
 import boardLayoutData from './board-layout.json';
@@ -38,13 +34,8 @@ import boardLayoutData from './board-layout.json';
 // ===== ÉDITIONS =====
 
 // Données locales (fallback offline uniquement)
-const LOCAL_EDITIONS: Record<EditionId, Edition> = {
+const LOCAL_EDITIONS: Record<string, Edition> = {
   classic: classicData as Edition,
-  agriculture: agricultureData as Edition,
-  education: educationData as Edition,
-  sante: santeData as Edition,
-  tourisme: tourismeData as Edition,
-  culture: cultureData as Edition,
 };
 
 // Mutable — commence vide, rempli par Firestore ou fallback local
@@ -52,26 +43,25 @@ const LOCAL_EDITIONS: Record<EditionId, Edition> = {
 export let EDITIONS: Record<EditionId, Edition> = {};
 
 /**
- * Rafraîchit les éditions depuis Firestore.
- * Firestore est la source de vérité principale.
- * Les données locales ne sont utilisées qu'en fallback si Firestore échoue ou est vide.
+ * Charge les éditions : AsyncStorage d'abord, puis Firestore si stale (>24h).
+ * Les données locales ne sont utilisées qu'en fallback si aucune donnée disponible.
  */
 export async function refreshEditionsFromFirestore(): Promise<void> {
   try {
-    const remote = await fetchEditionsFromFirestore();
-    // Si Firestore retourne des éditions, les utiliser directement (priorité absolue)
-    if (Object.keys(remote).length > 0) {
-      EDITIONS = remote;
-      console.log('[Data] Editions loaded from Firestore:', Object.keys(remote).length, 'editions');
-    } else {
-      // Firestore vide, utiliser le fallback local
-      console.warn('[Data] Firestore returned no editions, using local fallback');
+    await cachedFetch<Record<EditionId, Edition>>(
+      'editions',
+      fetchEditionsFromFirestore,
+      (data) => {
+        // Firestore vide = suppression → fallback local
+        EDITIONS = Object.keys(data).length > 0 ? data : { ...LOCAL_EDITIONS };
+      }
+    );
+  } catch {
+    // Ni cache ni Firestore — fallback local
+    if (Object.keys(EDITIONS).length === 0) {
+      console.warn('[Data] No editions available, using local fallback');
       EDITIONS = { ...LOCAL_EDITIONS };
     }
-  } catch (error) {
-    // Erreur Firestore, utiliser le fallback local
-    console.warn('[Data] Firestore fetch failed, using local fallback:', error);
-    EDITIONS = { ...LOCAL_EDITIONS };
   }
 }
 

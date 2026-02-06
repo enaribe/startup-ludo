@@ -79,15 +79,7 @@ export default function ChallengeGameScreen() {
   const handleStartGame = useCallback(() => {
     if (!challenge || !enrollment) return;
 
-    // Déterminer l'édition basée sur le secteur
-    let edition = 'classic';
-    if (selectedSector) {
-      if (selectedSector.category === 'agriculture') {
-        edition = 'agriculture';
-      } else if (selectedSector.category === 'services') {
-        edition = 'services';
-      }
-    }
+    const edition = 'classic';
 
     // Configuration automatique: joueur vs IA
     // Utiliser l'UID Firebase pour que l'écran de résultats identifie le gagnant

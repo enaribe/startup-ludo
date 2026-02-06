@@ -110,6 +110,19 @@ export interface StartupIdea {
   revenueModel?: string;
 }
 
+// ===== PROJETS PAR DÉFAUT =====
+
+export interface DefaultProject {
+  id: string;
+  name: string;
+  description: string;
+  sector: string;
+  target: string;
+  mission: string;
+  initialBudget?: number;
+  icon?: string;
+}
+
 // ===== ÉDITION COMPLÈTE =====
 
 export interface Edition {
@@ -118,17 +131,19 @@ export interface Edition {
   description: string;
   icon: keyof typeof Ionicons.glyphMap;
   color: string;
+  sectors?: string[];
   quizzes: Quiz[];
   duels: Duel[];
   fundings: Funding[];
   opportunities: Opportunity[];
   challenges: Challenge[];
   startupIdeas?: StartupIdea[];
+  defaultProjects?: DefaultProject[];
 }
 
 // ===== HELPERS POUR VALIDATION =====
 
-const KNOWN_EDITIONS = ['classic', 'agriculture', 'education', 'sante', 'tourisme', 'culture'];
+const KNOWN_EDITIONS = ['classic'];
 
 export function isValidEditionId(id: string): id is EditionId {
   return KNOWN_EDITIONS.includes(id) || id.length > 0;

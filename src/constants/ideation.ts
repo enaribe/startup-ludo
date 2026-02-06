@@ -164,9 +164,9 @@ const RAW_SECTORS: { id: string; name: string; xp: number }[] = [
   { id: 'cleantech-environnement', name: 'CleanTech & Environnement', xp: 1.8 },
 ];
 
-// ===== EXPORTS CONSTRUITS =====
+// ===== LOCAL FALLBACK (données codées en dur) =====
 
-export const TARGET_CARDS: TargetCard[] = RAW_TARGETS.map((t) => ({
+const LOCAL_TARGET_CARDS: TargetCard[] = RAW_TARGETS.map((t) => ({
   id: t.id,
   category: targetCategory(t.id),
   title: t.name,
@@ -175,7 +175,7 @@ export const TARGET_CARDS: TargetCard[] = RAW_TARGETS.map((t) => ({
   xpMultiplier: t.xp,
 }));
 
-export const MISSION_CARDS: MissionCard[] = RAW_MISSIONS.map((m) => ({
+const LOCAL_MISSION_CARDS: MissionCard[] = RAW_MISSIONS.map((m) => ({
   id: m.id,
   category: missionCategory(m.id),
   title: m.name,
@@ -184,9 +184,46 @@ export const MISSION_CARDS: MissionCard[] = RAW_MISSIONS.map((m) => ({
   xpMultiplier: m.xp,
 }));
 
-export const SECTOR_CARDS: SectorCard[] = RAW_SECTORS.map((s) => ({
+const LOCAL_SECTOR_CARDS: SectorCard[] = RAW_SECTORS.map((s) => ({
   id: s.id,
   title: s.name,
   rarity: rarityFromXP(s.xp),
   xpMultiplier: s.xp,
 }));
+
+// ===== EXPORTS MUTABLES =====
+// Commence avec les données locales, remplacé par Firestore via refreshIdeationFromFirestore()
+
+// eslint-disable-next-line import/no-mutable-exports
+export let TARGET_CARDS: TargetCard[] = LOCAL_TARGET_CARDS;
+// eslint-disable-next-line import/no-mutable-exports
+export let MISSION_CARDS: MissionCard[] = LOCAL_MISSION_CARDS;
+// eslint-disable-next-line import/no-mutable-exports
+export let SECTOR_CARDS: SectorCard[] = LOCAL_SECTOR_CARDS;
+
+// ===== REFRESH DEPUIS FIRESTORE (avec cache AsyncStorage) =====
+
+import { fetchIdeationFromFirestore, type IdeationData } from '@/services/firebase/ideationService';
+import { cachedFetch } from '@/services/firebase/cacheHelper';
+
+function applyIdeationData(data: IdeationData): void {
+  // Firestore vide = suppression → fallback local
+  TARGET_CARDS = data.targets.length > 0 ? data.targets : LOCAL_TARGET_CARDS;
+  MISSION_CARDS = data.missions.length > 0 ? data.missions : LOCAL_MISSION_CARDS;
+  SECTOR_CARDS = data.sectors.length > 0 ? data.sectors : LOCAL_SECTOR_CARDS;
+}
+
+/**
+ * Charge les cartes d'idéation : AsyncStorage d'abord, puis Firestore si stale (>24h).
+ */
+export async function refreshIdeationFromFirestore(): Promise<void> {
+  try {
+    await cachedFetch<IdeationData>(
+      'ideation',
+      fetchIdeationFromFirestore,
+      applyIdeationData
+    );
+  } catch {
+    console.warn('[Ideation] Firestore + cache failed, using local fallback');
+  }
+}

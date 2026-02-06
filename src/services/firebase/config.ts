@@ -112,6 +112,7 @@ export const FIRESTORE_COLLECTIONS = {
   reports: 'reports',
   challenges: 'challenges',
   challengeEnrollments: 'challengeEnrollments',
+  ideationCards: 'ideationCards',
 } as const;
 
 // ===== ERROR HANDLING =====
