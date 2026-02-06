@@ -223,6 +223,8 @@ export interface RealtimePlayer {
   startupId?: string;
   startupName?: string;
   isDefaultProject?: boolean;
+  sector?: string;    // Secteur du projet (online - éditions par joueur)
+  edition?: string;   // Édition dérivée du secteur (online)
 }
 
 // Compact game state for bandwidth efficiency

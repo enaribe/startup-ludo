@@ -182,6 +182,18 @@ export class EventManager {
   }
 
   /**
+   * Génère un événement pour une édition spécifique (sans modifier l'état global).
+   * Utilisé en mode online où chaque joueur a sa propre édition.
+   */
+  generateEventForEdition(eventType: EventType, editionId: EditionId): GeneratedGameEvent | null {
+    const previousEdition = this.editionId;
+    this.editionId = editionId;
+    const event = this.generateEvent(eventType);
+    this.editionId = previousEdition;
+    return event;
+  }
+
+  /**
    * Sélectionne un élément aléatoire d'un tableau
    */
   private pickRandom<T>(items: T[]): T | null {

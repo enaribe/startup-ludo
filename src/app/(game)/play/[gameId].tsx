@@ -226,11 +226,11 @@ export default function PlayScreen() {
 
   const handleTriggeredEvent = useCallback(
     (eventType: string) => {
-      // Utilise EventManager pour générer des événements depuis les données de l'édition
-      if (game?.edition) {
-        eventManager.setEdition(game.edition);
-      }
-      const event = eventManager.generateEvent(eventType as any);
+      // Utilise l'édition du joueur courant (mode online) ou l'édition globale (mode solo/local)
+      const playerEdition = (currentPlayer?.edition || game?.edition || 'classic') as import('@/data').EditionId;
+
+      // Génère l'événement depuis l'édition du joueur
+      const event = eventManager.generateEventForEdition(eventType as any, playerEdition);
       if (!event) {
         // No event generated — skip directly
         return;
@@ -309,7 +309,8 @@ export default function PlayScreen() {
             const otherPlayers = game?.players?.filter((p) => p.id !== currentPlayer?.id) ?? [];
             if (otherPlayers.length >= 1) {
               const opponentId = otherPlayers[0]!.id;
-              const questions = getRandomDuelQuestions(3, game?.edition);
+              // L'attaquant (AI) impose son édition pour le duel
+              const questions = getRandomDuelQuestions(3, currentPlayer?.edition || game?.edition);
               duel.startDuelWithQuestions(currentPlayer!.id, opponentId, questions);
               // Duel: show spectator popup then auto-resolve after a delay (no real Q&A for AI vs AI)
               setTimeout(resolveAndClose, 2000);
@@ -352,7 +353,8 @@ export default function PlayScreen() {
           const otherPlayers = game?.players?.filter((p) => p.id !== currentPlayer.id) ?? [];
           if (otherPlayers.length === 1) {
             const opponentId = otherPlayers[0]!.id;
-            const questions = getRandomDuelQuestions(3, game?.edition);
+            // L'attaquant (challenger) impose son édition pour le duel
+            const questions = getRandomDuelQuestions(3, currentPlayer.edition || game?.edition);
             duel.startDuelWithQuestions(currentPlayer.id, opponentId, questions);
             if (isOnline) {
               onlineGame.broadcastDuelStart(currentPlayer.id, opponentId, questions as unknown as Record<string, unknown>[]);
@@ -636,7 +638,9 @@ export default function PlayScreen() {
     (opponent: Player) => {
       if (!duel.challenger) return;
       duel.selectOpponent(opponent.id);
-      const questions = getRandomDuelQuestions(3, game?.edition);
+      // L'attaquant (challenger) impose son édition pour le duel
+      const challengerEdition = duel.challenger.edition || game?.edition;
+      const questions = getRandomDuelQuestions(3, challengerEdition);
       duel.startDuelWithQuestions(duel.challenger.id, opponent.id, questions);
       if (isOnline) {
         onlineGame.broadcastDuelStart(duel.challenger.id, opponent.id, questions as unknown as Record<string, unknown>[]);
@@ -940,7 +944,8 @@ export default function PlayScreen() {
                 const otherPlayers = game?.players?.filter((p) => p.id !== currentPlayer.id) ?? [];
                 if (otherPlayers.length === 1) {
                   const opponentId = otherPlayers[0]!.id;
-                  const questions = getRandomDuelQuestions(3, game?.edition);
+                  // L'attaquant (challenger) impose son édition pour le duel
+                  const questions = getRandomDuelQuestions(3, currentPlayer.edition || game?.edition);
                   duel.startDuelWithQuestions(currentPlayer.id, opponentId, questions);
                   if (isOnline) {
                     onlineGame.broadcastDuelStart(currentPlayer.id, opponentId, questions as unknown as Record<string, unknown>[]);

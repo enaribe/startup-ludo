@@ -196,3 +196,19 @@ export function isOwnStartup(startupId: string | undefined): boolean {
   if (!startupId) return false;
   return !startupId.startsWith('default_');
 }
+
+/**
+ * Retourne l'édition correspondant à un secteur donné.
+ * Parcourt EDITION_SECTORS pour trouver l'édition contenant ce secteur.
+ * Fallback: 'classic' si non trouvé.
+ */
+export function getSectorEdition(sector: string): EditionId {
+  if (!sector) return 'classic';
+  const normalizedSector = sector.toLowerCase();
+  for (const [editionId, sectors] of Object.entries(EDITION_SECTORS)) {
+    if (sectors.includes(normalizedSector)) {
+      return editionId as EditionId;
+    }
+  }
+  return 'classic';
+}

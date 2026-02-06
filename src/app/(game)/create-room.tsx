@@ -102,9 +102,9 @@ export default function CreateRoomScreen() {
   );
   const hasSelectedStartup = !!myPlayer?.startupId;
 
-  const handleStartupSelected = useCallback(async (startupId: string, startupName: string, isDefault: boolean) => {
+  const handleStartupSelected = useCallback(async (startupId: string, startupName: string, isDefault: boolean, sector: string) => {
     setShowStartupModal(false);
-    await setStartupSelection(startupId, startupName, isDefault);
+    await setStartupSelection(startupId, startupName, isDefault, sector);
   }, [setStartupSelection]);
 
   // Listen for game start (room status change to 'playing')

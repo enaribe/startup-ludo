@@ -192,6 +192,9 @@ export const useGameStore = create<GameStore>()(
               tokens: 0,
               pawns: GameEngine.createInitialPawns(),
               isHost: index === 0,
+              // Conserver l'édition du joueur (online) ou fallback sur édition globale
+              edition: p.edition || edition,
+              sector: p.sector,
             })),
             currentPlayerIndex: 0,
             currentTurn: 1,

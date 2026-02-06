@@ -164,19 +164,24 @@ export default function ResultsScreen() {
   const challengeLevelNumber = game?.challengeContext?.levelNumber ?? 1;
 
   // Valorisation : differenciee selon projet perso vs defaut
+  // Si projet par defaut utilise, on attribue la valorisation au premier projet personnel
   const usedOwnStartup = isOwnStartup(myPlayer?.startupId);
+  const firstPersonalStartup = profile?.startups?.[0] ?? null;
   const myStartup = usedOwnStartup
     ? profile?.startups?.find((s) => s.id === myPlayer?.startupId)
-    : null;
+    : firstPersonalStartup; // Fallback au premier projet personnel
 
+  // Calcul de la valorisation (toujours appliquee si l'utilisateur a un projet)
+  const hasAnyStartup = myStartup !== null;
   const valorisationBefore = myStartup?.valorisation ?? 0;
-  const valorisationGain = usedOwnStartup
+  const valorisationGain = hasAnyStartup
     ? isWinner
       ? (myPlayer?.tokens ?? 0) * 5000 * (isOnline ? 2 : 1)
       : (myPlayer?.tokens ?? 0) * 2000 * (isOnline ? 2 : 1)
     : 0;
   const valorisationAfter = valorisationBefore + valorisationGain;
   const defaultProjectXPBonus = !usedOwnStartup && myPlayer?.startupId ? 5 : 0;
+  const isUsingFallbackStartup = !usedOwnStartup && hasAnyStartup;
 
   // Cagnotte (online only)
   const cagnotte = isOnline ? (game?.players.length ?? 0) * 100 : 0;
@@ -194,8 +199,8 @@ export default function ResultsScreen() {
     if (totalXP > 0) addXP(totalXP);
     if (myPlayer) addTokensEarned(myPlayer.tokens);
 
-    // 1b. Valorisation de la startup personnelle
-    if (usedOwnStartup && myStartup && valorisationGain > 0) {
+    // 1b. Valorisation de la startup personnelle (ou premier projet si defaut utilise)
+    if (myStartup && valorisationGain > 0) {
       updateStartup(myStartup.id, { valorisation: valorisationAfter });
 
       // Sync to Firestore
@@ -461,8 +466,8 @@ export default function ResultsScreen() {
           </Animated.View>
         )}
 
-        {/* Valorisation — projet perso uniquement */}
-        {usedOwnStartup && valorisationGain > 0 ? (
+        {/* Valorisation — projet perso ou fallback au premier projet */}
+        {valorisationGain > 0 && myStartup ? (
           <Animated.View style={[styles.section, valorisationStyle]}>
             <DynamicGradientBorder
               borderRadius={20}
@@ -473,9 +478,14 @@ export default function ResultsScreen() {
                 <View style={styles.valorisationHeader}>
                   <Ionicons name="trending-up" size={18} color={COLORS.success} />
                   <Text style={styles.valorisationTitle}>
-                    {myStartup?.name ?? 'Projet'}
+                    {myStartup.name}
                   </Text>
                 </View>
+                {isUsingFallbackStartup && (
+                  <Text style={styles.fallbackHint}>
+                    Valorisation attribuee a votre projet principal
+                  </Text>
+                )}
                 <View style={styles.valorisationRow}>
                   <View style={styles.valorisationCol}>
                     <Text style={styles.valorisationLabel}>Avant</Text>
@@ -496,10 +506,16 @@ export default function ResultsScreen() {
                     </Text>
                   </View>
                 </View>
+                {defaultProjectXPBonus > 0 && (
+                  <View style={styles.defaultBonusRow}>
+                    <Ionicons name="star" size={14} color={COLORS.primary} />
+                    <Text style={styles.defaultBonusText}>+{defaultProjectXPBonus} XP bonus (projet par defaut)</Text>
+                  </View>
+                )}
               </View>
             </DynamicGradientBorder>
           </Animated.View>
-        ) : myPlayer?.startupId ? (
+        ) : myPlayer?.startupId && !myStartup ? (
           <Animated.View style={[styles.section, valorisationStyle]}>
             <DynamicGradientBorder
               borderRadius={20}
@@ -865,6 +881,14 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     textAlign: 'center',
     marginTop: SPACING[1],
+  },
+  fallbackHint: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.primary,
+    textAlign: 'center',
+    marginBottom: SPACING[2],
+    fontStyle: 'italic',
   },
   defaultBonusRow: {
     flexDirection: 'row',

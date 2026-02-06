@@ -430,10 +430,21 @@ export const getGameHistory = async (
     );
 
     const snapshot = await getDocs(q);
-    const sessions = snapshot.docs.map((d) => ({
-      ...d.data(),
-      id: d.id,
-    })) as GameSession[];
+    const sessions = snapshot.docs.map((d) => {
+      const data = d.data();
+      // Convert Firestore Timestamp to milliseconds if needed
+      let createdAt = data.createdAt;
+      if (createdAt && typeof createdAt === 'object' && 'toMillis' in createdAt) {
+        createdAt = (createdAt as Timestamp).toMillis();
+      } else if (typeof createdAt !== 'number') {
+        createdAt = Date.now();
+      }
+      return {
+        ...data,
+        id: d.id,
+        createdAt,
+      } as GameSession;
+    });
 
     firebaseLog('Game history fetched successfully', { count: sessions.length });
     return sessions;

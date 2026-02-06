@@ -173,10 +173,10 @@ export default function LocalSetupScreen() {
     setShowStartupModal(true);
   }, [players, defaultProjects]);
 
-  const handleStartupSelected = (startupId: string, startupName: string, isDefault: boolean) => {
+  const handleStartupSelected = (startupId: string, startupName: string, isDefault: boolean, sector: string) => {
     setStartupSelections((prev) => ({
       ...prev,
-      [currentSelectingPlayer]: { startupId, startupName, isDefaultProject: isDefault },
+      [currentSelectingPlayer]: { startupId, startupName, isDefaultProject: isDefault, sector },
     }));
     setShowStartupModal(false);
 
@@ -211,10 +211,17 @@ export default function LocalSetupScreen() {
   };
 
   const handleStartGame = () => {
+    // userId du joueur connecte (pour l'historique)
+    const currentUserId = user?.id ?? profile?.userId;
+
     const gamePlayers = players.map((p, index) => {
       const selection = startupSelections[index];
+      // Le premier joueur humain utilise son vrai userId pour l'historique
+      const playerId = index === 0 && currentUserId && !p.isAI
+        ? currentUserId
+        : `player_${index}`;
       return {
-        id: `player_${index}`,
+        id: playerId,
         name: p.name || `Joueur ${index + 1}`,
         color: p.color,
         isAI: p.isAI,

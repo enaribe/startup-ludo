@@ -20,7 +20,7 @@ interface StartupSelectionModalProps {
   defaultProjects: DefaultProject[];
   /** Nom du joueur qui choisit (optionnel, pour le titre) */
   playerName?: string;
-  onSelect: (startupId: string, startupName: string, isDefault: boolean) => void;
+  onSelect: (startupId: string, startupName: string, isDefault: boolean, sector: string) => void;
   onClose: () => void;
 }
 
@@ -40,7 +40,7 @@ export const StartupSelectionModal = memo(function StartupSelectionModal({
     // Check user startups first
     const userStartup = userStartups.find((s) => s.id === selectedId);
     if (userStartup) {
-      onSelect(userStartup.id, userStartup.name, false);
+      onSelect(userStartup.id, userStartup.name, false, userStartup.sector);
       setSelectedId(null);
       return;
     }
@@ -48,7 +48,7 @@ export const StartupSelectionModal = memo(function StartupSelectionModal({
     // Then default projects
     const defaultProject = defaultProjects.find((p) => p.id === selectedId);
     if (defaultProject) {
-      onSelect(defaultProject.id, defaultProject.name, true);
+      onSelect(defaultProject.id, defaultProject.name, true, defaultProject.sector);
       setSelectedId(null);
     }
   };

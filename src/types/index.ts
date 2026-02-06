@@ -31,6 +31,8 @@ export interface Player {
   startupId?: string;
   startupName?: string;
   isDefaultProject?: boolean;
+  sector?: string;    // Secteur du projet sélectionné (online)
+  edition?: string;   // Édition dérivée du secteur (online)
 }
 
 // Ancien format (pour compatibilité)

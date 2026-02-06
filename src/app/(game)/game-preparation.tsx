@@ -180,6 +180,8 @@ export default function GamePreparationScreen() {
           startupId: p.startupId,
           startupName: p.startupName,
           isDefaultProject: p.isDefaultProject,
+          sector: p.sector,      // Secteur du projet (pour édition par joueur)
+          edition: p.edition,    // Édition dérivée du secteur
         }));
 
         if (checkpoint && (checkpoint as unknown as CompactCheckpoint).t) {

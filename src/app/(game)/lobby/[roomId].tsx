@@ -140,9 +140,9 @@ export default function LobbyScreen() {
     return playersList.every((p) => p.isReady || p.isHost);
   }, [playersList]);
 
-  const handleStartupSelected = useCallback(async (startupId: string, startupName: string, isDefault: boolean) => {
+  const handleStartupSelected = useCallback(async (startupId: string, startupName: string, isDefault: boolean, sector: string) => {
     setShowStartupModal(false);
-    await setStartupSelection(startupId, startupName, isDefault);
+    await setStartupSelection(startupId, startupName, isDefault, sector);
   }, [setStartupSelection]);
 
   const handleToggleReady = useCallback(async () => {

@@ -348,26 +348,36 @@ export class MultiplayerSync {
 
   /**
    * Définir la startup sélectionnée pour ce joueur
+   * @param sector - Secteur du projet (permet de calculer l'édition du joueur)
    */
-  async setStartupSelection(startupId: string, startupName: string, isDefaultProject: boolean): Promise<void> {
+  async setStartupSelection(startupId: string, startupName: string, isDefaultProject: boolean, sector?: string): Promise<void> {
     if (!this.roomId || !this.playerId) return;
 
     try {
-      firebaseLog('Setting startup selection', { roomId: this.roomId, startupId, startupName, isDefaultProject });
+      firebaseLog('Setting startup selection', { roomId: this.roomId, startupId, startupName, isDefaultProject, sector });
+
+      // Calculer l'édition basée sur le secteur
+      let edition: string | undefined;
+      if (sector) {
+        const { getSectorEdition } = await import('@/data/defaultProjects');
+        edition = getSectorEdition(sector);
+      }
 
       await update(ref(database, REALTIME_PATHS.roomPlayer(this.roomId, this.playerId)), {
         startupId,
         startupName,
         isDefaultProject,
+        ...(sector && { sector }),
+        ...(edition && { edition }),
       });
 
       this.emit({
         type: 'player_startup_selected',
-        data: { playerId: this.playerId, startupId, startupName, isDefaultProject },
+        data: { playerId: this.playerId, startupId, startupName, isDefaultProject, sector, edition },
         timestamp: Date.now(),
       });
 
-      firebaseLog('Startup selection updated');
+      firebaseLog('Startup selection updated', { edition });
     } catch (error) {
       firebaseLog('Failed to set startup selection', error);
       throw new Error(getFirebaseErrorMessage(error));

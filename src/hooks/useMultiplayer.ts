@@ -37,7 +37,7 @@ interface UseMultiplayerActions {
   joinRoom: (code: string, playerName: string) => Promise<{ roomId: string } | null>;
   leaveRoom: () => Promise<void>;
   setReady: (ready: boolean) => Promise<void>;
-  setStartupSelection: (startupId: string, startupName: string, isDefaultProject: boolean) => Promise<void>;
+  setStartupSelection: (startupId: string, startupName: string, isDefaultProject: boolean, sector?: string) => Promise<void>;
   startGame: () => Promise<string | null>;
   sendAction: (action: Omit<RealtimeAction, 'id' | 'timestamp'>) => Promise<void>;
   updateGameState: (state: Partial<RealtimeGameState>) => Promise<void>;
@@ -263,9 +263,9 @@ export function useMultiplayer(userId: string | null): UseMultiplayerReturn {
     }
   }, []);
 
-  const setStartupSelection = useCallback(async (startupId: string, startupName: string, isDefaultProject: boolean) => {
+  const setStartupSelection = useCallback(async (startupId: string, startupName: string, isDefaultProject: boolean, sector?: string) => {
     try {
-      await multiplayerSync.setStartupSelection(startupId, startupName, isDefaultProject);
+      await multiplayerSync.setStartupSelection(startupId, startupName, isDefaultProject, sector);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erreur';
       setState((prev) => ({ ...prev, error: message }));
