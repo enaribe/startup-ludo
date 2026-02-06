@@ -7,6 +7,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GameBoard } from '@/components/game/GameBoard';
 import { PlayerCard } from '@/components/game/PlayerCard';
 import {
+  EmojiReactionBar,
+  EmojiReactionOverlay,
+  type GameEmoji,
+  type EmojiReaction,
+} from '@/components/game';
+import {
   EventPopup,
   FundingPopup,
   QuizPopup,
@@ -159,6 +165,9 @@ export default function PlayScreen() {
   // Online disconnection/forfeit state
   const [showDisconnectPopup, setShowDisconnectPopup] = useState(false);
   const disconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Emoji reactions state
+  const [activeReactions, setActiveReactions] = useState<EmojiReaction[]>([]);
 
   // ===== UNIFIED ACTIONS (resolve online/local split once) =====
 
@@ -730,6 +739,52 @@ export default function PlayScreen() {
     }
   }, [duel.result, currentPlayer?.id, userId, isOnline, actions, handleEventResolve, duel]);
 
+  // ===== EMOJI REACTIONS HANDLERS =====
+
+  const handleEmojiPress = useCallback(
+    (emoji: GameEmoji) => {
+      const playerName = currentPlayer?.name ?? 'Joueur';
+      const reaction: EmojiReaction = {
+        id: `${currentPlayer?.id ?? 'local'}-${Date.now()}`,
+        playerId: currentPlayer?.id ?? '',
+        playerName,
+        emoji,
+        timestamp: Date.now(),
+      };
+
+      // Display locally
+      setActiveReactions((prev) => [...prev, reaction]);
+
+      // Broadcast in online mode
+      if (isOnline) {
+        onlineGame.sendEmojiReaction(emoji, playerName);
+      }
+    },
+    [currentPlayer, isOnline, onlineGame]
+  );
+
+  const handleEmojiAnimationComplete = useCallback((reactionId: string) => {
+    setActiveReactions((prev) => prev.filter((r) => r.id !== reactionId));
+  }, []);
+
+  // ===== ONLINE: React to remote emoji reactions =====
+
+  useEffect(() => {
+    if (!isOnline || !onlineGame.remoteEmojiReaction) return;
+
+    const remoteReaction = onlineGame.remoteEmojiReaction;
+    const reaction: EmojiReaction = {
+      id: remoteReaction.id,
+      playerId: remoteReaction.playerId,
+      playerName: remoteReaction.playerName,
+      emoji: remoteReaction.emoji as GameEmoji,
+      timestamp: remoteReaction.timestamp,
+    };
+
+    setActiveReactions((prev) => [...prev, reaction]);
+    onlineGame.clearRemoteEmojiReaction();
+  }, [isOnline, onlineGame.remoteEmojiReaction, onlineGame]);
+
   // ===== QUIT HANDLER =====
 
   const handleQuit = useCallback(() => {
@@ -897,6 +952,11 @@ export default function PlayScreen() {
             </View>
           </View>
 
+          {/* Emoji Reaction Bar */}
+          <View style={styles.emojiBarContainer}>
+            <EmojiReactionBar onEmojiPress={handleEmojiPress} />
+          </View>
+
           {/* Boutons de test des popups (désactivés — décommenter pour debug) */}
           {/* <View style={styles.testPopupsRow}>
             <Pressable
@@ -960,6 +1020,12 @@ export default function PlayScreen() {
           </View> */}
         </View>
       </View>
+
+      {/* Emoji Reaction Overlay */}
+      <EmojiReactionOverlay
+        reactions={activeReactions}
+        onAnimationComplete={handleEmojiAnimationComplete}
+      />
 
       {/* Quit Confirmation Modal */}
       <QuitConfirmPopup
@@ -1261,5 +1327,9 @@ const styles = StyleSheet.create({
   },
   noGameButton: {
     minWidth: 140,
+  },
+  emojiBarContainer: {
+    alignItems: 'center',
+    paddingTop: SPACING[2],
   },
 });

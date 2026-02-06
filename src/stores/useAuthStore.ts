@@ -9,6 +9,13 @@ import {
   logout as firebaseLogout,
   resetPassword as firebaseResetPassword,
   subscribeToAuthState,
+  signInWithGoogle,
+  signInWithApple,
+  signOutFromGoogle,
+  configureGoogleSignIn,
+  sendPhoneVerificationCode,
+  verifyPhoneCode,
+  resendPhoneVerificationCode,
   type AuthUser,
 } from '@/services/firebase';
 import {
@@ -23,6 +30,9 @@ interface AuthState {
   isAuthenticated: boolean;
   isInitialized: boolean;
   error: string | null;
+  // Phone auth state
+  phoneAuthStep: 'idle' | 'code_sent' | 'verifying';
+  phoneNumber: string | null;
 }
 
 interface AuthActions {
@@ -32,6 +42,13 @@ interface AuthActions {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, displayName: string) => Promise<void>;
   loginAsGuest: () => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
+  loginWithApple: () => Promise<void>;
+  // Phone auth
+  sendPhoneCode: (phoneNumber: string) => Promise<void>;
+  verifyPhoneCode: (code: string) => Promise<void>;
+  resendPhoneCode: () => Promise<void>;
+  resetPhoneAuth: () => void;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   clearError: () => void;
@@ -46,6 +63,9 @@ const initialState: AuthState = {
   isAuthenticated: false,
   isInitialized: false,
   error: null,
+  // Phone auth
+  phoneAuthStep: 'idle',
+  phoneNumber: null,
 };
 
 // Convert AuthUser to our User type
@@ -54,9 +74,13 @@ const mapAuthUserToUser = (authUser: AuthUser): User => ({
   email: authUser.email ?? '',
   displayName: authUser.displayName ?? 'Joueur',
   isGuest: authUser.isAnonymous,
+  photoURL: authUser.photoURL ?? undefined,
   createdAt: Date.now(),
   lastLogin: Date.now(),
 });
+
+// Configure Google Sign-In at module load
+configureGoogleSignIn();
 
 export const useAuthStore = create<AuthStore>()(
   subscribeWithSelector(
@@ -222,12 +246,180 @@ export const useAuthStore = create<AuthStore>()(
         }
       },
 
+      loginWithGoogle: async () => {
+        set((state) => {
+          state.isLoading = true;
+          state.error = null;
+        });
+
+        try {
+          const authUser = await signInWithGoogle();
+          const user = mapAuthUserToUser(authUser);
+
+          // Create or update user profile in Firestore
+          let profile = await getUserProfile(authUser.id);
+          if (!profile) {
+            profile = await createUserProfile(authUser.id, {
+              email: authUser.email,
+              displayName: authUser.displayName ?? 'Joueur',
+              photoURL: authUser.photoURL,
+            });
+          }
+
+          set((state) => {
+            state.user = user;
+            state.isAuthenticated = true;
+            state.isLoading = false;
+          });
+
+          useUserStore.getState().setProfile(profile);
+        } catch (error) {
+          set((state) => {
+            state.error = error instanceof Error ? error.message : 'Erreur de connexion Google';
+            state.isLoading = false;
+          });
+        }
+      },
+
+      loginWithApple: async () => {
+        set((state) => {
+          state.isLoading = true;
+          state.error = null;
+        });
+
+        try {
+          const authUser = await signInWithApple();
+          const user = mapAuthUserToUser(authUser);
+
+          // Create or update user profile in Firestore
+          let profile = await getUserProfile(authUser.id);
+          if (!profile) {
+            profile = await createUserProfile(authUser.id, {
+              email: authUser.email,
+              displayName: authUser.displayName ?? 'Joueur',
+            });
+          }
+
+          set((state) => {
+            state.user = user;
+            state.isAuthenticated = true;
+            state.isLoading = false;
+          });
+
+          useUserStore.getState().setProfile(profile);
+        } catch (error) {
+          set((state) => {
+            state.error = error instanceof Error ? error.message : 'Erreur de connexion Apple';
+            state.isLoading = false;
+          });
+        }
+      },
+
+      // Phone Authentication
+      sendPhoneCode: async (phoneNumber) => {
+        set((state) => {
+          state.isLoading = true;
+          state.error = null;
+          state.phoneNumber = phoneNumber;
+        });
+
+        try {
+          await sendPhoneVerificationCode(phoneNumber);
+          set((state) => {
+            state.phoneAuthStep = 'code_sent';
+            state.isLoading = false;
+          });
+        } catch (error) {
+          set((state) => {
+            state.error = error instanceof Error ? error.message : "Erreur d'envoi du code";
+            state.isLoading = false;
+            state.phoneAuthStep = 'idle';
+          });
+        }
+      },
+
+      verifyPhoneCode: async (code) => {
+        set((state) => {
+          state.isLoading = true;
+          state.error = null;
+          state.phoneAuthStep = 'verifying';
+        });
+
+        try {
+          const authUser = await verifyPhoneCode(code);
+          const user = mapAuthUserToUser(authUser);
+
+          // Create or update user profile in Firestore
+          let profile = await getUserProfile(authUser.id);
+          if (!profile) {
+            profile = await createUserProfile(authUser.id, {
+              email: authUser.email,
+              displayName: authUser.displayName ?? 'Joueur',
+            });
+          }
+
+          set((state) => {
+            state.user = user;
+            state.isAuthenticated = true;
+            state.isLoading = false;
+            state.phoneAuthStep = 'idle';
+            state.phoneNumber = null;
+          });
+
+          useUserStore.getState().setProfile(profile);
+        } catch (error) {
+          set((state) => {
+            state.error = error instanceof Error ? error.message : 'Code invalide';
+            state.isLoading = false;
+            state.phoneAuthStep = 'code_sent'; // Allow retry
+          });
+        }
+      },
+
+      resendPhoneCode: async () => {
+        const phoneNumber = _get().phoneNumber;
+        if (!phoneNumber) {
+          set((state) => {
+            state.error = 'Numéro de téléphone non disponible';
+          });
+          return;
+        }
+
+        set((state) => {
+          state.isLoading = true;
+          state.error = null;
+        });
+
+        try {
+          await resendPhoneVerificationCode(phoneNumber);
+          set((state) => {
+            state.isLoading = false;
+          });
+        } catch (error) {
+          set((state) => {
+            state.error = error instanceof Error ? error.message : "Erreur d'envoi du code";
+            state.isLoading = false;
+          });
+        }
+      },
+
+      resetPhoneAuth: () => {
+        set((state) => {
+          state.phoneAuthStep = 'idle';
+          state.phoneNumber = null;
+          state.error = null;
+        });
+      },
+
       logout: async () => {
         set((state) => {
           state.isLoading = true;
         });
 
         try {
+          // Sign out from Google if signed in
+          await signOutFromGoogle();
+          // Sign out from Firebase
           await firebaseLogout();
           set((state) => {
             state.user = null;

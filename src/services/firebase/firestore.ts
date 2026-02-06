@@ -34,7 +34,7 @@ import {
 // Create initial user profile in Firestore
 export const createUserProfile = async (
   userId: string,
-  data: { email: string | null; displayName: string }
+  data: { email: string | null; displayName: string; photoURL?: string | null }
 ): Promise<UserProfile> => {
   try {
     firebaseLog('Creating user profile', { userId, displayName: data.displayName });
@@ -44,7 +44,7 @@ export const createUserProfile = async (
       id: userId,
       email: data.email,
       displayName: data.displayName,
-      avatarUrl: null,
+      avatarUrl: data.photoURL ?? null,
       createdAt: now,
       updatedAt: now,
       settings: {

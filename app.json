@@ -12,6 +12,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.startupludo.app",
       "googleServicesFile": "./GoogleService-Info.plist",
+      "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -47,7 +48,18 @@
           "resizeMode": "contain",
           "backgroundColor": "#0C243E"
         }
-      ]
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static"
+          }
+        }
+      ],
+      "@react-native-firebase/app",
+      "@react-native-firebase/auth",
+      "@react-native-google-signin/google-signin"
     ],
     "experiments": {
       "typedRoutes": true,

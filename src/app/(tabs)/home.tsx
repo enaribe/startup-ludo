@@ -13,6 +13,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChallengeHomeCard, EnrollmentFormModal } from '@/components/challenges';
+import { AdBanner } from '@/components/home';
 import { Avatar, DynamicGradientBorder, GradientBorder, RadialBackground } from '@/components/ui';
 import { getActiveChallenges } from '@/data/challenges';
 import { formatXP, getLevelFromXP, getRankFromXP, getRankProgress } from '@/config/progression';
@@ -131,15 +132,35 @@ export default function HomeScreen() {
 
       {/* Header Fixe */}
       <View style={[styles.fixedHeader, { paddingTop: headerTopPadding }]}>
-        {/* Logo avec rayons tournants */}
-        <Animated.View entering={FadeInDown.duration(500)} style={styles.logoContainer}>
-          <SpinningRays />
-          <Image
-            source={require('../../../assets/images/logostartupludo.png')}
-            style={styles.logo}
-            resizeMode="contain"
-          />
-        </Animated.View>
+        {/* Top Row: Logo + Settings */}
+        <View style={styles.headerTopRow}>
+          {/* Spacer for balance */}
+          <View style={styles.headerSpacer} />
+
+          {/* Logo avec rayons tournants */}
+          <Animated.View entering={FadeInDown.duration(500)} style={styles.logoContainer}>
+            <SpinningRays />
+            <Image
+              source={require('../../../assets/images/logostartupludo.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+          </Animated.View>
+
+          {/* Settings Icon */}
+          <Animated.View entering={FadeInDown.delay(100).duration(400)}>
+            <Pressable
+              onPress={() => router.push('/settings')}
+              style={styles.settingsButton}
+            >
+              <GradientBorder boxHeight={40} boxWidth={40} borderRadius={20} fill="rgba(0, 0, 0, 0.2)">
+                <View style={styles.settingsIconContainer}>
+                  <Ionicons name="settings-outline" size={20} color="#FFBC40" />
+                </View>
+              </GradientBorder>
+            </Pressable>
+          </Animated.View>
+        </View>
 
         {/* Profile Card */}
         <Animated.View entering={FadeInDown.delay(100).duration(500)}>
@@ -222,6 +243,15 @@ export default function HomeScreen() {
               </View>
             </GradientBorder>
           </Pressable>
+        </Animated.View>
+
+        {/* Banniere Publicitaire */}
+        <Animated.View entering={FadeInDown.delay(550).duration(500)}>
+          <AdBanner
+            // imageUrl sera fourni depuis Firestore/config admin
+            // Pour l'instant on affiche le placeholder
+            showPlaceholder={true}
+          />
         </Animated.View>
 
         {/* Challenge Section */}
@@ -351,10 +381,27 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 24,
     overflow: 'visible',
   },
+  headerTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 4,
+  },
+  headerSpacer: {
+    width: 40,
+  },
+  settingsButton: {
+    marginTop: 10,
+  },
+  settingsIconContainer: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   logoContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 4,
     height: 120,
     overflow: 'visible',
   },

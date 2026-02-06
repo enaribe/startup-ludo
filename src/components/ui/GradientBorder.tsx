@@ -26,7 +26,7 @@ export const GradientBorder = memo(function GradientBorder({
   const gradientId = `grad_${Math.random().toString(36).substr(2, 9)}`;
 
   return (
-    <View style={[{ position: 'relative', height: boxHeight, borderRadius, overflow: 'hidden' }, style]}>
+    <View style={[{ position: 'relative', width: boxWidth, height: boxHeight, borderRadius, overflow: 'hidden' }, style]}>
       <Svg
         width={boxWidth}
         height={boxHeight}

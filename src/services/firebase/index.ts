@@ -1,6 +1,7 @@
 // Firebase Services - Main Export
 export * from './config';
 export * from './auth';
+export * from './socialAuth';
 export {
   createUserProfile,
   getUserProfile,

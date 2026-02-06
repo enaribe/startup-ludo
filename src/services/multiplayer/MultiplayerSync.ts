@@ -566,6 +566,26 @@ export class MultiplayerSync {
     }
   }
 
+  /**
+   * Envoie une reaction emoji aux autres joueurs (affichage en overlay)
+   */
+  async sendEmojiReaction(emoji: string, playerName: string): Promise<void> {
+    if (!this.roomId || !this.playerId) return;
+
+    try {
+      const action: Omit<RealtimeAction, 'id' | 'timestamp' | 'ts'> = {
+        t: 'em',
+        p: this.playerId,
+        d: { emoji, name: playerName },
+      };
+
+      await this.sendAction(action);
+      firebaseLog('Emoji reaction sent', { emoji });
+    } catch (error) {
+      firebaseLog('Failed to send emoji reaction', error);
+    }
+  }
+
   // ===== SUBSCRIPTIONS =====
 
   /**

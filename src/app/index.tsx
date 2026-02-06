@@ -1,24 +1,60 @@
-import { useState, useCallback, useEffect } from 'react';
-import { View, Text, Pressable } from 'react-native';
+/**
+ * WelcomeScreen - Écran d'accueil avec le logo START UP LUDO
+ *
+ * Design basé sur le système de design avec RadialBackground,
+ * GameButton et les assets existants (shape.png, logostartupludo.png).
+ */
+
+import { useState, useCallback, useEffect, memo } from 'react';
+import { View, StyleSheet, Dimensions, Image } from 'react-native';
 import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
-  useSharedValue,
+  FadeInDown,
+  FadeIn,
   useAnimatedStyle,
+  useSharedValue,
   withRepeat,
   withTiming,
-  withSequence,
   Easing,
-  FadeInDown,
 } from 'react-native-reanimated';
 
-import { COLORS } from '@/styles/colors';
-import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
-import { Button } from '@/components/ui/Button';
+import { SPACING } from '@/styles/spacing';
+import { GameButton } from '@/components/ui/GameButton';
+import { RadialBackground } from '@/components/ui/RadialBackground';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { LoadingScreen } from '@/components/common/LoadingScreen';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+// Import des assets
+const shapeImage = require('@/../assets/images/shape.png');
+const logoImage = require('@/../assets/images/logostartupludo.png');
+
+// Rayons tournants sous le logo (comme dans home.tsx)
+const SpinningRays = memo(function SpinningRays() {
+  const rotation = useSharedValue(0);
+  useEffect(() => {
+    rotation.value = withRepeat(
+      withTiming(360, { duration: 12000, easing: Easing.linear }),
+      -1,
+      false
+    );
+  }, [rotation]);
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${rotation.value}deg` }],
+  }));
+  return (
+    <Animated.View style={[styles.raysWrapper, animatedStyle]}>
+      <Image
+        source={shapeImage}
+        style={styles.raysImage}
+        resizeMode="contain"
+      />
+    </Animated.View>
+  );
+});
 
 export default function WelcomeScreen() {
   const router = useRouter();
@@ -26,30 +62,12 @@ export default function WelcomeScreen() {
   const { loginAsGuest, isAuthenticated, isInitialized } = useAuthStore();
   const [isGuestLoading, setIsGuestLoading] = useState(false);
 
-  // Logo pulse animation
-  const logoScale = useSharedValue(1);
-
-  useEffect(() => {
-    logoScale.value = withRepeat(
-      withSequence(
-        withTiming(1.05, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
-        withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      true
-    );
-  }, [logoScale]);
-
   // Redirect if already authenticated (wait for auth to be initialized first)
   useEffect(() => {
     if (isInitialized && isAuthenticated) {
       router.replace('/(tabs)/home');
     }
   }, [isAuthenticated, isInitialized, router]);
-
-  const logoAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: logoScale.value }],
-  }));
 
   const handlePlayAsGuest = useCallback(async () => {
     setIsGuestLoading(true);
@@ -66,145 +84,148 @@ export default function WelcomeScreen() {
     router.push('/(auth)/register');
   }, [router]);
 
-  // Show loading screen while auth is initializing (après tous les hooks)
+  // Show loading screen while auth is initializing
   if (!isInitialized) {
-    return <LoadingScreen message="Chargement..." />;
+    return <LoadingScreen variant="splash" />;
   }
 
   return (
-    <LinearGradient
-      colors={COLORS.backgroundGradient}
-      style={{ flex: 1 }}
-      start={{ x: 0.5, y: 0 }}
-      end={{ x: 0.5, y: 1 }}
-    >
+    <View style={styles.container}>
+      {/* Fond radial */}
+      <RadialBackground centerColor="#0F3A6B" edgeColor="#081A2A" />
+
       <View
-        style={{
-          flex: 1,
-          paddingTop: insets.top + SPACING[4],
-          paddingBottom: insets.bottom + SPACING[4],
-          paddingHorizontal: SPACING[6],
-        }}
+        style={[
+          styles.content,
+          {
+            paddingTop: insets.top + SPACING[6],
+            paddingBottom: insets.bottom + SPACING[6],
+          },
+        ]}
       >
-        {/* Logo Section */}
-        <View
-          style={{
-            flex: 1,
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}
-        >
-          <Animated.View style={logoAnimatedStyle}>
-            <View
-              style={{
-                width: 150,
-                height: 150,
-                borderRadius: 75,
-                backgroundColor: COLORS.primary,
-                justifyContent: 'center',
-                alignItems: 'center',
-                marginBottom: SPACING[6],
-                shadowColor: COLORS.primary,
-                shadowOffset: { width: 0, height: 0 },
-                shadowOpacity: 0.5,
-                shadowRadius: 20,
-                elevation: 10,
-              }}
-            >
-              <Text
-                style={{
-                  fontFamily: FONTS.title,
-                  fontSize: FONT_SIZES['4xl'],
-                  color: COLORS.background,
-                }}
-              >
-                SL
-              </Text>
-            </View>
+        {/* Logo Section avec rayons tournants */}
+        <View style={styles.logoSection}>
+          <Animated.View entering={FadeIn.delay(200).duration(600)} style={styles.logoContainer}>
+            <SpinningRays />
+            <Image
+              source={logoImage}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
           </Animated.View>
 
-          <Animated.Text
-            entering={FadeInDown.delay(300).duration(600)}
-            style={{
-              fontFamily: FONTS.title,
-              fontSize: FONT_SIZES['4xl'],
-              color: COLORS.text,
-              textAlign: 'center',
-              marginBottom: SPACING[2],
-            }}
-          >
-            STARTUP LUDO
-          </Animated.Text>
-
+          {/* Tagline */}
           <Animated.Text
             entering={FadeInDown.delay(500).duration(600)}
-            style={{
-              fontFamily: FONTS.body,
-              fontSize: FONT_SIZES.md,
-              color: COLORS.textSecondary,
-              textAlign: 'center',
-              maxWidth: 280,
-            }}
+            style={styles.tagline}
           >
-            Apprends l'entrepreneuriat en jouant !
+            VOTRE EMPIRE{'\n'}ENTREPRENEURIAL GRANDIT À{'\n'}CHAQUE PARTIE !
           </Animated.Text>
         </View>
 
         {/* Buttons Section */}
         <Animated.View
           entering={FadeInDown.delay(700).duration(600)}
-          style={{
-            gap: SPACING[4],
-          }}
+          style={styles.buttonsSection}
         >
-          <Button
-            title="Jouer en invité"
-            variant="primary"
-            size="lg"
+          <GameButton
+            title="S'INSCRIRE"
+            variant="yellow"
+            fullWidth
+            onPress={handleRegister}
+            style={styles.button}
+          />
+
+          <GameButton
+            title="SE CONNECTER"
+            variant="blue"
+            fullWidth
+            onPress={handleLogin}
+            style={styles.button}
+          />
+
+          <GameButton
+            title="JOUER EN TANT QU'INVITÉ"
+            variant="blue"
             fullWidth
             loading={isGuestLoading}
             onPress={handlePlayAsGuest}
+            style={styles.button}
           />
-
-          <Button
-            title="Se connecter"
-            variant="outline"
-            size="lg"
-            fullWidth
-            onPress={handleLogin}
-          />
-
-          <Pressable onPress={handleRegister}>
-            <Text
-              style={{
-                fontFamily: FONTS.body,
-                fontSize: FONT_SIZES.base,
-                color: COLORS.textSecondary,
-                textAlign: 'center',
-                marginTop: SPACING[2],
-              }}
-            >
-              Pas encore de compte ?{' '}
-              <Text style={{ color: COLORS.primary, fontFamily: FONTS.bodySemiBold }}>
-                S'inscrire
-              </Text>
-            </Text>
-          </Pressable>
         </Animated.View>
 
-        {/* Version */}
-        <Text
-          style={{
-            fontFamily: FONTS.mono,
-            fontSize: FONT_SIZES.xs,
-            color: COLORS.textMuted,
-            textAlign: 'center',
-            marginTop: SPACING[6],
-          }}
+        {/* Footer */}
+        <Animated.Text
+          entering={FadeIn.delay(900).duration(400)}
+          style={styles.footer}
         >
-          Version 1.0.0
-        </Text>
+          by concree
+        </Animated.Text>
       </View>
-    </LinearGradient>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: SPACING[6],
+    justifyContent: 'space-between',
+  },
+  logoSection: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: SPACING[8],
+  },
+  logoContainer: {
+    width: SCREEN_WIDTH * 0.8,
+    height: SCREEN_WIDTH * 0.8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  raysWrapper: {
+    position: 'absolute',
+    width: SCREEN_WIDTH * 0.9,
+    height: SCREEN_WIDTH * 0.9,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  raysImage: {
+    width: '100%',
+    height: '100%',
+    opacity: 0.4,
+  },
+  logoImage: {
+    width: SCREEN_WIDTH * 0.6,
+    height: SCREEN_WIDTH * 0.45,
+  },
+  tagline: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES.lg,
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginTop: SPACING[8],
+    lineHeight: FONT_SIZES.lg * 1.4,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  buttonsSection: {
+    gap: SPACING[4],
+    paddingBottom: SPACING[4],
+  },
+  button: {
+    marginVertical: 0,
+  },
+  footer: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.sm,
+    color: 'rgba(255, 255, 255, 0.5)',
+    textAlign: 'center',
+    paddingBottom: SPACING[2],
+  },
+});

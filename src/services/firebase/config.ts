@@ -1,16 +1,11 @@
-// Firebase Configuration - SDK JavaScript
+/**
+ * Firebase Configuration
+ * - Auth: Uses @react-native-firebase/auth (native)
+ * - Firestore & Realtime Database: Uses Firebase JS SDK
+ */
 import { FirebaseApp, getApps, initializeApp } from 'firebase/app';
-import {
-  Auth,
-  connectAuthEmulator,
-  getAuth,
-  initializeAuth,
-} from 'firebase/auth';
-// @ts-expect-error - getReactNativePersistence is exported from this path
-import { getReactNativePersistence } from '@firebase/auth/dist/rn/index.js';
 import { Database, connectDatabaseEmulator, getDatabase } from 'firebase/database';
 import { Firestore, connectFirestoreEmulator, getFirestore } from 'firebase/firestore';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Environment detection
 const IS_DEV = __DEV__;
@@ -24,6 +19,7 @@ const firebaseLog = (message: string, data?: unknown): void => {
 };
 
 // Firebase configuration from your Firebase Console
+// Note: Auth is handled by @react-native-firebase/auth using GoogleService-Info.plist / google-services.json
 const firebaseConfig = {
   apiKey: 'AIzaSyB3TEuMAMfV0crfAMc0u63EFy-9rXwFRYc',
   authDomain: 'startup-ludo-new.firebaseapp.com',
@@ -38,31 +34,22 @@ const firebaseConfig = {
 const EMULATOR_CONFIG = {
   enabled: IS_DEV && false, // Set to true to use emulators
   host: 'localhost',
-  auth: 9099,
   firestore: 8080,
   database: 9000,
 };
 
-// Initialize Firebase
+// Initialize Firebase JS SDK for Firestore and Realtime Database only
 let app: FirebaseApp;
-let auth: Auth;
 let firestore: Firestore;
 let database: Database;
 
 const initializeFirebase = (): void => {
   if (getApps().length === 0) {
     app = initializeApp(firebaseConfig);
-    firebaseLog('Firebase initialized');
-
-    // Initialize Auth with persistence for React Native
-    auth = initializeAuth(app, {
-      persistence: getReactNativePersistence(AsyncStorage),
-    });
-    firebaseLog('Auth initialized with AsyncStorage persistence');
+    firebaseLog('Firebase JS SDK initialized (Firestore + Realtime Database)');
   } else {
     app = getApps()[0]!;
-    auth = getAuth(app);
-    firebaseLog('Firebase already initialized');
+    firebaseLog('Firebase JS SDK already initialized');
   }
 
   firestore = getFirestore(app);
@@ -70,10 +57,9 @@ const initializeFirebase = (): void => {
 
   // Connect to emulators in development
   if (EMULATOR_CONFIG.enabled) {
-    connectAuthEmulator(auth, `http://${EMULATOR_CONFIG.host}:${EMULATOR_CONFIG.auth}`);
     connectFirestoreEmulator(firestore, EMULATOR_CONFIG.host, EMULATOR_CONFIG.firestore);
     connectDatabaseEmulator(database, EMULATOR_CONFIG.host, EMULATOR_CONFIG.database);
-    firebaseLog('Connected to Firebase emulators');
+    firebaseLog('Connected to Firebase emulators (Firestore + Database)');
   }
 };
 
@@ -81,7 +67,8 @@ const initializeFirebase = (): void => {
 initializeFirebase();
 
 // Export Firebase services and utilities
-export { app, auth, database, firebaseLog, firestore };
+// Note: Auth is NOT exported here - use @react-native-firebase/auth directly
+export { app, database, firebaseLog, firestore };
 
 // ===== PATH CONSTANTS =====
 
@@ -252,4 +239,16 @@ export interface RealtimePresence {
   online: boolean;
   lastSeen: number;
   currentRoom: string | null;
+}
+
+// ===== EMOJI REACTIONS =====
+
+/** Emojis disponibles pour les reactions en jeu */
+export const REACTION_EMOJIS = ['👍', '👏', '😂', '😱', '🔥'] as const;
+export type ReactionEmoji = (typeof REACTION_EMOJIS)[number];
+
+/** Structure d'une reaction emoji pour synchronisation */
+export interface RealtimeEmojiReaction {
+  emoji: ReactionEmoji;
+  playerName: string;
 }

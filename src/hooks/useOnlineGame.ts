@@ -52,6 +52,15 @@ export interface RemoteDuelResult {
   winnerId: string | null;
 }
 
+/** Info about a remote emoji reaction */
+export interface RemoteEmojiReaction {
+  id: string;
+  playerId: string;
+  playerName: string;
+  emoji: string;
+  timestamp: number;
+}
+
 interface UseOnlineGameReturn {
   /** Roll dice and broadcast to other players */
   rollDice: () => number;
@@ -107,6 +116,13 @@ interface UseOnlineGameReturn {
   remoteDuelResult: RemoteDuelResult | null;
   /** Clear remote duel result after processing */
   clearRemoteDuelResult: () => void;
+
+  /** Send an emoji reaction to other players */
+  sendEmojiReaction: (emoji: string, playerName: string) => void;
+  /** Remote emoji reaction received (for overlay display) */
+  remoteEmojiReaction: RemoteEmojiReaction | null;
+  /** Clear remote emoji reaction after animation */
+  clearRemoteEmojiReaction: () => void;
 }
 
 // Checkpoint every N turns
@@ -141,11 +157,13 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
   const [remoteEventResult, setRemoteEventResult] = useState<RemoteEventResult | null>(null);
   const [remoteDuelScore, setRemoteDuelScore] = useState<RemoteDuelScore | null>(null);
   const [remoteDuelResult, setRemoteDuelResult] = useState<RemoteDuelResult | null>(null);
+  const [remoteEmojiReaction, setRemoteEmojiReaction] = useState<RemoteEmojiReaction | null>(null);
 
   const clearRemoteEvent = useCallback(() => setRemoteEvent(null), []);
   const clearRemoteEventResult = useCallback(() => setRemoteEventResult(null), []);
   const clearRemoteDuelScore = useCallback(() => setRemoteDuelScore(null), []);
   const clearRemoteDuelResult = useCallback(() => setRemoteDuelResult(null), []);
+  const clearRemoteEmojiReaction = useCallback(() => setRemoteEmojiReaction(null), []);
 
   // Track processed actions to avoid duplicates
   const processedActionsRef = useRef<Set<string>>(new Set());
@@ -254,6 +272,20 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
           };
           console.log('[useOnlineGame] Résultat duel reçu (spectateur):', data);
           setRemoteDuelResult(data);
+          return;
+        }
+        case 'em': {
+          // Emoji reaction received from another player
+          const emData = action.d as { emoji: string; name: string };
+          const reaction: RemoteEmojiReaction = {
+            id: `${action.p}-${action.ts}`,
+            playerId: action.p,
+            playerName: emData.name ?? 'Joueur',
+            emoji: emData.emoji,
+            timestamp: action.ts,
+          };
+          console.log('[useOnlineGame] Emoji reaction reçue:', reaction);
+          setRemoteEmojiReaction(reaction);
           return;
         }
       }
@@ -645,6 +677,14 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
     multiplayerSync.leaveRoom();
   }, [userId, game, storeEndGame]);
 
+  const sendEmojiReaction = useCallback(
+    (emoji: string, playerName: string) => {
+      if (!userId) return;
+      multiplayerSync.sendEmojiReaction(emoji, playerName);
+    },
+    [userId]
+  );
+
   return {
     rollDice,
     movePawn,
@@ -672,5 +712,8 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
     broadcastDuelStart,
     broadcastDuelScore,
     broadcastDuelResult,
+    sendEmojiReaction,
+    remoteEmojiReaction,
+    clearRemoteEmojiReaction,
   };
 }

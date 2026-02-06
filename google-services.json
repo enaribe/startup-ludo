@@ -1,6 +1,7 @@
 {
   "project_info": {
     "project_number": "767192713144",
+    "firebase_url": "https://startup-ludo-new-default-rtdb.firebaseio.com",
     "project_id": "startup-ludo-new",
     "storage_bucket": "startup-ludo-new.firebasestorage.app"
   },
@@ -12,7 +13,20 @@
           "package_name": "com.startupludo.app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "767192713144-fjg9q246djesuvnvprpm3lhb4gic0a2f.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.startupludo.app",
+            "certificate_hash": "3971dd9b5d9fa53e33524bc0586c52dcc9650734"
+          }
+        },
+        {
+          "client_id": "767192713144-pvimhe0rof56hjpc89b25jfmct2q2kh8.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDPJqt08kkw2awPGvuu62dA9maVOU4WxgM"
@@ -20,7 +34,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "767192713144-pvimhe0rof56hjpc89b25jfmct2q2kh8.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "767192713144-fh3reagfsi04t391fh3fkolij32eaagg.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.startupludo.app"
+              }
+            }
+          ]
         }
       }
     }
