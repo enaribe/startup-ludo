@@ -17,17 +17,18 @@ import Animated, { FadeIn, FadeInDown, FadeInUp, ZoomIn } from 'react-native-rea
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
-    SectorChoiceModal,
-    PitchBuilderModal,
     BusinessPlanModal,
+    EnrollmentFormModal,
     FinalQuizModal,
+    PitchBuilderModal,
+    SectorChoiceModal,
 } from '@/components/challenges';
-import { DynamicGradientBorder, RadialBackground, GameButton } from '@/components/ui';
+import { DynamicGradientBorder, GameButton, RadialBackground } from '@/components/ui';
 import { useChallengeStore } from '@/stores';
 import { COLORS } from '@/styles/colors';
 import { BORDER_RADIUS, SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
-import type { ChallengeLevel, ChallengeSubLevel } from '@/types/challenge';
+import type { ChallengeLevel, ChallengeSubLevel, EnrollmentFormData } from '@/types/challenge';
 import {
     getLevelProgress,
     isLevelUnlocked,
@@ -275,6 +276,7 @@ export default function ChallengeHubScreen() {
   const activeChallengeId = useChallengeStore((state) => state.activeChallengeId);
   const enrollments = useChallengeStore((state) => state.enrollments);
   const selectSector = useChallengeStore((state) => state.selectSector);
+  const submitEnrollmentForm = useChallengeStore((state) => state.submitEnrollmentForm);
 
   // Déterminer le Challenge à afficher
   const challengeId = params.challengeId || activeChallengeId;
@@ -480,6 +482,28 @@ export default function ChallengeHubScreen() {
             <GameButton title="Retour" variant="blue" onPress={handleBack} />
           </View>
         </View>
+      </View>
+    );
+  }
+
+  // Formulaire d'inscription obligatoire : bloquer l'accès aux niveaux tant qu'il n'est pas rempli
+  const handleEnrollmentFormSubmit = useCallback(
+    (formData: EnrollmentFormData) => {
+      submitEnrollmentForm(enrollment.id, formData);
+    },
+    [enrollment.id, submitEnrollmentForm]
+  );
+
+  if (enrollment.formData == null) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <RadialBackground />
+        <EnrollmentFormModal
+          visible
+          challengeName={challenge.name}
+          onSubmit={handleEnrollmentFormSubmit}
+          onClose={handleBack}
+        />
       </View>
     );
   }

@@ -37,6 +37,7 @@ interface ChallengeStoreActions {
   getChallengeById: (id: string) => Challenge | undefined;
   getActiveChallenge: () => Challenge | null;
   enrollInChallenge: (challengeId: string, userId: string, formData?: EnrollmentFormData) => ChallengeEnrollment;
+  submitEnrollmentForm: (enrollmentId: string, formData: EnrollmentFormData) => void;
   getEnrollmentForChallenge: (challengeId: string) => ChallengeEnrollment | undefined;
   getActiveEnrollment: () => ChallengeEnrollment | null;
   getUserEnrollments: (userId: string) => ChallengeEnrollment[];
@@ -117,6 +118,21 @@ export const useChallengeStore = create<ChallengeStoreState & ChallengeStoreActi
           });
         }
         return newEnrollment;
+      },
+
+      submitEnrollmentForm: (enrollmentId, formData) => {
+        const enrollment = get().enrollments.find((e) => e.id === enrollmentId);
+        if (!enrollment) return;
+        set((state) => {
+          const e = state.enrollments.find((x) => x.id === enrollmentId);
+          if (e) e.formData = formData;
+        });
+        const updated = get().enrollments.find((e) => e.id === enrollmentId);
+        if (updated && enrollment.userId) {
+          setChallengeEnrollment(updated).catch(() => {
+            get().setError('Impossible de synchroniser le formulaire.');
+          });
+        }
       },
 
       getEnrollmentForChallenge: (challengeId) =>

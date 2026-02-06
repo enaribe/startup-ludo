@@ -893,8 +893,8 @@ export default function PlayScreen() {
             </View>
           </View>
 
-          {/* Boutons de test des popups (sous le gameboard) */}
-          <View style={styles.testPopupsRow}>
+          {/* Boutons de test des popups (désactivés — décommenter pour debug) */}
+          {/* <View style={styles.testPopupsRow}>
             <Pressable
               style={styles.testPopupButton}
               onPress={() => {
@@ -952,7 +952,7 @@ export default function PlayScreen() {
             >
               <Text style={[styles.testPopupLabel, { color: COLORS.white }]}>Duel</Text>
             </Pressable>
-          </View>
+          </View> */}
         </View>
       </View>
 

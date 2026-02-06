@@ -12,13 +12,13 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ChallengeHomeCard } from '@/components/challenges';
+import { ChallengeHomeCard, EnrollmentFormModal } from '@/components/challenges';
 import { Avatar, DynamicGradientBorder, GradientBorder, RadialBackground } from '@/components/ui';
 import { getActiveChallenges } from '@/data/challenges';
 import { formatXP, getLevelFromXP, getRankFromXP, getRankProgress } from '@/config/progression';
 import { useAuthStore, useChallengeStore, useUserStore } from '@/stores';
 import { FONTS } from '@/styles/typography';
-import type { Challenge } from '@/types/challenge';
+import type { Challenge, EnrollmentFormData } from '@/types/challenge';
 
 const { width } = Dimensions.get('window');
 
@@ -62,9 +62,14 @@ export default function HomeScreen() {
   const profile = useUserStore((state) => state.profile);
   const activeChallenges = getActiveChallenges();
   const enrollInChallenge = useChallengeStore((s) => s.enrollInChallenge);
+  const submitEnrollmentForm = useChallengeStore((s) => s.submitEnrollmentForm);
   const setActiveChallenge = useChallengeStore((s) => s.setActiveChallenge);
   const getEnrollmentForChallenge = useChallengeStore((s) => s.getEnrollmentForChallenge);
+  const getActiveChallenge = useChallengeStore((s) => s.getActiveChallenge);
+  const getActiveEnrollment = useChallengeStore((s) => s.getActiveEnrollment);
   const userId = user?.id ?? '';
+
+  const [showEnrollmentForm, setShowEnrollmentForm] = useState(false);
 
   // Horizontal challenge carousel
   const challengeListRef = useRef<FlatList<Challenge>>(null);
@@ -98,6 +103,18 @@ export default function HomeScreen() {
   const portfolioValue = profile?.startups?.reduce((sum, s) => sum + s.tokensInvested, 0) ?? 0;
 
   const displayName = user?.displayName || profile?.displayName || 'Joueur';
+
+  const handleEnrollmentFormSubmit = useCallback(
+    (formData: EnrollmentFormData) => {
+      const enrollment = getActiveEnrollment();
+      if (enrollment) {
+        submitEnrollmentForm(enrollment.id, formData);
+        setShowEnrollmentForm(false);
+        router.push('/(challenges)/challenge-hub');
+      }
+    },
+    [submitEnrollmentForm, getActiveEnrollment, router]
+  );
 
   const handlePlay = () => {
     router.push('/(game)/mode-selection');
@@ -261,11 +278,15 @@ export default function HomeScreen() {
                         if (!userId) return;
                         enrollInChallenge(challenge.id, userId);
                         setActiveChallenge(challenge.id);
-                        router.push('/(challenges)/challenge-hub');
+                        setShowEnrollmentForm(true);
                       }}
                       onContinue={() => {
                         setActiveChallenge(challenge.id);
-                        router.push('/(challenges)/challenge-hub');
+                        if (enrollment && enrollment.formData == null) {
+                          setShowEnrollmentForm(true);
+                        } else {
+                          router.push('/(challenges)/challenge-hub');
+                        }
                       }}
                     />
                   </View>
@@ -300,6 +321,14 @@ export default function HomeScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Formulaire d'inscription au challenge (obligatoire avant d'accéder aux niveaux) */}
+      <EnrollmentFormModal
+        visible={showEnrollmentForm}
+        challengeName={getActiveChallenge()?.name ?? 'Programme'}
+        onSubmit={handleEnrollmentFormSubmit}
+        onClose={() => setShowEnrollmentForm(false)}
+      />
     </View>
   );
 }
