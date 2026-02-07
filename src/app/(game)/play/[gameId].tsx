@@ -897,7 +897,7 @@ export default function PlayScreen() {
   return (
     <View style={styles.container}>
       <RadialBackground />
-      <View style={[styles.content, { paddingTop: insets.top + 72, paddingBottom: insets.bottom }]}>
+      <View style={[styles.content, { paddingTop: insets.top + 72, paddingBottom: insets.bottom + 70 }]}>
         {/* Fixed Header */}
         <View style={[styles.fixedHeader, { paddingTop: insets.top + SPACING[2] }]}>
           <Pressable onPress={() => setShowQuitConfirm(true)} hitSlop={8} style={styles.headerButton}>
@@ -950,11 +950,6 @@ export default function PlayScreen() {
             <View style={styles.playerSlot}>
               {renderPlayerCard('red')}
             </View>
-          </View>
-
-          {/* Emoji Reaction Bar */}
-          <View style={styles.emojiBarContainer}>
-            <EmojiReactionBar onEmojiPress={handleEmojiPress} />
           </View>
 
           {/* Boutons de test des popups (désactivés — décommenter pour debug) */}
@@ -1019,6 +1014,11 @@ export default function PlayScreen() {
             </Pressable>
           </View> */}
         </View>
+      </View>
+
+      {/* Fixed Emoji Reaction Bar at bottom */}
+      <View style={[styles.emojiBarFooter, { paddingBottom: insets.bottom + SPACING[2] }]}>
+        <EmojiReactionBar onEmojiPress={handleEmojiPress} />
       </View>
 
       {/* Emoji Reaction Overlay */}
@@ -1328,8 +1328,15 @@ const styles = StyleSheet.create({
   noGameButton: {
     minWidth: 140,
   },
-  emojiBarContainer: {
+  emojiBarFooter: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     alignItems: 'center',
     paddingTop: SPACING[2],
+    backgroundColor: 'rgba(10, 25, 41, 0.95)',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
   },
 });

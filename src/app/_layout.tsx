@@ -51,7 +51,18 @@ export default function RootLayout() {
   useEffect(() => {
     if (authInitialized.current) return;
     authInitialized.current = true;
+    console.log('[App] Starting auth initialization...');
     const unsubscribe = useAuthStore.getState().initializeAuth();
+
+    // Safety timeout: if auth doesn't initialize within 5 seconds, force it
+    const timeout = setTimeout(() => {
+      const state = useAuthStore.getState();
+      if (!state.isInitialized) {
+        console.warn('[App] Auth timeout - forcing initialization');
+        useAuthStore.setState({ isInitialized: true, isLoading: false });
+      }
+    }, 5000);
+
     // Load editions from Firestore (priority) or fallback to local JSONs
     refreshEditionsFromFirestore()
       .then(() => {
@@ -65,7 +76,10 @@ export default function RootLayout() {
     refreshDefaultProjectsFromFirestore();
     refreshChallengesFromFirestore();
     refreshIdeationFromFirestore();
-    return () => unsubscribe();
+    return () => {
+      clearTimeout(timeout);
+      unsubscribe();
+    };
   }, []);
 
   const onLayoutRootView = useCallback(async () => {

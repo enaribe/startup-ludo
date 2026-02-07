@@ -1,17 +1,41 @@
+/**
+ * SettingsScreen - Écran des paramètres
+ *
+ * Design basé sur le système de design avec RadialBackground,
+ * GradientBorder, GameButton et les styles cohérents.
+ */
+
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
+import { memo, useCallback } from 'react';
+import {
+  Pressable,
+  ScrollView,
+  Switch,
+  Text,
+  View,
+  StyleSheet,
+  Dimensions,
+  Image,
+} from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
+import { RadialBackground } from '@/components/ui/RadialBackground';
+import { DynamicGradientBorder } from '@/components/ui/GradientBorder';
+import { GameButton } from '@/components/ui/GameButton';
 import { useAuthStore, useSettingsStore } from '@/stores';
-import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+// Import des assets
+const shapeImage = require('@/../assets/images/shape.png');
+
+// Padding horizontal des écrans (design system)
+const SCREEN_PADDING_H = 18;
 
 interface SettingRowProps {
   icon: keyof typeof Ionicons.glyphMap;
@@ -22,102 +46,110 @@ interface SettingRowProps {
   onToggle?: (value: boolean) => void;
   onPress?: () => void;
   showArrow?: boolean;
+  isLast?: boolean;
 }
 
-function SettingRow({
+const SettingRow = memo(function SettingRow({
   icon,
-  iconColor = COLORS.primary,
+  iconColor = '#FFBC40',
   title,
   subtitle,
   value,
   onToggle,
   onPress,
   showArrow,
+  isLast = false,
 }: SettingRowProps) {
   const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
 
-  const handlePress = () => {
+  const handlePress = useCallback(() => {
     if (onPress) {
       if (hapticsEnabled) {
         Haptics.selectionAsync();
       }
       onPress();
     }
-  };
+  }, [onPress, hapticsEnabled]);
 
-  const handleToggle = (newValue: boolean) => {
+  const handleToggle = useCallback((newValue: boolean) => {
     if (onToggle) {
       if (hapticsEnabled) {
         Haptics.selectionAsync();
       }
       onToggle(newValue);
     }
-  };
+  }, [onToggle, hapticsEnabled]);
 
   const content = (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: SPACING[3],
-      }}
-    >
-      <View
-        style={{
-          width: 40,
-          height: 40,
-          borderRadius: 10,
-          backgroundColor: `${iconColor}20`,
-          justifyContent: 'center',
-          alignItems: 'center',
-          marginRight: SPACING[3],
-        }}
-      >
+    <View style={[styles.settingRow, !isLast && styles.settingRowBorder]}>
+      <View style={[styles.iconContainer, { backgroundColor: `${iconColor}20` }]}>
         <Ionicons name={icon} size={20} color={iconColor} />
       </View>
-      <View style={{ flex: 1 }}>
-        <Text
-          style={{
-            fontFamily: FONTS.bodySemiBold,
-            fontSize: FONT_SIZES.base,
-            color: COLORS.text,
-          }}
-        >
-          {title}
-        </Text>
-        {subtitle && (
-          <Text
-            style={{
-              fontFamily: FONTS.body,
-              fontSize: FONT_SIZES.sm,
-              color: COLORS.textSecondary,
-              marginTop: 2,
-            }}
-          >
-            {subtitle}
-          </Text>
-        )}
+      <View style={styles.settingTextContainer}>
+        <Text style={styles.settingTitle}>{title}</Text>
+        {subtitle && <Text style={styles.settingSubtitle}>{subtitle}</Text>}
       </View>
       {onToggle !== undefined && (
         <Switch
           value={value}
           onValueChange={handleToggle}
-          trackColor={{ false: COLORS.border, true: COLORS.primary }}
-          thumbColor={COLORS.white}
+          trackColor={{ false: 'rgba(255, 255, 255, 0.2)', true: '#FFBC40' }}
+          thumbColor="#FFFFFF"
+          ios_backgroundColor="rgba(255, 255, 255, 0.2)"
         />
       )}
       {showArrow && (
-        <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
+        <View style={styles.arrowContainer}>
+          <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.5)" />
+        </View>
       )}
     </View>
   );
 
   if (onPress) {
-    return <Pressable onPress={handlePress}>{content}</Pressable>;
+    return (
+      <Pressable
+        onPress={handlePress}
+        style={({ pressed }) => pressed && styles.settingRowPressed}
+      >
+        {content}
+      </Pressable>
+    );
   }
 
   return content;
+});
+
+interface SettingSectionProps {
+  title: string;
+  children: React.ReactNode;
+  delay?: number;
 }
+
+const SettingSection = memo(function SettingSection({
+  title,
+  children,
+  delay = 200,
+}: SettingSectionProps) {
+  return (
+    <Animated.View
+      entering={FadeInDown.delay(delay).duration(500)}
+      style={styles.section}
+    >
+      <Text style={styles.sectionTitle}>{title}</Text>
+      <DynamicGradientBorder
+        boxWidth={SCREEN_WIDTH - SCREEN_PADDING_H * 2}
+        borderRadius={16}
+        fill="rgba(0, 0, 0, 0.3)"
+        style={styles.sectionCard}
+      >
+        <View style={styles.sectionContent}>
+          {children}
+        </View>
+      </DynamicGradientBorder>
+    </Animated.View>
+  );
+});
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -135,258 +167,345 @@ export default function SettingsScreen() {
   const logout = useAuthStore((state) => state.logout);
   const user = useAuthStore((state) => state.user);
 
-  const handleBack = () => {
+  const handleBack = useCallback(() => {
     router.back();
-  };
+  }, [router]);
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     await logout();
     router.replace('/');
-  };
+  }, [logout, router]);
 
   return (
-    <LinearGradient
-      colors={COLORS.backgroundGradient}
-      style={{ flex: 1 }}
-      start={{ x: 0.5, y: 0 }}
-      end={{ x: 0.5, y: 1 }}
-    >
+    <View style={styles.container}>
+      {/* Fond radial */}
+      <RadialBackground centerColor="#0F3A6B" edgeColor="#081A2A" />
+
+      {/* Shape (rayons) en arrière-plan */}
+      <View style={styles.shapeContainer}>
+        <Image
+          source={shapeImage}
+          style={styles.shapeImage}
+          resizeMode="contain"
+        />
+      </View>
+
       <ScrollView
-        contentContainerStyle={{
-          flexGrow: 1,
-          paddingTop: insets.top + SPACING[4],
-          paddingBottom: insets.bottom + SPACING[4],
-          paddingHorizontal: SPACING[4],
-        }}
+        contentContainerStyle={[
+          styles.scrollContent,
+          {
+            paddingTop: insets.top + SPACING[4],
+            paddingBottom: insets.bottom + SPACING[6],
+          },
+        ]}
+        showsVerticalScrollIndicator={false}
       >
         {/* Header */}
         <Animated.View
           entering={FadeInDown.delay(100).duration(500)}
-          style={{ marginBottom: SPACING[6] }}
+          style={styles.header}
         >
-          <Pressable
-            onPress={handleBack}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              marginBottom: SPACING[4],
-            }}
-          >
-            <Ionicons name="arrow-back" size={24} color={COLORS.text} />
-            <Text
-              style={{
-                fontFamily: FONTS.body,
-                fontSize: FONT_SIZES.md,
-                color: COLORS.text,
-                marginLeft: SPACING[2],
-              }}
-            >
-              Retour
-            </Text>
+          <Pressable onPress={handleBack} style={styles.backButton}>
+            <View style={styles.backIconContainer}>
+              <Ionicons name="arrow-back" size={20} color="#FFBC40" />
+            </View>
+            <Text style={styles.backText}>Retour</Text>
           </Pressable>
 
-          <Text
-            style={{
-              fontFamily: FONTS.title,
-              fontSize: FONT_SIZES['2xl'],
-              color: COLORS.text,
-            }}
-          >
-            Paramètres
-          </Text>
+          <Text style={styles.title}>PARAMÈTRES</Text>
         </Animated.View>
 
         {/* Account Section */}
-        <Animated.View entering={FadeInDown.delay(200).duration(500)}>
-          <Text
-            style={{
-              fontFamily: FONTS.bodySemiBold,
-              fontSize: FONT_SIZES.sm,
-              color: COLORS.textSecondary,
-              marginBottom: SPACING[2],
-              textTransform: 'uppercase',
-              letterSpacing: 1,
-            }}
-          >
-            Compte
-          </Text>
-          <Card style={{ marginBottom: SPACING[4] }}>
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                paddingVertical: SPACING[2],
-              }}
-            >
-              <View
-                style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 24,
-                  backgroundColor: COLORS.primary,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  marginRight: SPACING[3],
-                }}
-              >
-                <Text
-                  style={{
-                    fontFamily: FONTS.title,
-                    fontSize: FONT_SIZES.lg,
-                    color: COLORS.white,
-                  }}
-                >
+        <SettingSection title="COMPTE" delay={200}>
+          <View style={styles.accountRow}>
+            <View style={styles.avatarContainer}>
+              {user?.photoURL ? (
+                <Image
+                  source={{ uri: user.photoURL }}
+                  style={styles.avatar}
+                />
+              ) : (
+                <Text style={styles.avatarText}>
                   {user?.displayName?.charAt(0).toUpperCase() || 'U'}
                 </Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text
-                  style={{
-                    fontFamily: FONTS.bodySemiBold,
-                    fontSize: FONT_SIZES.base,
-                    color: COLORS.text,
-                  }}
-                >
-                  {user?.displayName || 'Utilisateur'}
-                </Text>
-                <Text
-                  style={{
-                    fontFamily: FONTS.body,
-                    fontSize: FONT_SIZES.sm,
-                    color: COLORS.textSecondary,
-                  }}
-                >
-                  {user?.isGuest ? 'Compte invité' : user?.email || ''}
-                </Text>
-              </View>
+              )}
             </View>
-          </Card>
-        </Animated.View>
+            <View style={styles.accountInfo}>
+              <Text style={styles.accountName}>
+                {user?.displayName || 'Utilisateur'}
+              </Text>
+              <Text style={styles.accountEmail}>
+                {user?.isGuest ? 'Compte invité' : user?.email || ''}
+              </Text>
+            </View>
+            <Pressable style={styles.editButton}>
+              <Ionicons name="pencil" size={16} color="#FFBC40" />
+            </Pressable>
+          </View>
+        </SettingSection>
 
         {/* Audio & Feedback Section */}
-        <Animated.View entering={FadeInDown.delay(300).duration(500)}>
-          <Text
-            style={{
-              fontFamily: FONTS.bodySemiBold,
-              fontSize: FONT_SIZES.sm,
-              color: COLORS.textSecondary,
-              marginBottom: SPACING[2],
-              textTransform: 'uppercase',
-              letterSpacing: 1,
-            }}
-          >
-            Audio & Retours
-          </Text>
-          <Card style={{ marginBottom: SPACING[4] }}>
-            <SettingRow
-              icon="volume-high"
-              title="Sons"
-              subtitle="Effets sonores du jeu"
-              value={soundEnabled}
-              onToggle={setSoundEnabled}
-            />
-            <View style={{ height: 1, backgroundColor: COLORS.border }} />
-            <SettingRow
-              icon="phone-portrait"
-              title="Vibrations"
-              subtitle="Retours haptiques"
-              value={hapticsEnabled}
-              onToggle={setHapticsEnabled}
-            />
-            <View style={{ height: 1, backgroundColor: COLORS.border }} />
-            <SettingRow
-              icon="notifications"
-              title="Notifications"
-              subtitle="Alertes et rappels"
-              value={notifications}
-              onToggle={setNotifications}
-            />
-          </Card>
-        </Animated.View>
+        <SettingSection title="AUDIO & RETOURS" delay={300}>
+          <SettingRow
+            icon="volume-high"
+            iconColor="#3498DB"
+            title="Sons"
+            subtitle="Effets sonores du jeu"
+            value={soundEnabled}
+            onToggle={setSoundEnabled}
+          />
+          <SettingRow
+            icon="phone-portrait"
+            iconColor="#9B59B6"
+            title="Vibrations"
+            subtitle="Retours haptiques"
+            value={hapticsEnabled}
+            onToggle={setHapticsEnabled}
+          />
+          <SettingRow
+            icon="notifications"
+            iconColor="#E67E22"
+            title="Notifications"
+            subtitle="Alertes et rappels"
+            value={notifications}
+            onToggle={setNotifications}
+            isLast
+          />
+        </SettingSection>
 
         {/* About Section */}
-        <Animated.View entering={FadeInDown.delay(400).duration(500)}>
-          <Text
-            style={{
-              fontFamily: FONTS.bodySemiBold,
-              fontSize: FONT_SIZES.sm,
-              color: COLORS.textSecondary,
-              marginBottom: SPACING[2],
-              textTransform: 'uppercase',
-              letterSpacing: 1,
-            }}
-          >
-            A propos
-          </Text>
-          <Card style={{ marginBottom: SPACING[4] }}>
-            <SettingRow
-              icon="help-circle"
-              iconColor={COLORS.info}
-              title="Aide"
-              subtitle="FAQ et tutoriels"
-              onPress={() => router.push('/help')}
-              showArrow
-            />
-            <View style={{ height: 1, backgroundColor: COLORS.border }} />
-            <SettingRow
-              icon="time"
-              iconColor={COLORS.warning}
-              title="Historique"
-              subtitle="Voir tes parties passées"
-              onPress={() => router.push('/history')}
-              showArrow
-            />
-            <View style={{ height: 1, backgroundColor: COLORS.border }} />
-            <SettingRow
-              icon="document-text"
-              iconColor={COLORS.textSecondary}
-              title="Conditions d'utilisation"
-              onPress={() => {}}
-              showArrow
-            />
-            <View style={{ height: 1, backgroundColor: COLORS.border }} />
-            <SettingRow
-              icon="shield-checkmark"
-              iconColor={COLORS.textSecondary}
-              title="Politique de confidentialité"
-              onPress={() => {}}
-              showArrow
-            />
-          </Card>
-        </Animated.View>
+        <SettingSection title="À PROPOS" delay={400}>
+          <SettingRow
+            icon="help-circle"
+            iconColor="#1ABC9C"
+            title="Aide"
+            subtitle="FAQ et tutoriels"
+            onPress={() => router.push('/help')}
+            showArrow
+          />
+          <SettingRow
+            icon="time"
+            iconColor="#F39C12"
+            title="Historique"
+            subtitle="Voir tes parties passées"
+            onPress={() => router.push('/history')}
+            showArrow
+          />
+          <SettingRow
+            icon="document-text"
+            iconColor="#95A5A6"
+            title="Conditions d'utilisation"
+            onPress={() => {}}
+            showArrow
+          />
+          <SettingRow
+            icon="shield-checkmark"
+            iconColor="#27AE60"
+            title="Politique de confidentialité"
+            onPress={() => {}}
+            showArrow
+            isLast
+          />
+        </SettingSection>
 
         {/* Version */}
-        <Animated.View entering={FadeInDown.delay(500).duration(500)}>
-          <Text
-            style={{
-              fontFamily: FONTS.body,
-              fontSize: FONT_SIZES.sm,
-              color: COLORS.textSecondary,
-              textAlign: 'center',
-              marginBottom: SPACING[4],
-            }}
-          >
-            Startup Ludo v1.0.0
-          </Text>
+        <Animated.View
+          entering={FadeInDown.delay(500).duration(500)}
+          style={styles.versionContainer}
+        >
+          <Text style={styles.versionText}>Startup Ludo v1.0.0</Text>
+          <Text style={styles.copyrightText}>by concree</Text>
         </Animated.View>
 
         {/* Spacer */}
-        <View style={{ flex: 1 }} />
+        <View style={styles.spacer} />
 
-        {/* Logout */}
-        <Animated.View entering={FadeInDown.delay(600).duration(500)}>
-          <Button
-            title="Se déconnecter"
-            variant="outline"
-            size="lg"
+        {/* Logout Button */}
+        <Animated.View
+          entering={FadeInDown.delay(600).duration(500)}
+          style={styles.logoutContainer}
+        >
+          <GameButton
+            title="SE DÉCONNECTER"
+            variant="red"
             fullWidth
             onPress={handleLogout}
-            leftIcon={<Ionicons name="log-out" size={20} color={COLORS.error} />}
-            style={{ borderColor: COLORS.error }}
-            textStyle={{ color: COLORS.error }}
           />
         </Animated.View>
       </ScrollView>
-    </LinearGradient>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  shapeContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    top: -Dimensions.get('window').height * 0.4,
+  },
+  shapeImage: {
+    width: SCREEN_WIDTH * 1.2,
+    height: SCREEN_WIDTH * 1.2,
+    opacity: 0.1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: SCREEN_PADDING_H,
+  },
+  header: {
+    marginBottom: SPACING[6],
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SPACING[4],
+  },
+  backIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 188, 64, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: SPACING[2],
+  },
+  backText: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.md,
+    color: 'rgba(255, 255, 255, 0.7)',
+  },
+  title: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES['2xl'],
+    color: '#FFFFFF',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  section: {
+    marginBottom: SPACING[5],
+  },
+  sectionTitle: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.xs,
+    color: 'rgba(255, 255, 255, 0.5)',
+    letterSpacing: 1.5,
+    marginBottom: SPACING[2],
+    marginLeft: SPACING[1],
+  },
+  sectionCard: {
+    width: '100%',
+    alignSelf: 'stretch',
+  },
+  sectionContent: {
+    padding: SPACING[4],
+  },
+  settingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: SPACING[3],
+  },
+  settingRowBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  settingRowPressed: {
+    opacity: 0.7,
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: SPACING[3],
+  },
+  settingTextContainer: {
+    flex: 1,
+  },
+  settingTitle: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.base,
+    color: '#FFFFFF',
+  },
+  settingSubtitle: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.sm,
+    color: 'rgba(255, 255, 255, 0.5)',
+    marginTop: 2,
+  },
+  arrowContainer: {
+    marginLeft: SPACING[2],
+  },
+  accountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  avatarContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FFBC40',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: SPACING[3],
+  },
+  avatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+  },
+  avatarText: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES.xl,
+    color: '#0A1929',
+  },
+  accountInfo: {
+    flex: 1,
+  },
+  accountName: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.lg,
+    color: '#FFFFFF',
+  },
+  accountEmail: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.sm,
+    color: 'rgba(255, 255, 255, 0.5)',
+    marginTop: 2,
+  },
+  editButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 188, 64, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  versionContainer: {
+    alignItems: 'center',
+    marginTop: SPACING[4],
+  },
+  versionText: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.sm,
+    color: 'rgba(255, 255, 255, 0.4)',
+  },
+  copyrightText: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.xs,
+    color: 'rgba(255, 255, 255, 0.3)',
+    marginTop: SPACING[1],
+  },
+  spacer: {
+    flex: 1,
+    minHeight: SPACING[6],
+  },
+  logoutContainer: {
+    marginTop: SPACING[4],
+  },
+});

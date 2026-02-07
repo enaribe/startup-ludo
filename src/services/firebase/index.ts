@@ -17,4 +17,5 @@ export {
   type LeaderboardEntry,
   type GameSession,
 } from './firestore';
+export type { UserProfile } from '@/types';
 export * from './realtimeDb';

@@ -21,6 +21,7 @@ import {
 import {
   createUserProfile,
   getUserProfile,
+  type UserProfile,
 } from '@/services/firebase';
 import { useUserStore } from './useUserStore';
 
@@ -33,6 +34,8 @@ interface AuthState {
   // Phone auth state
   phoneAuthStep: 'idle' | 'code_sent' | 'verifying';
   phoneNumber: string | null;
+  // Profile completion (for new phone auth users)
+  needsProfileCompletion: boolean;
 }
 
 interface AuthActions {
@@ -49,6 +52,7 @@ interface AuthActions {
   verifyPhoneCode: (code: string) => Promise<void>;
   resendPhoneCode: () => Promise<void>;
   resetPhoneAuth: () => void;
+  clearNeedsProfileCompletion: () => void;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   clearError: () => void;
@@ -64,6 +68,7 @@ const initialState: AuthState = {
   isInitialized: false,
   error: null,
   // Phone auth
+  needsProfileCompletion: false,
   phoneAuthStep: 'idle',
   phoneNumber: null,
 };
@@ -115,12 +120,15 @@ export const useAuthStore = create<AuthStore>()(
       },
 
       initializeAuth: () => {
+        console.log('[Auth] initializeAuth called');
         set((state) => {
           state.isLoading = true;
         });
 
         // Subscribe to Firebase auth state changes
+        console.log('[Auth] Subscribing to auth state...');
         const unsubscribe = subscribeToAuthState(async (authUser) => {
+          console.log('[Auth] Auth state callback received:', authUser ? 'user' : 'null');
           if (authUser) {
             // User is signed in
             const user = mapAuthUserToUser(authUser);
@@ -136,9 +144,41 @@ export const useAuthStore = create<AuthStore>()(
               const profile = await getUserProfile(authUser.id);
               if (profile) {
                 useUserStore.getState().setProfile(profile);
+              } else {
+                // Profile doesn't exist, create a minimal one
+                console.log('[Auth] No profile found, using minimal profile');
+                useUserStore.getState().setProfile({
+                  userId: authUser.id,
+                  displayName: authUser.displayName ?? 'Joueur',
+                  avatarUrl: authUser.photoURL ?? null,
+                  xp: 0,
+                  level: 1,
+                  rank: 'Stagiaire',
+                  gamesPlayed: 0,
+                  gamesWon: 0,
+                  totalTokensEarned: 0,
+                  achievements: [],
+                  startups: [],
+                  createdAt: Date.now(),
+                });
               }
             } catch (error) {
-              console.error('Failed to load user profile:', error);
+              // Firestore error (permissions, offline, etc.) - use minimal profile
+              console.warn('[Auth] Failed to load profile, using minimal:', error);
+              useUserStore.getState().setProfile({
+                userId: authUser.id,
+                displayName: authUser.displayName ?? 'Joueur',
+                avatarUrl: authUser.photoURL ?? null,
+                xp: 0,
+                level: 1,
+                rank: 'Stagiaire',
+                gamesPlayed: 0,
+                gamesWon: 0,
+                totalTokensEarned: 0,
+                achievements: [],
+                startups: [],
+                createdAt: Date.now(),
+              });
             }
           } else {
             // User is signed out
@@ -171,10 +211,25 @@ export const useAuthStore = create<AuthStore>()(
             state.isLoading = false;
           });
 
-          // Load user profile
+          // Load user profile (null if offline or profile not created yet)
           const profile = await getUserProfile(authUser.id);
           if (profile) {
             useUserStore.getState().setProfile(profile);
+          } else {
+            useUserStore.getState().setProfile({
+              userId: authUser.id,
+              displayName: authUser.displayName ?? 'Joueur',
+              avatarUrl: authUser.photoURL ?? null,
+              xp: 0,
+              level: 1,
+              rank: 'Stagiaire',
+              gamesPlayed: 0,
+              gamesWon: 0,
+              totalTokensEarned: 0,
+              achievements: [],
+              startups: [],
+              createdAt: Date.now(),
+            });
           }
         } catch (error) {
           set((state) => {
@@ -349,13 +404,39 @@ export const useAuthStore = create<AuthStore>()(
           const authUser = await verifyPhoneCode(code);
           const user = mapAuthUserToUser(authUser);
 
-          // Create or update user profile in Firestore
-          let profile = await getUserProfile(authUser.id);
-          if (!profile) {
-            profile = await createUserProfile(authUser.id, {
-              email: authUser.email,
+          // Try to get or create user profile in Firestore
+          // If Firestore is offline, continue with a minimal profile
+          let profile: UserProfile | null = null;
+          let isNewUser = false;
+          try {
+            profile = await getUserProfile(authUser.id);
+            if (!profile) {
+              // New user - needs to complete profile
+              isNewUser = true;
+              profile = await createUserProfile(authUser.id, {
+                email: authUser.email,
+                displayName: authUser.displayName ?? 'Joueur',
+              });
+            }
+          } catch (firestoreError) {
+            // Firestore offline - create minimal profile locally
+            // Treat as new user since we can't verify
+            console.warn('[Auth] Firestore offline, using minimal profile');
+            isNewUser = true;
+            profile = {
+              userId: authUser.id,
               displayName: authUser.displayName ?? 'Joueur',
-            });
+              avatarUrl: authUser.photoURL ?? null,
+              xp: 0,
+              level: 1,
+              rank: 'Stagiaire',
+              gamesPlayed: 0,
+              gamesWon: 0,
+              totalTokensEarned: 0,
+              achievements: [],
+              startups: [],
+              createdAt: Date.now(),
+            };
           }
 
           set((state) => {
@@ -364,6 +445,8 @@ export const useAuthStore = create<AuthStore>()(
             state.isLoading = false;
             state.phoneAuthStep = 'idle';
             state.phoneNumber = null;
+            // New phone users need to complete their profile
+            state.needsProfileCompletion = isNewUser;
           });
 
           useUserStore.getState().setProfile(profile);
@@ -408,6 +491,12 @@ export const useAuthStore = create<AuthStore>()(
           state.phoneAuthStep = 'idle';
           state.phoneNumber = null;
           state.error = null;
+        });
+      },
+
+      clearNeedsProfileCompletion: () => {
+        set((state) => {
+          state.needsProfileCompletion = false;
         });
       },
 

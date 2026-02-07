@@ -26,7 +26,7 @@ import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { GameButton } from '@/components/ui/GameButton';
 import { RadialBackground } from '@/components/ui/RadialBackground';
 import { GradientBorder } from '@/components/ui/GradientBorder';
-import { AuthInput, AuthHeader } from '@/components/auth';
+import { AuthHeader } from '@/components/auth';
 import { useAuthStore } from '@/stores';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -42,6 +42,8 @@ export default function PhoneAuthScreen() {
     error,
     phoneAuthStep,
     phoneNumber: storedPhoneNumber,
+    isAuthenticated,
+    needsProfileCompletion,
     sendPhoneCode,
     verifyPhoneCode,
     resendPhoneCode,
@@ -49,12 +51,14 @@ export default function PhoneAuthScreen() {
     clearError,
   } = useAuthStore();
 
+  const countryCode = '+221';
   const [phoneNumber, setPhoneNumber] = useState('');
   const [verificationCode, setVerificationCode] = useState(['', '', '', '', '', '']);
 
   const codeInputRefs = useRef<(TextInput | null)[]>([]);
 
-  const isPhoneValid = phoneNumber.trim().length >= 10;
+  // Numéro sénégalais = 9 chiffres (77 XXX XX XX)
+  const isPhoneValid = phoneNumber.replace(/\s/g, '').length >= 9;
   const isCodeValid = verificationCode.every(digit => digit !== '');
 
   // Reset phone auth state when component unmounts
@@ -64,11 +68,25 @@ export default function PhoneAuthScreen() {
     };
   }, [resetPhoneAuth]);
 
+  // Redirect after successful authentication
+  useEffect(() => {
+    if (isAuthenticated) {
+      if (needsProfileCompletion) {
+        // New user - needs to complete profile
+        router.replace('/(auth)/complete-profile');
+      } else {
+        // Returning user - go to home
+        router.replace('/(tabs)/home');
+      }
+    }
+  }, [isAuthenticated, needsProfileCompletion, router]);
+
   const handleSendCode = useCallback(async () => {
     if (!isPhoneValid) return;
     clearError();
-    await sendPhoneCode(phoneNumber);
-  }, [phoneNumber, isPhoneValid, sendPhoneCode, clearError]);
+    const fullNumber = `${countryCode}${phoneNumber.replace(/\s/g, '')}`;
+    await sendPhoneCode(fullNumber);
+  }, [countryCode, phoneNumber, isPhoneValid, sendPhoneCode, clearError]);
 
   const handleVerifyCode = useCallback(async () => {
     if (!isCodeValid) return;
@@ -168,15 +186,30 @@ export default function PhoneAuthScreen() {
                 entering={FadeInDown.delay(200).duration(400)}
                 style={styles.formSection}
               >
-                <AuthInput
-                  label="NUMÉRO DE TÉLÉPHONE"
-                  placeholder="+33 6 12 34 56 78"
-                  value={phoneNumber}
-                  onChangeText={setPhoneNumber}
-                  keyboardType="phone-pad"
-                  autoComplete="tel"
-                  leftIcon="call-outline"
-                />
+                <Text style={styles.inputLabel}>NUMÉRO DE TÉLÉPHONE</Text>
+                <GradientBorder
+                  boxHeight={56}
+                  borderRadius={12}
+                  fill="rgba(0, 0, 0, 0.2)"
+                >
+                  <View style={styles.phoneInputRow}>
+                    {/* Préfixe +221 fixe */}
+                    <View style={styles.countryCodeBox}>
+                      <Text style={styles.countryCodeText}>{countryCode}</Text>
+                    </View>
+                    <View style={styles.phoneDivider} />
+                    {/* Numéro de téléphone */}
+                    <TextInput
+                      style={styles.phoneInput}
+                      placeholder="77 123 45 67"
+                      placeholderTextColor="rgba(255, 255, 255, 0.4)"
+                      value={phoneNumber}
+                      onChangeText={setPhoneNumber}
+                      keyboardType="phone-pad"
+                      autoComplete="tel"
+                    />
+                  </View>
+                </GradientBorder>
 
                 {error && (
                   <Text style={styles.globalError}>{error}</Text>
@@ -218,7 +251,7 @@ export default function PhoneAuthScreen() {
                 <Text style={styles.title}>VÉRIFICATION</Text>
                 <Text style={styles.subtitle}>
                   Entre le code à 6 chiffres envoyé au{'\n'}
-                  <Text style={styles.phoneHighlight}>{storedPhoneNumber || phoneNumber}</Text>
+                  <Text style={styles.phoneHighlight}>{storedPhoneNumber || `${countryCode} ${phoneNumber}`}</Text>
                 </Text>
               </Animated.View>
 
@@ -334,8 +367,42 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.bodySemiBold,
   },
   formSection: {
-    gap: SPACING[4],
+    gap: SPACING[2],
     marginBottom: SPACING[6],
+  },
+  inputLabel: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.xs,
+    color: 'rgba(255, 255, 255, 0.7)',
+    letterSpacing: 1,
+    marginBottom: SPACING[1],
+  },
+  phoneInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: '100%',
+    paddingHorizontal: SPACING[3],
+  },
+  countryCodeBox: {
+    paddingRight: SPACING[3],
+  },
+  countryCodeText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.md,
+    color: '#FFBC40',
+  },
+  phoneDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    marginRight: SPACING[3],
+  },
+  phoneInput: {
+    flex: 1,
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.md,
+    color: '#FFFFFF',
+    height: '100%',
   },
   codeSection: {
     alignItems: 'center',

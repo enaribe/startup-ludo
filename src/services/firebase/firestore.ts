@@ -25,6 +25,7 @@ import {
     firestore,
     FIRESTORE_COLLECTIONS,
     getFirebaseErrorMessage,
+    isFirebaseOfflineError,
     type FirestoreUser,
     type FirestoreUserStats,
 } from './config';
@@ -143,6 +144,10 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
       createdAt: userData.createdAt.seconds * 1000,
     };
   } catch (error) {
+    if (isFirebaseOfflineError(error)) {
+      firebaseLog('User profile not loaded (device offline or Firestore unavailable)');
+      return null;
+    }
     firebaseLog('Failed to fetch user profile', error);
     throw new Error(getFirebaseErrorMessage(error));
   }

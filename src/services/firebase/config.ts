@@ -142,6 +142,18 @@ export const getFirebaseErrorMessage = (error: unknown): string => {
   return FIREBASE_ERRORS['default']!;
 };
 
+/** Returns true if the error is due to offline / Firestore unavailable (no network). */
+export const isFirebaseOfflineError = (error: unknown): boolean => {
+  if (!error || typeof error !== 'object') return false;
+  const code = (error as { code?: string }).code;
+  const message = typeof (error as { message?: string }).message === 'string'
+    ? (error as { message: string }).message
+    : '';
+  if (code === 'unavailable') return true;
+  if (/offline|client is offline|could not reach/i.test(message)) return true;
+  return false;
+};
+
 // ===== TYPE DEFINITIONS =====
 
 export interface FirebaseTimestamp {

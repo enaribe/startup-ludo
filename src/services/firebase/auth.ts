@@ -2,7 +2,7 @@
  * Firebase Authentication Service
  * Uses @react-native-firebase/auth for native authentication
  */
-import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
+import auth, { FirebaseAuthTypes, onAuthStateChanged } from '@react-native-firebase/auth';
 import { firebaseLog, getFirebaseErrorMessage } from './config';
 
 export interface AuthUser {
@@ -134,8 +134,11 @@ export const subscribeToAuthState = (
   callback: (user: AuthUser | null) => void
 ): (() => void) => {
   firebaseLog('Subscribing to auth state changes');
+  console.log('[Firebase Auth] Setting up onAuthStateChanged listener...');
 
-  const unsubscribe = auth().onAuthStateChanged((firebaseUser) => {
+  // v22+ syntax: use standalone onAuthStateChanged function
+  const unsubscribe = onAuthStateChanged(auth(), (firebaseUser) => {
+    console.log('[Firebase Auth] onAuthStateChanged callback triggered');
     if (firebaseUser) {
       firebaseLog('Auth state changed: user signed in', { uid: firebaseUser.uid });
       callback(mapFirebaseUser(firebaseUser));

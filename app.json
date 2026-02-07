@@ -53,11 +53,13 @@
         "expo-build-properties",
         {
           "ios": {
-            "useFrameworks": "static"
+            "useFrameworks": "static",
+            "deploymentTarget": "15.1"
           }
         }
       ],
       "@react-native-firebase/app",
+      "./plugins/withRNFirebasePodfile.js",
       "@react-native-firebase/auth",
       "@react-native-google-signin/google-signin"
     ],
