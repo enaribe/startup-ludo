@@ -1,74 +1,28 @@
 /**
  * Firebase Configuration
- * - Auth: Uses @react-native-firebase/auth (native)
- * - Firestore & Realtime Database: Uses Firebase JS SDK
+ * MIGRATED TO @react-native-firebase (native modules)
+ * - Auth: @react-native-firebase/auth
+ * - Firestore: @react-native-firebase/firestore
+ * - Realtime Database: @react-native-firebase/database
  */
-import { FirebaseApp, getApps, initializeApp } from 'firebase/app';
-import { Database, connectDatabaseEmulator, getDatabase } from 'firebase/database';
-import { Firestore, connectFirestoreEmulator, getFirestore } from 'firebase/firestore';
+import firestore, {
+  FirebaseFirestoreTypes,
+} from '@react-native-firebase/firestore';
+import database from '@react-native-firebase/database';
 
 // Environment detection
 const IS_DEV = __DEV__;
 
 // ===== LOGGING =====
-// Defined early to be available during initialization
-const firebaseLog = (message: string, data?: unknown): void => {
+export const firebaseLog = (message: string, data?: unknown): void => {
   if (IS_DEV) {
     console.log(`[Firebase] ${message}`, data ?? '');
   }
 };
 
-// Firebase configuration from your Firebase Console
-// Note: Auth is handled by @react-native-firebase/auth using GoogleService-Info.plist / google-services.json
-const firebaseConfig = {
-  apiKey: 'AIzaSyB3TEuMAMfV0crfAMc0u63EFy-9rXwFRYc',
-  authDomain: 'startup-ludo-new.firebaseapp.com',
-  projectId: 'startup-ludo-new',
-  storageBucket: 'startup-ludo-new.firebasestorage.app',
-  messagingSenderId: '767192713144',
-  appId: '1:767192713144:ios:d0dae4035cf900e1c6714d',
-  databaseURL: 'https://startup-ludo-new-default-rtdb.firebaseio.com',
-};
-
-// Emulator configuration
-const EMULATOR_CONFIG = {
-  enabled: IS_DEV && false, // Set to true to use emulators
-  host: 'localhost',
-  firestore: 8080,
-  database: 9000,
-};
-
-// Initialize Firebase JS SDK for Firestore and Realtime Database only
-let app: FirebaseApp;
-let firestore: Firestore;
-let database: Database;
-
-const initializeFirebase = (): void => {
-  if (getApps().length === 0) {
-    app = initializeApp(firebaseConfig);
-    firebaseLog('Firebase JS SDK initialized (Firestore + Realtime Database)');
-  } else {
-    app = getApps()[0]!;
-    firebaseLog('Firebase JS SDK already initialized');
-  }
-
-  firestore = getFirestore(app);
-  database = getDatabase(app);
-
-  // Connect to emulators in development
-  if (EMULATOR_CONFIG.enabled) {
-    connectFirestoreEmulator(firestore, EMULATOR_CONFIG.host, EMULATOR_CONFIG.firestore);
-    connectDatabaseEmulator(database, EMULATOR_CONFIG.host, EMULATOR_CONFIG.database);
-    firebaseLog('Connected to Firebase emulators (Firestore + Database)');
-  }
-};
-
-// Initialize on import
-initializeFirebase();
-
-// Export Firebase services and utilities
-// Note: Auth is NOT exported here - use @react-native-firebase/auth directly
-export { app, database, firebaseLog, firestore };
+// Log initialization
+console.log('[Firebase Config] Using @react-native-firebase native modules');
+console.log('[Firebase Config] Firestore and Database auto-initialized via native SDK');
 
 // ===== PATH CONSTANTS =====
 
@@ -167,8 +121,8 @@ export interface FirestoreUser {
   email: string | null;
   displayName: string;
   avatarUrl: string | null;
-  createdAt: FirebaseTimestamp;
-  updatedAt: FirebaseTimestamp;
+  createdAt: FirebaseTimestamp | FirebaseFirestoreTypes.Timestamp;
+  updatedAt: FirebaseTimestamp | FirebaseFirestoreTypes.Timestamp;
   settings: {
     soundEnabled: boolean;
     musicEnabled: boolean;
@@ -187,8 +141,8 @@ export interface FirestoreUserStats {
   totalTokensEarned: number;
   weeklyXP: number;
   monthlyXP: number;
-  lastGameAt: FirebaseTimestamp | null;
-  updatedAt: FirebaseTimestamp;
+  lastGameAt: FirebaseTimestamp | FirebaseFirestoreTypes.Timestamp | null;
+  updatedAt: FirebaseTimestamp | FirebaseFirestoreTypes.Timestamp;
 }
 
 // Realtime Database room structure
@@ -264,3 +218,7 @@ export interface RealtimeEmojiReaction {
   emoji: ReactionEmoji;
   playerName: string;
 }
+
+// ===== NATIVE MODULE EXPORTS =====
+// Export the native modules directly for use in services
+export { firestore, database };

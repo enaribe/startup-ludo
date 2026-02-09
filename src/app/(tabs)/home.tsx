@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import { Dimensions, FlatList, Image, Pressable, ScrollView, StyleSheet, Text, View, type ViewToken } from 'react-native';
 import Animated, {
   Easing,
@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChallengeHomeCard, EnrollmentFormModal } from '@/components/challenges';
 import { AdBanner } from '@/components/home';
 import { Avatar, DynamicGradientBorder, GradientBorder, RadialBackground } from '@/components/ui';
-import { getActiveChallenges } from '@/data/challenges';
+import { getActiveChallenges, ALL_CHALLENGES, refreshChallengesFromFirestore } from '@/data/challenges';
 import { formatXP, getLevelFromXP, getRankFromXP, getRankProgress } from '@/config/progression';
 import { useAuthStore, useChallengeStore, useUserStore } from '@/stores';
 import { FONTS } from '@/styles/typography';
@@ -61,7 +61,8 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const user = useAuthStore((state) => state.user);
   const profile = useUserStore((state) => state.profile);
-  const activeChallenges = getActiveChallenges();
+  // Re-compute when challengesLoaded changes to force re-render after async load
+  const activeChallenges = useMemo(() => getActiveChallenges(), [challengesLoaded]);
   const enrollInChallenge = useChallengeStore((s) => s.enrollInChallenge);
   const submitEnrollmentForm = useChallengeStore((s) => s.submitEnrollmentForm);
   const setActiveChallenge = useChallengeStore((s) => s.setActiveChallenge);
@@ -71,6 +72,22 @@ export default function HomeScreen() {
   const userId = user?.id ?? '';
 
   const [showEnrollmentForm, setShowEnrollmentForm] = useState(false);
+  const [challengesLoaded, setChallengesLoaded] = useState(false);
+
+  // Refresh challenges when screen mounts or focuses
+  useEffect(() => {
+    const loadChallenges = async () => {
+      try {
+        await refreshChallengesFromFirestore();
+        setChallengesLoaded(true);
+        console.log('[Home] Challenges loaded, ALL_CHALLENGES:', ALL_CHALLENGES.length);
+      } catch (error) {
+        console.error('[Home] Failed to load challenges:', error);
+        setChallengesLoaded(true); // Still set true to show fallback
+      }
+    };
+    loadChallenges();
+  }, []);
 
   // Horizontal challenge carousel
   const challengeListRef = useRef<FlatList<Challenge>>(null);
@@ -104,6 +121,12 @@ export default function HomeScreen() {
   const portfolioValue = profile?.startups?.reduce((sum, s) => sum + s.tokensInvested, 0) ?? 0;
 
   const displayName = user?.displayName || profile?.displayName || 'Joueur';
+
+  // Debug: log active challenges
+  console.log('[Home] Active challenges count:', activeChallenges.length);
+  if (activeChallenges.length > 0) {
+    console.log('[Home] Challenges:', activeChallenges.map(c => ({ id: c.id, name: c.name, isActive: c.isActive })));
+  }
 
   const handleEnrollmentFormSubmit = useCallback(
     (formData: EnrollmentFormData) => {

@@ -10,25 +10,23 @@
  */
 
 import {
-    BOARD_SIZE,
     coordsToPixels,
     FINAL_PATHS,
     getEventAtCircuitPosition,
     MAIN_CIRCUIT,
     type Coordinate,
 } from '@/config/boardConfig';
+import { useResponsiveLayout } from '@/hooks/useResponsiveLayout';
 import { GameEngine } from '@/services/game/GameEngine';
 import { useGameStore } from '@/stores';
 import type { Player, PlayerColor } from '@/types';
 import { memo, useMemo } from 'react';
-import { Dimensions, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { CenterZone } from './CenterZone';
 import { HomeZone } from './HomeZone';
 import { PathCell } from './PathCell';
 import { Pawn } from './Pawn';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 interface GameBoardProps {
   players: Player[];
@@ -47,10 +45,8 @@ export const GameBoard = memo(function GameBoard({
   onPawnPress,
   onPawnMoveComplete,
 }: GameBoardProps) {
-  // Dimensions - le plateau prend presque toute la largeur
-  const boardPadding = 4;
-  const boardSize = Math.min(SCREEN_WIDTH - 16, 400);
-  const cellSize = (boardSize - boardPadding * 2) / BOARD_SIZE;
+  // Dimensions responsive (téléphone/tablette)
+  const { boardSize, cellSize, boardPadding } = useResponsiveLayout();
 
   // Taille des zones maison (5 cellules pour grille 13x13)
   const homeZoneSize = cellSize * 5;

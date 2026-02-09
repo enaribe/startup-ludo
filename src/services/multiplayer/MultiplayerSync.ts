@@ -1,5 +1,6 @@
 /**
  * MultiplayerSync - Service de synchronisation temps réel
+ * MIGRATED TO @react-native-firebase/database
  *
  * Utilise Firebase Realtime Database pour la synchronisation
  * du jeu multijoueur (facturé par bande passante, économique).
@@ -13,20 +14,8 @@
  *   └── chat/{messageId} (ChatMessage)
  */
 
+import database, { FirebaseDatabaseTypes } from '@react-native-firebase/database';
 import {
-  ref,
-  set,
-  get,
-  update,
-  remove,
-  push,
-  onValue,
-  onChildAdded,
-  onDisconnect,
-  type Unsubscribe,
-} from 'firebase/database';
-import {
-  database,
   firebaseLog,
   getFirebaseErrorMessage,
   REALTIME_PATHS,
@@ -115,7 +104,7 @@ const PRESENCE_HEARTBEAT_MS = 10000; // Réaffirmer la présence toutes les 10s 
 export class MultiplayerSync {
   private roomId: string | null = null;
   private playerId: string | null = null;
-  private listeners: Map<string, Unsubscribe | (() => void)> = new Map();
+  private listeners: Map<string, () => void> = new Map();
   private eventCallbacks: Set<EventCallback> = new Set();
   private isConnected = false;
   private heartbeatIntervalId: ReturnType<typeof setInterval> | null = null;
@@ -127,8 +116,8 @@ export class MultiplayerSync {
     try {
       firebaseLog('Creating room', { hostId: config.hostId, hostName: config.hostName });
 
-      const roomsRef = ref(database, REALTIME_PATHS.rooms);
-      const newRoomRef = push(roomsRef);
+      const roomsRef = database().ref(REALTIME_PATHS.rooms);
+      const newRoomRef = roomsRef.push();
       const roomId = newRoomRef.key!;
       const code = generateRoomCode();
 
@@ -161,8 +150,8 @@ export class MultiplayerSync {
       };
 
       // Write room + host player to Firebase
-      await set(ref(database, REALTIME_PATHS.room(roomId)), roomData);
-      await set(ref(database, REALTIME_PATHS.roomPlayer(roomId, config.hostId)), hostPlayer);
+      await database().ref(REALTIME_PATHS.room(roomId)).set(roomData);
+      await database().ref(REALTIME_PATHS.roomPlayer(roomId, config.hostId)).set(hostPlayer);
 
       this.roomId = roomId;
       this.playerId = config.hostId;
@@ -189,8 +178,8 @@ export class MultiplayerSync {
       firebaseLog('Joining room by code', { code, playerId: data.playerId });
 
       // Search for the room by code
-      const roomsRef = ref(database, REALTIME_PATHS.rooms);
-      const snapshot = await get(roomsRef);
+      const roomsRef = database().ref(REALTIME_PATHS.rooms);
+      const snapshot = await roomsRef.once('value');
 
       if (!snapshot.exists()) {
         throw new Error('Aucun salon trouvé avec ce code');
@@ -204,7 +193,9 @@ export class MultiplayerSync {
         if (roomData.code === code.toUpperCase()) {
           matchedRoom = roomData;
           matchedRoomId = childSnapshot.key;
+          return true; // Stop iteration
         }
+        return undefined;
       });
 
       if (!matchedRoom || !matchedRoomId) {
@@ -220,19 +211,22 @@ export class MultiplayerSync {
       }
 
       // Get existing players to determine available color
-      const playersRef = ref(database, REALTIME_PATHS.roomPlayers(foundRoomId));
-      const playersSnap = await get(playersRef);
+      const playersRef = database().ref(REALTIME_PATHS.roomPlayers(foundRoomId));
+      const playersSnap = await playersRef.once('value');
 
       const usedColors = new Set<string>();
       if (playersSnap.exists()) {
+        let playerCount = 0;
         playersSnap.forEach((child) => {
           const player = child.val() as RealtimePlayer;
           usedColors.add(player.color);
+          playerCount++;
+          return undefined;
         });
 
         // Check max players
         const maxPlayers = foundRoom.maxPlayers ?? foundRoom.gameSettings?.maxPlayers ?? 4;
-        if (playersSnap.size >= maxPlayers) {
+        if (playerCount >= maxPlayers) {
           throw new Error('Ce salon est plein');
         }
       }
@@ -252,7 +246,7 @@ export class MultiplayerSync {
       };
 
       // Write player to Firebase
-      await set(ref(database, REALTIME_PATHS.roomPlayer(foundRoomId, data.playerId)), playerData);
+      await database().ref(REALTIME_PATHS.roomPlayer(foundRoomId, data.playerId)).set(playerData);
 
       this.roomId = foundRoomId;
       this.playerId = data.playerId;
@@ -288,15 +282,15 @@ export class MultiplayerSync {
       firebaseLog('Leaving room', { roomId: this.roomId, playerId: this.playerId });
 
       // Remove player from Firebase
-      await remove(ref(database, REALTIME_PATHS.roomPlayer(this.roomId, this.playerId)));
+      await database().ref(REALTIME_PATHS.roomPlayer(this.roomId, this.playerId)).remove();
 
       // Check if room is now empty
-      const playersRef = ref(database, REALTIME_PATHS.roomPlayers(this.roomId));
-      const playersSnap = await get(playersRef);
+      const playersRef = database().ref(REALTIME_PATHS.roomPlayers(this.roomId));
+      const playersSnap = await playersRef.once('value');
 
-      if (!playersSnap.exists() || playersSnap.size === 0) {
+      if (!playersSnap.exists() || playersSnap.numChildren() === 0) {
         // Delete empty room
-        await remove(ref(database, REALTIME_PATHS.room(this.roomId)));
+        await database().ref(REALTIME_PATHS.room(this.roomId)).remove();
         firebaseLog('Room deleted (empty)');
       }
 
@@ -329,7 +323,7 @@ export class MultiplayerSync {
     try {
       firebaseLog('Setting player ready', { roomId: this.roomId, playerId: this.playerId, ready });
 
-      await update(ref(database, REALTIME_PATHS.roomPlayer(this.roomId, this.playerId)), {
+      await database().ref(REALTIME_PATHS.roomPlayer(this.roomId, this.playerId)).update({
         isReady: ready,
       });
 
@@ -363,7 +357,7 @@ export class MultiplayerSync {
         edition = getSectorEdition(sector);
       }
 
-      await update(ref(database, REALTIME_PATHS.roomPlayer(this.roomId, this.playerId)), {
+      await database().ref(REALTIME_PATHS.roomPlayer(this.roomId, this.playerId)).update({
         startupId,
         startupName,
         isDefaultProject,
@@ -396,8 +390,8 @@ export class MultiplayerSync {
       const gameId = `game_${this.roomId}_${Date.now()}`;
 
       // Get all player IDs
-      const playersRef = ref(database, REALTIME_PATHS.roomPlayers(this.roomId));
-      const playersSnap = await get(playersRef);
+      const playersRef = database().ref(REALTIME_PATHS.roomPlayers(this.roomId));
+      const playersSnap = await playersRef.once('value');
 
       const playerIds: string[] = [];
       const positions: Record<string, number> = {};
@@ -409,6 +403,7 @@ export class MultiplayerSync {
           playerIds.push(player.id);
           positions[player.id] = -1; // Start position
           tokens[player.id] = 0;
+          return undefined;
         });
       }
 
@@ -422,14 +417,14 @@ export class MultiplayerSync {
       };
 
       // Update room status + set game ID
-      await update(ref(database, REALTIME_PATHS.room(this.roomId)), {
+      await database().ref(REALTIME_PATHS.room(this.roomId)).update({
         status: 'playing',
         gameId,
         updatedAt: Date.now(),
       });
 
       // Set initial game state
-      await set(ref(database, REALTIME_PATHS.roomState(this.roomId)), initialState);
+      await database().ref(REALTIME_PATHS.roomState(this.roomId)).set(initialState);
 
       this.emit({
         type: 'game_started',
@@ -458,10 +453,10 @@ export class MultiplayerSync {
     console.log('[MultiplayerSync.sendAction] Envoi:', { type: action.t, p: action.p, d: action.d });
 
     try {
-      const actionsRef = ref(database, REALTIME_PATHS.roomActions(this.roomId));
-      const newActionRef = push(actionsRef);
+      const actionsRef = database().ref(REALTIME_PATHS.roomActions(this.roomId));
+      const newActionRef = actionsRef.push();
 
-      await set(newActionRef, {
+      await newActionRef.set({
         ...action,
         ts: Date.now(),
       });
@@ -485,7 +480,7 @@ export class MultiplayerSync {
     if (!this.roomId) return;
 
     try {
-      await update(ref(database, REALTIME_PATHS.roomState(this.roomId)), state);
+      await database().ref(REALTIME_PATHS.roomState(this.roomId)).update(state);
 
       this.emit({
         type: 'state_updated',
@@ -507,7 +502,7 @@ export class MultiplayerSync {
     if (!this.roomId) return;
 
     try {
-      await set(ref(database, `${REALTIME_PATHS.room(this.roomId)}/positions/${playerId}`), pawns);
+      await database().ref(`${REALTIME_PATHS.room(this.roomId)}/positions/${playerId}`).set(pawns);
       firebaseLog('Positions updated', { playerId });
     } catch (error) {
       firebaseLog('Failed to update positions', error);
@@ -522,7 +517,7 @@ export class MultiplayerSync {
     if (!this.roomId) return;
 
     try {
-      await set(ref(database, `${REALTIME_PATHS.room(this.roomId)}/tokens/${playerId}`), tokens);
+      await database().ref(`${REALTIME_PATHS.room(this.roomId)}/tokens/${playerId}`).set(tokens);
       firebaseLog('Tokens updated', { playerId, tokens });
     } catch (error) {
       firebaseLog('Failed to update tokens', error);
@@ -537,8 +532,8 @@ export class MultiplayerSync {
     if (!this.roomId || !this.playerId) return;
 
     try {
-      const chatRef = ref(database, REALTIME_PATHS.roomChat(this.roomId));
-      const newMessageRef = push(chatRef);
+      const chatRef = database().ref(REALTIME_PATHS.roomChat(this.roomId));
+      const newMessageRef = chatRef.push();
 
       const message = {
         userId: this.playerId,
@@ -546,7 +541,7 @@ export class MultiplayerSync {
         timestamp: Date.now(),
       };
 
-      await set(newMessageRef, message);
+      await newMessageRef.set(message);
 
       this.emit({
         type: 'chat_message',
@@ -594,21 +589,23 @@ export class MultiplayerSync {
   subscribeToRoom(callback: (room: RealtimeRoom | null) => void): () => void {
     if (!this.roomId) return () => {};
 
-    const roomRef = ref(database, REALTIME_PATHS.room(this.roomId));
+    const roomRef = database().ref(REALTIME_PATHS.room(this.roomId));
 
-    const unsubscribe = onValue(roomRef, (snapshot) => {
+    const onValueCallback = (snapshot: FirebaseDatabaseTypes.DataSnapshot) => {
       if (snapshot.exists()) {
         callback(snapshot.val() as RealtimeRoom);
       } else {
         callback(null);
       }
-    });
+    };
+
+    roomRef.on('value', onValueCallback);
 
     const key = `room_${this.roomId}`;
-    this.listeners.set(key, unsubscribe);
+    this.listeners.set(key, () => roomRef.off('value', onValueCallback));
 
     return () => {
-      unsubscribe();
+      roomRef.off('value', onValueCallback);
       this.listeners.delete(key);
     };
   }
@@ -619,28 +616,28 @@ export class MultiplayerSync {
   subscribeToPlayers(callback: (players: Record<string, RealtimePlayer>) => void): () => void {
     if (!this.roomId) return () => {};
 
-    const playersRef = ref(database, REALTIME_PATHS.roomPlayers(this.roomId));
+    const playersRef = database().ref(REALTIME_PATHS.roomPlayers(this.roomId));
 
-    const unsubscribe = onValue(playersRef, (snapshot) => {
+    const onValueCallback = (snapshot: FirebaseDatabaseTypes.DataSnapshot) => {
       const players: Record<string, RealtimePlayer> = {};
-      const rawPresence: Record<string, { isConnected?: boolean; lastSeen?: number }> = {};
       if (snapshot.exists()) {
         snapshot.forEach((child) => {
           const player = child.val() as RealtimePlayer;
           const key = child.key ?? player.id;
           players[key] = player;
-          rawPresence[key] = { isConnected: player.isConnected, lastSeen: player.lastSeen };
+          return undefined;
         });
       }
-      // Presence logs suppressed (heartbeat every 10s is too verbose)
       callback(players);
-    });
+    };
+
+    playersRef.on('value', onValueCallback);
 
     const key = `players_${this.roomId}`;
-    this.listeners.set(key, unsubscribe);
+    this.listeners.set(key, () => playersRef.off('value', onValueCallback));
 
     return () => {
-      unsubscribe();
+      playersRef.off('value', onValueCallback);
       this.listeners.delete(key);
     };
   }
@@ -651,48 +648,50 @@ export class MultiplayerSync {
   subscribeToGameState(callback: (state: RealtimeGameState | null) => void): () => void {
     if (!this.roomId) return () => {};
 
-    const stateRef = ref(database, REALTIME_PATHS.roomState(this.roomId));
+    const stateRef = database().ref(REALTIME_PATHS.roomState(this.roomId));
 
-    const unsubscribe = onValue(stateRef, (snapshot) => {
+    const onValueCallback = (snapshot: FirebaseDatabaseTypes.DataSnapshot) => {
       if (snapshot.exists()) {
         callback(snapshot.val() as RealtimeGameState);
       } else {
         callback(null);
       }
-    });
+    };
+
+    stateRef.on('value', onValueCallback);
 
     const key = `state_${this.roomId}`;
-    this.listeners.set(key, unsubscribe);
+    this.listeners.set(key, () => stateRef.off('value', onValueCallback));
 
     return () => {
-      unsubscribe();
+      stateRef.off('value', onValueCallback);
       this.listeners.delete(key);
     };
   }
 
   /**
-   * S'abonne aux actions (nouvelles uniquement via onChildAdded)
+   * S'abonne aux actions (nouvelles uniquement via child_added)
    */
   subscribeToActions(callback: (action: RealtimeAction) => void): () => void {
     if (!this.roomId) return () => {};
 
-    const actionsRef = ref(database, REALTIME_PATHS.roomActions(this.roomId));
+    const actionsRef = database().ref(REALTIME_PATHS.roomActions(this.roomId));
 
-    // onChildAdded fires once per existing child then once per new child
+    // child_added fires once per existing child then once per new child
     // We skip initial children by tracking init phase
     let initialLoadDone = false;
     let initialCount = 0;
 
     // First get the current count to skip existing actions
-    get(actionsRef).then((snapshot) => {
-      initialCount = snapshot.exists() ? snapshot.size : 0;
+    actionsRef.once('value').then((snapshot) => {
+      initialCount = snapshot.exists() ? snapshot.numChildren() : 0;
       initialLoadDone = true;
     }).catch(() => {
       initialLoadDone = true;
     });
 
     let received = 0;
-    const unsubscribe = onChildAdded(actionsRef, (snapshot) => {
+    const onChildAdded = (snapshot: FirebaseDatabaseTypes.DataSnapshot) => {
       received++;
       // Skip actions that existed before subscription
       if (!initialLoadDone || received <= initialCount) return;
@@ -707,13 +706,15 @@ export class MultiplayerSync {
         });
         callback(fullAction);
       }
-    });
+    };
+
+    actionsRef.on('child_added', onChildAdded);
 
     const key = `actions_${this.roomId}`;
-    this.listeners.set(key, unsubscribe);
+    this.listeners.set(key, () => actionsRef.off('child_added', onChildAdded));
 
     return () => {
-      unsubscribe();
+      actionsRef.off('child_added', onChildAdded);
       this.listeners.delete(key);
     };
   }
@@ -724,10 +725,10 @@ export class MultiplayerSync {
   subscribeToChat(callback: (message: ChatMessage) => void): () => void {
     if (!this.roomId) return () => {};
 
-    const chatRef = ref(database, REALTIME_PATHS.roomChat(this.roomId));
+    const chatRef = database().ref(REALTIME_PATHS.roomChat(this.roomId));
     let isInitialLoad = true;
 
-    const unsubscribe = onValue(chatRef, (snapshot) => {
+    const onValueCallback = (snapshot: FirebaseDatabaseTypes.DataSnapshot) => {
       if (isInitialLoad) {
         isInitialLoad = false;
         return;
@@ -743,6 +744,7 @@ export class MultiplayerSync {
             emoji: val.emoji,
             timestamp: val.timestamp,
           });
+          return undefined;
         });
 
         const latestMessage = messages[messages.length - 1];
@@ -750,13 +752,15 @@ export class MultiplayerSync {
           callback(latestMessage);
         }
       }
-    });
+    };
+
+    chatRef.on('value', onValueCallback);
 
     const key = `chat_${this.roomId}`;
-    this.listeners.set(key, unsubscribe);
+    this.listeners.set(key, () => chatRef.off('value', onValueCallback));
 
     return () => {
-      unsubscribe();
+      chatRef.off('value', onValueCallback);
       this.listeners.delete(key);
     };
   }
@@ -770,7 +774,7 @@ export class MultiplayerSync {
     if (!this.roomId) return;
 
     try {
-      await set(ref(database, `${REALTIME_PATHS.room(this.roomId)}/checkpoint`), {
+      await database().ref(`${REALTIME_PATHS.room(this.roomId)}/checkpoint`).set({
         ...data,
         ts: Date.now(),
       });
@@ -787,7 +791,7 @@ export class MultiplayerSync {
     if (!this.roomId) return null;
 
     try {
-      const snap = await get(ref(database, `${REALTIME_PATHS.room(this.roomId)}/checkpoint`));
+      const snap = await database().ref(`${REALTIME_PATHS.room(this.roomId)}/checkpoint`).once('value');
       return snap.exists() ? (snap.val() as Record<string, unknown>) : null;
     } catch (error) {
       firebaseLog('Failed to get checkpoint', error);
@@ -802,7 +806,7 @@ export class MultiplayerSync {
     if (!this.roomId) return;
 
     try {
-      await update(ref(database, REALTIME_PATHS.room(this.roomId)), {
+      await database().ref(REALTIME_PATHS.room(this.roomId)).update({
         status,
         updatedAt: Date.now(),
       });
@@ -821,10 +825,9 @@ export class MultiplayerSync {
     if (!this.roomId || !this.playerId) return;
 
     try {
-      const playerRef = ref(database, REALTIME_PATHS.roomPlayer(this.roomId, this.playerId));
+      const playerRef = database().ref(REALTIME_PATHS.roomPlayer(this.roomId, this.playerId));
       const now = Date.now();
-      await update(playerRef, { isConnected: true, lastSeen: now });
-      // updateMyPresence log suppressed (heartbeat every 10s)
+      await playerRef.update({ isConnected: true, lastSeen: now });
     } catch (error) {
       firebaseLog('Failed to update my presence', error);
     }
@@ -837,10 +840,10 @@ export class MultiplayerSync {
     if (!this.roomId || !this.playerId) return;
 
     try {
-      const playerRef = ref(database, REALTIME_PATHS.roomPlayer(this.roomId, this.playerId));
+      const playerRef = database().ref(REALTIME_PATHS.roomPlayer(this.roomId, this.playerId));
 
       // When disconnected, mark as not connected
-      onDisconnect(playerRef).update({
+      playerRef.onDisconnect().update({
         isConnected: false,
         lastSeen: Date.now(),
       });
@@ -854,14 +857,14 @@ export class MultiplayerSync {
       }
 
       // Also set user-level presence
-      const presenceRef = ref(database, REALTIME_PATHS.userPresence(this.playerId));
-      set(presenceRef, {
+      const presenceRef = database().ref(REALTIME_PATHS.userPresence(this.playerId));
+      presenceRef.set({
         online: true,
         lastSeen: Date.now(),
         currentRoom: this.roomId,
       });
 
-      onDisconnect(presenceRef).set({
+      presenceRef.onDisconnect().set({
         online: false,
         lastSeen: Date.now(),
         currentRoom: null,
@@ -887,8 +890,8 @@ export class MultiplayerSync {
     if (!this.roomId) return false;
 
     try {
-      const playerRef = ref(database, REALTIME_PATHS.roomPlayer(this.roomId, playerId));
-      const snapshot = await get(playerRef);
+      const playerRef = database().ref(REALTIME_PATHS.roomPlayer(this.roomId, playerId));
+      const snapshot = await playerRef.once('value');
 
       if (snapshot.exists()) {
         const player = snapshot.val() as RealtimePlayer;

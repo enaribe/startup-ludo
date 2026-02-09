@@ -6,3 +6,4 @@ export {
   type HapticType,
 } from './useHaptics';
 export { useMultiplayer } from './useMultiplayer';
+export { useResponsiveLayout } from './useResponsiveLayout';

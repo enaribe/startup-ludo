@@ -1,10 +1,11 @@
 /**
  * Edition Service - Fetch editions from Firestore
+ * MIGRATED TO @react-native-firebase/firestore
  * Used to hot-swap local JSON data with remote Firestore data.
  */
 
-import { collection, getDocs } from 'firebase/firestore';
-import { firestore, FIRESTORE_COLLECTIONS, firebaseLog } from './config';
+import firestore from '@react-native-firebase/firestore';
+import { FIRESTORE_COLLECTIONS, firebaseLog } from './config';
 import type { Edition, EditionId } from '@/data/types';
 
 let cachedEditions: Record<EditionId, Edition> | null = null;
@@ -15,7 +16,10 @@ let cachedEditions: Record<EditionId, Edition> | null = null;
  */
 export async function fetchEditionsFromFirestore(): Promise<Record<EditionId, Edition>> {
   try {
-    const snapshot = await getDocs(collection(firestore, FIRESTORE_COLLECTIONS.editions));
+    const snapshot = await firestore()
+      .collection(FIRESTORE_COLLECTIONS.editions)
+      .get();
+
     const editions: Record<string, Edition> = {};
 
     snapshot.docs.forEach((doc) => {

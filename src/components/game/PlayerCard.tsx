@@ -3,6 +3,7 @@
  */
 
 import { Dice } from '@/components/game/Dice';
+import { useResponsiveLayout } from '@/hooks/useResponsiveLayout';
 import { Avatar } from '@/components/ui/Avatar';
 import { COLORS } from '@/styles/colors';
 import { FONTS } from '@/styles/typography';
@@ -41,13 +42,14 @@ export const PlayerCard = memo(function PlayerCard({
   onRollDice,
   onDiceComplete,
 }: PlayerCardProps) {
-  const scale = useSharedValue(1);
+  const { sizes } = useResponsiveLayout();
+  const animScale = useSharedValue(1);
   const glowOpacity = useSharedValue(0);
 
   // Pulse animation for current turn
   useEffect(() => {
     if (isCurrentTurn) {
-      scale.value = withSequence(
+      animScale.value = withSequence(
         withTiming(1.05, { duration: 300 }),
         withTiming(1, { duration: 300 })
       );
@@ -55,7 +57,7 @@ export const PlayerCard = memo(function PlayerCard({
 
       // Continuous subtle pulse
       const interval = setInterval(() => {
-        scale.value = withSequence(
+        animScale.value = withSequence(
           withTiming(1.02, { duration: 500 }),
           withTiming(1, { duration: 500 })
         );
@@ -63,13 +65,13 @@ export const PlayerCard = memo(function PlayerCard({
 
       return () => clearInterval(interval);
     }
-    scale.value = withSpring(1);
+    animScale.value = withSpring(1);
     glowOpacity.value = withTiming(0, { duration: 200 });
     return undefined;
-  }, [isCurrentTurn, scale, glowOpacity]);
+  }, [isCurrentTurn, animScale, glowOpacity]);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
+    transform: [{ scale: animScale.value }],
   }));
 
   const playerColor = COLORS.players[player.color];
@@ -138,12 +140,12 @@ export const PlayerCard = memo(function PlayerCard({
 
             {/* Dé 3D animé — visible uniquement quand c'est le tour de ce joueur */}
             {isCurrentTurn && (
-              <View style={styles.diceWrapper}>
+              <View style={[styles.diceWrapper, { width: sizes.diceWrapper, height: sizes.diceWrapper }]}>
                 <Dice
                   value={diceValue}
                   isRolling={isDiceRolling}
                   disabled={isDiceDisabled}
-                  size={28}
+                  size={sizes.dice}
                   onRoll={onRollDice}
                   onRollComplete={onDiceComplete}
                 />
@@ -210,8 +212,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.7)',
   },
   diceWrapper: {
-    width: 36,
-    height: 36,
     justifyContent: 'center',
     alignItems: 'center',
   },

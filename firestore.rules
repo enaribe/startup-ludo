@@ -27,45 +27,48 @@ service cloud.firestore {
              request.resource.data.displayName is string;
     }
 
-    // Users collection
+    // Users collection (PUBLIC read for profiles/leaderboard)
+    // Write requires authentication and ownership
     match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow create: if isOwner(userId) && isValidUser();
-      allow update, delete: if isOwner(userId) || isAdmin();
+      allow read: if true;  // Public read for leaderboard display
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+      allow delete: if isOwner(userId) || isAdmin();
 
-      // User's startups subcollection
+      // User's startups subcollection (PUBLIC read for leaderboard)
       match /startups/{startupId} {
-        allow read: if isAuthenticated();
+        allow read: if true;  // Public read for leaderboard
         allow write: if isOwner(userId);
       }
     }
 
     // Collection group: allow reading all "startups" subcollections (for classement)
     match /{path=**}/startups/{startupId} {
-      allow read: if isAuthenticated();
+      allow read: if true;  // Public read for leaderboard
     }
 
-    // User Stats collection
+    // User Stats collection (PUBLIC read for leaderboard)
+    // Write requires authentication and ownership
     match /userStats/{userId} {
-      allow read: if isAuthenticated();
+      allow read: if true;  // Public read for leaderboard display
       allow write: if isOwner(userId);
     }
 
-    // Editions collection (read for all auth users, write for admins)
+    // Editions collection (PUBLIC read - game content, write for admins)
     match /editions/{editionId} {
-      allow read: if isAuthenticated();
+      allow read: if true;  // Public read - no sensitive data
       allow write: if isAdmin();
     }
 
-    // Challenge programs (read for all auth, write for admins)
+    // Challenge programs (PUBLIC read - game content, write for admins)
     match /challenges/{challengeId} {
-      allow read: if isAuthenticated();
+      allow read: if true;  // Public read - no sensitive data
       allow write: if isAdmin();
     }
 
-    // Ideation cards/decks (read for all auth, write for admins)
+    // Ideation cards/decks (PUBLIC read - game content, write for admins)
     match /ideationCards/{deckId} {
-      allow read: if isAuthenticated();
+      allow read: if true;  // Public read - no sensitive data
       allow write: if isAdmin();
     }
 
@@ -82,13 +85,12 @@ service cloud.firestore {
     }
 
     // Game Sessions collection
+    // Write requires authentication
     match /gameSessions/{sessionId} {
-      allow read: if isAuthenticated();
+      allow read: if true;
       allow create: if isAuthenticated();
-      allow update: if isAuthenticated() &&
-                      resource.data.players[request.auth.uid] != null;
-      allow delete: if isAuthenticated() &&
-                      (resource.data.hostId == request.auth.uid || isAdmin());
+      allow update: if isAuthenticated();
+      allow delete: if isAdmin();
     }
 
     // Achievements collection
@@ -108,21 +110,19 @@ service cloud.firestore {
     }
 
     // Challenge enrollments (doc id = userId_challengeId)
+    // Authenticated users can read/write their own enrollments
     match /challengeEnrollments/{enrollmentId} {
-      // get: lecture d'un doc spécifique — propre inscription ou admin
-      allow get: if isAuthenticated() &&
-                   (resource.data.userId == request.auth.uid || isAdmin());
-      // list: queries (where userId == uid) — authentifié suffit, le filtre where protège
-      allow list: if isAuthenticated();
-
-      // Écriture: propres inscriptions OU admin
-      allow write: if isAuthenticated() &&
-                     (request.resource.data.userId == request.auth.uid || isAdmin());
+      allow read: if true;  // Public read for challenge progress display
+      allow create: if isAuthenticated() &&
+                      request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() &&
+                      resource.data.userId == request.auth.uid;
+      allow delete: if isAdmin();
     }
 
-    // Default projects (read for all auth users, write for admins)
+    // Default projects (PUBLIC read - game content, write for admins)
     match /defaultProjects/{projectId} {
-      allow read: if isAuthenticated();
+      allow read: if true;  // Public read - no sensitive data
       allow write: if isAdmin();
     }
   }

@@ -25,6 +25,7 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import { refreshEditionsFromFirestore } from '@/data';
 import { refreshDefaultProjectsFromFirestore } from '@/data/defaultProjects';
 import { refreshChallengesFromFirestore } from '@/data/challenges';
+import { clearCache } from '@/services/firebase/cacheHelper';
 import { refreshIdeationFromFirestore } from '@/constants/ideation';
 
 // Keep splash screen visible while loading resources
@@ -63,6 +64,12 @@ export default function RootLayout() {
       }
     }, 5000);
 
+    // DEBUG: Clear caches to force fresh fetch (remove after debugging)
+    if (__DEV__) {
+      clearCache('challenges').then(() => console.log('[App] Challenges cache cleared'));
+      clearCache('editions').then(() => console.log('[App] Editions cache cleared'));
+    }
+
     // Load editions from Firestore (priority) or fallback to local JSONs
     refreshEditionsFromFirestore()
       .then(() => {
@@ -74,7 +81,9 @@ export default function RootLayout() {
         editionsLoaded.current = true;
       });
     refreshDefaultProjectsFromFirestore();
-    refreshChallengesFromFirestore();
+    refreshChallengesFromFirestore()
+      .then(() => console.log('[App] Challenges refresh completed'))
+      .catch((error) => console.error('[App] Challenges refresh failed:', error));
     refreshIdeationFromFirestore();
     return () => {
       clearTimeout(timeout);

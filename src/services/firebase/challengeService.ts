@@ -1,10 +1,11 @@
 /**
  * Challenge Service - Fetch challenge programs from Firestore
+ * MIGRATED TO @react-native-firebase/firestore
  * Maps admin-simplified data to the rich mobile Challenge type.
  */
 
-import { collection, getDocs } from 'firebase/firestore';
-import { firestore, FIRESTORE_COLLECTIONS, firebaseLog } from './config';
+import firestore from '@react-native-firebase/firestore';
+import { FIRESTORE_COLLECTIONS, firebaseLog } from './config';
 import type {
   Challenge,
   ChallengeLevel,
@@ -22,19 +23,28 @@ let cachedChallenges: Challenge[] | null = null;
  * Maps the admin-simplified structure to the full mobile Challenge type.
  */
 export async function fetchChallengesFromFirestore(): Promise<Challenge[]> {
+  console.log('[ChallengeService] Starting Firestore fetch...');
+  console.log('[ChallengeService] Collection path:', FIRESTORE_COLLECTIONS.challenges);
+
   try {
-    const snapshot = await getDocs(
-      collection(firestore, FIRESTORE_COLLECTIONS.challenges)
-    );
+    const snapshot = await firestore()
+      .collection(FIRESTORE_COLLECTIONS.challenges)
+      .get();
+
+    console.log('[ChallengeService] Snapshot received, docs count:', snapshot.docs.length);
+
     const challenges: Challenge[] = snapshot.docs.map((doc) => {
+      console.log('[ChallengeService] Processing doc:', doc.id);
       const d = doc.data();
       return mapFirestoreToChallenge(doc.id, d);
     });
 
     cachedChallenges = challenges;
     firebaseLog(`Fetched ${challenges.length} challenges from Firestore`);
+    console.log('[ChallengeService] Active challenges:', challenges.filter(c => c.isActive).length);
     return challenges;
   } catch (error) {
+    console.error('[ChallengeService] FETCH ERROR:', error);
     firebaseLog('Failed to fetch challenges from Firestore', error);
     throw error;
   }

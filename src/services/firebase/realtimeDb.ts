@@ -1,16 +1,7 @@
 // Firebase Realtime Database Service for Multiplayer
+// MIGRATED TO @react-native-firebase/database
+import database from '@react-native-firebase/database';
 import {
-  ref,
-  set,
-  get,
-  update,
-  remove,
-  push,
-  onValue,
-  onDisconnect,
-} from 'firebase/database';
-import {
-  database,
   firebaseLog,
   getFirebaseErrorMessage,
   REALTIME_PATHS,
@@ -42,8 +33,8 @@ export const createRoom = async (
   try {
     firebaseLog('Creating room', { hostId, hostName });
 
-    const roomsRef = ref(database, REALTIME_PATHS.rooms);
-    const newRoomRef = push(roomsRef);
+    const roomsRef = database().ref(REALTIME_PATHS.rooms);
+    const newRoomRef = roomsRef.push();
     const roomId = newRoomRef.key!;
     const code = generateRoomCode();
 
@@ -65,8 +56,8 @@ export const createRoom = async (
     };
 
     // Create room with host as first player
-    await set(ref(database, REALTIME_PATHS.room(roomId)), roomData);
-    await set(ref(database, REALTIME_PATHS.roomPlayer(roomId, hostId)), hostPlayer);
+    await database().ref(REALTIME_PATHS.room(roomId)).set(roomData);
+    await database().ref(REALTIME_PATHS.roomPlayer(roomId, hostId)).set(hostPlayer);
 
     firebaseLog('Room created successfully', { roomId, code });
     return { roomId, code };
@@ -83,8 +74,8 @@ export const findRoomByCode = async (code: string): Promise<RealtimeRoom | null>
 
     // Note: This requires an index on 'code' field
     // For now, we'll fetch all rooms and filter (not ideal for production)
-    const roomsRef = ref(database, REALTIME_PATHS.rooms);
-    const snapshot = await get(roomsRef);
+    const roomsRef = database().ref(REALTIME_PATHS.rooms);
+    const snapshot = await roomsRef.once('value');
 
     if (!snapshot.exists()) {
       return null;
@@ -95,7 +86,9 @@ export const findRoomByCode = async (code: string): Promise<RealtimeRoom | null>
       const room = childSnapshot.val() as RealtimeRoom;
       if (room.code === code.toUpperCase()) {
         foundRoom = room;
+        return true; // Stop iteration
       }
+      return undefined;
     });
 
     firebaseLog('Room search result', { found: !!foundRoom });
@@ -116,14 +109,15 @@ export const joinRoom = async (
     firebaseLog('Joining room', { roomId, playerId, playerName });
 
     // Get current players to determine color
-    const playersRef = ref(database, REALTIME_PATHS.roomPlayers(roomId));
-    const playersSnap = await get(playersRef);
+    const playersRef = database().ref(REALTIME_PATHS.roomPlayers(roomId));
+    const playersSnap = await playersRef.once('value');
 
     const usedColors = new Set<string>();
     if (playersSnap.exists()) {
       playersSnap.forEach((child) => {
         const player = child.val() as RealtimePlayer;
         usedColors.add(player.color);
+        return undefined;
       });
     }
 
@@ -139,7 +133,7 @@ export const joinRoom = async (
       joinedAt: Date.now(),
     };
 
-    await set(ref(database, REALTIME_PATHS.roomPlayer(roomId, playerId)), playerData);
+    await database().ref(REALTIME_PATHS.roomPlayer(roomId, playerId)).set(playerData);
 
     firebaseLog('Joined room successfully', { color: availableColor });
     return playerData;
@@ -154,15 +148,15 @@ export const leaveRoom = async (roomId: string, playerId: string): Promise<void>
   try {
     firebaseLog('Leaving room', { roomId, playerId });
 
-    await remove(ref(database, REALTIME_PATHS.roomPlayer(roomId, playerId)));
+    await database().ref(REALTIME_PATHS.roomPlayer(roomId, playerId)).remove();
 
     // Check if room is now empty
-    const playersRef = ref(database, REALTIME_PATHS.roomPlayers(roomId));
-    const playersSnap = await get(playersRef);
+    const playersRef = database().ref(REALTIME_PATHS.roomPlayers(roomId));
+    const playersSnap = await playersRef.once('value');
 
-    if (!playersSnap.exists() || playersSnap.size === 0) {
+    if (!playersSnap.exists() || playersSnap.numChildren() === 0) {
       // Delete empty room
-      await remove(ref(database, REALTIME_PATHS.room(roomId)));
+      await database().ref(REALTIME_PATHS.room(roomId)).remove();
       firebaseLog('Room deleted (empty)');
     }
 
@@ -182,7 +176,7 @@ export const setPlayerReady = async (
   try {
     firebaseLog('Setting player ready', { roomId, playerId, isReady });
 
-    await update(ref(database, REALTIME_PATHS.roomPlayer(roomId, playerId)), {
+    await database().ref(REALTIME_PATHS.roomPlayer(roomId, playerId)).update({
       isReady,
     });
 
@@ -202,7 +196,7 @@ export const setPlayerColor = async (
   try {
     firebaseLog('Setting player color', { roomId, playerId, color });
 
-    await update(ref(database, REALTIME_PATHS.roomPlayer(roomId, playerId)), {
+    await database().ref(REALTIME_PATHS.roomPlayer(roomId, playerId)).update({
       color,
     });
 
@@ -239,11 +233,11 @@ export const startGame = async (
       j: tokens,
     };
 
-    await update(ref(database, REALTIME_PATHS.room(roomId)), {
+    await database().ref(REALTIME_PATHS.room(roomId)).update({
       status: 'playing',
     });
 
-    await set(ref(database, REALTIME_PATHS.roomState(roomId)), initialState);
+    await database().ref(REALTIME_PATHS.roomState(roomId)).set(initialState);
 
     firebaseLog('Game started successfully');
   } catch (error) {
@@ -260,7 +254,7 @@ export const updateGameState = async (
   try {
     firebaseLog('Updating game state', { roomId, updates });
 
-    await update(ref(database, REALTIME_PATHS.roomState(roomId)), updates);
+    await database().ref(REALTIME_PATHS.roomState(roomId)).update(updates);
 
     firebaseLog('Game state updated');
   } catch (error) {
@@ -277,10 +271,10 @@ export const pushAction = async (
   try {
     firebaseLog('Pushing action', { roomId, type: action.t });
 
-    const actionsRef = ref(database, REALTIME_PATHS.roomActions(roomId));
-    const newActionRef = push(actionsRef);
+    const actionsRef = database().ref(REALTIME_PATHS.roomActions(roomId));
+    const newActionRef = actionsRef.push();
 
-    await set(newActionRef, {
+    await newActionRef.set({
       ...action,
       ts: Date.now(),
     });
@@ -300,11 +294,11 @@ export const endGame = async (
   try {
     firebaseLog('Ending game', { roomId, winnerId });
 
-    await update(ref(database, REALTIME_PATHS.room(roomId)), {
+    await database().ref(REALTIME_PATHS.room(roomId)).update({
       status: 'finished',
     });
 
-    await update(ref(database, REALTIME_PATHS.roomState(roomId)), {
+    await database().ref(REALTIME_PATHS.roomState(roomId)).update({
       s: 'finished',
     });
 
@@ -322,17 +316,17 @@ export const setPresence = async (userId: string, roomId: string | null): Promis
   try {
     firebaseLog('Setting presence', { userId, roomId });
 
-    const presenceRef = ref(database, REALTIME_PATHS.userPresence(userId));
+    const presenceRef = database().ref(REALTIME_PATHS.userPresence(userId));
     const presenceData: RealtimePresence = {
       online: true,
       lastSeen: Date.now(),
       currentRoom: roomId,
     };
 
-    await set(presenceRef, presenceData);
+    await presenceRef.set(presenceData);
 
     // Set up disconnect handler
-    onDisconnect(presenceRef).set({
+    await presenceRef.onDisconnect().set({
       online: false,
       lastSeen: Date.now(),
       currentRoom: null,
@@ -354,17 +348,21 @@ export const subscribeToRoom = (
 ): (() => void) => {
   firebaseLog('Subscribing to room', { roomId });
 
-  const roomRef = ref(database, REALTIME_PATHS.room(roomId));
+  const roomRef = database().ref(REALTIME_PATHS.room(roomId));
 
-  const unsubscribe = onValue(roomRef, (snapshot) => {
+  const onValueCallback = (snapshot: ReturnType<typeof roomRef.once> extends Promise<infer T> ? T : never) => {
     if (snapshot.exists()) {
       callback(snapshot.val() as RealtimeRoom);
     } else {
       callback(null);
     }
-  });
+  };
 
-  return unsubscribe;
+  roomRef.on('value', onValueCallback as Parameters<typeof roomRef.on>[1]);
+
+  return () => {
+    roomRef.off('value', onValueCallback as Parameters<typeof roomRef.off>[1]);
+  };
 };
 
 // Subscribe to room players
@@ -374,19 +372,24 @@ export const subscribeToPlayers = (
 ): (() => void) => {
   firebaseLog('Subscribing to players', { roomId });
 
-  const playersRef = ref(database, REALTIME_PATHS.roomPlayers(roomId));
+  const playersRef = database().ref(REALTIME_PATHS.roomPlayers(roomId));
 
-  const unsubscribe = onValue(playersRef, (snapshot) => {
+  const onValueCallback = (snapshot: ReturnType<typeof playersRef.once> extends Promise<infer T> ? T : never) => {
     const players: RealtimePlayer[] = [];
     if (snapshot.exists()) {
       snapshot.forEach((child) => {
         players.push(child.val() as RealtimePlayer);
+        return undefined;
       });
     }
     callback(players);
-  });
+  };
 
-  return unsubscribe;
+  playersRef.on('value', onValueCallback as Parameters<typeof playersRef.on>[1]);
+
+  return () => {
+    playersRef.off('value', onValueCallback as Parameters<typeof playersRef.off>[1]);
+  };
 };
 
 // Subscribe to game state
@@ -396,17 +399,21 @@ export const subscribeToGameState = (
 ): (() => void) => {
   firebaseLog('Subscribing to game state', { roomId });
 
-  const stateRef = ref(database, REALTIME_PATHS.roomState(roomId));
+  const stateRef = database().ref(REALTIME_PATHS.roomState(roomId));
 
-  const unsubscribe = onValue(stateRef, (snapshot) => {
+  const onValueCallback = (snapshot: ReturnType<typeof stateRef.once> extends Promise<infer T> ? T : never) => {
     if (snapshot.exists()) {
       callback(snapshot.val() as RealtimeGameState);
     } else {
       callback(null);
     }
-  });
+  };
 
-  return unsubscribe;
+  stateRef.on('value', onValueCallback as Parameters<typeof stateRef.on>[1]);
+
+  return () => {
+    stateRef.off('value', onValueCallback as Parameters<typeof stateRef.off>[1]);
+  };
 };
 
 // Subscribe to game actions
@@ -416,12 +423,12 @@ export const subscribeToActions = (
 ): (() => void) => {
   firebaseLog('Subscribing to actions', { roomId });
 
-  const actionsRef = ref(database, REALTIME_PATHS.roomActions(roomId));
+  const actionsRef = database().ref(REALTIME_PATHS.roomActions(roomId));
 
   // Only listen for new actions (after subscription)
   let isInitialLoad = true;
 
-  const unsubscribe = onValue(actionsRef, (snapshot) => {
+  const onValueCallback = (snapshot: ReturnType<typeof actionsRef.once> extends Promise<infer T> ? T : never) => {
     if (isInitialLoad) {
       isInitialLoad = false;
       return;
@@ -431,6 +438,7 @@ export const subscribeToActions = (
       const actions: RealtimeAction[] = [];
       snapshot.forEach((child) => {
         actions.push(child.val() as RealtimeAction);
+        return undefined;
       });
 
       // Get the latest action
@@ -439,9 +447,13 @@ export const subscribeToActions = (
         callback(latestAction);
       }
     }
-  });
+  };
 
-  return unsubscribe;
+  actionsRef.on('value', onValueCallback as Parameters<typeof actionsRef.on>[1]);
+
+  return () => {
+    actionsRef.off('value', onValueCallback as Parameters<typeof actionsRef.off>[1]);
+  };
 };
 
 // ===== CHAT (Emoji only) =====
@@ -461,10 +473,10 @@ export const sendEmoji = async (
   try {
     firebaseLog('Sending emoji', { roomId, emoji });
 
-    const chatRef = ref(database, REALTIME_PATHS.roomChat(roomId));
-    const newMessageRef = push(chatRef);
+    const chatRef = database().ref(REALTIME_PATHS.roomChat(roomId));
+    const newMessageRef = chatRef.push();
 
-    await set(newMessageRef, {
+    await newMessageRef.set({
       userId,
       emoji,
       timestamp: Date.now(),
@@ -484,10 +496,10 @@ export const subscribeToChat = (
 ): (() => void) => {
   firebaseLog('Subscribing to chat', { roomId });
 
-  const chatRef = ref(database, REALTIME_PATHS.roomChat(roomId));
+  const chatRef = database().ref(REALTIME_PATHS.roomChat(roomId));
   let isInitialLoad = true;
 
-  const unsubscribe = onValue(chatRef, (snapshot) => {
+  const onValueCallback = (snapshot: ReturnType<typeof chatRef.once> extends Promise<infer T> ? T : never) => {
     if (isInitialLoad) {
       isInitialLoad = false;
       return;
@@ -497,6 +509,7 @@ export const subscribeToChat = (
       const messages: ChatMessage[] = [];
       snapshot.forEach((child) => {
         messages.push(child.val() as ChatMessage);
+        return undefined;
       });
 
       const latestMessage = messages[messages.length - 1];
@@ -504,7 +517,11 @@ export const subscribeToChat = (
         callback(latestMessage);
       }
     }
-  });
+  };
 
-  return unsubscribe;
+  chatRef.on('value', onValueCallback as Parameters<typeof chatRef.on>[1]);
+
+  return () => {
+    chatRef.off('value', onValueCallback as Parameters<typeof chatRef.off>[1]);
+  };
 };

@@ -1,5 +1,6 @@
 /**
  * Projets par defaut et mapping edition-secteurs
+ * MIGRATED TO @react-native-firebase/firestore
  *
  * Chaque edition a 4 startups fictives (templates) que les joueurs
  * peuvent choisir s'ils n'ont pas de startup personnelle du bon secteur.
@@ -7,8 +8,8 @@
  * Supporte le hot-swap depuis Firestore via refreshDefaultProjectsFromFirestore().
  */
 
-import { collection, getDocs } from 'firebase/firestore';
-import { firestore, FIRESTORE_COLLECTIONS } from '@/services/firebase/config';
+import firestore from '@react-native-firebase/firestore';
+import { FIRESTORE_COLLECTIONS } from '@/services/firebase/config';
 import { cachedFetch } from '@/services/firebase/cacheHelper';
 import type { Startup } from '@/types';
 
@@ -83,7 +84,10 @@ export let DEFAULT_PROJECTS: Record<EditionId, DefaultProject[]> = { ...LOCAL_DE
  * cette fonction n'est utilisée que pour la backward compatibility.
  */
 async function fetchDefaultProjectsFromFirestore(): Promise<Record<EditionId, DefaultProject[]>> {
-  const snapshot = await getDocs(collection(firestore, FIRESTORE_COLLECTIONS.defaultProjects));
+  const snapshot = await firestore()
+    .collection(FIRESTORE_COLLECTIONS.defaultProjects)
+    .get();
+
   if (snapshot.empty) return { ...LOCAL_DEFAULT_PROJECTS };
 
   const remoteByEdition: Record<string, DefaultProject[]> = {};

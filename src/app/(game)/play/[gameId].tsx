@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GameBoard } from '@/components/game/GameBoard';
 import { PlayerCard } from '@/components/game/PlayerCard';
+import { useResponsiveLayout } from '@/hooks/useResponsiveLayout';
 import {
   EmojiReactionBar,
   EmojiReactionOverlay,
@@ -79,6 +80,7 @@ const MOCK_CHALLENGE: ChallengeEvent = {
 export default function PlayScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { sizes, spacing } = useResponsiveLayout();
   const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
   const params = useLocalSearchParams<{ mode?: string; roomId?: string }>();
   const isOnline = params.mode === 'online';
@@ -897,7 +899,7 @@ export default function PlayScreen() {
   return (
     <View style={styles.container}>
       <RadialBackground />
-      <View style={[styles.content, { paddingTop: insets.top + 72, paddingBottom: insets.bottom + 70 }]}>
+      <View style={[styles.content, { paddingTop: insets.top + sizes.header, paddingBottom: insets.bottom + sizes.footer }]}>
         {/* Fixed Header */}
         <View style={[styles.fixedHeader, { paddingTop: insets.top + SPACING[2] }]}>
           <Pressable onPress={() => setShowQuitConfirm(true)} hitSlop={8} style={styles.headerButton}>
@@ -916,7 +918,7 @@ export default function PlayScreen() {
         </View>
 
         {/* Board + PlayerCards */}
-        <View style={styles.boardWrapper}>
+        <View style={[styles.boardWrapper, { marginHorizontal: spacing.screen }]}>
           {/* Top Players Row — yellow (top-left) and blue (top-right) */}
           <View style={styles.playersRow}>
             <View style={styles.playerSlot}>
@@ -1246,7 +1248,6 @@ const styles = StyleSheet.create({
   boardWrapper: {
     backgroundColor: 'rgba(0, 0, 0, 0.25)',
     borderRadius: 20,
-    marginHorizontal: SPACING[2],
     paddingVertical: SPACING[1],
     paddingHorizontal: SPACING[1],
   },

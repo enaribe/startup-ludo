@@ -29,8 +29,8 @@ import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { RadialBackground, DynamicGradientBorder } from '@/components/ui';
 import { multiplayerSync } from '@/services/multiplayer';
 import { useGameStore } from '@/stores';
-import { ref, get } from 'firebase/database';
-import { database, REALTIME_PATHS } from '@/services/firebase/config';
+import database from '@react-native-firebase/database';
+import { REALTIME_PATHS } from '@/services/firebase/config';
 import type { RealtimePlayer } from '@/services/firebase/config';
 import { decodeCheckpoint } from '@/utils/onlineCodec';
 import type { CompactCheckpoint } from '@/utils/onlineCodec';
@@ -148,8 +148,7 @@ export default function GamePreparationScreen() {
         await new Promise((r) => setTimeout(r, 500));
         setState('syncing');
 
-        const playersRef = ref(database, REALTIME_PATHS.roomPlayers(roomId));
-        const playersSnap = await get(playersRef);
+        const playersSnap = await database().ref(REALTIME_PATHS.roomPlayers(roomId)).once('value');
 
         if (!playersSnap.exists()) {
           setState('error');
@@ -159,13 +158,13 @@ export default function GamePreparationScreen() {
         const rtdbPlayers: RealtimePlayer[] = [];
         playersSnap.forEach((child) => {
           rtdbPlayers.push(child.val() as RealtimePlayer);
+          return undefined;
         });
 
         setState('loading');
         const checkpoint = await multiplayerSync.getCheckpoint();
 
-        const roomRef = ref(database, REALTIME_PATHS.room(roomId));
-        const roomSnap = await get(roomRef);
+        const roomSnap = await database().ref(REALTIME_PATHS.room(roomId)).once('value');
         const roomData = roomSnap.val();
         const edition = roomData?.edition || 'classic';
 

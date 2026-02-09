@@ -1,10 +1,11 @@
 /**
  * Ideation Service - Fetch ideation decks from Firestore
+ * MIGRATED TO @react-native-firebase/firestore
  * Downloads target, mission, and sector cards to replace hardcoded data.
  */
 
-import { collection, getDocs } from 'firebase/firestore';
-import { firestore, FIRESTORE_COLLECTIONS, firebaseLog } from './config';
+import firestore from '@react-native-firebase/firestore';
+import { FIRESTORE_COLLECTIONS, firebaseLog } from './config';
 import type { TargetCard, MissionCard, SectorCard } from '@/types';
 
 // ===== Firestore types (matches admin IdeationCard/IdeationDeck) =====
@@ -76,7 +77,10 @@ function toSectorCard(card: FirestoreIdeationCard): SectorCard {
  */
 export async function fetchIdeationFromFirestore(): Promise<IdeationData> {
   try {
-    const snapshot = await getDocs(collection(firestore, FIRESTORE_COLLECTIONS.ideationCards));
+    const snapshot = await firestore()
+      .collection(FIRESTORE_COLLECTIONS.ideationCards)
+      .get();
+
     const decks: FirestoreIdeationDeck[] = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),

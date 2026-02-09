@@ -554,6 +554,16 @@ export default function ChallengeHubScreen() {
     setShowFinalQuizModal(false);
   }, []);
 
+  // Formulaire d'inscription obligatoire (hook doit être avant les returns conditionnels)
+  const handleEnrollmentFormSubmit = useCallback(
+    (formData: EnrollmentFormData) => {
+      if (enrollment) {
+        submitEnrollmentForm(enrollment.id, formData);
+      }
+    },
+    [enrollment?.id, submitEnrollmentForm]
+  );
+
   // Si pas de Challenge ou d'inscription, afficher un message
   if (!challenge || !enrollment) {
     return (
@@ -569,14 +579,6 @@ export default function ChallengeHubScreen() {
       </View>
     );
   }
-
-  // Formulaire d'inscription obligatoire : bloquer l'accès aux niveaux tant qu'il n'est pas rempli
-  const handleEnrollmentFormSubmit = useCallback(
-    (formData: EnrollmentFormData) => {
-      submitEnrollmentForm(enrollment.id, formData);
-    },
-    [enrollment.id, submitEnrollmentForm]
-  );
 
   if (enrollment.formData == null) {
     return (
