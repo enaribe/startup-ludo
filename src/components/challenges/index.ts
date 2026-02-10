@@ -1,6 +1,8 @@
 export { ChallengeHomeCard } from './ChallengeHomeCard';
 export { ChallengeProgressMap } from './ChallengeProgressMap';
 export type { MapNode } from './ChallengeProgressMap';
+export { ChallengeGalleryMap } from './ChallengeGalleryMap';
+export type { GalleryNode } from './ChallengeGalleryMap';
 export { EnrollmentFormModal } from './EnrollmentFormModal';
 export { SectorChoiceModal } from './SectorChoiceModal';
 export { PitchBuilderModal } from './PitchBuilderModal';

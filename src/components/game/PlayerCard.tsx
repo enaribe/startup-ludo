@@ -156,7 +156,7 @@ export const PlayerCard = memo(function PlayerCard({
           {/* Bottom Row: Progress Bar */}
           <View style={styles.progressContainer}>
             <View style={styles.progressDots}>
-              {[...Array(7)].map((_, i) => (
+              {[...Array(8)].map((_, i) => (
                 <View
                   key={i}
                   style={[
@@ -168,7 +168,7 @@ export const PlayerCard = memo(function PlayerCard({
                 />
               ))}
             </View>
-            <Text style={styles.progressText}>{player.tokens}/7</Text>
+            <Text style={styles.progressText}>{player.tokens}/8</Text>
           </View>
         </View>
       </Pressable>

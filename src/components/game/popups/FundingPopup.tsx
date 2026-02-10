@@ -3,11 +3,9 @@ import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
-  withSpring,
   withSequence,
   withTiming,
   withRepeat,
-  withDelay,
   SlideInUp,
   FadeInDown,
   Easing,

@@ -11,20 +11,20 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { memo, useCallback, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View, Modal } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, FadeInUp, SlideInUp } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import type { GalleryNode } from '@/components/challenges';
 import {
     BusinessPlanModal,
-    ChallengeProgressMap,
+    ChallengeGalleryMap,
     EnrollmentFormModal,
     FinalQuizModal,
     PitchBuilderModal,
     SectorChoiceModal,
 } from '@/components/challenges';
-import type { MapNode } from '@/components/challenges';
-import { GameButton, RadialBackground, DynamicGradientBorder } from '@/components/ui';
+import { DynamicGradientBorder, GameButton, RadialBackground } from '@/components/ui';
 import { useChallengeStore } from '@/stores';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
@@ -36,7 +36,7 @@ import { getLevelProgress } from '@/types/challenge';
 
 interface LevelInfoPopupProps {
   visible: boolean;
-  node: MapNode | null;
+  node: GalleryNode | null;
   onClose: () => void;
   onPlay: () => void;
 }
@@ -82,9 +82,7 @@ const LevelInfoPopup = memo(function LevelInfoPopup({
                     {node.isCompleted ? (
                       <Ionicons name="checkmark" size={24} color={COLORS.white} />
                     ) : (
-                      <Text style={styles.levelPopupNumberText}>
-                        {node.type === 'level' ? node.levelNumber : `${node.levelNumber}.${node.subLevelNumber}`}
-                      </Text>
+                      <Text style={styles.levelPopupNumberText}>{node.levelNumber}</Text>
                     )}
                   </View>
                   <Pressable onPress={onClose} style={styles.levelPopupCloseBtn}>
@@ -96,6 +94,14 @@ const LevelInfoPopup = memo(function LevelInfoPopup({
                 <Text style={styles.levelPopupTitle}>{node.name}</Text>
                 {node.description && (
                   <Text style={styles.levelPopupDescription}>{node.description}</Text>
+                )}
+
+                {/* Posture */}
+                {node.posture && (
+                  <View style={styles.levelPopupPosture}>
+                    <Ionicons name="person-outline" size={16} color={COLORS.primary} />
+                    <Text style={styles.levelPopupPostureText}>{node.posture}</Text>
+                  </View>
                 )}
 
                 {/* Status */}
@@ -118,20 +124,6 @@ const LevelInfoPopup = memo(function LevelInfoPopup({
                     <Text style={styles.levelPopupXpText}>
                       {node.xpCurrent.toLocaleString()} / {node.xpRequired.toLocaleString()} XP
                     </Text>
-                  </View>
-                )}
-
-                {/* Catégories de cartes (sous-niveaux) */}
-                {node.cardCategories && node.cardCategories.length > 0 && (
-                  <View style={styles.levelPopupCategories}>
-                    <Text style={styles.levelPopupCategoriesLabel}>Types de cartes</Text>
-                    <View style={styles.levelPopupCategoriesList}>
-                      {node.cardCategories.map((cat, i) => (
-                        <View key={i} style={styles.levelPopupCategoryChip}>
-                          <Text style={styles.levelPopupCategoryText}>{cat}</Text>
-                        </View>
-                      ))}
-                    </View>
                   </View>
                 )}
 
@@ -366,7 +358,7 @@ export default function ChallengeHubScreen() {
   const [pitchModalMode, setPitchModalMode] = useState<'create' | 'view' | 'edit'>('create');
   const [bpModalMode, setBpModalMode] = useState<'create' | 'view' | 'edit'>('create');
   const [showDeliverablesPanel, setShowDeliverablesPanel] = useState(false);
-  const [selectedNode, setSelectedNode] = useState<MapNode | null>(null);
+  const [selectedNode, setSelectedNode] = useState<GalleryNode | null>(null);
 
   // Données dérivées
   const currentLevel = useMemo(() => {
@@ -439,16 +431,6 @@ export default function ChallengeHubScreen() {
     return isBPFullUnlocked && !enrollment?.deliverables.businessPlanFull;
   }, [isBPFullUnlocked, enrollment]);
 
-  // Données existantes pour les modals de BP
-  const existingDataForBP = useMemo(() => {
-    if (!enrollment) return undefined;
-    return {
-      sectorName: selectedSector?.name,
-      pitch: enrollment.deliverables.pitch,
-      businessPlanSimple: enrollment.deliverables.businessPlanSimple,
-    };
-  }, [enrollment, selectedSector]);
-
   // Handlers
   const handleBack = useCallback(() => {
     router.back();
@@ -481,7 +463,7 @@ export default function ChallengeHubScreen() {
     [enrollment, selectSector, router, challengeId]
   );
 
-  const handleLevelPress = useCallback((node: MapNode) => {
+  const handleLevelPress = useCallback((node: GalleryNode) => {
     setSelectedNode(node);
   }, []);
 
@@ -542,16 +524,30 @@ export default function ChallengeHubScreen() {
     }
   }, [enrollment, isSectorUnlocked, isPitchUnlocked, isBPSimpleUnlocked, isBPFullUnlocked]);
 
-  const handlePitchComplete = useCallback(() => {
+  const handlePitchComplete = useCallback((_pitch: {
+    problem: string;
+    solution: string;
+    target: string;
+    viability: string;
+    impact: string;
+    generatedDocument: string;
+  }) => {
     setShowPitchModal(false);
+    // TODO: Sauvegarder le pitch dans l'enrollment via le store
   }, []);
 
-  const handleBPComplete = useCallback(() => {
+  const handleBPComplete = useCallback((_bp: {
+    content: Record<string, string>;
+    generatedDocument: string;
+    certificate?: string;
+  }) => {
     setShowBPModal(false);
+    // TODO: Sauvegarder le BP dans l'enrollment via le store
   }, []);
 
-  const handleFinalQuizComplete = useCallback((_champion: import('@/types/challenge').ChampionStatus) => {
+  const handleFinalQuizPass = useCallback((_certificate: string) => {
     setShowFinalQuizModal(false);
+    // TODO: Sauvegarder le certificat dans l'enrollment via le store
   }, []);
 
   // Formulaire d'inscription obligatoire (hook doit être avant les returns conditionnels)
@@ -662,9 +658,9 @@ export default function ChallengeHubScreen() {
         </Animated.View>
       </View>
 
-      {/* Carte de progression */}
-      <View style={[styles.mapContainer, { paddingTop: insets.top + 180 }]}>
-        <ChallengeProgressMap
+      {/* Carte de progression style Galerie */}
+      <View style={[styles.mapContainer, { paddingTop: insets.top + 190 }]}>
+        <ChallengeGalleryMap
           levels={challenge.levels}
           currentLevel={enrollment.currentLevel}
           currentSubLevel={enrollment.currentSubLevel}
@@ -751,12 +747,10 @@ export default function ChallengeHubScreen() {
       {enrollment && challengeId && (
         <PitchBuilderModal
           visible={showPitchModal}
-          enrollmentId={enrollment.id}
-          challengeId={challengeId}
           sectorName={selectedSector?.name}
           mode={pitchModalMode}
           initialData={enrollment.deliverables.pitch}
-          onComplete={handlePitchComplete}
+          onValidate={handlePitchComplete}
           onClose={() => setShowPitchModal(false)}
         />
       )}
@@ -765,29 +759,24 @@ export default function ChallengeHubScreen() {
       {enrollment && challengeId && (
         <BusinessPlanModal
           visible={showBPModal}
-          enrollmentId={enrollment.id}
-          challengeId={challengeId}
           type={showBPType}
           mode={bpModalMode}
-          initialBPData={showBPType === 'simple' ? enrollment.deliverables.businessPlanSimple : enrollment.deliverables.businessPlanFull}
-          existingData={existingDataForBP}
-          onComplete={handleBPComplete}
+          initialData={showBPType === 'simple' ? enrollment.deliverables.businessPlanSimple?.content : enrollment.deliverables.businessPlanFull?.content}
+          sectorName={selectedSector?.name}
+          pitchData={enrollment.deliverables.pitch}
+          bpSimpleData={enrollment.deliverables.businessPlanSimple?.content}
+          onValidate={handleBPComplete}
           onClose={() => setShowBPModal(false)}
         />
       )}
 
       {/* Modal Quiz Final + Certificat */}
-      {enrollment && challengeId && (
+      {enrollment && challenge && (
         <FinalQuizModal
           visible={showFinalQuizModal}
-          enrollmentId={enrollment.id}
-          challengeId={challengeId}
-          existingData={{
-            sectorName: selectedSector?.name || '',
-            pitch: enrollment.deliverables.pitch,
-            businessPlanSimple: enrollment.deliverables.businessPlanSimple,
-          }}
-          onComplete={handleFinalQuizComplete}
+          enrollment={enrollment}
+          challenge={challenge}
+          onPass={handleFinalQuizPass}
           onClose={() => setShowFinalQuizModal(false)}
         />
       )}
@@ -1123,6 +1112,22 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     lineHeight: 20,
     marginBottom: SPACING[3],
+  },
+  levelPopupPosture: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[2],
+    backgroundColor: 'rgba(255, 188, 64, 0.15)',
+    paddingHorizontal: SPACING[3],
+    paddingVertical: SPACING[2],
+    borderRadius: 12,
+    marginBottom: SPACING[3],
+    alignSelf: 'flex-start',
+  },
+  levelPopupPostureText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.primary,
   },
   levelPopupStatusBadge: {
     alignSelf: 'flex-start',

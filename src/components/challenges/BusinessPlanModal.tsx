@@ -42,8 +42,8 @@ export const BusinessPlanModal = memo(function BusinessPlanModal({
 
   if (!visible) return null;
 
-  const key = steps[step];
-  const value = values[key] ?? '';
+  const key = steps[step] ?? steps[0];
+  const value = key ? values[key] ?? '' : '';
   const isValid = value.length >= 20;
 
   const handleNext = () => {
@@ -77,7 +77,7 @@ export const BusinessPlanModal = memo(function BusinessPlanModal({
               <TextInput
                 style={styles.input}
                 value={value}
-                onChangeText={(t) => setValues((v) => ({ ...v, [key]: t }))}
+                onChangeText={(t) => key && setValues((v) => ({ ...v, [key]: t }))}
                 placeholder="Min 20 caractères..."
                 placeholderTextColor={COLORS.textMuted}
                 multiline

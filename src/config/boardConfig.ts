@@ -31,7 +31,8 @@ export interface PlayerConfig {
 export const BOARD_SIZE = 13;        // Grille 13x13
 export const CIRCUIT_LENGTH = 44;    // 44 cases sur le circuit
 export const FINAL_PATH_LENGTH = 5;  // 5 cases vers le centre
-export const TOKENS_TO_FINISH = 7;   // Jetons requis pour finir
+export const TOKENS_TO_FINISH = 8;   // Jetons requis pour finir
+export const MAX_TOKENS = 8;         // Maximum de jetons qu'un joueur peut avoir
 export const DICE_TO_EXIT = 6;       // Dé pour sortir de la maison
 export const DEFAULT_PAWNS_COUNT = 1; // 1 pion par défaut (configurable à 4)
 

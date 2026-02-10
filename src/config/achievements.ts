@@ -315,14 +315,14 @@ export const ACHIEVEMENTS: Achievement[] = [
     condition: { type: 'tokens_earned', count: 2000 },
   },
   {
-    id: 'tokens_in_game_7',
-    title: 'Bien Garni',
-    description: 'Termine une partie avec 7 jetons',
+    id: 'tokens_in_game_8',
+    title: 'Coffre-fort Plein',
+    description: 'Termine une partie avec 8 jetons (maximum)',
     icon: 'wallet-outline',
     category: 'collectionneur',
-    rarity: 'rare',
-    xpReward: 200,
-    condition: { type: 'tokens_in_game', count: 7 },
+    rarity: 'epic',
+    xpReward: 250,
+    condition: { type: 'tokens_in_game', count: 8 },
   },
 
   // ===== SOCIAL =====

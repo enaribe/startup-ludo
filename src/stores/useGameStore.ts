@@ -19,6 +19,7 @@ import { eventManager, type GeneratedGameEvent } from '@/services/game/EventMana
 import type { EditionId } from '@/data';
 import type { CheckpointData } from '@/utils/onlineCodec';
 import { useChallengeStore } from '@/stores/useChallengeStore';
+import { MAX_TOKENS } from '@/config/boardConfig';
 
 /** Action compacte recue d'un joueur distant via RTDB */
 export interface RemoteAction {
@@ -469,7 +470,7 @@ export const useGameStore = create<GameStore>()(
           if (state.game) {
             const player = state.game.players.find((p) => p.id === playerId);
             if (player) {
-              player.tokens += amount;
+              player.tokens = Math.min(MAX_TOKENS, player.tokens + amount);
               state.game.updatedAt = Date.now();
             }
           }

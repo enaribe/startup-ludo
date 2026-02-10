@@ -61,8 +61,6 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const user = useAuthStore((state) => state.user);
   const profile = useUserStore((state) => state.profile);
-  // Re-compute when challengesLoaded changes to force re-render after async load
-  const activeChallenges = useMemo(() => getActiveChallenges(), [challengesLoaded]);
   const enrollInChallenge = useChallengeStore((s) => s.enrollInChallenge);
   const submitEnrollmentForm = useChallengeStore((s) => s.submitEnrollmentForm);
   const setActiveChallenge = useChallengeStore((s) => s.setActiveChallenge);
@@ -73,6 +71,9 @@ export default function HomeScreen() {
 
   const [showEnrollmentForm, setShowEnrollmentForm] = useState(false);
   const [challengesLoaded, setChallengesLoaded] = useState(false);
+
+  // Re-compute when challengesLoaded changes to force re-render after async load
+  const activeChallenges = useMemo(() => getActiveChallenges(), [challengesLoaded]);
 
   // Refresh challenges when screen mounts or focuses
   useEffect(() => {

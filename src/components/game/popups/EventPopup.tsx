@@ -3,11 +3,9 @@ import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
-  withSpring,
   withSequence,
   withTiming,
   withRepeat,
-  withDelay,
   SlideInUp,
   FadeInDown,
   Easing,
@@ -240,6 +238,26 @@ const styles = StyleSheet.create({
   },
   iconWrap: {
     marginBottom: SPACING[3],
+  },
+  opportunityIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(76, 175, 80, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: COLORS.success,
+  },
+  challengeIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(244, 67, 54, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: COLORS.error,
   },
   title: {
     fontFamily: FONTS.title,
