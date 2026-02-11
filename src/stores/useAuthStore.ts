@@ -8,6 +8,7 @@ import {
   loginAsGuest as firebaseLoginAsGuest,
   logout as firebaseLogout,
   resetPassword as firebaseResetPassword,
+  deleteUserAccount as firebaseDeleteAccount,
   subscribeToAuthState,
   signInWithGoogle,
   signInWithApple,
@@ -54,6 +55,7 @@ interface AuthActions {
   resetPhoneAuth: () => void;
   clearNeedsProfileCompletion: () => void;
   logout: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   clearError: () => void;
   initializeAuth: () => () => void;
@@ -521,6 +523,31 @@ export const useAuthStore = create<AuthStore>()(
             state.error = error instanceof Error ? error.message : 'Erreur de déconnexion';
             state.isLoading = false;
           });
+        }
+      },
+
+      deleteAccount: async () => {
+        set((state) => {
+          state.isLoading = true;
+          state.error = null;
+        });
+
+        try {
+          // Delete user account from Firebase
+          await firebaseDeleteAccount();
+          // Clear local state
+          set((state) => {
+            state.user = null;
+            state.isAuthenticated = false;
+            state.isLoading = false;
+          });
+          useUserStore.getState().reset();
+        } catch (error) {
+          set((state) => {
+            state.error = error instanceof Error ? error.message : 'Erreur de suppression du compte';
+            state.isLoading = false;
+          });
+          throw error;
         }
       },
 

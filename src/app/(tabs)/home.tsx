@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { memo, useCallback, useEffect, useRef, useState, useMemo } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Dimensions, FlatList, Image, Pressable, ScrollView, StyleSheet, Text, View, type ViewToken } from 'react-native';
 import Animated, {
   Easing,
@@ -15,8 +15,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChallengeHomeCard, EnrollmentFormModal } from '@/components/challenges';
 import { AdBanner } from '@/components/home';
 import { Avatar, DynamicGradientBorder, GradientBorder, RadialBackground } from '@/components/ui';
-import { getActiveChallenges, ALL_CHALLENGES, refreshChallengesFromFirestore } from '@/data/challenges';
 import { formatXP, getLevelFromXP, getRankFromXP, getRankProgress } from '@/config/progression';
+import { ALL_CHALLENGES, refreshChallengesFromFirestore } from '@/data/challenges';
 import { useAuthStore, useChallengeStore, useUserStore } from '@/stores';
 import { FONTS } from '@/styles/typography';
 import type { Challenge, EnrollmentFormData } from '@/types/challenge';
@@ -72,8 +72,15 @@ export default function HomeScreen() {
   const [showEnrollmentForm, setShowEnrollmentForm] = useState(false);
   const [challengesLoaded, setChallengesLoaded] = useState(false);
 
-  // Re-compute when challengesLoaded changes to force re-render after async load
-  const activeChallenges = useMemo(() => getActiveChallenges(), [challengesLoaded]);
+  // Récupérer uniquement les challenges inscrits de l'utilisateur
+  const userEnrollments = useChallengeStore((state) => state.enrollments);
+  const enrolledChallenges = useMemo(() => {
+    if (!userId) return [];
+    const userChallengeIds = userEnrollments
+      .filter((e) => e.userId === userId)
+      .map((e) => e.challengeId);
+    return ALL_CHALLENGES.filter((c) => userChallengeIds.includes(c.id) && c.isActive);
+  }, [userEnrollments, userId, challengesLoaded]);
 
   // Refresh challenges when screen mounts or focuses
   useEffect(() => {
@@ -105,11 +112,11 @@ export default function HomeScreen() {
   ).current;
 
   const scrollToIndex = useCallback((index: number) => {
-    if (index >= 0 && index < activeChallenges.length) {
+    if (index >= 0 && index < enrolledChallenges.length) {
       challengeListRef.current?.scrollToIndex({ index, animated: true });
       setActiveIndex(index);
     }
-  }, [activeChallenges.length]);
+  }, [enrolledChallenges.length]);
 
   // Calculs de progression
   const totalXP = profile?.xp ?? 0;
@@ -123,10 +130,10 @@ export default function HomeScreen() {
 
   const displayName = user?.displayName || profile?.displayName || 'Joueur';
 
-  // Debug: log active challenges
-  console.log('[Home] Active challenges count:', activeChallenges.length);
-  if (activeChallenges.length > 0) {
-    console.log('[Home] Challenges:', activeChallenges.map(c => ({ id: c.id, name: c.name, isActive: c.isActive })));
+  // Debug: log enrolled challenges
+  console.log('[Home] Enrolled challenges count:', enrolledChallenges.length);
+  if (enrolledChallenges.length > 0) {
+    console.log('[Home] Challenges:', enrolledChallenges.map(c => ({ id: c.id, name: c.name, isActive: c.isActive })));
   }
 
   const handleEnrollmentFormSubmit = useCallback(
@@ -280,10 +287,21 @@ export default function HomeScreen() {
 
         {/* Challenge Section */}
         <View style={styles.challengeHeader}>
-          <Text style={styles.challengeHeaderTitle}>
-            {activeChallenges.length > 1 ? 'PROGRAMMES' : 'CHALLENGE A LA UNE'}
-          </Text>
-          {activeChallenges.length > 1 && (
+          <View style={styles.challengeHeaderLeft}>
+            <Text style={styles.challengeHeaderTitle}>
+              {enrolledChallenges.length > 1 ? 'MES PROGRAMMES' : enrolledChallenges.length === 1 ? 'MON PROGRAMME' : 'PROGRAMMES'}
+            </Text>
+            {enrolledChallenges.length > 0 && (
+              <Pressable
+                style={styles.viewAllButton}
+                onPress={() => router.push('/(challenges)/challenge-explorer')}
+              >
+                <Text style={styles.viewAllButtonText}>Voir tous</Text>
+                <Ionicons name="arrow-forward" size={12} color="#FFBC40" />
+              </Pressable>
+            )}
+          </View>
+          {enrolledChallenges.length > 1 && (
             <View style={styles.challengeNav}>
               <Pressable
                 style={[styles.challengeNavBtn, activeIndex > 0 && styles.challengeNavBtnActive]}
@@ -293,21 +311,21 @@ export default function HomeScreen() {
                 <Ionicons name="chevron-back" size={14} color={activeIndex > 0 ? '#FFBC40' : 'rgba(255,255,255,0.2)'} />
               </Pressable>
               <Pressable
-                style={[styles.challengeNavBtn, activeIndex < activeChallenges.length - 1 && styles.challengeNavBtnActive]}
+                style={[styles.challengeNavBtn, activeIndex < enrolledChallenges.length - 1 && styles.challengeNavBtnActive]}
                 onPress={() => scrollToIndex(activeIndex + 1)}
-                disabled={activeIndex === activeChallenges.length - 1}
+                disabled={activeIndex === enrolledChallenges.length - 1}
               >
-                <Ionicons name="chevron-forward" size={14} color={activeIndex < activeChallenges.length - 1 ? '#FFBC40' : 'rgba(255,255,255,0.2)'} />
+                <Ionicons name="chevron-forward" size={14} color={activeIndex < enrolledChallenges.length - 1 ? '#FFBC40' : 'rgba(255,255,255,0.2)'} />
               </Pressable>
             </View>
           )}
         </View>
 
-        {activeChallenges.length > 0 ? (
+        {enrolledChallenges.length > 0 ? (
           <View style={styles.challengeCardWrapper}>
             <FlatList
               ref={challengeListRef}
-              data={activeChallenges}
+              data={enrolledChallenges}
               keyExtractor={(item) => item.id}
               horizontal
               pagingEnabled
@@ -347,9 +365,9 @@ export default function HomeScreen() {
                 );
               }}
             />
-            {activeChallenges.length > 1 && (
+            {enrolledChallenges.length > 1 && (
               <View style={styles.pagination}>
-                {activeChallenges.map((c, i) => (
+                {enrolledChallenges.map((c, i) => (
                   <View key={c.id} style={[styles.dot, i === activeIndex && styles.dotActive]} />
                 ))}
               </View>
@@ -361,13 +379,20 @@ export default function HomeScreen() {
               <DynamicGradientBorder borderRadius={16} fill="rgba(0, 0, 0, 0.35)">
                 <View style={styles.challengeCardContent}>
                   <View style={{ alignItems: 'center', paddingVertical: 20 }}>
-                    <Ionicons name="trophy-outline" size={40} color="rgba(255, 255, 255, 0.2)" />
-                    <Text style={[styles.challengeNameText, { marginTop: 12, opacity: 0.5 }]}>
-                      BIENTOT DISPONIBLE
+                    <Ionicons name="school-outline" size={48} color="rgba(255, 188, 64, 0.3)" />
+                    <Text style={[styles.challengeNameText, { marginTop: 12 }]}>
+                      AUCUN PROGRAMME INSCRIT
                     </Text>
-                    <Text style={[styles.challengeDescText, { textAlign: 'center', marginTop: 6 }]}>
-                      Les challenges arrivent bientot !
+                    <Text style={[styles.challengeDescText, { textAlign: 'center', marginTop: 6, marginBottom: 16 }]}>
+                      Explorez et inscrivez-vous à un programme pour commencer votre parcours entrepreneurial.
                     </Text>
+                    <Pressable
+                      style={styles.exploreChallengesButton}
+                      onPress={() => router.push('/(challenges)/challenge-explorer')}
+                    >
+                      <Text style={styles.exploreChallengesButtonText}>EXPLORER LES PROGRAMMES</Text>
+                      <Ionicons name="arrow-forward" size={18} color="#0C243E" />
+                    </Pressable>
                   </View>
                 </View>
               </DynamicGradientBorder>
@@ -559,12 +584,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginVertical: 15,
+  },
+  challengeHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   challengeHeaderTitle: {
     fontFamily: FONTS.title,
     fontSize: 13,
     color: 'rgba(255, 255, 255, 0.4)',
+  },
+  viewAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255, 188, 64, 0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  viewAllButtonText: {
+    fontFamily: FONTS.bodyMedium,
+    fontSize: 11,
+    color: '#FFBC40',
   },
   challengeNav: {
     flexDirection: 'row',
@@ -745,5 +789,20 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
     backgroundColor: '#F35145',
-  }
+  },
+  exploreChallengesButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFBC40',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  exploreChallengesButtonText: {
+    fontFamily: FONTS.title,
+    fontSize: 14,
+    color: '#0C243E',
+    letterSpacing: 0.5,
+  },
 });

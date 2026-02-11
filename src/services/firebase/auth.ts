@@ -92,6 +92,23 @@ export const logout = async (): Promise<void> => {
   }
 };
 
+// Delete user account
+export const deleteUserAccount = async (): Promise<void> => {
+  const user = auth().currentUser;
+  if (!user) {
+    throw new Error('Aucun utilisateur connecté');
+  }
+
+  try {
+    firebaseLog('Attempting to delete user account', { uid: user.uid });
+    await user.delete();
+    firebaseLog('User account deleted successfully');
+  } catch (error) {
+    firebaseLog('Account deletion failed', error);
+    throw new Error(getFirebaseErrorMessage(error));
+  }
+};
+
 // Send password reset email
 export const resetPassword = async (email: string): Promise<void> => {
   try {

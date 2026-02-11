@@ -8,7 +8,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useState } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -18,8 +18,10 @@ import {
   StyleSheet,
   Dimensions,
   Image,
+  Modal,
+  Alert,
 } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RadialBackground } from '@/components/ui/RadialBackground';
@@ -165,7 +167,11 @@ export default function SettingsScreen() {
   } = useSettingsStore();
 
   const logout = useAuthStore((state) => state.logout);
+  const deleteAccount = useAuthStore((state) => state.deleteAccount);
   const user = useAuthStore((state) => state.user);
+
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleBack = useCallback(() => {
     router.back();
@@ -175,6 +181,23 @@ export default function SettingsScreen() {
     await logout();
     router.replace('/');
   }, [logout, router]);
+
+  const handleDeleteAccount = useCallback(async () => {
+    setIsDeleting(true);
+    try {
+      await deleteAccount();
+      setShowDeleteModal(false);
+      router.replace('/');
+    } catch (error) {
+      Alert.alert(
+        'Erreur',
+        error instanceof Error ? error.message : 'Impossible de supprimer le compte',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [deleteAccount, router]);
 
   return (
     <View style={styles.container}>
@@ -317,6 +340,19 @@ export default function SettingsScreen() {
           <Text style={styles.copyrightText}>by concree</Text>
         </Animated.View>
 
+        {/* Danger Zone Section */}
+        <SettingSection title="ZONE DE DANGER" delay={500}>
+          <SettingRow
+            icon="trash"
+            iconColor="#E74C3C"
+            title="Supprimer mon compte"
+            subtitle="Cette action est irréversible"
+            onPress={() => setShowDeleteModal(true)}
+            showArrow
+            isLast
+          />
+        </SettingSection>
+
         {/* Spacer */}
         <View style={styles.spacer} />
 
@@ -333,6 +369,69 @@ export default function SettingsScreen() {
           />
         </Animated.View>
       </ScrollView>
+
+      {/* Delete Account Confirmation Modal */}
+      <Modal
+        visible={showDeleteModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !isDeleting && setShowDeleteModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <Animated.View entering={FadeIn.duration(300)} style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalIconContainer}>
+                <Ionicons name="warning" size={48} color="#E74C3C" />
+              </View>
+            </View>
+
+            <Text style={styles.modalTitle}>Supprimer mon compte</Text>
+            <Text style={styles.modalMessage}>
+              Êtes-vous sûr de vouloir supprimer votre compte ?{'\n\n'}
+              Cette action est <Text style={styles.modalWarning}>irréversible</Text> et entraînera la perte de :
+            </Text>
+
+            <View style={styles.modalList}>
+              <View style={styles.modalListItem}>
+                <Ionicons name="close-circle" size={16} color="#E74C3C" />
+                <Text style={styles.modalListText}>Toutes vos parties et statistiques</Text>
+              </View>
+              <View style={styles.modalListItem}>
+                <Ionicons name="close-circle" size={16} color="#E74C3C" />
+                <Text style={styles.modalListText}>Votre progression dans les challenges</Text>
+              </View>
+              <View style={styles.modalListItem}>
+                <Ionicons name="close-circle" size={16} color="#E74C3C" />
+                <Text style={styles.modalListText}>Votre portfolio de startups</Text>
+              </View>
+              <View style={styles.modalListItem}>
+                <Ionicons name="close-circle" size={16} color="#E74C3C" />
+                <Text style={styles.modalListText}>Tous vos succès et récompenses</Text>
+              </View>
+            </View>
+
+            <View style={styles.modalButtons}>
+              <Pressable
+                style={[styles.modalButton, styles.modalButtonCancel]}
+                onPress={() => setShowDeleteModal(false)}
+                disabled={isDeleting}
+              >
+                <Text style={styles.modalButtonTextCancel}>Annuler</Text>
+              </Pressable>
+
+              <Pressable
+                style={[styles.modalButton, styles.modalButtonDelete]}
+                onPress={handleDeleteAccount}
+                disabled={isDeleting}
+              >
+                <Text style={styles.modalButtonTextDelete}>
+                  {isDeleting ? 'Suppression...' : 'Supprimer'}
+                </Text>
+              </Pressable>
+            </View>
+          </Animated.View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -507,5 +606,100 @@ const styles = StyleSheet.create({
   },
   logoutContainer: {
     marginTop: SPACING[4],
+  },
+  // Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING[4],
+  },
+  modalContainer: {
+    backgroundColor: '#1B314A',
+    borderRadius: 20,
+    padding: SPACING[6],
+    width: '100%',
+    maxWidth: 400,
+    borderWidth: 1,
+    borderColor: 'rgba(231, 76, 60, 0.3)',
+  },
+  modalHeader: {
+    alignItems: 'center',
+    marginBottom: SPACING[4],
+  },
+  modalIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(231, 76, 60, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES.xl,
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: SPACING[3],
+  },
+  modalMessage: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.base,
+    color: 'rgba(255, 255, 255, 0.7)',
+    textAlign: 'center',
+    marginBottom: SPACING[4],
+    lineHeight: 22,
+  },
+  modalWarning: {
+    fontFamily: FONTS.bodySemiBold,
+    color: '#E74C3C',
+  },
+  modalList: {
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderRadius: 12,
+    padding: SPACING[3],
+    marginBottom: SPACING[5],
+    gap: SPACING[2],
+  },
+  modalListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[2],
+  },
+  modalListText: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.sm,
+    color: 'rgba(255, 255, 255, 0.7)',
+    flex: 1,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: SPACING[3],
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: SPACING[3],
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalButtonCancel: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  modalButtonDelete: {
+    backgroundColor: '#E74C3C',
+  },
+  modalButtonTextCancel: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.base,
+    color: '#FFFFFF',
+  },
+  modalButtonTextDelete: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES.base,
+    color: '#FFFFFF',
   },
 });
