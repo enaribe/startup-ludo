@@ -25,6 +25,8 @@ import { GameButton } from '@/components/ui/GameButton';
 import { RadialBackground } from '@/components/ui/RadialBackground';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { LoadingScreen } from '@/components/common/LoadingScreen';
+import { PrivacyPolicyModal } from '@/components/common/PrivacyPolicyModal';
+import { usePrivacyAcceptance } from '@/hooks/usePrivacyAcceptance';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -61,6 +63,15 @@ export default function WelcomeScreen() {
   const insets = useSafeAreaInsets();
   const { loginAsGuest, isAuthenticated, isInitialized } = useAuthStore();
   const [isGuestLoading, setIsGuestLoading] = useState(false);
+  const { accepted, loading: privacyLoading, acceptPrivacy } = usePrivacyAcceptance();
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+
+  // Show privacy modal on first visit
+  useEffect(() => {
+    if (!privacyLoading && accepted === false) {
+      setShowPrivacyModal(true);
+    }
+  }, [privacyLoading, accepted]);
 
   // Redirect if already authenticated (wait for auth to be initialized first)
   useEffect(() => {
@@ -69,20 +80,37 @@ export default function WelcomeScreen() {
     }
   }, [isAuthenticated, isInitialized, router]);
 
+  const handleAcceptPrivacy = useCallback(async () => {
+    await acceptPrivacy();
+    setShowPrivacyModal(false);
+  }, [acceptPrivacy]);
+
   const handlePlayAsGuest = useCallback(async () => {
+    if (accepted !== true) {
+      setShowPrivacyModal(true);
+      return;
+    }
     setIsGuestLoading(true);
     await loginAsGuest();
     setIsGuestLoading(false);
     router.replace('/(tabs)/home');
-  }, [loginAsGuest, router]);
+  }, [loginAsGuest, router, accepted]);
 
   const handleLogin = useCallback(() => {
+    if (accepted !== true) {
+      setShowPrivacyModal(true);
+      return;
+    }
     router.push('/(auth)/login');
-  }, [router]);
+  }, [router, accepted]);
 
   const handleRegister = useCallback(() => {
+    if (accepted !== true) {
+      setShowPrivacyModal(true);
+      return;
+    }
     router.push('/(auth)/register');
-  }, [router]);
+  }, [router, accepted]);
 
   // Show loading screen while auth is initializing
   if (!isInitialized) {
@@ -162,6 +190,12 @@ export default function WelcomeScreen() {
           by concree
         </Animated.Text>
       </View>
+
+      {/* Privacy Policy Modal */}
+      <PrivacyPolicyModal
+        visible={showPrivacyModal}
+        onAccept={handleAcceptPrivacy}
+      />
     </View>
   );
 }

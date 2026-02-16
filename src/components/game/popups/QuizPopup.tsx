@@ -6,10 +6,10 @@ import Animated, {
   withTiming,
   withSequence,
   SlideInUp,
+  interpolateColor,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Modal } from '@/components/ui/Modal';
 import { PopupQuizIcon } from '@/components/game/popups/PopupIcons';
 import { COLORS } from '@/styles/colors';
@@ -88,13 +88,13 @@ export const QuizPopup = memo(function QuizPopup({
   }, [isSpectator, spectatorResult, quiz, resultScale, badgeBounce]);
 
   const handleTimeUp = useCallback(() => {
-    if (hasAnswered) return;
+    if (hasAnswered || !quiz) return;
     setHasAnswered(true);
     resultScale.value = withTiming(1, { duration: 220 });
     badgeBounce.value = withTiming(1, { duration: 220 });
     if (hapticsEnabled) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-    setTimeout(() => onAnswer(false, 0), 2000);
-  }, [hasAnswered, hapticsEnabled, onAnswer, resultScale, badgeBounce]);
+    setTimeout(() => onAnswer(false, quiz.reward), 2000);
+  }, [hasAnswered, quiz, hapticsEnabled, onAnswer, resultScale, badgeBounce]);
 
   const handleSelectAnswer = useCallback(
     (index: number) => {
@@ -102,7 +102,8 @@ export const QuizPopup = memo(function QuizPopup({
       setSelectedAnswer(index);
       setHasAnswered(true);
       const isCorrect = index === quiz.correctAnswer;
-      const reward = isCorrect ? quiz.reward : 0;
+      // Toujours envoyer quiz.reward - le système retire les points si incorrect
+      const reward = quiz.reward;
       resultScale.value = withTiming(1, { duration: 220 });
       badgeBounce.value = withTiming(1, { duration: 220 });
       if (hapticsEnabled) {
@@ -114,9 +115,22 @@ export const QuizPopup = memo(function QuizPopup({
     [hasAnswered, quiz, hapticsEnabled, onAnswer, resultScale, badgeBounce]
   );
 
-  const timerAnimStyle = useAnimatedStyle(() => ({
-    width: `${timerProgress.value * 100}%`,
-  }));
+  const timerAnimStyle = useAnimatedStyle(() => {
+    'worklet';
+    const progress = timerProgress.value;
+
+    // Interpoler la couleur de vert -> jaune -> rouge en 3 étapes
+    const backgroundColor = interpolateColor(
+      progress,
+      [0, 0.33, 0.66, 1],
+      ['#F44336', '#FF9800', '#FFD700', '#4CAF50'] // Rouge -> Orange -> Jaune -> Vert
+    );
+
+    return {
+      width: `${progress * 100}%`,
+      backgroundColor,
+    };
+  });
 
   const resultAnimStyle = useAnimatedStyle(() => ({
     transform: [{ scale: resultScale.value }],
@@ -171,14 +185,7 @@ export const QuizPopup = memo(function QuizPopup({
             <View style={styles.timerContainer}>
               <Ionicons name="time-outline" size={16} color={COLORS.events.quiz} />
               <View style={styles.timerTrack}>
-                <Animated.View style={[styles.timerFillWrap, timerAnimStyle]}>
-                  <LinearGradient
-                    colors={[COLORS.events.quiz, COLORS.primary]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={StyleSheet.absoluteFill}
-                  />
-                </Animated.View>
+                <Animated.View style={[styles.timerFill, timerAnimStyle]} />
               </View>
             </View>
           )}
@@ -364,10 +371,9 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.full,
     overflow: 'hidden',
   },
-  timerFillWrap: {
+  timerFill: {
     height: '100%',
     borderRadius: BORDER_RADIUS.full,
-    overflow: 'hidden',
   },
   options: {
     width: '100%',

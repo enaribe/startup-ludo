@@ -98,7 +98,7 @@ function getRandomItem<T>(items: T[]): T | null {
  */
 export function getRandomQuiz(editionId: EditionId, difficulty?: DifficultyLevel): Quiz | null {
   const edition = EDITIONS[editionId];
-  if (!edition) return null;
+  if (!edition || !edition.quizzes) return null;
   const quizzes = difficulty
     ? edition.quizzes.filter(q => q.difficulty === difficulty)
     : edition.quizzes;
@@ -112,7 +112,7 @@ export function getRandomQuiz(editionId: EditionId, difficulty?: DifficultyLevel
  */
 export function getRandomDuel(editionId: EditionId): Duel | null {
   const edition = EDITIONS[editionId];
-  if (!edition) return null;
+  if (!edition || !edition.duels) return null;
   return getRandomItem(edition.duels);
 }
 
@@ -122,7 +122,7 @@ export function getRandomDuel(editionId: EditionId): Duel | null {
  */
 export function getRandomFunding(editionId: EditionId): Funding | null {
   const edition = EDITIONS[editionId];
-  if (!edition) return null;
+  if (!edition || !edition.fundings) return null;
   return getRandomItem(edition.fundings);
 }
 
@@ -133,7 +133,7 @@ export function getRandomFunding(editionId: EditionId): Funding | null {
  */
 export function getRandomEvent(editionId: EditionId): GameEvent | null {
   const edition = EDITIONS[editionId];
-  if (!edition) return null;
+  if (!edition || !edition.opportunities || !edition.challenges) return null;
   const { opportunities, challenges } = edition;
 
   // Si les deux tableaux sont vides, retourner null
@@ -175,7 +175,7 @@ export function getRandomEvent(editionId: EditionId): GameEvent | null {
  */
 export function getRandomOpportunity(editionId: EditionId): Opportunity | null {
   const edition = EDITIONS[editionId];
-  if (!edition) return null;
+  if (!edition || !edition.opportunities) return null;
   return getRandomItem(edition.opportunities);
 }
 
@@ -184,7 +184,7 @@ export function getRandomOpportunity(editionId: EditionId): Opportunity | null {
  */
 export function getRandomChallenge(editionId: EditionId): Challenge | null {
   const edition = EDITIONS[editionId];
-  if (!edition) return null;
+  if (!edition || !edition.challenges) return null;
   return getRandomItem(edition.challenges);
 }
 

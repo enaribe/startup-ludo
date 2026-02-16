@@ -1,4 +1,4 @@
-import { memo, useState, useEffect, useCallback } from 'react';
+import { memo, useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -15,6 +15,16 @@ import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { SPACING, BORDER_RADIUS, SHADOWS } from '@/styles/spacing';
 import { useSettingsStore } from '@/stores';
 import type { DuelQuestion } from '@/types';
+
+// Fonction pour mélanger un tableau
+function shuffleArray<T>(array: T[]): T[] {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j]!, shuffled[i]!];
+  }
+  return shuffled;
+}
 
 interface DuelQuestionPopupProps {
   visible: boolean;
@@ -58,16 +68,16 @@ export const DuelQuestionPopup = memo(function DuelQuestionPopup({
     width: `${progressAnim.value}%`,
   }));
 
-  const handleSelectAnswer = useCallback((answerIndex: number) => {
+  const handleSelectAnswer = useCallback((shuffledIndex: number, originalIndex: number) => {
     if (selectedAnswer !== null) return;
 
     const question = questions[currentIndex];
     if (!question) return;
-    const points = question.options[answerIndex]?.points || 0;
+    const points = question.options[originalIndex]?.points || 0;
 
-    setSelectedAnswer(answerIndex);
+    setSelectedAnswer(shuffledIndex);
     setTotalScore((prev) => prev + points);
-    setAnswers((prev) => [...prev, answerIndex]);
+    setAnswers((prev) => [...prev, originalIndex]);
 
     if (hapticsEnabled) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -80,7 +90,7 @@ export const DuelQuestionPopup = memo(function DuelQuestionPopup({
         setSelectedAnswer(null);
       } else {
         // Toutes les questions répondues
-        const finalAnswers = [...answers, answerIndex];
+        const finalAnswers = [...answers, originalIndex];
         const finalScore = totalScore + points;
         onComplete(finalAnswers, finalScore);
       }
@@ -88,6 +98,17 @@ export const DuelQuestionPopup = memo(function DuelQuestionPopup({
   }, [selectedAnswer, currentIndex, questions, answers, totalScore, hapticsEnabled, onComplete]);
 
   const currentQuestion = questions[currentIndex];
+
+  // Mélanger les options de la question courante
+  const shuffledOptions = useMemo(() => {
+    if (!currentQuestion) return [];
+    return shuffleArray(
+      currentQuestion.options.map((opt, originalIndex) => ({
+        ...opt,
+        originalIndex,
+      }))
+    );
+  }, [currentQuestion?.id]); // Re-mélanger quand la question change
 
   if (__DEV__) {
     console.log('[DuelQuestionPopup] render', {
@@ -132,16 +153,16 @@ export const DuelQuestionPopup = memo(function DuelQuestionPopup({
 
           {/* Options */}
           <View style={styles.options}>
-            {currentQuestion.options.map((option, index) => {
-              const isSelected = selectedAnswer === index;
+            {shuffledOptions.map((option, shuffledIndex) => {
+              const isSelected = selectedAnswer === shuffledIndex;
 
               return (
                 <Animated.View
-                  key={`${currentQuestion.id}-${index}`}
-                  entering={FadeIn.delay(index * 100)}
+                  key={`${currentQuestion.id}-${shuffledIndex}`}
+                  entering={FadeIn.delay(shuffledIndex * 100)}
                 >
                   <Pressable
-                    onPress={() => handleSelectAnswer(index)}
+                    onPress={() => handleSelectAnswer(shuffledIndex, option.originalIndex)}
                     disabled={selectedAnswer !== null}
                   >
                     {({ pressed }) => (
@@ -161,11 +182,6 @@ export const DuelQuestionPopup = memo(function DuelQuestionPopup({
                         >
                           {option.text}
                         </Text>
-                        {isSelected && (
-                          <View style={styles.pointsBadge}>
-                            <Text style={styles.pointsText}>+{option.points}</Text>
-                          </View>
-                        )}
                       </View>
                     )}
                   </Pressable>
@@ -285,19 +301,6 @@ const styles = StyleSheet.create({
   optionTextSelected: {
     color: COLORS.white,
     fontFamily: FONTS.bodySemiBold,
-  },
-  pointsBadge: {
-    backgroundColor: COLORS.white,
-    borderRadius: BORDER_RADIUS.full,
-    paddingVertical: SPACING[1],
-    paddingHorizontal: SPACING[3],
-    marginLeft: SPACING[2],
-    ...SHADOWS.sm,
-  },
-  pointsText: {
-    fontFamily: FONTS.title,
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.success,
   },
   scoreSection: {
     flexDirection: 'row',

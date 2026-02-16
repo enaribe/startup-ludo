@@ -140,7 +140,7 @@ export function getRandomDuelQuestions(count: number = 3, editionId?: string): D
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { EDITIONS } = require('@/data');
       const edition = EDITIONS[editionId];
-      if (edition && edition.duels && edition.duels.length >= count) {
+      if (edition && Array.isArray(edition.duels) && edition.duels.length >= count) {
         // Les duels de l'édition sont au format DuelQuestion (question/options/category)
         pool = edition.duels as DuelQuestion[];
       }

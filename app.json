@@ -45,8 +45,8 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
+          "image": "./assets/images/logostartupludo.png",
+          "imageWidth": 280,
           "resizeMode": "contain",
           "backgroundColor": "#0C243E"
         }
@@ -64,7 +64,8 @@
       "@react-native-firebase/app",
       "./plugins/withRNFirebasePodfile.js",
       "@react-native-firebase/auth",
-      "@react-native-google-signin/google-signin"
+      "@react-native-google-signin/google-signin",
+      "./plugins/withGoogleSignIn.js"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -5,9 +5,7 @@ import Animated, {
   useAnimatedStyle,
   withSequence,
   withTiming,
-  withSpring,
   withRepeat,
-  Easing,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { COLORS } from '@/styles/colors';
@@ -71,11 +69,7 @@ export const Dice = memo(function Dice({
   const isRolling = externalRolling || internalRolling;
 
   // Animation values
-  const rotateX = useSharedValue(0);
-  const rotateY = useSharedValue(0);
-  const rotateZ = useSharedValue(0);
   const scale = useSharedValue(1);
-  const translateY = useSharedValue(0);
 
   const triggerHaptic = useCallback(() => {
     if (hapticsEnabled) {
@@ -121,60 +115,14 @@ export const Dice = memo(function Dice({
       }
     }, 100);
 
-    // Shaking rotation (small angles, like a real dice bouncing)
-    rotateX.value = withSequence(
-      withTiming(8, { duration: 60, easing: Easing.inOut(Easing.quad) }),
-      withRepeat(
-        withSequence(
-          withTiming(-12, { duration: 70, easing: Easing.inOut(Easing.quad) }),
-          withTiming(10, { duration: 70, easing: Easing.inOut(Easing.quad) }),
-        ),
-        5,
-        true
+    // Simple pulse animation
+    scale.value = withRepeat(
+      withSequence(
+        withTiming(1.1, { duration: 100 }),
+        withTiming(1, { duration: 100 })
       ),
-      withSpring(0, { damping: 12, stiffness: 200 })
-    );
-
-    rotateY.value = withSequence(
-      withTiming(-10, { duration: 50, easing: Easing.inOut(Easing.quad) }),
-      withRepeat(
-        withSequence(
-          withTiming(15, { duration: 80, easing: Easing.inOut(Easing.quad) }),
-          withTiming(-10, { duration: 80, easing: Easing.inOut(Easing.quad) }),
-        ),
-        4,
-        true
-      ),
-      withSpring(0, { damping: 12, stiffness: 200 })
-    );
-
-    rotateZ.value = withSequence(
-      withRepeat(
-        withSequence(
-          withTiming(-8, { duration: 60, easing: Easing.inOut(Easing.quad) }),
-          withTiming(8, { duration: 60, easing: Easing.inOut(Easing.quad) }),
-        ),
-        6,
-        true
-      ),
-      withSpring(0, { damping: 15, stiffness: 200 })
-    );
-
-    // Bounce animation — dice jumping up and landing
-    translateY.value = withSequence(
-      withTiming(-25, { duration: 120, easing: Easing.out(Easing.quad) }),
-      withTiming(4, { duration: 80, easing: Easing.in(Easing.quad) }),
-      withTiming(-18, { duration: 100, easing: Easing.out(Easing.quad) }),
-      withTiming(3, { duration: 70, easing: Easing.in(Easing.quad) }),
-      withTiming(-8, { duration: 80, easing: Easing.out(Easing.quad) }),
-      withSpring(0, { damping: 12, stiffness: 180 })
-    );
-
-    scale.value = withSequence(
-      withTiming(1.15, { duration: 80 }),
-      withTiming(0.92, { duration: 80 }),
-      withTiming(1.08, { duration: 70 }),
-      withSpring(1, { damping: 12, stiffness: 180 })
+      10,
+      false
     );
   }, [
     disabled,
@@ -182,10 +130,6 @@ export const Dice = memo(function Dice({
     triggerHaptic,
     onRoll,
     handleRollComplete,
-    rotateX,
-    rotateY,
-    rotateZ,
-    translateY,
     scale,
     hapticsEnabled,
   ]);
@@ -216,42 +160,14 @@ export const Dice = memo(function Dice({
       }
     }, 100);
 
-    // Shaking rotation (small angles, dice-like)
-    rotateX.value = withSequence(
-      withRepeat(
-        withSequence(
-          withTiming(-10, { duration: 70, easing: Easing.inOut(Easing.quad) }),
-          withTiming(10, { duration: 70, easing: Easing.inOut(Easing.quad) }),
-        ),
-        4,
-        true
+    // Simple pulse animation for remote dice
+    scale.value = withRepeat(
+      withSequence(
+        withTiming(1.08, { duration: 100 }),
+        withTiming(1, { duration: 100 })
       ),
-      withSpring(0, { damping: 12, stiffness: 200 })
-    );
-
-    rotateY.value = withSequence(
-      withRepeat(
-        withSequence(
-          withTiming(12, { duration: 80, easing: Easing.inOut(Easing.quad) }),
-          withTiming(-12, { duration: 80, easing: Easing.inOut(Easing.quad) }),
-        ),
-        3,
-        true
-      ),
-      withSpring(0, { damping: 12, stiffness: 200 })
-    );
-
-    translateY.value = withSequence(
-      withTiming(-18, { duration: 100, easing: Easing.out(Easing.quad) }),
-      withTiming(3, { duration: 70, easing: Easing.in(Easing.quad) }),
-      withTiming(-8, { duration: 80, easing: Easing.out(Easing.quad) }),
-      withSpring(0, { damping: 12, stiffness: 180 })
-    );
-
-    scale.value = withSequence(
-      withTiming(1.1, { duration: 80 }),
-      withTiming(0.95, { duration: 80 }),
-      withSpring(1, { damping: 12, stiffness: 180 })
+      8,
+      false
     );
 
     return () => clearInterval(rollInterval);
@@ -259,11 +175,6 @@ export const Dice = memo(function Dice({
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [
-      { perspective: 1000 },
-      { translateY: translateY.value },
-      { rotateX: `${rotateX.value}deg` },
-      { rotateY: `${rotateY.value}deg` },
-      { rotateZ: `${rotateZ.value}deg` },
       { scale: scale.value },
     ],
   }));
