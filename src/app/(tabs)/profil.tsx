@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, Pressable, Dimensions, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Pressable, Dimensions, StyleSheet, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -53,6 +53,9 @@ export default function ProfilScreen() {
         break;
       case 'achievements':
         router.push('/achievements' as never);
+        break;
+      case 'community':
+        Linking.openURL('https://chat.whatsapp.com/HMOY7uJBbNd4O64gysmitZ');
         break;
       case 'help':
         router.push('/help' as never);

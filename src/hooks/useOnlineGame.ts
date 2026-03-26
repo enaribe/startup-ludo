@@ -245,11 +245,6 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
             ok: result.ok ?? false,
             reward: result.r ?? 0,
           });
-          // Clear remote event popup after a delay
-          setTimeout(() => {
-            setRemoteEvent(null);
-            setRemoteEventResult(null);
-          }, 3000);
           // Ne pas appeler applyRemoteAction pour 'e' ici : le store sera mis à jour
           // par applyRemoteAction ci-dessous (case 'e' dans le store applique tokens + resolveEvent)
           break;

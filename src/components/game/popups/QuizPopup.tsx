@@ -1,5 +1,5 @@
 import { memo, useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -93,7 +93,8 @@ export const QuizPopup = memo(function QuizPopup({
     resultScale.value = withTiming(1, { duration: 220 });
     badgeBounce.value = withTiming(1, { duration: 220 });
     if (hapticsEnabled) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-    setTimeout(() => onAnswer(false, quiz.reward), 2000);
+    const delay = quiz.explanation ? 4500 : 2000;
+    setTimeout(() => onAnswer(false, quiz.reward), delay);
   }, [hasAnswered, quiz, hapticsEnabled, onAnswer, resultScale, badgeBounce]);
 
   const handleSelectAnswer = useCallback(
@@ -102,7 +103,6 @@ export const QuizPopup = memo(function QuizPopup({
       setSelectedAnswer(index);
       setHasAnswered(true);
       const isCorrect = index === quiz.correctAnswer;
-      // Toujours envoyer quiz.reward - le système retire les points si incorrect
       const reward = quiz.reward;
       resultScale.value = withTiming(1, { duration: 220 });
       badgeBounce.value = withTiming(1, { duration: 220 });
@@ -110,24 +110,21 @@ export const QuizPopup = memo(function QuizPopup({
         if (isCorrect) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         else Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
-      setTimeout(() => onAnswer(isCorrect, reward), 2000);
+      const delay = quiz.explanation ? 4500 : 2000;
+      setTimeout(() => onAnswer(isCorrect, reward), delay);
     },
     [hasAnswered, quiz, hapticsEnabled, onAnswer, resultScale, badgeBounce]
   );
 
   const timerAnimStyle = useAnimatedStyle(() => {
     'worklet';
-    const progress = timerProgress.value;
-
-    // Interpoler la couleur de vert -> jaune -> rouge en 3 étapes
     const backgroundColor = interpolateColor(
-      progress,
+      timerProgress.value,
       [0, 0.33, 0.66, 1],
-      ['#F44336', '#FF9800', '#FFD700', '#4CAF50'] // Rouge -> Orange -> Jaune -> Vert
+      ['#F44336', '#FF9800', '#FFD700', '#4CAF50']
     );
-
     return {
-      width: `${progress * 100}%`,
+      width: `${timerProgress.value * 100}%`,
       backgroundColor,
     };
   });
@@ -157,7 +154,7 @@ export const QuizPopup = memo(function QuizPopup({
   return (
     <Modal visible={visible} onClose={onClose} closeOnBackdrop={false} showCloseButton={false} bareContent>
       <Animated.View entering={SlideInUp.duration(280)} style={styles.card}>
-        <View style={styles.content}>
+        <ScrollView style={styles.scrollContent} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           {isSpectator && (
             <View style={styles.spectatorBanner}>
               <Ionicons name="eye" size={14} color={COLORS.white} />
@@ -287,7 +284,20 @@ export const QuizPopup = memo(function QuizPopup({
               </Animated.View>
             </Animated.View>
           )}
-        </View>
+
+          {/* Explication - visible après réponse, uniquement si disponible */}
+          {hasAnswered && quiz.explanation ? (
+            <Animated.View style={[styles.explanationWrap, resultAnimStyle]}>
+              <View style={styles.explanationBox}>
+                <View style={styles.explanationHeader}>
+                  <Ionicons name="bulb-outline" size={16} color="#FF9800" />
+                  <Text style={styles.explanationTitle}>Explication</Text>
+                </View>
+                <Text style={styles.explanationText}>{quiz.explanation}</Text>
+              </View>
+            </Animated.View>
+          ) : null}
+        </ScrollView>
       </Animated.View>
     </Modal>
   );
@@ -299,8 +309,12 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS['3xl'],
     maxWidth: 360,
     width: '92%',
+    maxHeight: '85%',
     ...SHADOWS.xl,
     overflow: 'hidden',
+  },
+  scrollContent: {
+    flexGrow: 0,
   },
   content: {
     paddingTop: SPACING[5],
@@ -507,5 +521,34 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.title,
     fontSize: FONT_SIZES.xl,
     color: COLORS.white,
+  },
+  explanationWrap: {
+    width: '100%',
+    marginTop: SPACING[3],
+  },
+  explanationBox: {
+    backgroundColor: '#FFF8E1',
+    borderRadius: BORDER_RADIUS.xl,
+    paddingVertical: SPACING[3],
+    paddingHorizontal: SPACING[4],
+    borderLeftWidth: 3,
+    borderLeftColor: '#FF9800',
+  },
+  explanationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[2],
+    marginBottom: SPACING[1],
+  },
+  explanationTitle: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.sm,
+    color: '#E65100',
+  },
+  explanationText: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.sm,
+    color: '#5D4037',
+    lineHeight: 20,
   },
 });

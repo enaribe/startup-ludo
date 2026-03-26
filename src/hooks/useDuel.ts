@@ -141,13 +141,14 @@ export function useDuel({
       logDuel('Safety timeout expired — auto-resolving duel');
       setDuelState((prev) => {
         if (!prev || prev.phase !== 'waiting') return prev;
-        // Give the waiting player a default win (opponent didn't respond)
-        const myScore = myRole === 'challenger' ? prev.challengerScore : prev.opponentScore;
+        // Use stored scores if available, otherwise give 0 to the non-responding player
+        const challengerScore = prev.challengerScore > 0 ? prev.challengerScore : (myRole === 'challenger' ? (myLocalScoreRef.current ?? 0) : 0);
+        const opponentScore = prev.opponentScore > 0 ? prev.opponentScore : (myRole === 'opponent' ? (myLocalScoreRef.current ?? 0) : 0);
         const duelResult = calculateResult(
           prev.challengerId,
           prev.opponentId,
-          myRole === 'challenger' ? myScore : 0,
-          myRole === 'opponent' ? myScore : 0
+          challengerScore,
+          opponentScore
         );
         setTimeout(() => {
           setResult(duelResult);
@@ -455,14 +456,21 @@ export function useDuel({
 
     setDuelState((prev) => {
       if (!prev) return prev;
+      const isRemoteScore = playerId === prev.challengerId || playerId === prev.opponentId;
+      if (!isRemoteScore) return prev;
+
       const challengerScore = playerId === prev.challengerId ? score : prev.challengerScore;
       const opponentScore = playerId === prev.opponentId ? score : prev.opponentScore;
       const next = { ...prev, challengerScore, opponentScore };
 
-      const isRemoteScore = playerId === prev.challengerId || playerId === prev.opponentId;
-      // We're done if we're already waiting (submitted our own answers)
+      // Calculate result if I already submitted my answers (phase === 'waiting')
+      // OR if both scores are now present (remote arrived first, my score was already stored)
       const weAlreadySubmitted = prev.phase === 'waiting';
-      if (!isRemoteScore || !weAlreadySubmitted) return next;
+      const myScoreAlreadyStored =
+        (playerId === prev.challengerId && prev.opponentScore > 0) ||
+        (playerId === prev.opponentId && prev.challengerScore > 0);
+
+      if (!weAlreadySubmitted && !myScoreAlreadyStored) return next;
 
       const duelResult = calculateResult(prev.challengerId, prev.opponentId, challengerScore, opponentScore);
       setTimeout(() => {

@@ -90,6 +90,7 @@ export interface QuizEvent {
   difficulty: 'facile' | 'moyen' | 'difficile' | 'easy' | 'medium' | 'hard';
   reward: number;
   timeLimit: number;
+  explanation?: string;
 }
 
 export interface FundingEvent {

@@ -1,5 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
@@ -15,6 +15,7 @@ interface ErrorBoundaryProps {
 interface ErrorBoundaryState {
   hasError: boolean;
   error: Error | null;
+  errorInfo: ErrorInfo | null;
 }
 
 export class ErrorBoundary extends Component<
@@ -23,22 +24,22 @@ export class ErrorBoundary extends Component<
 > {
   constructor(props: ErrorBoundaryProps) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null, errorInfo: null };
   }
 
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+  static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
     return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    if (__DEV__) {
-      console.error('ErrorBoundary caught an error:', error, errorInfo);
-    }
+    console.error('[ErrorBoundary] Error caught:', error);
+    console.error('[ErrorBoundary] Component stack:', errorInfo.componentStack);
+    this.setState({ errorInfo });
     this.props.onError?.(error, errorInfo);
   }
 
   handleReset = (): void => {
-    this.setState({ hasError: false, error: null });
+    this.setState({ hasError: false, error: null, errorInfo: null });
     this.props.onReset?.();
   };
 
@@ -49,63 +50,67 @@ export class ErrorBoundary extends Component<
       }
 
       return (
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: COLORS.background,
-            justifyContent: 'center',
-            alignItems: 'center',
-            padding: SPACING[6],
-          }}
-        >
-          <Text
-            style={{
-              fontFamily: FONTS.title,
-              fontSize: FONT_SIZES['2xl'],
-              color: COLORS.error,
-              marginBottom: SPACING[4],
-              textAlign: 'center',
-            }}
+        <View style={styles.container}>
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
           >
-            Oups !
-          </Text>
+            <Text style={styles.title}>Oups !</Text>
 
-          <Text
-            style={{
-              fontFamily: FONTS.body,
-              fontSize: FONT_SIZES.md,
-              color: COLORS.text,
-              marginBottom: SPACING[2],
-              textAlign: 'center',
-            }}
-          >
-            Une erreur inattendue s'est produite.
-          </Text>
-
-          {__DEV__ && this.state.error && (
-            <Text
-              style={{
-                fontFamily: FONTS.mono,
-                fontSize: FONT_SIZES.sm,
-                color: COLORS.textSecondary,
-                marginTop: SPACING[4],
-                marginBottom: SPACING[6],
-                textAlign: 'center',
-                backgroundColor: COLORS.card,
-                padding: SPACING[3],
-                borderRadius: 8,
-                maxWidth: '100%',
-              }}
-            >
-              {this.state.error.message}
+            <Text style={styles.message}>
+              Une erreur inattendue s'est produite.
             </Text>
-          )}
 
-          <Button
-            title="Réessayer"
-            variant="primary"
-            onPress={this.handleReset}
-          />
+            {/* Error Message */}
+            {this.state.error && (
+              <View style={styles.errorBlock}>
+                <Text style={styles.errorLabel}>Message d'erreur :</Text>
+                <Text style={styles.errorText}>
+                  {this.state.error.message || 'Erreur inconnue'}
+                </Text>
+              </View>
+            )}
+
+            {/* Error Stack */}
+            {this.state.error?.stack && (
+              <View style={styles.errorBlock}>
+                <Text style={styles.errorLabel}>Stack trace :</Text>
+                <ScrollView
+                  horizontal
+                  style={styles.stackScrollView}
+                  nestedScrollEnabled
+                >
+                  <Text style={styles.stackText}>
+                    {this.state.error.stack}
+                  </Text>
+                </ScrollView>
+              </View>
+            )}
+
+            {/* Component Stack (Dev only) */}
+            {__DEV__ && this.state.errorInfo?.componentStack && (
+              <View style={styles.errorBlock}>
+                <Text style={styles.errorLabel}>Component Stack :</Text>
+                <ScrollView
+                  horizontal
+                  style={styles.stackScrollView}
+                  nestedScrollEnabled
+                >
+                  <Text style={styles.stackText}>
+                    {this.state.errorInfo.componentStack}
+                  </Text>
+                </ScrollView>
+              </View>
+            )}
+
+            <View style={styles.buttonContainer}>
+              <Button
+                title="Réessayer"
+                variant="primary"
+                onPress={this.handleReset}
+              />
+            </View>
+          </ScrollView>
         </View>
       );
     }
@@ -113,3 +118,64 @@ export class ErrorBoundary extends Component<
     return this.props.children;
   }
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: SPACING[6],
+    paddingTop: SPACING[12],
+  },
+  title: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES['3xl'],
+    color: COLORS.error,
+    marginBottom: SPACING[4],
+    textAlign: 'center',
+  },
+  message: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.md,
+    color: COLORS.text,
+    marginBottom: SPACING[6],
+    textAlign: 'center',
+  },
+  errorBlock: {
+    marginBottom: SPACING[5],
+    backgroundColor: COLORS.card,
+    borderRadius: 12,
+    padding: SPACING[4],
+    borderWidth: 1,
+    borderColor: 'rgba(255, 68, 54, 0.2)',
+  },
+  errorLabel: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.error,
+    marginBottom: SPACING[2],
+  },
+  errorText: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.text,
+    lineHeight: FONT_SIZES.sm * 1.5,
+  },
+  stackScrollView: {
+    maxHeight: 200,
+  },
+  stackText: {
+    fontFamily: 'monospace',
+    fontSize: 11,
+    color: COLORS.textSecondary,
+    lineHeight: 16,
+  },
+  buttonContainer: {
+    marginTop: SPACING[6],
+    alignItems: 'center',
+  },
+});

@@ -61,12 +61,9 @@ export default function PhoneAuthScreen() {
   const isPhoneValid = phoneNumber.replace(/\s/g, '').length >= 9;
   const isCodeValid = verificationCode.every(digit => digit !== '');
 
-  // Reset phone auth state when component unmounts
-  useEffect(() => {
-    return () => {
-      resetPhoneAuth();
-    };
-  }, [resetPhoneAuth]);
+  // Reset phone auth state only when leaving explicitly (back navigation)
+  // Ne pas reset au démontage pour éviter la perte d'état quand iOS revient de reCAPTCHA
+  // Le reset est géré manuellement dans handleBack
 
   // Redirect after successful authentication
   useEffect(() => {

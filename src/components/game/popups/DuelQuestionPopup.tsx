@@ -1,4 +1,4 @@
-import { memo, useState, useEffect, useCallback, useMemo } from 'react';
+import { memo, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -16,7 +16,13 @@ import { SPACING, BORDER_RADIUS, SHADOWS } from '@/styles/spacing';
 import { useSettingsStore } from '@/stores';
 import type { DuelQuestion } from '@/types';
 
-// Fonction pour mélanger un tableau
+interface DuelQuestionPopupProps {
+  visible: boolean;
+  questions: DuelQuestion[];
+  onComplete: (answers: number[], totalScore: number) => void;
+  onClose: () => void;
+}
+
 function shuffleArray<T>(array: T[]): T[] {
   const shuffled = [...array];
   for (let i = shuffled.length - 1; i > 0; i--) {
@@ -24,13 +30,6 @@ function shuffleArray<T>(array: T[]): T[] {
     [shuffled[i], shuffled[j]] = [shuffled[j]!, shuffled[i]!];
   }
   return shuffled;
-}
-
-interface DuelQuestionPopupProps {
-  visible: boolean;
-  questions: DuelQuestion[];
-  onComplete: (answers: number[], totalScore: number) => void;
-  onClose: () => void;
 }
 
 export const DuelQuestionPopup = memo(function DuelQuestionPopup({
@@ -55,6 +54,7 @@ export const DuelQuestionPopup = memo(function DuelQuestionPopup({
       setAnswers([]);
       setTotalScore(0);
       setSelectedAnswer(null);
+      isTransitioningRef.current = false;
       progressAnim.value = 0;
     }
   }, [visible, progressAnim]);
@@ -68,16 +68,16 @@ export const DuelQuestionPopup = memo(function DuelQuestionPopup({
     width: `${progressAnim.value}%`,
   }));
 
-  const handleSelectAnswer = useCallback((shuffledIndex: number, originalIndex: number) => {
-    if (selectedAnswer !== null) return;
+  const isTransitioningRef = useRef(false);
 
-    const question = questions[currentIndex];
-    if (!question) return;
-    const points = question.options[originalIndex]?.points || 0;
+  const handleSelectAnswer = useCallback((answerIndex: number) => {
+    if (selectedAnswer !== null || isTransitioningRef.current) return;
+    if (!questions[currentIndex]) return;
 
-    setSelectedAnswer(shuffledIndex);
-    setTotalScore((prev) => prev + points);
-    setAnswers((prev) => [...prev, originalIndex]);
+    const points = shuffledOptions[answerIndex]?.points || 0;
+    isTransitioningRef.current = true;
+
+    setSelectedAnswer(answerIndex);
 
     if (hapticsEnabled) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -85,30 +85,32 @@ export const DuelQuestionPopup = memo(function DuelQuestionPopup({
 
     // Passer à la question suivante après un délai
     setTimeout(() => {
-      if (currentIndex < questions.length - 1) {
-        setCurrentIndex((prev) => prev + 1);
-        setSelectedAnswer(null);
-      } else {
-        // Toutes les questions répondues
-        const finalAnswers = [...answers, originalIndex];
-        const finalScore = totalScore + points;
-        onComplete(finalAnswers, finalScore);
-      }
+      setAnswers((prevAnswers) => {
+        const newAnswers = [...prevAnswers, answerIndex];
+        setTotalScore((prevScore) => {
+          const newScore = prevScore + points;
+          if (currentIndex < questions.length - 1) {
+            setCurrentIndex((prev) => prev + 1);
+            setSelectedAnswer(null);
+            isTransitioningRef.current = false;
+          } else {
+            // Toutes les questions répondues — utiliser les valeurs accumulées depuis le state
+            onComplete(newAnswers, newScore);
+          }
+          return newScore;
+        });
+        return newAnswers;
+      });
     }, 600);
-  }, [selectedAnswer, currentIndex, questions, answers, totalScore, hapticsEnabled, onComplete]);
+  }, [selectedAnswer, currentIndex, questions, shuffledOptions, hapticsEnabled, onComplete]);
 
   const currentQuestion = questions[currentIndex];
 
-  // Mélanger les options de la question courante
   const shuffledOptions = useMemo(() => {
     if (!currentQuestion) return [];
-    return shuffleArray(
-      currentQuestion.options.map((opt, originalIndex) => ({
-        ...opt,
-        originalIndex,
-      }))
-    );
-  }, [currentQuestion?.id]); // Re-mélanger quand la question change
+    return shuffleArray(currentQuestion.options);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentQuestion?.id]);
 
   if (__DEV__) {
     console.log('[DuelQuestionPopup] render', {
@@ -153,16 +155,16 @@ export const DuelQuestionPopup = memo(function DuelQuestionPopup({
 
           {/* Options */}
           <View style={styles.options}>
-            {shuffledOptions.map((option, shuffledIndex) => {
-              const isSelected = selectedAnswer === shuffledIndex;
+            {shuffledOptions.map((option, index) => {
+              const isSelected = selectedAnswer === index;
 
               return (
                 <Animated.View
-                  key={`${currentQuestion.id}-${shuffledIndex}`}
-                  entering={FadeIn.delay(shuffledIndex * 100)}
+                  key={`${currentQuestion.id}-${index}`}
+                  entering={FadeIn.delay(index * 100)}
                 >
                   <Pressable
-                    onPress={() => handleSelectAnswer(shuffledIndex, option.originalIndex)}
+                    onPress={() => handleSelectAnswer(index)}
                     disabled={selectedAnswer !== null}
                   >
                     {({ pressed }) => (
@@ -301,6 +303,19 @@ const styles = StyleSheet.create({
   optionTextSelected: {
     color: COLORS.white,
     fontFamily: FONTS.bodySemiBold,
+  },
+  pointsBadge: {
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.full,
+    paddingVertical: SPACING[1],
+    paddingHorizontal: SPACING[3],
+    marginLeft: SPACING[2],
+    ...SHADOWS.sm,
+  },
+  pointsText: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.success,
   },
   scoreSection: {
     flexDirection: 'row',

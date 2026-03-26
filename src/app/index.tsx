@@ -61,7 +61,7 @@ const SpinningRays = memo(function SpinningRays() {
 export default function WelcomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { loginAsGuest, isAuthenticated, isInitialized } = useAuthStore();
+  const { loginAsGuest, isAuthenticated, isInitialized, phoneAuthStep } = useAuthStore();
   const [isGuestLoading, setIsGuestLoading] = useState(false);
   const { accepted, loading: privacyLoading, acceptPrivacy } = usePrivacyAcceptance();
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
@@ -79,6 +79,14 @@ export default function WelcomeScreen() {
       router.replace('/(tabs)/home');
     }
   }, [isAuthenticated, isInitialized, router]);
+
+  // Retour depuis Safari (reCAPTCHA iOS) : phoneAuthStep est encore 'code_sent' ou 'verifying'
+  // Expo Router atterrit sur index via le scheme URL → rediriger vers phone-auth pour afficher l'OTP
+  useEffect(() => {
+    if (isInitialized && !isAuthenticated && phoneAuthStep !== 'idle') {
+      router.replace('/(auth)/phone-auth');
+    }
+  }, [isInitialized, isAuthenticated, phoneAuthStep, router]);
 
   const handleAcceptPrivacy = useCallback(async () => {
     await acceptPrivacy();

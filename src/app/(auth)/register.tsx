@@ -185,11 +185,6 @@ export default function RegisterScreen() {
                 <Text style={styles.loginLinkHighlight}>SE CONNECTER</Text>
               </Text>
             </Pressable>
-
-            {/* Privacy Policy Link */}
-            <Text style={styles.privacyText}>
-              CGU et politique de confidentialité
-            </Text>
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -273,12 +268,5 @@ const styles = StyleSheet.create({
   },
   loginLinkHighlight: {
     color: '#3498DB',
-  },
-  privacyText: {
-    fontFamily: FONTS.body,
-    fontSize: FONT_SIZES.xs,
-    color: 'rgba(255, 255, 255, 0.4)',
-    textAlign: 'center',
-    marginTop: SPACING[3],
   },
 });

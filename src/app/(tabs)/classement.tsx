@@ -19,8 +19,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/common/EmptyState';
 import { Avatar, DynamicGradientBorder, GameButton, RadialBackground, ScreenHeader } from '@/components/ui';
-import { getLeaderboard, getAllStartups } from '@/services/firebase/firestore';
 import { useAuthStore, useSettingsStore, useUserStore } from '@/stores';
+import { useLeaderboardCache } from '@/hooks/useLeaderboardCache';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
@@ -76,47 +76,28 @@ export default function ClassementScreen() {
   const currentUserName = useAuthStore((state) => state.user?.displayName);
   const localProfile = useUserStore((state) => state.profile);
   const [activeFilter, setActiveFilter] = useState('joueurs');
-  const [refreshing, setRefreshing] = useState(false);
-  const [remoteUsers, setRemoteUsers] = useState<RankedItem[]>([]);
-  const [remoteStartups, setRemoteStartups] = useState<Startup[]>([]);
   const [selectedProfile, setSelectedProfile] = useState<{ item: RankedItem; rank: number } | null>(null);
   const [followedIds, setFollowedIds] = useState<Set<string>>(new Set());
 
+  // Utiliser le hook de cache
+  const { players: remotePlayers, startups: remoteStartups, isRefreshing, refresh } = useLeaderboardCache();
+
   const isJoueurs = activeFilter === 'joueurs';
 
-  const fetchRemoteData = useCallback(async () => {
-    try {
-      const [entries, startups] = await Promise.all([
-        getLeaderboard('allTime', 50),
-        getAllStartups(100),
-      ]);
-
-      const mappedUsers: RankedItem[] = entries.map((e) => ({
-        id: e.id,
-        name: e.displayName.toUpperCase(),
-        score: e.xp,
-        subtitle: `${e.xp.toLocaleString()} xp`,
-        type: 'user' as const,
-        avatar: e.avatarUrl,
-        isCurrentUser: e.id === currentUserId,
-        level: e.level,
-        gamesPlayed: 0,
-        gamesWon: e.gamesWon,
-        startupCount: 0,
-      }));
-
-      setRemoteUsers(mappedUsers);
-      setRemoteStartups(startups);
-    } catch (error) {
-      console.warn('[Classement] Failed to fetch remote data:', error);
-    } finally {
-      setRefreshing(false);
-    }
-  }, [currentUserId]);
-
-  useEffect(() => {
-    fetchRemoteData();
-  }, [fetchRemoteData]);
+  // Mapper les joueurs du cache
+  const remoteUsers: RankedItem[] = remotePlayers.map((e) => ({
+    id: e.id,
+    name: e.displayName.toUpperCase(),
+    score: e.xp,
+    subtitle: `${e.xp.toLocaleString()} xp`,
+    type: 'user' as const,
+    avatar: e.avatarUrl,
+    isCurrentUser: e.id === currentUserId,
+    level: e.level,
+    gamesPlayed: 0,
+    gamesWon: e.gamesWon,
+    startupCount: 0,
+  }));
 
   // === JOUEURS DATA: merge remote users with local profile ===
   const joueurData: RankedItem[] = (() => {
@@ -199,12 +180,42 @@ export default function ClassementScreen() {
   // Handle podium: need 3+ items
   const hasPodium = data.length >= 3;
   const podiumData = hasPodium ? [data[1], data[0], data[2]].filter(Boolean) : [];
-  const restOfList = hasPodium ? data.slice(3) : [];
+
+  // Calculer les joueurs à afficher autour de l'utilisateur
+  const getDisplayList = useCallback(() => {
+    if (!hasPodium) return data;
+
+    // Trouver le rang de l'utilisateur
+    const userIndex = data.findIndex((item) =>
+      item.type === 'user' && item.isCurrentUser
+    );
+
+    // Si l'utilisateur n'est pas trouvé ou dans le top 3, afficher les 10 premiers après le podium
+    if (userIndex === -1 || userIndex < 3) {
+      return data.slice(3, 13); // Rangs 4 à 13
+    }
+
+    // Calculer la fenêtre autour de l'utilisateur (5 avant, 5 après)
+    const WINDOW_SIZE = 10;
+    const HALF_WINDOW = 5;
+
+    let start = Math.max(3, userIndex - HALF_WINDOW); // Ne pas inclure le podium
+    let end = start + WINDOW_SIZE;
+
+    // Ajuster si on dépasse la fin
+    if (end > data.length) {
+      end = data.length;
+      start = Math.max(3, end - WINDOW_SIZE);
+    }
+
+    return data.slice(start, end);
+  }, [data, hasPodium]);
+
+  const restOfList = getDisplayList();
 
   const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    fetchRemoteData();
-  }, [fetchRemoteData]);
+    refresh();
+  }, [refresh]);
 
   const handleProfilePress = useCallback((item: RankedItem, rank: number) => {
     if (hapticsEnabled) {
@@ -262,7 +273,7 @@ export default function ClassementScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={refreshing}
+            refreshing={isRefreshing}
             onRefresh={onRefresh}
             tintColor="#FFBC40"
             colors={['#FFBC40']}
@@ -426,15 +437,19 @@ export default function ClassementScreen() {
                     />
                   </View>
                 ) : (
-                  restOfList.map((item, index) => (
-                    <RankingItem
-                      key={item.id}
-                      rank={index + 4}
-                      item={item}
-                      isLast={index === restOfList.length - 1}
-                      onPress={() => handleProfilePress(item, index + 4)}
-                    />
-                  ))
+                  restOfList.map((item, index) => {
+                    // Calculer le vrai rang dans le classement complet
+                    const actualRank = data.findIndex((d) => d.id === item.id) + 1;
+                    return (
+                      <RankingItem
+                        key={item.id}
+                        rank={actualRank}
+                        item={item}
+                        isLast={index === restOfList.length - 1}
+                        onPress={() => handleProfilePress(item, actualRank)}
+                      />
+                    );
+                  })
                 )}
               </DynamicGradientBorder>
             </Animated.View>

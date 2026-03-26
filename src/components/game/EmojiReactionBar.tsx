@@ -40,7 +40,7 @@ export const EmojiReactionBar = memo(function EmojiReactionBar({
   disabled = false,
   visible = true,
 }: EmojiReactionBarProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
 
   const handleToggle = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

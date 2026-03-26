@@ -162,19 +162,30 @@ export const useGameStore = create<GameStore>()(
             const subLevel = level?.subLevels.find((s) => s.number === challengeContext.subLevelNumber);
             console.log('[GameStore] SubLevel found:', subLevel?.name, 'quizzes:', subLevel?.quizzes?.length ?? 0, 'duels:', subLevel?.duels?.length ?? 0);
             if (subLevel) {
-              const hasContent = subLevel.quizzes?.length || subLevel.duels?.length ||
-                subLevel.fundings?.length || subLevel.opportunities?.length || subLevel.challengeEvents?.length;
+              // Filter content by sector: keep items without sectorId (generic) + items matching player's sector
+              const sectorId = challengeContext.sectorId;
+              const filterBySector = <T extends { sectorId?: string }>(items: T[] | undefined): T[] => {
+                if (!items) return [];
+                if (!sectorId) return items; // No sector selected → show all
+                return items.filter(item => !item.sectorId || item.sectorId === sectorId);
+              };
+
+              const filteredContent = {
+                quizzes: filterBySector(subLevel.quizzes),
+                duels: filterBySector(subLevel.duels),
+                fundings: filterBySector(subLevel.fundings),
+                opportunities: filterBySector(subLevel.opportunities),
+                challengeEvents: filterBySector(subLevel.challengeEvents),
+              };
+
+              const hasContent = filteredContent.quizzes.length || filteredContent.duels.length ||
+                filteredContent.fundings.length || filteredContent.opportunities.length || filteredContent.challengeEvents.length;
+
               if (hasContent) {
-                eventManager.setSubLevelContent({
-                  quizzes: subLevel.quizzes || [],
-                  duels: subLevel.duels || [],
-                  fundings: subLevel.fundings || [],
-                  opportunities: subLevel.opportunities || [],
-                  challengeEvents: subLevel.challengeEvents || [],
-                });
-                console.log('[GameStore] SubLevel content loaded into EventManager');
+                eventManager.setSubLevelContent(filteredContent);
+                console.log('[GameStore] SubLevel content loaded into EventManager (filtered by sector:', sectorId || 'none', ')');
               } else {
-                console.log('[GameStore] SubLevel has no content, using edition fallback');
+                console.log('[GameStore] SubLevel has no content after sector filtering, using edition fallback');
               }
             }
           } else {

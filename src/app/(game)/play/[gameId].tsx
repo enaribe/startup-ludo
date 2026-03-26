@@ -127,6 +127,7 @@ export default function PlayScreen() {
   const [challengeData, setChallengeData] = useState<ChallengeEvent | null>(null);
   const [duelTriggered, setDuelTriggered] = useState(false);
   const [isEventSpectator, setIsEventSpectator] = useState(false);
+  const [aiSpectatorResult, setAiSpectatorResult] = useState<{ ok: boolean; reward: number } | null>(null);
   const [spectatorDuelChallengerId, setSpectatorDuelChallengerId] = useState<string | null>(null);
   const [spectatorDuelOpponentId, setSpectatorDuelOpponentId] = useState<string | null>(null);
 
@@ -255,83 +256,75 @@ export default function PlayScreen() {
       if (currentPlayer?.isAI) {
         triggerEvent(gameEvent);
         setIsEventSpectator(true);
+        setAiSpectatorResult(null);
 
-        const resolveAndClose = () => {
-          switch (event.type) {
-            case 'quiz': {
-              const aiCorrect = Math.random() < 0.6;
-              const quizEv = event.data as QuizEvent;
-              const reward = quizEv.reward;
-              actions.resolveEvent({ ok: aiCorrect, reward });
-              break;
-            }
-            case 'duel': {
-              const aiDuelScore = Math.floor(Math.random() * 4) + 1;
-              actions.resolveEvent({ ok: true, reward: aiDuelScore });
-              break;
-            }
-            case 'funding': {
-              const fundingEv = event.data as FundingEvent;
-              actions.resolveEvent({ ok: true, reward: fundingEv.amount });
-              break;
-            }
-            case 'opportunity': {
-              const oppEv = event.data as OpportunityEvent;
-              actions.resolveEvent({ ok: oppEv.effect === 'tokens', reward: oppEv.value });
-              break;
-            }
-            case 'challenge': {
-              const chalEv = event.data as ChallengeEvent;
-              actions.resolveEvent({ ok: false, reward: chalEv.value });
-              break;
-            }
-            default:
-              actions.resolveEvent({ ok: false, reward: 0 });
-          }
+        const resolveAndClose = (result: { ok: boolean; reward: number }) => {
+          actions.resolveEvent(result);
           setQuizData(null);
           setFundingData(null);
           setOpportunityData(null);
           setChallengeData(null);
           setDuelTriggered(false);
           setIsEventSpectator(false);
+          setAiSpectatorResult(null);
           handleEventResolveRef.current();
         };
 
         // Show the same popups as for human, then auto-resolve after delay
         switch (event.type) {
-          case 'quiz':
-            setQuizData(event.data as QuizEvent);
-            setTimeout(resolveAndClose, 2800);
+          case 'quiz': {
+            const aiCorrect = Math.random() < 0.6;
+            const quizEv = event.data as QuizEvent;
+            const reward = quizEv.reward;
+            const result = { ok: aiCorrect, reward };
+            setQuizData(quizEv);
+            // Show quiz question first, then after 1.5s show AI's answer (green/red feedback)
+            setTimeout(() => setAiSpectatorResult(result), 1500);
+            // Then close after another 2s (total 3.5s)
+            setTimeout(() => resolveAndClose(result), 3500);
             break;
-          case 'funding':
-            setFundingData(event.data as FundingEvent);
-            setTimeout(resolveAndClose, 2500);
+          }
+          case 'funding': {
+            const fundingEv = event.data as FundingEvent;
+            setFundingData(fundingEv);
+            setTimeout(() => resolveAndClose({ ok: true, reward: fundingEv.amount }), 2500);
             break;
-          case 'opportunity':
-            setOpportunityData(event.data as OpportunityEvent);
-            setTimeout(resolveAndClose, 2500);
+          }
+          case 'opportunity': {
+            const oppEv = event.data as OpportunityEvent;
+            setOpportunityData(oppEv);
+            setTimeout(() => resolveAndClose({ ok: oppEv.effect === 'tokens', reward: oppEv.value }), 2500);
             break;
-          case 'challenge':
-            setChallengeData(event.data as ChallengeEvent);
-            setTimeout(resolveAndClose, 2500);
+          }
+          case 'challenge': {
+            const chalEv = event.data as ChallengeEvent;
+            setChallengeData(chalEv);
+            setTimeout(() => resolveAndClose({ ok: false, reward: chalEv.value }), 2500);
             break;
+          }
           case 'duel': {
-            setDuelTriggered(true);
             const otherPlayers = game?.players?.filter((p) => p.id !== currentPlayer?.id) ?? [];
             if (otherPlayers.length >= 1) {
-              const opponentId = otherPlayers[0]!.id;
-              // L'attaquant (AI) impose son édition pour le duel
+              const humanPlayer = otherPlayers[0]!;
               const questions = getRandomDuelQuestions(3, currentPlayer?.edition || game?.edition);
-              duel.startDuelWithQuestions(currentPlayer!.id, opponentId, questions);
-              // Duel: show spectator popup then auto-resolve after a delay (no real Q&A for AI vs AI)
-              setTimeout(resolveAndClose, 2000);
+              // AI is challenger, human is opponent
+              // Start duel with AI as challenger, then auto-submit AI's answers
+              // so the human gets to play as opponent
+              setDuelTriggered(true);
+              setIsEventSpectator(false); // Human will actively participate as opponent
+              duel.startDuelWithQuestions(currentPlayer!.id, humanPlayer.id, questions);
+              // Auto-submit AI challenger answers after a short delay (skip intro for AI)
+              setTimeout(() => {
+                const aiScore = Math.floor(Math.random() * 60) + 30; // AI scores 30-90
+                duel.submitChallengerAnswers([], aiScore);
+              }, 500);
             } else {
-              resolveAndClose();
+              resolveAndClose({ ok: true, reward: 1 });
             }
             break;
           }
           default:
-            resolveAndClose();
+            resolveAndClose({ ok: false, reward: 0 });
         }
         return;
       }
@@ -412,6 +405,10 @@ export default function PlayScreen() {
   // Keep ref in sync so handleTriggeredEvent (AI path) can call it without circular dependency
   handleEventResolveRef.current = handleEventResolve;
 
+  // ===== SHAKE TO ROLL (temporairement désactivé) =====
+  // Désactivé pour l’instant car le module natif requis (expo-sensors / ExponentPedometer)
+  // n’est pas encore disponible tant que tu n’as pas fait le build natif.
+
   // ===== ONLINE: React to remote dice rolls =====
 
   useEffect(() => {
@@ -455,14 +452,22 @@ export default function PlayScreen() {
           // Je suis le challenger — j'ai déjà configuré le duel localement, ignorer
           console.log('[PlayScreen] Je suis le challenger (ignoré, duel déjà en cours)');
         } else if (userId === opponentId) {
-          // Je suis l'adversaire — rejoindre le duel (seulement si pas déjà actif)
-          if (!duelRef.current.isActive) {
+          // Je suis l'adversaire — rejoindre le duel
+          // On rejoint même si un duel précédent est encore "actif" côté state (race condition reset)
+          // car ce nouveau broadcast correspond à un duel différent (nouveau challengerId/opponentId/questions)
+          const currentDuel = duelRef.current;
+          const isDifferentDuel =
+            !currentDuel.isActive ||
+            currentDuel.duelState?.challengerId !== challengerId ||
+            currentDuel.duelState?.opponentId !== opponentId;
+
+          if (isDifferentDuel) {
             console.log('[PlayScreen] Je suis l\'adversaire, je rejoins le duel');
             setIsEventSpectator(false);
             setDuelTriggered(true);
             duelRef.current.joinDuel(challengerId, opponentId, questions);
           } else {
-            console.log('[PlayScreen] Je suis l\'adversaire mais duel déjà actif, ignoré');
+            console.log('[PlayScreen] Je suis l\'adversaire — même duel déjà en cours, ignoré');
           }
         } else {
           // Je suis spectateur (3-4 joueurs)
@@ -500,7 +505,7 @@ export default function PlayScreen() {
           console.warn('[PlayScreen] Type d\'événement distant inconnu:', eventType);
       }
     }
-  }, [isOnline, onlineGame.remoteEvent, userId, onlineGame]);
+  }, [isOnline, onlineGame.remoteEvent, userId]);
 
   // ===== ONLINE: React to remote event result (close popup) =====
   // Note: ONLY close non-duel popups here. Duels have their own lifecycle.
@@ -509,7 +514,7 @@ export default function PlayScreen() {
     if (!isOnline || !onlineGame.remoteEventResult) return;
 
     // Don't interfere with an active duel (duel has its own score/result flow)
-    if (duelRef.current.isActive) {
+    if (duelRef.current.isActive && onlineGame.remoteEvent?.eventType === 'duel') {
       onlineGame.clearRemoteEventResult();
       return;
     }
@@ -525,7 +530,7 @@ export default function PlayScreen() {
     }, 2500);
 
     return () => clearTimeout(timer);
-  }, [isOnline, onlineGame.remoteEventResult, onlineGame]);
+  }, [isOnline, onlineGame.remoteEventResult]);
 
   // Clear remote dice value on turn change
   useEffect(() => {
@@ -539,7 +544,7 @@ export default function PlayScreen() {
     const { playerId, score } = onlineGame.remoteDuelScore;
     duelRef.current.receiveRemoteScore(playerId, score);
     onlineGame.clearRemoteDuelScore();
-  }, [isOnline, onlineGame.remoteDuelScore, onlineGame]);
+  }, [isOnline, onlineGame.remoteDuelScore]);
 
   // ===== ONLINE: Réception du résultat du duel (pour spectateurs) =====
   useEffect(() => {
@@ -550,20 +555,29 @@ export default function PlayScreen() {
 
     // Si je suis spectateur, fermer le popup spectateur après un délai
     if (isEventSpectator) {
+      // Capturer les IDs du duel en cours pour éviter d'effacer un nouveau duel
+      // si un 2ème duel démarre pendant le délai (3-4 joueurs)
+      const resolvedChallengerId = result.challengerId;
+      const resolvedOpponentId = result.opponentId;
       const timer = setTimeout(() => {
-        setDuelTriggered(false);
-        setIsEventSpectator(false);
-        setSpectatorDuelChallengerId(null);
-        setSpectatorDuelOpponentId(null);
-        onlineGame.clearRemoteDuelResult();
-        onlineGame.clearRemoteEvent();
+        setSpectatorDuelChallengerId((current) => {
+          if (current === resolvedChallengerId) {
+            setDuelTriggered(false);
+            setIsEventSpectator(false);
+            setSpectatorDuelOpponentId(null);
+            onlineGame.clearRemoteDuelResult();
+            onlineGame.clearRemoteEvent();
+            return null;
+          }
+          return current;
+        });
       }, 2000);
       return () => clearTimeout(timer);
     }
 
     onlineGame.clearRemoteDuelResult();
     return undefined;
-  }, [isOnline, onlineGame.remoteDuelResult, isEventSpectator, onlineGame]);
+  }, [isOnline, onlineGame.remoteDuelResult, isEventSpectator]);
 
   // ===== ONLINE: Detect opponent disconnect → forfeit after 30s =====
 
@@ -1070,7 +1084,7 @@ export default function PlayScreen() {
         onAnswer={handleQuizAnswer}
         onClose={() => setQuizData(null)}
         isSpectator={isEventSpectator}
-        spectatorResult={onlineGame.remoteEventResult ? { ok: onlineGame.remoteEventResult.ok, reward: onlineGame.remoteEventResult.reward } : undefined}
+        spectatorResult={aiSpectatorResult ?? (onlineGame.remoteEventResult ? { ok: onlineGame.remoteEventResult.ok, reward: onlineGame.remoteEventResult.reward } : undefined)}
       />
 
       <FundingPopup
@@ -1117,7 +1131,12 @@ export default function PlayScreen() {
       {(() => {
         // Online: intro for both players, then 'answering' for both in parallel
         // Local: intro for challenger, opponent_prepare for opponent, then challenger_turn / opponent_turn
-        const showPrepare = (duel.currentPhase === 'intro' || duel.currentPhase === 'opponent_prepare') && !!duel.challenger && !!duel.opponent;
+        // When AI is challenger, skip intro phase (AI auto-submits, human only sees opponent_prepare)
+        const aiIsChallenger = duel.challenger?.isAI === true;
+        const showPrepare = (
+          (duel.currentPhase === 'intro' && !aiIsChallenger) ||
+          duel.currentPhase === 'opponent_prepare'
+        ) && !!duel.challenger && !!duel.opponent;
         const showQuestion = (duel.currentPhase === 'challenger_turn' || duel.currentPhase === 'opponent_turn' || duel.currentPhase === 'answering') && duel.questions.length > 0;
         return (
           <>

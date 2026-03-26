@@ -42,6 +42,7 @@ export interface Quiz {
   rewardTokens?: number;   // Jetons gagnés si bonne réponse (défaut: 2)
   penaltyTokens?: number;  // Jetons perdus si mauvaise réponse (défaut: 0)
   timeLimit?: number;      // Secondes (défaut: 30)
+  sectorId?: string;       // Secteur associé (si absent = générique, montré à tous)
 }
 
 // ===== DUEL =====
@@ -58,6 +59,7 @@ export interface Duel {
   question: string;
   options: DuelOption[];
   category: string;
+  sectorId?: string;       // Secteur associé (si absent = générique, montré à tous)
 }
 
 // ===== FINANCEMENT =====
@@ -69,6 +71,7 @@ export interface Funding {
   description: string;
   tokens: number;
   source?: string; // Ex: "Tontine", "Microcrédit", "Investisseur"
+  sectorId?: string;       // Secteur associé (si absent = générique, montré à tous)
 }
 
 // ===== ÉVÉNEMENTS : OPPORTUNITÉS =====
@@ -79,6 +82,7 @@ export interface Opportunity {
   title: string;
   description: string;
   tokens: number; // Toujours positif
+  sectorId?: string;       // Secteur associé (si absent = générique, montré à tous)
 }
 
 // ===== ÉVÉNEMENTS : CHALLENGES =====
@@ -89,6 +93,7 @@ export interface Challenge {
   title: string;
   description: string;
   tokens: number; // Toujours négatif (ex: -2, -3)
+  sectorId?: string;       // Secteur associé (si absent = générique, montré à tous)
 }
 
 // ===== TYPE UNION POUR ÉVÉNEMENT =====

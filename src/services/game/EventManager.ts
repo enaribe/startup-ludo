@@ -46,6 +46,7 @@ export interface GeneratedQuizEvent {
     reward: number;
     penalty: number;
     timeLimit: number;
+    explanation?: string;
   };
 }
 
@@ -223,7 +224,7 @@ export class EventManager {
 
     // Déterminer la difficulté
     const quizDifficulty = quiz.difficulty ?? this.inferDifficulty(quiz);
-    const config = DEFAULT_QUIZ_CONFIG.rewards[quizDifficulty];
+    const config = DEFAULT_QUIZ_CONFIG.rewards[quizDifficulty] ?? { reward: 2, penalty: 0 };
 
     return {
       type: 'quiz',
@@ -237,6 +238,7 @@ export class EventManager {
         reward: quiz.rewardTokens ?? config.reward,
         penalty: quiz.penaltyTokens ?? config.penalty,
         timeLimit: quiz.timeLimit ?? DEFAULT_QUIZ_CONFIG.timeLimit,
+        explanation: quiz.explanation || undefined,
       },
     };
   }
