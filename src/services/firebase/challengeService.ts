@@ -4,7 +4,7 @@
  * Maps admin-simplified data to the rich mobile Challenge type.
  */
 
-import firestore from '@react-native-firebase/firestore';
+import { getFirestore, collection, getDocs } from '@react-native-firebase/firestore';
 import { FIRESTORE_COLLECTIONS, firebaseLog } from './config';
 import type {
   Challenge,
@@ -27,9 +27,7 @@ export async function fetchChallengesFromFirestore(): Promise<Challenge[]> {
   console.log('[ChallengeService] Collection path:', FIRESTORE_COLLECTIONS.challenges);
 
   try {
-    const snapshot = await firestore()
-      .collection(FIRESTORE_COLLECTIONS.challenges)
-      .get();
+    const snapshot = await getDocs(collection(getFirestore(), FIRESTORE_COLLECTIONS.challenges));
 
     console.log('[ChallengeService] Snapshot received, docs count:', snapshot.docs.length);
 

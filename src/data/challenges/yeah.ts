@@ -277,7 +277,7 @@ export const YEAH_CHALLENGE: Challenge = {
   description:
     'Programme d\'accompagnement pour jeunes entrepreneurs agricoles. Développez vos compétences entrepreneuriales à travers 4 niveaux de progression et obtenez votre certification Champion.',
   logoUrl: '',
-  bannerUrl: '',
+  bannerUrl: 'TON_URL_ICI',
   primaryColor: '#FFBC40',
   secondaryColor: '#EB001B',
   totalLevels: 4,

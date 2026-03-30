@@ -158,6 +158,7 @@ export const Modal = memo(function Modal({
                     backgroundColor: 'transparent',
                     zIndex: Z_INDEX.modal,
                     width: '100%',
+                    flex: 1,
                     alignItems: 'center',
                     justifyContent: 'center',
                   }

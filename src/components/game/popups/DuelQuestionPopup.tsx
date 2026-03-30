@@ -70,6 +70,14 @@ export const DuelQuestionPopup = memo(function DuelQuestionPopup({
 
   const isTransitioningRef = useRef(false);
 
+  const currentQuestion = questions[currentIndex];
+
+  const shuffledOptions = useMemo(() => {
+    if (!currentQuestion) return [];
+    return shuffleArray(currentQuestion.options);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentQuestion?.id]);
+
   const handleSelectAnswer = useCallback((answerIndex: number) => {
     if (selectedAnswer !== null || isTransitioningRef.current) return;
     if (!questions[currentIndex]) return;
@@ -85,32 +93,24 @@ export const DuelQuestionPopup = memo(function DuelQuestionPopup({
 
     // Passer à la question suivante après un délai
     setTimeout(() => {
-      setAnswers((prevAnswers) => {
-        const newAnswers = [...prevAnswers, answerIndex];
-        setTotalScore((prevScore) => {
-          const newScore = prevScore + points;
-          if (currentIndex < questions.length - 1) {
-            setCurrentIndex((prev) => prev + 1);
-            setSelectedAnswer(null);
-            isTransitioningRef.current = false;
-          } else {
-            // Toutes les questions répondues — utiliser les valeurs accumulées depuis le state
-            onComplete(newAnswers, newScore);
-          }
-          return newScore;
-        });
-        return newAnswers;
-      });
+      // Important: éviter les side-effects (onComplete / setState multiples)
+      // à l'intérieur des updaters setState pour ne pas déclencher
+      // "Cannot update a component while rendering a different component".
+      const newAnswers = [...answers, answerIndex];
+      const newScore = totalScore + points;
+
+      setAnswers(newAnswers);
+      setTotalScore(newScore);
+
+      if (currentIndex < questions.length - 1) {
+        setCurrentIndex((prev) => prev + 1);
+        setSelectedAnswer(null);
+        isTransitioningRef.current = false;
+      } else {
+        onComplete(newAnswers, newScore);
+      }
     }, 600);
-  }, [selectedAnswer, currentIndex, questions, shuffledOptions, hapticsEnabled, onComplete]);
-
-  const currentQuestion = questions[currentIndex];
-
-  const shuffledOptions = useMemo(() => {
-    if (!currentQuestion) return [];
-    return shuffleArray(currentQuestion.options);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentQuestion?.id]);
+  }, [selectedAnswer, currentIndex, questions, shuffledOptions, hapticsEnabled, onComplete, answers, totalScore]);
 
   if (__DEV__) {
     console.log('[DuelQuestionPopup] render', {

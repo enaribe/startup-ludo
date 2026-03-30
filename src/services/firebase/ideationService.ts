@@ -4,7 +4,7 @@
  * Downloads target, mission, and sector cards to replace hardcoded data.
  */
 
-import firestore from '@react-native-firebase/firestore';
+import { getFirestore, collection, getDocs } from '@react-native-firebase/firestore';
 import { FIRESTORE_COLLECTIONS, firebaseLog } from './config';
 import type { TargetCard, MissionCard, SectorCard } from '@/types';
 
@@ -77,9 +77,7 @@ function toSectorCard(card: FirestoreIdeationCard): SectorCard {
  */
 export async function fetchIdeationFromFirestore(): Promise<IdeationData> {
   try {
-    const snapshot = await firestore()
-      .collection(FIRESTORE_COLLECTIONS.ideationCards)
-      .get();
+    const snapshot = await getDocs(collection(getFirestore(), FIRESTORE_COLLECTIONS.ideationCards));
 
     const decks: FirestoreIdeationDeck[] = snapshot.docs.map((doc) => ({
       id: doc.id,

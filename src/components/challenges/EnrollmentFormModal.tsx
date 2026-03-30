@@ -7,31 +7,23 @@
  * - Numero de telephone (optionnel)
  */
 
-import { memo, useState, useCallback } from 'react';
-import {
-  View,
-  Text,
-  Modal,
-  Pressable,
-  ScrollView,
-  TextInput,
-  StyleSheet,
-  Dimensions,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
-import Animated, {
-  FadeIn,
-  FadeOut,
-  SlideInUp,
-  FadeInDown,
-} from 'react-native-reanimated';
-import { Ionicons } from '@expo/vector-icons';
-import { DynamicGradientBorder, GameButton } from '@/components/ui';
+import { DynamicGradientBorder, GameButton, Modal } from '@/components/ui';
 import { COLORS } from '@/styles/colors';
-import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { SPACING } from '@/styles/spacing';
+import { FONTS, FONT_SIZES } from '@/styles/typography';
 import type { EnrollmentFormData } from '@/types/challenge';
+import { Ionicons } from '@expo/vector-icons';
+import { memo, useCallback, useState } from 'react';
+import {
+    Dimensions,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
+} from 'react-native';
+import Animated, { FadeInDown, SlideInUp } from 'react-native-reanimated';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -109,18 +101,10 @@ export const EnrollmentFormModal = memo(function EnrollmentFormModal({
     });
   }, [isValid, lastName, firstName, age, region, isCurrentEntrepreneur, planToStart, wantsContact, phone, onSubmit]);
 
-  if (!visible) return null;
-
   return (
-    <Modal transparent visible={visible} animationType="none" onRequestClose={onClose}>
-      <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} style={styles.overlay}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.keyboardAvoid}
-        >
-          <Animated.View entering={SlideInUp.duration(300).springify().damping(20)} style={styles.container}>
-            <DynamicGradientBorder borderRadius={24} fill="rgba(10,25,41,0.97)" boxWidth={screenWidth - 36}>
+    <Modal visible={visible} onClose={onClose} closeOnBackdrop showCloseButton={false} bareContent>
+      <Animated.View entering={SlideInUp.duration(280)} style={styles.card}>
+            <DynamicGradientBorder borderRadius={24} fill="#0A1929" boxWidth={screenWidth - 36}>
               <View style={styles.inner}>
                 {/* Close button */}
                 <Pressable onPress={onClose} style={styles.closeBtn}>
@@ -245,8 +229,6 @@ export const EnrollmentFormModal = memo(function EnrollmentFormModal({
                 />
               </View>
             </DynamicGradientBorder>
-          </Animated.View>
-        </KeyboardAvoidingView>
       </Animated.View>
     </Modal>
   );
@@ -255,21 +237,11 @@ export const EnrollmentFormModal = memo(function EnrollmentFormModal({
 // ===== STYLES =====
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 18,
-  },
-  keyboardAvoid: {
-    width: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  container: {
-    width: '100%',
-    maxHeight: '90%',
+  /** Aligné QuizPopup / EventPopup : SlideInUp 280ms + même logique de carte */
+  card: {
+    width: '92%',
+    maxWidth: 400,
+    maxHeight: '92%',
   },
   inner: {
     padding: SPACING[5],

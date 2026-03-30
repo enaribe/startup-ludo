@@ -13,6 +13,7 @@ import {
   type GameEmoji,
   type EmojiReaction,
 } from '@/components/game';
+import { DiceChoiceButton } from '@/components/game/DiceChoiceButton';
 import {
   EventPopup,
   FundingPopup,
@@ -91,6 +92,7 @@ export default function PlayScreen() {
 
   // Game store — actions
   const storeRollDice = useGameStore((s) => s.rollDice);
+  const storeSetDiceValue = useGameStore((s) => s.setDiceValue);
   const storeExecuteMove = useGameStore((s) => s.executeMove);
   const storeExitHome = useGameStore((s) => s.exitHome);
   const storeHandleCapture = useGameStore((s) => s.handleCapture);
@@ -137,12 +139,16 @@ export default function PlayScreen() {
     isOnline,
     myPlayerId: userId,
     onDuelComplete: useCallback((result: DuelResult) => {
-      // Appliquer les récompenses aux joueurs
+      // Appliquer les récompenses/pénalités aux joueurs
       if (result.challengerReward > 0) {
         addTokens(result.challengerId, result.challengerReward);
+      } else if (result.challengerReward < 0) {
+        removeTokens(result.challengerId, Math.abs(result.challengerReward));
       }
       if (result.opponentReward > 0) {
         addTokens(result.opponentId, result.opponentReward);
+      } else if (result.opponentReward < 0) {
+        removeTokens(result.opponentId, Math.abs(result.opponentReward));
       }
       // Broadcaster le résultat aux spectateurs en mode online
       if (isOnline) {
@@ -152,6 +158,8 @@ export default function PlayScreen() {
           challengerScore: result.challengerScore,
           opponentScore: result.opponentScore,
           winnerId: result.winnerId,
+          challengerReward: result.challengerReward,
+          opponentReward: result.opponentReward,
         });
       }
     }, [addTokens, isOnline, onlineGame]),
@@ -178,6 +186,7 @@ export default function PlayScreen() {
     if (isOnline) {
       return {
         rollDice: onlineGame.rollDice,
+        // setDiceValue intentionally omitted for online: rollDice handles broadcast
         executeMove: onlineGame.movePawn,
         exitHome: onlineGame.exitHome,
         nextTurn: () => onlineGame.endTurn(false),
@@ -192,6 +201,7 @@ export default function PlayScreen() {
     }
     return {
       rollDice: storeRollDice,
+      setDiceValue: storeSetDiceValue,
       executeMove: storeExecuteMove,
       exitHome: storeExitHome,
       nextTurn: storeNextTurn,
@@ -217,6 +227,7 @@ export default function PlayScreen() {
     isOnline,
     onlineGame,
     storeRollDice,
+    storeSetDiceValue,
     storeExecuteMove,
     storeExitHome,
     storeNextTurn,
@@ -389,7 +400,7 @@ export default function PlayScreen() {
 
   // ===== TURN MACHINE =====
 
-  const { turnState, diceProps, handleEventResolve } = useTurnMachine({
+  const { turnState, diceProps, handleEventResolve, chosenDiceValue, hasUsedDiceChoice, setChosenDiceValue } = useTurnMachine({
     game,
     currentPlayer,
     isOnline,
@@ -527,7 +538,7 @@ export default function PlayScreen() {
       setIsEventSpectator(false);
       onlineGame.clearRemoteEvent();
       onlineGame.clearRemoteEventResult();
-    }, 2500);
+    }, 1200);
 
     return () => clearTimeout(timer);
   }, [isOnline, onlineGame.remoteEventResult]);
@@ -552,6 +563,15 @@ export default function PlayScreen() {
 
     const result = onlineGame.remoteDuelResult;
     console.log('[PlayScreen] Résultat duel reçu (spectateur):', result);
+
+    // Appliquer les tokens/pénalités pour les spectateurs
+    // Les 2 joueurs du duel ont déjà appliqué via onDuelComplete
+    if (isEventSpectator) {
+      if (result.challengerReward > 0) addTokens(result.challengerId, result.challengerReward);
+      else if (result.challengerReward < 0) removeTokens(result.challengerId, Math.abs(result.challengerReward));
+      if (result.opponentReward > 0) addTokens(result.opponentId, result.opponentReward);
+      else if (result.opponentReward < 0) removeTokens(result.opponentId, Math.abs(result.opponentReward));
+    }
 
     // Si je suis spectateur, fermer le popup spectateur après un délai
     if (isEventSpectator) {
@@ -630,8 +650,8 @@ export default function PlayScreen() {
   // ===== EVENT POPUP HANDLERS =====
 
   const handleQuizAnswer = useCallback(
-    (correct: boolean, reward: number) => {
-      actions.resolveEvent({ ok: correct, reward });
+    (correct: boolean, reward: number, selectedIndex: number) => {
+      actions.resolveEvent({ ok: correct, reward, selectedIndex });
       setQuizData(null);
       handleEventResolve();
     },
@@ -1034,7 +1054,17 @@ export default function PlayScreen() {
 
       {/* Fixed Emoji Reaction Bar at bottom */}
       <View style={[styles.emojiBarFooter, { paddingBottom: insets.bottom + SPACING[2] }]}>
-        <EmojiReactionBar onEmojiPress={handleEmojiPress} />
+        <View style={styles.emojiBarRow}>
+          <EmojiReactionBar onEmojiPress={handleEmojiPress} />
+          {!currentPlayer?.isAI && (
+            <DiceChoiceButton
+              available={!hasUsedDiceChoice}
+              chosenValue={chosenDiceValue}
+              canUse={turnState.phase === 'idle'}
+              onChoose={setChosenDiceValue}
+            />
+          )}
+        </View>
       </View>
 
       {/* Emoji Reaction Overlay */}
@@ -1084,7 +1114,7 @@ export default function PlayScreen() {
         onAnswer={handleQuizAnswer}
         onClose={() => setQuizData(null)}
         isSpectator={isEventSpectator}
-        spectatorResult={aiSpectatorResult ?? (onlineGame.remoteEventResult ? { ok: onlineGame.remoteEventResult.ok, reward: onlineGame.remoteEventResult.reward } : undefined)}
+        spectatorResult={aiSpectatorResult ?? (onlineGame.remoteEventResult ? { ok: onlineGame.remoteEventResult.ok, reward: onlineGame.remoteEventResult.reward, selectedIndex: onlineGame.remoteEventResult.selectedIndex } : undefined)}
       />
 
       <FundingPopup
@@ -1347,6 +1377,11 @@ const styles = StyleSheet.create({
   },
   noGameButton: {
     minWidth: 140,
+  },
+  emojiBarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[3],
   },
   emojiBarFooter: {
     position: 'absolute',

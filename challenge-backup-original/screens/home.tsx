@@ -12,11 +12,11 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Avatar, DynamicGradientBorder, GradientBorder, RadialBackground } from '@/components/ui';
 import { ChallengeHomeCard } from '@/components/challenges';
+import { Avatar, DynamicGradientBorder, GradientBorder, RadialBackground } from '@/components/ui';
 import { formatXP, getLevelFromXP, getRankFromXP, getRankProgress } from '@/config/progression';
 import { ALL_CHALLENGES } from '@/data/challenges';
-import { useAuthStore, useUserStore, useChallengeStore } from '@/stores';
+import { useAuthStore, useChallengeStore, useUserStore } from '@/stores';
 import { FONTS } from '@/styles/typography';
 
 const { width } = Dimensions.get('window');

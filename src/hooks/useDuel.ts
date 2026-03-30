@@ -547,10 +547,10 @@ function calculateResult(
   if (challengerScore > opponentScore) {
     winnerId = challengerId;
     challengerReward = 3;
-    opponentReward = 0;
+    opponentReward = -1;
   } else if (opponentScore > challengerScore) {
     winnerId = opponentId;
-    challengerReward = 0;
+    challengerReward = -1;
     opponentReward = 3;
   } else {
     winnerId = null;

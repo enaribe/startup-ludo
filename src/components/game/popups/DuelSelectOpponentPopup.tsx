@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import Animated, { SlideInUp, FadeIn } from 'react-native-reanimated';
 import { Modal } from '@/components/ui/Modal';
 import { Avatar } from '@/components/ui/Avatar';
@@ -33,7 +33,12 @@ export const DuelSelectOpponentPopup = memo(function DuelSelectOpponentPopup({
       bareContent
     >
       <Animated.View entering={SlideInUp.duration(280)} style={styles.card}>
-        <View style={styles.content}>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
           {/* Icône */}
           <View style={styles.iconCircle}>
             <PopupDuelIcon size={48} />
@@ -104,7 +109,7 @@ export const DuelSelectOpponentPopup = memo(function DuelSelectOpponentPopup({
               </Animated.View>
             ))}
           </View>
-        </View>
+        </ScrollView>
       </Animated.View>
     </Modal>
   );
@@ -116,9 +121,12 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS['3xl'],
     maxWidth: 360,
     width: '92%',
-    maxHeight: '90%',
+    maxHeight: '88%',
     ...SHADOWS.xl,
     overflow: 'hidden',
+  },
+  scroll: {
+    flexGrow: 0,
   },
   content: {
     paddingTop: SPACING[5],

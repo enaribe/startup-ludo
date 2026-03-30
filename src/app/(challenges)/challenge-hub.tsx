@@ -49,117 +49,85 @@ const LevelInfoPopup = memo(function LevelInfoPopup({
 }: LevelInfoPopupProps) {
   if (!visible || !node) return null;
 
-  const progressPercent = node.xpRequired > 0
-    ? Math.min(100, Math.round((node.xpCurrent / node.xpRequired) * 100))
-    : 0;
+  const isLocked = !node.isUnlocked && !node.isCompleted;
+  const canPlay  = (node.isUnlocked || node.isCurrent) && !node.isCompleted;
 
-  const getStatusText = () => {
-    if (node.isCompleted) return 'Complété';
-    if (node.isCurrent) return 'En cours';
-    if (node.isUnlocked) return 'Débloqué';
-    return 'Verrouillé';
-  };
-
-  const getStatusColor = () => {
-    if (node.isCompleted) return COLORS.success;
-    if (node.isCurrent) return COLORS.primary;
-    if (node.isUnlocked) return COLORS.info;
-    return COLORS.textMuted;
-  };
-
-  const canPlay = (node.isUnlocked || node.isCurrent) && !node.isCompleted;
+  const statusText  = node.isCompleted ? 'Complété'
+                    : node.isCurrent   ? 'En cours'
+                    : node.isUnlocked  ? 'Débloqué'
+                    : 'Verrouillé';
+  const statusColor = node.isCompleted ? COLORS.success
+                    : node.isCurrent   ? COLORS.primary
+                    : node.isUnlocked  ? COLORS.info
+                    : '#71808E';
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.levelPopupBackdrop} onPress={onClose}>
         <Animated.View entering={FadeIn.duration(200)} style={styles.levelPopupWrapper}>
           <Pressable onPress={(e) => e.stopPropagation()}>
-            <DynamicGradientBorder borderRadius={24} fill="rgba(10, 25, 41, 0.98)">
-              <View style={styles.levelPopupContainer}>
-                {/* Header avec numéro */}
-                <View style={styles.levelPopupHeader}>
-                  <View style={[styles.levelPopupNumber, { backgroundColor: getStatusColor() }]}>
-                    {node.isCompleted ? (
-                      <Ionicons name="checkmark" size={24} color={COLORS.white} />
-                    ) : (
-                      <Text style={styles.levelPopupNumberText}>{node.levelNumber}</Text>
-                    )}
-                  </View>
-                  <Pressable onPress={onClose} style={styles.levelPopupCloseBtn}>
-                    <Ionicons name="close" size={24} color={COLORS.textMuted} />
-                  </Pressable>
-                </View>
+            <View style={styles.levelPopupContainer}>
 
-                {/* Nom et description */}
-                <Text style={styles.levelPopupTitle}>{node.name}</Text>
-                {node.description && (
-                  <Text style={styles.levelPopupDescription}>{node.description}</Text>
-                )}
-
-                {/* Posture */}
-                {node.posture && (
-                  <View style={styles.levelPopupPosture}>
-                    <Ionicons name="person-outline" size={16} color={COLORS.primary} />
-                    <Text style={styles.levelPopupPostureText}>{node.posture}</Text>
-                  </View>
-                )}
-
-                {/* Status */}
-                <View style={[styles.levelPopupStatusBadge, { backgroundColor: getStatusColor() + '20' }]}>
-                  <Text style={[styles.levelPopupStatusText, { color: getStatusColor() }]}>
-                    {getStatusText()}
+              {/* Badge statut centré en haut */}
+              <View style={styles.levelPopupStatusRow}>
+                <View style={[styles.levelPopupStatusBadge, { backgroundColor: statusColor === '#71808E' ? '#71808E' : statusColor + '30' }]}>
+                  {isLocked && <Ionicons name="lock-closed" size={10} color={COLORS.background} style={{ marginRight: 4 }} />}
+                  <Text style={[styles.levelPopupStatusText, { color: isLocked ? COLORS.background : statusColor }]}>
+                    {statusText}
                   </Text>
                 </View>
+              </View>
 
-                {/* Progression XP */}
-                {canPlay && (
-                  <View style={styles.levelPopupProgress}>
-                    <View style={styles.levelPopupProgressHeader}>
-                      <Text style={styles.levelPopupProgressLabel}>Progression</Text>
-                      <Text style={styles.levelPopupProgressValue}>{progressPercent}%</Text>
-                    </View>
-                    <View style={styles.levelPopupProgressBar}>
-                      <View style={[styles.levelPopupProgressFill, { width: `${progressPercent}%` }]} />
-                    </View>
-                    <Text style={styles.levelPopupXpText}>
-                      {node.xpCurrent.toLocaleString()} / {node.xpRequired.toLocaleString()} XP
-                    </Text>
-                  </View>
-                )}
-
-                {/* Bouton Jouer avec GameButton */}
-                {canPlay && (
-                  <View style={styles.levelPopupActions}>
-                    <GameButton
-                      title="JOUER CE NIVEAU"
-                      variant="yellow"
-                      fullWidth
-                      onPress={onPlay}
-                    />
-                  </View>
-                )}
-
-                {/* Message verrouillé */}
-                {!node.isUnlocked && !node.isCompleted && (
-                  <View style={styles.levelPopupLocked}>
-                    <Ionicons name="lock-closed" size={20} color={COLORS.textMuted} />
-                    <Text style={styles.levelPopupLockedText}>
-                      Complétez les niveaux précédents pour débloquer
-                    </Text>
-                  </View>
-                )}
-
-                {/* Bouton Fermer */}
-                <View style={styles.levelPopupActions}>
-                  <GameButton
-                    title="Fermer"
-                    variant="blue"
-                    fullWidth
-                    onPress={onClose}
+              {/* Icône + Titre */}
+              <View style={styles.levelPopupTitleRow}>
+                <View style={styles.levelPopupIconWrap}>
+                  <Ionicons
+                    name={(node.iconName as keyof typeof Ionicons.glyphMap) || 'compass-outline'}
+                    size={32}
+                    color={isLocked ? '#71808E' : COLORS.primary}
                   />
                 </View>
+                <Text style={styles.levelPopupTitle}>{node.name}</Text>
               </View>
-            </DynamicGradientBorder>
+
+              {/* Description */}
+              {node.description && (
+                <Text style={styles.levelPopupDescription}>{node.description}</Text>
+              )}
+
+              {/* XP */}
+              {node.xpRequired > 0 && (
+                <View style={styles.levelPopupXpRow}>
+                  <Ionicons name="star" size={12} color={COLORS.primary} />
+                  <Text style={styles.levelPopupXpText}>
+                    {node.xpRequired.toLocaleString()} XP
+                  </Text>
+                </View>
+              )}
+
+              {/* Encart verrouillé */}
+              {isLocked && (
+                <View style={styles.levelPopupLocked}>
+                  <Ionicons name="lock-closed" size={16} color="#71808E" />
+                  <Text style={styles.levelPopupLockedText}>
+                    Compléter les niveaux précédents pour débloquer
+                  </Text>
+                </View>
+              )}
+
+              {/* Bouton Jouer */}
+              {canPlay && (
+                <View style={styles.levelPopupActions}>
+                  <GameButton title="JOUER CE NIVEAU" variant="yellow" fullWidth onPress={onPlay} />
+                </View>
+              )}
+
+              {/* Bouton Fermer */}
+              <View style={styles.levelPopupActions}>
+                <GameButton title="Fermer" variant={canPlay ? 'blue' : 'yellow'} fullWidth onPress={onClose} />
+              </View>
+
+            </View>
           </Pressable>
         </Animated.View>
       </Pressable>
@@ -617,49 +585,10 @@ export default function ChallengeHubScreen() {
           </Pressable>
         </View>
 
-        {/* Panneau de résumé de progression */}
-        <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.progressSummary}>
-          <DynamicGradientBorder borderRadius={16} fill="rgba(0, 0, 0, 0.35)">
-            <View style={styles.progressSummaryContent}>
-              {/* Niveau actuel */}
-              <View style={styles.progressSummaryMain}>
-                <View style={styles.levelBadge}>
-                  <Text style={styles.levelBadgeNumber}>{enrollment.currentLevel}</Text>
-                </View>
-                <View style={styles.progressSummaryInfo}>
-                  <Text style={styles.progressSummaryLevel}>Niveau {enrollment.currentLevel}</Text>
-                  <Text style={styles.progressSummarySublevel}>{currentSubLevel?.name || currentLevel?.name}</Text>
-                </View>
-              </View>
-
-              {/* Stats */}
-              <View style={styles.progressSummaryStats}>
-                <View style={styles.progressSummaryStat}>
-                  <Text style={styles.progressStatValue}>{enrollment.totalXp.toLocaleString()}</Text>
-                  <Text style={styles.progressStatLabel}>XP Total</Text>
-                </View>
-                <View style={styles.progressStatDivider} />
-                <View style={styles.progressSummaryStat}>
-                  <Text style={styles.progressStatValue}>{overallProgress}%</Text>
-                  <Text style={styles.progressStatLabel}>Progression</Text>
-                </View>
-                {selectedSector && (
-                  <>
-                    <View style={styles.progressStatDivider} />
-                    <View style={styles.progressSummaryStat}>
-                      <View style={[styles.sectorDot, { backgroundColor: selectedSector.color }]} />
-                      <Text style={styles.progressStatLabel}>{selectedSector.name}</Text>
-                    </View>
-                  </>
-                )}
-              </View>
-            </View>
-          </DynamicGradientBorder>
-        </Animated.View>
       </View>
 
       {/* Carte de progression style Galerie */}
-      <View style={[styles.mapContainer, { paddingTop: insets.top + 190 }]}>
+      <View style={[styles.mapContainer, { paddingTop: insets.top + 84 }]}>
         <ChallengeGalleryMap
           levels={challenge.levels}
           currentLevel={enrollment.currentLevel}
@@ -801,9 +730,7 @@ const styles = StyleSheet.create({
     zIndex: 10,
     paddingHorizontal: SPACING[4],
     paddingBottom: SPACING[3],
-    backgroundColor: '#0A1929',
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    backgroundColor: 'transparent',
   },
   headerRow: {
     flexDirection: 'row',
@@ -824,79 +751,6 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.lg,
     color: COLORS.white,
     textAlign: 'center',
-  },
-
-  // Résumé de progression
-  progressSummary: {
-    marginTop: SPACING[3],
-  },
-  progressSummaryContent: {
-    padding: SPACING[3],
-  },
-  progressSummaryMain: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: SPACING[3],
-  },
-  levelBadge: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: COLORS.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: SPACING[3],
-  },
-  levelBadgeNumber: {
-    fontFamily: FONTS.title,
-    fontSize: FONT_SIZES.xl,
-    color: COLORS.background,
-  },
-  progressSummaryInfo: {
-    flex: 1,
-  },
-  progressSummaryLevel: {
-    fontFamily: FONTS.title,
-    fontSize: FONT_SIZES.base,
-    color: COLORS.white,
-  },
-  progressSummarySublevel: {
-    fontFamily: FONTS.body,
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.textSecondary,
-    marginTop: 2,
-  },
-  progressSummaryStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 12,
-    paddingVertical: SPACING[2],
-  },
-  progressSummaryStat: {
-    alignItems: 'center',
-    gap: 2,
-  },
-  progressStatValue: {
-    fontFamily: FONTS.title,
-    fontSize: FONT_SIZES.base,
-    color: COLORS.primary,
-  },
-  progressStatLabel: {
-    fontFamily: FONTS.body,
-    fontSize: FONT_SIZES.xs,
-    color: COLORS.textMuted,
-  },
-  progressStatDivider: {
-    width: 1,
-    height: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  sectorDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
   },
 
   // Container de la carte
@@ -1062,166 +916,86 @@ const styles = StyleSheet.create({
   // Popup Info Niveau
   levelPopupBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: SPACING[4],
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'flex-end',
   },
   levelPopupWrapper: {
     width: '100%',
-    maxWidth: 340,
   },
   levelPopupContainer: {
-    padding: SPACING[5],
+    backgroundColor: COLORS.background,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: SPACING[6],
+    paddingTop: SPACING[6],
+    paddingBottom: SPACING[8],
+    gap: SPACING[5],
   },
-  levelPopupHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: SPACING[4],
-  },
-  levelPopupNumber: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
+  levelPopupStatusRow: {
     alignItems: 'center',
-  },
-  levelPopupNumberText: {
-    fontFamily: FONTS.title,
-    fontSize: FONT_SIZES.xl,
-    color: COLORS.white,
-  },
-  levelPopupCloseBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  levelPopupTitle: {
-    fontFamily: FONTS.title,
-    fontSize: FONT_SIZES.xl,
-    color: COLORS.white,
-    marginBottom: SPACING[2],
-  },
-  levelPopupDescription: {
-    fontFamily: FONTS.body,
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.textSecondary,
-    lineHeight: 20,
-    marginBottom: SPACING[3],
-  },
-  levelPopupPosture: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING[2],
-    backgroundColor: 'rgba(255, 188, 64, 0.15)',
-    paddingHorizontal: SPACING[3],
-    paddingVertical: SPACING[2],
-    borderRadius: 12,
-    marginBottom: SPACING[3],
-    alignSelf: 'flex-start',
-  },
-  levelPopupPostureText: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.primary,
   },
   levelPopupStatusBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: SPACING[3],
-    paddingVertical: SPACING[1],
-    borderRadius: 12,
-    marginBottom: SPACING[4],
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING[5],
+    paddingVertical: SPACING[2],
+    borderRadius: 30,
   },
   levelPopupStatusText: {
     fontFamily: FONTS.bodySemiBold,
     fontSize: FONT_SIZES.xs,
   },
-  levelPopupProgress: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 16,
-    padding: SPACING[3],
-    marginBottom: SPACING[4],
-  },
-  levelPopupProgressHeader: {
+  levelPopupTitleRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: SPACING[2],
+    alignItems: 'center',
+    gap: SPACING[5],
   },
-  levelPopupProgressLabel: {
+  levelPopupIconWrap: {
+    width: 53,
+    height: 53,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  levelPopupTitle: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES.lg,
+    color: COLORS.white,
+    letterSpacing: 0.72,
+    flex: 1,
+  },
+  levelPopupDescription: {
     fontFamily: FONTS.body,
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.textSecondary,
+    fontSize: FONT_SIZES.base,
+    color: '#71808E',
+    lineHeight: 22,
   },
-  levelPopupProgressValue: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.primary,
-  },
-  levelPopupProgressBar: {
-    height: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: SPACING[2],
-  },
-  levelPopupProgressFill: {
-    height: '100%',
-    backgroundColor: COLORS.primary,
-    borderRadius: 4,
+  levelPopupXpRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[1],
   },
   levelPopupXpText: {
-    fontFamily: FONTS.body,
-    fontSize: FONT_SIZES.xs,
-    color: COLORS.textMuted,
-    textAlign: 'right',
-  },
-  levelPopupCategories: {
-    marginBottom: SPACING[4],
-  },
-  levelPopupCategoriesLabel: {
-    fontFamily: FONTS.bodySemiBold,
+    fontFamily: FONTS.bodyBold,
     fontSize: FONT_SIZES.sm,
-    color: COLORS.textSecondary,
-    marginBottom: SPACING[2],
-  },
-  levelPopupCategoriesList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING[2],
-  },
-  levelPopupCategoryChip: {
-    backgroundColor: 'rgba(255, 188, 64, 0.15)',
-    paddingHorizontal: SPACING[3],
-    paddingVertical: SPACING[1],
-    borderRadius: 12,
-  },
-  levelPopupCategoryText: {
-    fontFamily: FONTS.body,
-    fontSize: FONT_SIZES.xs,
     color: COLORS.primary,
-  },
-  levelPopupActions: {
-    marginTop: SPACING[3],
   },
   levelPopupLocked: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING[2],
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    paddingVertical: SPACING[3],
-    paddingHorizontal: SPACING[4],
-    borderRadius: 12,
+    gap: SPACING[4],
+    backgroundColor: 'rgba(0,0,0,0.15)',
+    borderRadius: 15,
+    paddingHorizontal: SPACING[5],
+    paddingVertical: SPACING[4],
   },
   levelPopupLockedText: {
     fontFamily: FONTS.body,
     fontSize: FONT_SIZES.sm,
-    color: COLORS.textMuted,
-    textAlign: 'center',
+    color: COLORS.white,
     flex: 1,
+    lineHeight: 18,
+  },
+  levelPopupActions: {
+    marginTop: SPACING[1],
   },
 });

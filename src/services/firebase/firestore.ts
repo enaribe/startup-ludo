@@ -1,6 +1,23 @@
 // Firebase Firestore Service - MIGRATED TO @react-native-firebase/firestore
-import firestore from '@react-native-firebase/firestore';
-import { DEFAULT_RANK, getRankFromXP } from '@/config/progression';
+import {
+  getFirestore,
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
+  orderBy,
+  limit,
+  onSnapshot,
+  collectionGroup,
+  serverTimestamp,
+  Timestamp,
+} from '@react-native-firebase/firestore';
+import { DEFAULT_RANK, getRankFromXP, getLevelFromXP } from '@/config/progression';
 import type { ChallengeEnrollment } from '@/types/challenge';
 import type { Startup, UserProfile } from '@/types';
 import {
@@ -22,7 +39,7 @@ export const createUserProfile = async (
   try {
     firebaseLog('Creating user profile', { userId, displayName: data.displayName });
 
-    const now = firestore.Timestamp.now();
+    const now = Timestamp.now();
     const userData: FirestoreUser = {
       id: userId,
       email: data.email,
@@ -39,10 +56,7 @@ export const createUserProfile = async (
     };
 
     // Create user document
-    await firestore()
-      .collection(FIRESTORE_COLLECTIONS.users)
-      .doc(userId)
-      .set(userData);
+    await setDoc(doc(getFirestore(), FIRESTORE_COLLECTIONS.users, userId), userData);
 
     // Create user stats document
     const statsData: FirestoreUserStats = {
@@ -58,10 +72,7 @@ export const createUserProfile = async (
       updatedAt: now,
     };
 
-    await firestore()
-      .collection(FIRESTORE_COLLECTIONS.userStats)
-      .doc(userId)
-      .set(statsData);
+    await setDoc(doc(getFirestore(), FIRESTORE_COLLECTIONS.userStats, userId), statsData);
 
     firebaseLog('User profile created successfully');
 
@@ -92,22 +103,20 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
     firebaseLog('Fetching user profile', { userId });
 
     const [userSnap, statsSnap] = await Promise.all([
-      firestore().collection(FIRESTORE_COLLECTIONS.users).doc(userId).get(),
-      firestore().collection(FIRESTORE_COLLECTIONS.userStats).doc(userId).get(),
+      getDoc(doc(getFirestore(), FIRESTORE_COLLECTIONS.users, userId)),
+      getDoc(doc(getFirestore(), FIRESTORE_COLLECTIONS.userStats, userId)),
     ]);
 
-    if (!userSnap.exists()) {
+    if (!userSnap.exists) {
       firebaseLog('User profile not found');
       return null;
     }
 
     const userData = userSnap.data() as FirestoreUser;
-    const statsData = statsSnap.exists() ? statsSnap.data() as FirestoreUserStats : null;
+    const statsData = statsSnap.exists ? statsSnap.data() as FirestoreUserStats : null;
 
     // Fetch user startups
-    const startupsSnap = await firestore()
-      .collection(FIRESTORE_COLLECTIONS.userStartups(userId))
-      .get();
+    const startupsSnap = await getDocs(collection(getFirestore(), FIRESTORE_COLLECTIONS.userStartups(userId)));
     const startups = startupsSnap.docs.map((d) => d.data() as Startup);
 
     firebaseLog('User profile fetched successfully');
@@ -160,13 +169,10 @@ export const updateFirestoreUserProfile = async (
   try {
     firebaseLog('Updating user profile', { userId, updates });
 
-    await firestore()
-      .collection(FIRESTORE_COLLECTIONS.users)
-      .doc(userId)
-      .update({
-        ...updates,
-        updatedAt: firestore.FieldValue.serverTimestamp(),
-      });
+    await updateDoc(doc(getFirestore(), FIRESTORE_COLLECTIONS.users, userId), {
+      ...updates,
+      updatedAt: serverTimestamp(),
+    });
 
     firebaseLog('User profile updated successfully');
   } catch (error) {
@@ -189,36 +195,42 @@ export const updateUserStats = async (
   try {
     firebaseLog('Updating user stats', { userId, stats });
 
-    const statsRef = firestore()
-      .collection(FIRESTORE_COLLECTIONS.userStats)
-      .doc(userId);
-    const statsSnap = await statsRef.get();
+    const statsRef = doc(getFirestore(), FIRESTORE_COLLECTIONS.userStats, userId);
+    const statsSnap = await getDoc(statsRef);
 
-    const now = firestore.Timestamp.now();
+    const now = Timestamp.now();
 
-    if (!statsSnap.exists()) {
+    if (!statsSnap.exists) {
       // Créer le document stats s'il n'existe pas encore
       firebaseLog('User stats not found, creating document', { userId });
+      const firstXP = stats.xpGained ?? 0;
+      const firstLevel = getLevelFromXP(firstXP).level;
       const newStats: FirestoreUserStats = {
         id: userId,
-        xp: stats.xpGained ?? 0,
-        level: 1,
+        xp: firstXP,
+        level: firstLevel,
         totalGames: 1,
         gamesWon: stats.won ? 1 : 0,
         totalTokensEarned: stats.tokensEarned ?? 0,
-        weeklyXP: stats.xpGained ?? 0,
-        monthlyXP: stats.xpGained ?? 0,
+        weeklyXP: firstXP,
+        monthlyXP: firstXP,
         lastGameAt: now,
         updatedAt: now,
       };
-      await statsRef.set(newStats);
+      await setDoc(statsRef, newStats);
+      // Sync to main user profile for new users too
+      await updateDoc(doc(getFirestore(), FIRESTORE_COLLECTIONS.users, userId), {
+        xp: firstXP,
+        level: firstLevel,
+        updatedAt: now,
+      });
       firebaseLog('User stats document created successfully');
       return;
     }
 
     const currentStats = statsSnap.data() as FirestoreUserStats;
     const newXP = currentStats.xp + (stats.xpGained ?? 0);
-    const newLevel = Math.floor(newXP / 100) + 1;
+    const newLevel = getLevelFromXP(newXP).level;
 
     const updates: Partial<FirestoreUserStats> = {
       totalGames: currentStats.totalGames + 1,
@@ -235,7 +247,14 @@ export const updateUserStats = async (
       updates.gamesWon = currentStats.gamesWon + 1;
     }
 
-    await statsRef.update(updates);
+    await updateDoc(statsRef, updates);
+
+    // Sync level + XP to main user profile so it survives app restarts
+    await updateDoc(doc(getFirestore(), FIRESTORE_COLLECTIONS.users, userId), {
+      xp: newXP,
+      level: newLevel,
+      updatedAt: now,
+    });
 
     firebaseLog('User stats updated successfully');
   } catch (error) {
@@ -251,13 +270,10 @@ export const addStartup = async (userId: string, startup: Startup): Promise<void
   try {
     firebaseLog('Adding startup', { userId, startupId: startup.id });
 
-    await firestore()
-      .collection(FIRESTORE_COLLECTIONS.userStartups(userId))
-      .doc(startup.id)
-      .set({
-        ...startup,
-        createdAt: firestore.FieldValue.serverTimestamp(),
-      });
+    await setDoc(doc(getFirestore(), FIRESTORE_COLLECTIONS.userStartups(userId), startup.id), {
+      ...startup,
+      createdAt: serverTimestamp(),
+    });
 
     firebaseLog('Startup added successfully');
   } catch (error) {
@@ -275,10 +291,10 @@ export const updateStartupValorisation = async (
   try {
     firebaseLog('Updating startup valorisation', { userId, startupId, newValorisation });
 
-    await firestore()
-      .collection(FIRESTORE_COLLECTIONS.userStartups(userId))
-      .doc(startupId)
-      .update({ valorisation: newValorisation });
+    await updateDoc(
+      doc(getFirestore(), FIRESTORE_COLLECTIONS.userStartups(userId), startupId),
+      { valorisation: newValorisation }
+    );
 
     firebaseLog('Startup valorisation updated successfully');
   } catch (error) {
@@ -292,10 +308,7 @@ export const deleteStartup = async (userId: string, startupId: string): Promise<
   try {
     firebaseLog('Deleting startup', { userId, startupId });
 
-    await firestore()
-      .collection(FIRESTORE_COLLECTIONS.userStartups(userId))
-      .doc(startupId)
-      .delete();
+    await deleteDoc(doc(getFirestore(), FIRESTORE_COLLECTIONS.userStartups(userId), startupId));
 
     firebaseLog('Startup deleted successfully');
   } catch (error) {
@@ -310,10 +323,9 @@ export const getAllStartups = async (limitCount: number = 100): Promise<Startup[
     console.log('[Firestore] getAllStartups: Starting fetch...');
     firebaseLog('Fetching all startups', { limit: limitCount });
 
-    const snapshot = await firestore()
-      .collectionGroup('startups')
-      .limit(limitCount)
-      .get();
+    const snapshot = await getDocs(
+      query(collectionGroup(getFirestore(), 'startups'), limit(limitCount))
+    );
 
     const startups = snapshot.docs.map((d) => d.data() as Startup);
 
@@ -350,11 +362,13 @@ export const getLeaderboard = async (
 
     const orderField = type === 'weekly' ? 'weeklyXP' : type === 'monthly' ? 'monthlyXP' : 'xp';
 
-    const snapshot = await firestore()
-      .collection(FIRESTORE_COLLECTIONS.userStats)
-      .orderBy(orderField, 'desc')
-      .limit(limitCount)
-      .get();
+    const snapshot = await getDocs(
+      query(
+        collection(getFirestore(), FIRESTORE_COLLECTIONS.userStats),
+        orderBy(orderField, 'desc'),
+        limit(limitCount)
+      )
+    );
 
     // Fetch user display names
     const entries: LeaderboardEntry[] = [];
@@ -362,12 +376,9 @@ export const getLeaderboard = async (
 
     for (const statDoc of snapshot.docs) {
       const stats = statDoc.data() as FirestoreUserStats;
-      const userSnap = await firestore()
-        .collection(FIRESTORE_COLLECTIONS.users)
-        .doc(stats.id)
-        .get();
+      const userSnap = await getDoc(doc(getFirestore(), FIRESTORE_COLLECTIONS.users, stats.id));
 
-      if (userSnap.exists()) {
+      if (userSnap.exists) {
         const userData = userSnap.data() as FirestoreUser;
         entries.push({
           id: stats.id,
@@ -408,13 +419,10 @@ export const saveGameSession = async (session: GameSession): Promise<void> => {
   try {
     firebaseLog('Saving game session', { sessionId: session.id });
 
-    await firestore()
-      .collection(FIRESTORE_COLLECTIONS.gameSessions)
-      .doc(session.id)
-      .set({
-        ...session,
-        createdAt: firestore.FieldValue.serverTimestamp(),
-      });
+    await setDoc(doc(getFirestore(), FIRESTORE_COLLECTIONS.gameSessions, session.id), {
+      ...session,
+      createdAt: serverTimestamp(),
+    });
 
     firebaseLog('Game session saved successfully');
   } catch (error) {
@@ -431,12 +439,14 @@ export const getGameHistory = async (
   try {
     firebaseLog('Fetching game history', { userId, limit: limitCount });
 
-    const snapshot = await firestore()
-      .collection(FIRESTORE_COLLECTIONS.gameSessions)
-      .where('playerIds', 'array-contains', userId)
-      .orderBy('createdAt', 'desc')
-      .limit(limitCount)
-      .get();
+    const snapshot = await getDocs(
+      query(
+        collection(getFirestore(), FIRESTORE_COLLECTIONS.gameSessions),
+        where('playerIds', 'array-contains', userId),
+        orderBy('createdAt', 'desc'),
+        limit(limitCount)
+      )
+    );
 
     const sessions = snapshot.docs.map((d) => {
       const data = d.data();
@@ -476,13 +486,13 @@ export const setChallengeEnrollment = async (
     firebaseLog('Setting challenge enrollment', { enrollmentId: enrollment.id });
 
     const docId = enrollmentDocId(enrollment.userId, enrollment.challengeId);
-    await firestore()
-      .collection(FIRESTORE_COLLECTIONS.challengeEnrollments)
-      .doc(docId)
-      .set({
+    await setDoc(
+      doc(getFirestore(), FIRESTORE_COLLECTIONS.challengeEnrollments, docId),
+      {
         ...enrollment,
-        updatedAt: firestore.FieldValue.serverTimestamp(),
-      });
+        updatedAt: serverTimestamp(),
+      }
+    );
 
     firebaseLog('Challenge enrollment set successfully');
   } catch (error) {
@@ -503,18 +513,16 @@ export const updateChallengeEnrollment = async (
     const docId = enrollmentDocId(userId, challengeId);
     // set + merge pour créer le doc s'il n'existe pas encore
     // userId et challengeId inclus pour satisfaire les règles Firestore
-    await firestore()
-      .collection(FIRESTORE_COLLECTIONS.challengeEnrollments)
-      .doc(docId)
-      .set(
-        {
-          ...updates,
-          userId,
-          challengeId,
-          updatedAt: firestore.FieldValue.serverTimestamp(),
-        },
-        { merge: true }
-      );
+    await setDoc(
+      doc(getFirestore(), FIRESTORE_COLLECTIONS.challengeEnrollments, docId),
+      {
+        ...updates,
+        userId,
+        challengeId,
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
 
     firebaseLog('Challenge enrollment updated successfully');
   } catch (error) {
@@ -530,10 +538,12 @@ export const getChallengeEnrollmentsForUser = async (
   try {
     firebaseLog('Fetching challenge enrollments', { userId });
 
-    const snapshot = await firestore()
-      .collection(FIRESTORE_COLLECTIONS.challengeEnrollments)
-      .where('userId', '==', userId)
-      .get();
+    const snapshot = await getDocs(
+      query(
+        collection(getFirestore(), FIRESTORE_COLLECTIONS.challengeEnrollments),
+        where('userId', '==', userId)
+      )
+    );
 
     const enrollments = snapshot.docs.map((d) => {
       const data = d.data();
@@ -555,21 +565,22 @@ export const subscribeToChallengeEnrollments = (
 ): (() => void) => {
   firebaseLog('Subscribing to challenge enrollments', { userId });
 
-  const unsubscribe = firestore()
-    .collection(FIRESTORE_COLLECTIONS.challengeEnrollments)
-    .where('userId', '==', userId)
-    .onSnapshot(
-      (snapshot) => {
-        const enrollments = snapshot.docs.map((d) => {
-          const data = d.data();
-          return { ...data, id: (data as { id?: string }).id ?? d.id } as ChallengeEnrollment;
-        });
-        callback(enrollments);
-      },
-      (error) => {
-        firebaseLog('Challenge enrollments subscription error', error);
-      }
-    );
+  const unsubscribe = onSnapshot(
+    query(
+      collection(getFirestore(), FIRESTORE_COLLECTIONS.challengeEnrollments),
+      where('userId', '==', userId)
+    ),
+    (snapshot) => {
+      const enrollments = snapshot.docs.map((d) => {
+        const data = d.data();
+        return { ...data, id: (data as { id?: string }).id ?? d.id } as ChallengeEnrollment;
+      });
+      callback(enrollments);
+    },
+    (error) => {
+      firebaseLog('Challenge enrollments subscription error', error);
+    }
+  );
 
   return unsubscribe;
 };
@@ -583,23 +594,21 @@ export const subscribeToUserProfile = (
 ): (() => void) => {
   firebaseLog('Subscribing to user profile', { userId });
 
-  const unsubscribe = firestore()
-    .collection(FIRESTORE_COLLECTIONS.users)
-    .doc(userId)
-    .onSnapshot(
-      async (snapshot) => {
-        if (snapshot.exists()) {
-          // Fetch full profile including stats
-          const profile = await getUserProfile(userId);
-          callback(profile);
-        } else {
-          callback(null);
-        }
-      },
-      (error) => {
-        firebaseLog('User profile subscription error', error);
+  const unsubscribe = onSnapshot(
+    doc(getFirestore(), FIRESTORE_COLLECTIONS.users, userId),
+    async (snapshot) => {
+      if (snapshot.exists) {
+        // Fetch full profile including stats
+        const profile = await getUserProfile(userId);
+        callback(profile);
+      } else {
+        callback(null);
       }
-    );
+    },
+    (error) => {
+      firebaseLog('User profile subscription error', error);
+    }
+  );
 
   return unsubscribe;
 };
@@ -614,42 +623,40 @@ export const subscribeToLeaderboard = (
 
   const orderField = type === 'weekly' ? 'weeklyXP' : type === 'monthly' ? 'monthlyXP' : 'xp';
 
-  const unsubscribe = firestore()
-    .collection(FIRESTORE_COLLECTIONS.userStats)
-    .orderBy(orderField, 'desc')
-    .limit(limitCount)
-    .onSnapshot(
-      async (snapshot) => {
-        const entries: LeaderboardEntry[] = [];
-        let rank = 1;
+  const unsubscribe = onSnapshot(
+    query(
+      collection(getFirestore(), FIRESTORE_COLLECTIONS.userStats),
+      orderBy(orderField, 'desc'),
+      limit(limitCount)
+    ),
+    async (snapshot) => {
+      const entries: LeaderboardEntry[] = [];
+      let rank = 1;
 
-        for (const statDoc of snapshot.docs) {
-          const stats = statDoc.data() as FirestoreUserStats;
-          const userSnap = await firestore()
-            .collection(FIRESTORE_COLLECTIONS.users)
-            .doc(stats.id)
-            .get();
+      for (const statDoc of snapshot.docs) {
+        const stats = statDoc.data() as FirestoreUserStats;
+        const userSnap = await getDoc(doc(getFirestore(), FIRESTORE_COLLECTIONS.users, stats.id));
 
-          if (userSnap.exists()) {
-            const userData = userSnap.data() as FirestoreUser;
-            entries.push({
-              id: stats.id,
-              displayName: userData.displayName,
-              avatarUrl: userData.avatarUrl,
-              xp: type === 'weekly' ? stats.weeklyXP : type === 'monthly' ? stats.monthlyXP : stats.xp,
-              level: stats.level,
-              gamesWon: stats.gamesWon,
-              rank: rank++,
-            });
-          }
+        if (userSnap.exists) {
+          const userData = userSnap.data() as FirestoreUser;
+          entries.push({
+            id: stats.id,
+            displayName: userData.displayName,
+            avatarUrl: userData.avatarUrl,
+            xp: type === 'weekly' ? stats.weeklyXP : type === 'monthly' ? stats.monthlyXP : stats.xp,
+            level: stats.level,
+            gamesWon: stats.gamesWon,
+            rank: rank++,
+          });
         }
-
-        callback(entries);
-      },
-      (error) => {
-        firebaseLog('Leaderboard subscription error', error);
       }
-    );
+
+      callback(entries);
+    },
+    (error) => {
+      firebaseLog('Leaderboard subscription error', error);
+    }
+  );
 
   return unsubscribe;
 };

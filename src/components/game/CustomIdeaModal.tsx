@@ -253,7 +253,7 @@ export const CustomIdeaModal = memo(function CustomIdeaModal({
         <Animated.View entering={SlideInUp.duration(280).springify().damping(32)} style={styles.container}>
           <DynamicGradientBorder
             borderRadius={24}
-            fill="rgba(10, 25, 41, 0.95)"
+            fill="#0A1929"
             boxWidth={screenWidth - 32}
           >
             <View style={styles.inner}>

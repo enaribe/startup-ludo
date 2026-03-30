@@ -33,6 +33,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 // Import des assets
 const shapeImage = require('@/../assets/images/shape.png');
 const logoImage = require('@/../assets/images/logostartupludo.png');
+const splashIcon = require('@/../assets/images/iconludo.png');
 
 // Rayons tournants sous le logo (comme dans home.tsx)
 const SpinningRays = memo(function SpinningRays() {
@@ -65,28 +66,37 @@ export default function WelcomeScreen() {
   const [isGuestLoading, setIsGuestLoading] = useState(false);
   const { accepted, loading: privacyLoading, acceptPrivacy } = usePrivacyAcceptance();
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
+
+  // Splash screen timeout
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowSplash(false);
+    }, 2500); // Afficher le splash pendant 2.5s
+    return () => clearTimeout(timer);
+  }, []);
 
   // Show privacy modal on first visit
   useEffect(() => {
-    if (!privacyLoading && accepted === false) {
+    if (!showSplash && !privacyLoading && accepted === false) {
       setShowPrivacyModal(true);
     }
-  }, [privacyLoading, accepted]);
+  }, [showSplash, privacyLoading, accepted]);
 
   // Redirect if already authenticated (wait for auth to be initialized first)
   useEffect(() => {
-    if (isInitialized && isAuthenticated) {
+    if (!showSplash && isInitialized && isAuthenticated) {
       router.replace('/(tabs)/home');
     }
-  }, [isAuthenticated, isInitialized, router]);
+  }, [showSplash, isAuthenticated, isInitialized, router]);
 
   // Retour depuis Safari (reCAPTCHA iOS) : phoneAuthStep est encore 'code_sent' ou 'verifying'
   // Expo Router atterrit sur index via le scheme URL → rediriger vers phone-auth pour afficher l'OTP
   useEffect(() => {
-    if (isInitialized && !isAuthenticated && phoneAuthStep !== 'idle') {
+    if (!showSplash && isInitialized && !isAuthenticated && phoneAuthStep !== 'idle') {
       router.replace('/(auth)/phone-auth');
     }
-  }, [isInitialized, isAuthenticated, phoneAuthStep, router]);
+  }, [showSplash, isInitialized, isAuthenticated, phoneAuthStep, router]);
 
   const handleAcceptPrivacy = useCallback(async () => {
     await acceptPrivacy();
@@ -120,7 +130,26 @@ export default function WelcomeScreen() {
     router.push('/(auth)/register');
   }, [router, accepted]);
 
-  // Show loading screen while auth is initializing
+  // Splash Screen initial
+  if (showSplash) {
+    return (
+      <View style={[styles.container, styles.splashContainer]}>
+        <RadialBackground centerColor="#0F3A6B" edgeColor="#081A2A" />
+        <Animated.View 
+          entering={FadeIn.duration(800)}
+          style={styles.splashContent}
+        >
+          <Image
+            source={splashIcon}
+            style={styles.splashIcon}
+            resizeMode="contain"
+          />
+        </Animated.View>
+      </View>
+    );
+  }
+
+  // Show loading screen while auth is initializing (after splash)
   if (!isInitialized) {
     return <LoadingScreen variant="splash" />;
   }
@@ -269,5 +298,17 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.5)',
     textAlign: 'center',
     paddingBottom: SPACING[2],
+  },
+  splashContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  splashContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  splashIcon: {
+    width: SCREEN_WIDTH * 0.4,
+    height: SCREEN_WIDTH * 0.4,
   },
 });

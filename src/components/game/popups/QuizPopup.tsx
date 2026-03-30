@@ -21,10 +21,10 @@ import type { QuizEvent } from '@/types';
 interface QuizPopupProps {
   visible: boolean;
   quiz: QuizEvent | null;
-  onAnswer: (correct: boolean, reward: number) => void;
+  onAnswer: (correct: boolean, reward: number, selectedIndex: number) => void;
   onClose: () => void;
   isSpectator?: boolean;
-  spectatorResult?: { ok: boolean; reward: number };
+  spectatorResult?: { ok: boolean; reward: number; selectedIndex?: number };
 }
 
 
@@ -82,7 +82,14 @@ export const QuizPopup = memo(function QuizPopup({
   useEffect(() => {
     if (!isSpectator || !spectatorResult || !quiz) return;
     setHasAnswered(true);
-    setSelectedAnswer(spectatorResult.ok ? quiz.correctAnswer : -1);
+    // Si correct : montrer la bonne réponse. Si faux : montrer l'index choisi (rouge) ou la bonne réponse si index inconnu
+    if (spectatorResult.ok) {
+      setSelectedAnswer(quiz.correctAnswer);
+    } else {
+      setSelectedAnswer(spectatorResult.selectedIndex !== undefined && spectatorResult.selectedIndex >= 0
+        ? spectatorResult.selectedIndex
+        : -1);
+    }
     resultScale.value = withTiming(1, { duration: 220 });
     badgeBounce.value = withTiming(1, { duration: 220 });
   }, [isSpectator, spectatorResult, quiz, resultScale, badgeBounce]);
@@ -93,8 +100,8 @@ export const QuizPopup = memo(function QuizPopup({
     resultScale.value = withTiming(1, { duration: 220 });
     badgeBounce.value = withTiming(1, { duration: 220 });
     if (hapticsEnabled) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-    const delay = quiz.explanation ? 4500 : 2000;
-    setTimeout(() => onAnswer(false, quiz.reward), delay);
+    const delay = quiz.explanation ? 3000 : 1500;
+    setTimeout(() => onAnswer(false, quiz.reward, -1), delay);
   }, [hasAnswered, quiz, hapticsEnabled, onAnswer, resultScale, badgeBounce]);
 
   const handleSelectAnswer = useCallback(
@@ -110,8 +117,8 @@ export const QuizPopup = memo(function QuizPopup({
         if (isCorrect) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         else Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
-      const delay = quiz.explanation ? 4500 : 2000;
-      setTimeout(() => onAnswer(isCorrect, reward), delay);
+      const delay = quiz.explanation ? 3000 : 1500;
+      setTimeout(() => onAnswer(isCorrect, reward, index), delay);
     },
     [hasAnswered, quiz, hapticsEnabled, onAnswer, resultScale, badgeBounce]
   );
@@ -309,7 +316,7 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS['3xl'],
     maxWidth: 360,
     width: '92%',
-    maxHeight: '85%',
+    maxHeight: '92%',
     ...SHADOWS.xl,
     overflow: 'hidden',
   },
@@ -317,9 +324,9 @@ const styles = StyleSheet.create({
     flexGrow: 0,
   },
   content: {
-    paddingTop: SPACING[5],
-    paddingBottom: SPACING[8],
-    paddingHorizontal: SPACING[5],
+    paddingTop: SPACING[4],
+    paddingBottom: SPACING[5],
+    paddingHorizontal: SPACING[4],
     alignItems: 'center',
   },
   spectatorBanner: {
@@ -339,30 +346,30 @@ const styles = StyleSheet.create({
     color: COLORS.white,
   },
   iconWrap: {
-    marginBottom: SPACING[3],
+    marginBottom: SPACING[2],
   },
   iconCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: 'rgba(74, 144, 226, 0.12)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   title: {
     fontFamily: FONTS.title,
-    fontSize: FONT_SIZES['2xl'],
+    fontSize: FONT_SIZES.xl,
     color: COLORS.events.quiz,
     letterSpacing: 2,
-    marginBottom: SPACING[3],
+    marginBottom: SPACING[2],
   },
   questionBox: {
     backgroundColor: '#F8F9FA',
     borderRadius: BORDER_RADIUS.xl,
-    paddingVertical: SPACING[3],
+    paddingVertical: SPACING[2],
     paddingHorizontal: SPACING[4],
     width: '100%',
-    marginBottom: SPACING[4],
+    marginBottom: SPACING[3],
   },
   question: {
     fontFamily: FONTS.bodyMedium,
@@ -376,7 +383,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: SPACING[2],
     width: '100%',
-    marginBottom: SPACING[4],
+    marginBottom: SPACING[3],
   },
   timerTrack: {
     flex: 1,
@@ -391,16 +398,16 @@ const styles = StyleSheet.create({
   },
   options: {
     width: '100%',
-    gap: SPACING[3],
+    gap: SPACING[2],
   },
   optionPill: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F5F7FA',
     borderRadius: BORDER_RADIUS.xl,
-    paddingVertical: SPACING[3],
-    paddingHorizontal: SPACING[4],
-    minHeight: 56,
+    paddingVertical: SPACING[2],
+    paddingHorizontal: SPACING[3],
+    minHeight: 48,
     ...SHADOWS.sm,
   },
   optionPillPressed: {
@@ -485,8 +492,8 @@ const styles = StyleSheet.create({
   },
   resultWrap: {
     alignItems: 'center',
-    marginTop: SPACING[5],
-    paddingTop: SPACING[4],
+    marginTop: SPACING[3],
+    paddingTop: SPACING[3],
     borderTopWidth: 1,
     borderTopColor: '#E8EEF4',
     width: '100%',

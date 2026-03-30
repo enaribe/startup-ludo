@@ -134,6 +134,75 @@ export const PopupDuelIcon = ({ size = 48 }: PopupIconProps) => {
   );
 };
 
+// ===== DÉ MAGIQUE — Dé avec étoiles, couleurs or/jaune de l'appli =====
+export const PopupDiceMagicIcon = ({ size = 56 }: PopupIconProps) => {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 56 56" fill="none">
+      <Defs>
+        <LinearGradient id="paint0_linear_dice_magic" x1="4" y1="4" x2="52" y2="52" gradientUnits="userSpaceOnUse">
+          <Stop stopColor="#FFD966" />
+          <Stop offset="1" stopColor="#CC8800" />
+        </LinearGradient>
+        <LinearGradient id="paint1_linear_dice_magic" x1="4" y1="4" x2="52" y2="52" gradientUnits="userSpaceOnUse">
+          <Stop stopColor="#FFBC40" />
+          <Stop offset="1" stopColor="#996600" />
+        </LinearGradient>
+      </Defs>
+      {/* Corps du dé */}
+      <Path
+        d="M8 14C8 10.686 10.686 8 14 8H42C45.314 8 48 10.686 48 14V42C48 45.314 45.314 48 42 48H14C10.686 48 8 45.314 8 42V14Z"
+        fill="url(#paint0_linear_dice_magic)"
+        stroke="#996600"
+        strokeWidth={1.5}
+      />
+      {/* Reflet haut-gauche */}
+      <Path
+        d="M13 10C16 9 20 8.5 22 9"
+        stroke="white"
+        strokeOpacity={0.5}
+        strokeWidth={1.2}
+        strokeLinecap="round"
+      />
+      {/* Points du dé (face 5) */}
+      {/* haut-gauche */}
+      <Path d="M19 19m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" fill="#7A4400" />
+      <Path d="M16 19C16 17.343 17.343 16 19 16C20.657 16 22 17.343 22 19C22 20.657 20.657 22 19 22C17.343 22 16 20.657 16 19Z" fill="#7A4400" />
+      {/* haut-droite */}
+      <Path d="M34 19C34 17.343 35.343 16 37 16C38.657 16 40 17.343 40 19C40 20.657 38.657 22 37 22C35.343 22 34 20.657 34 19Z" fill="#7A4400" />
+      {/* centre */}
+      <Path d="M25 28C25 26.343 26.343 25 28 25C29.657 25 31 26.343 31 28C31 29.657 29.657 31 28 31C26.343 31 25 29.657 25 28Z" fill="#7A4400" />
+      {/* bas-gauche */}
+      <Path d="M16 37C16 35.343 17.343 34 19 34C20.657 34 22 35.343 22 37C22 38.657 20.657 40 19 40C17.343 40 16 38.657 16 37Z" fill="#7A4400" />
+      {/* bas-droite */}
+      <Path d="M34 37C34 35.343 35.343 34 37 34C38.657 34 40 35.343 40 37C40 38.657 38.657 40 37 40C35.343 40 34 38.657 34 37Z" fill="#7A4400" />
+      {/* Étoile haut-droite */}
+      <Path
+        d="M46 6L47.2 9.4L51 9.4L48.1 11.6L49.2 15L46 12.8L42.8 15L43.9 11.6L41 9.4L44.8 9.4L46 6Z"
+        fill="#FFBC40"
+        stroke="#996600"
+        strokeWidth={0.6}
+        strokeLinejoin="round"
+      />
+      {/* Petite étoile bas-gauche */}
+      <Path
+        d="M10 46L10.8 48.2L13 48.2L11.3 49.5L11.9 51.7L10 50.3L8.1 51.7L8.7 49.5L7 48.2L9.2 48.2L10 46Z"
+        fill="#FFBC40"
+        stroke="#996600"
+        strokeWidth={0.5}
+        strokeLinejoin="round"
+      />
+      {/* Scintillement haut-gauche */}
+      <Path
+        d="M5 8L5.5 9.4L7 9.4L5.8 10.3L6.2 11.7L5 10.8L3.8 11.7L4.2 10.3L3 9.4L4.5 9.4L5 8Z"
+        fill="#FFD966"
+        stroke="#CC8800"
+        strokeWidth={0.4}
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+};
+
 // ===== CHALLENGE — Triangle avertissement avec point d'exclamation =====
 export const PopupChallengeIcon = ({ size = 77 }: PopupIconProps) => {
   const aspectRatio = 55 / 61;

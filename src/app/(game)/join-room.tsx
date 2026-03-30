@@ -15,10 +15,12 @@ import * as Haptics from 'expo-haptics';
 
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
-import { useAuthStore } from '@/stores';
+import { useAuthStore, useUserStore } from '@/stores';
 import { useMultiplayer } from '@/hooks/useMultiplayer';
 import { Avatar } from '@/components/ui/Avatar';
 import { RadialBackground, DynamicGradientBorder, GameButton } from '@/components/ui';
+import { StartupSelectionModal } from '@/components/game/StartupSelectionModal';
+import { getDefaultProjectsForEdition, getMatchingUserStartups } from '@/data/defaultProjects';
 
 const { width: screenWidth } = Dimensions.get('window');
 const contentWidth = screenWidth - SPACING[4] * 2;
@@ -29,22 +31,41 @@ export default function JoinRoomScreen() {
   useLocalSearchParams<{ challenge?: string }>();
 
   const user = useAuthStore((state) => state.user);
+  const profile = useUserStore((state) => state.profile);
   const {
     room,
     players,
     isLoading,
     joinRoom,
     setReady,
+    setStartupSelection,
     leaveRoom,
   } = useMultiplayer(user?.id ?? null);
 
   const [code, setCode] = useState('');
   const [playerName] = useState(user?.displayName ?? 'Joueur');
-  const [hasJoined, setHasJoined] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [joiningRoom, setJoiningRoom] = useState(false);
-  const [joinedRoomCode, setJoinedRoomCode] = useState('');
   const [showLobby, setShowLobby] = useState(false);
+  const [showStartupModal, setShowStartupModal] = useState(false);
+
+  const edition = room?.edition ?? 'classic';
+  const defaultProjects = useMemo(() => getDefaultProjectsForEdition(edition), [edition]);
+  const userStartups = useMemo(
+    () => getMatchingUserStartups(profile?.startups ?? [], edition),
+    [profile?.startups, edition]
+  );
+
+  const myPlayer = useMemo(
+    () => (user?.id ? players[user.id] : null),
+    [players, user?.id]
+  );
+  const hasSelectedStartup = !!myPlayer?.startupId;
+
+  const handleStartupSelected = useCallback(async (startupId: string, startupName: string, isDefault: boolean, sector: string) => {
+    setShowStartupModal(false);
+    await setStartupSelection(startupId, startupName, isDefault, sector);
+  }, [setStartupSelection]);
 
   // Helper function to format room code
   const formatRoomCode = (codeStr: string) => {
@@ -89,29 +110,10 @@ export default function JoinRoomScreen() {
           },
         ]
       );
-    } else if (hasJoined) {
-      // In confirmation: go back (leave room)
-      Alert.alert(
-        'Quitter le salon',
-        'Es-tu sur de vouloir quitter ?',
-        [
-          { text: 'Annuler', style: 'cancel' },
-          {
-            text: 'Quitter',
-            style: 'destructive',
-            onPress: async () => {
-              await leaveRoom();
-              setHasJoined(false);
-              setJoinedRoomCode('');
-              setCode('');
-            },
-          },
-        ]
-      );
     } else {
       router.back();
     }
-  }, [showLobby, hasJoined, leaveRoom, router]);
+  }, [showLobby, leaveRoom, router]);
 
   const handleJoinRoom = useCallback(async () => {
     const cleanCode = code.replace(/-/g, '').trim().toUpperCase();
@@ -134,8 +136,7 @@ export default function JoinRoomScreen() {
       setJoiningRoom(false);
 
       if (result) {
-        setJoinedRoomCode(formatRoomCode(cleanCode));
-        setHasJoined(true);
+        setShowLobby(true);
       } else {
         Alert.alert('Erreur', 'Impossible de rejoindre le salon. Verifie le code et reessaye.');
       }
@@ -146,11 +147,6 @@ export default function JoinRoomScreen() {
     }
   }, [code, user, playerName, joinRoom]);
 
-  const handleContinueToLobby = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setShowLobby(true);
-  }, []);
-
   const handleToggleReady = useCallback(async () => {
     const newReady = !isReady;
     setIsReady(newReady);
@@ -159,7 +155,7 @@ export default function JoinRoomScreen() {
   }, [isReady, setReady]);
 
   // Code entry phase
-  if (!hasJoined) {
+  if (!showLobby) {
     return (
       <View style={styles.container}>
         <RadialBackground />
@@ -241,76 +237,6 @@ export default function JoinRoomScreen() {
     );
   }
 
-  // Confirmation (après avoir rejoint, avant lobby)
-  if (hasJoined && joinedRoomCode && !showLobby) {
-    return (
-      <View style={styles.container}>
-        <RadialBackground />
-
-        {/* Fixed Header avec bouton retour */}
-        <View style={[styles.header, { paddingTop: insets.top + SPACING[2] }]}>
-          <Pressable onPress={handleBack} hitSlop={8}>
-            <Ionicons name="arrow-back" size={24} color="white" />
-          </Pressable>
-          <View style={{ flex: 1 }} />
-        </View>
-
-        <ScrollView
-          contentContainerStyle={{
-            paddingTop: insets.top + 60,
-            paddingBottom: insets.bottom + 120,
-            paddingHorizontal: SPACING[4],
-            alignItems: 'center',
-          }}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Carte de confirmation */}
-          <Animated.View entering={FadeInDown.delay(100).duration(500)}>
-            <DynamicGradientBorder
-              borderRadius={24}
-              fill="rgba(0, 0, 0, 0.35)"
-              boxWidth={contentWidth}
-            >
-              <View style={styles.confirmationCard}>
-                {/* Icône globe */}
-                <View style={styles.globeIconContainer}>
-                  <Ionicons name="globe" size={48} color="#FFFFFF" />
-                </View>
-
-                {/* Message de confirmation */}
-                <Text style={styles.confirmationTitle}>
-                  SALON REJOINT !
-                </Text>
-
-                {/* Code */}
-                <DynamicGradientBorder
-                  borderRadius={14}
-                  fill="rgba(0, 0, 0, 0.35)"
-                  style={styles.codeBoxWrapper}
-                >
-                  <View style={styles.codeBox}>
-                    <Text style={styles.codeLabelText}>Code:</Text>
-                    <Text style={styles.codeValue}>{joinedRoomCode}</Text>
-                  </View>
-                </DynamicGradientBorder>
-              </View>
-            </DynamicGradientBorder>
-          </Animated.View>
-        </ScrollView>
-
-        {/* Bottom button - Continue to lobby */}
-        <View style={[styles.bottomBar, { paddingBottom: insets.bottom + SPACING[4] }]}>
-          <GameButton
-            variant="green"
-            fullWidth
-            title="CONTINUER"
-            onPress={handleContinueToLobby}
-          />
-        </View>
-      </View>
-    );
-  }
-
   // Waiting room phase
   return (
     <View style={styles.container}>
@@ -343,7 +269,7 @@ export default function JoinRoomScreen() {
             <View style={styles.codeSection}>
               <Text style={styles.codeLabel}>CODE DU SALON</Text>
               <Text style={styles.codeText}>
-                {room?.code ? formatRoomCode(room.code) : joinedRoomCode || code}
+                {room?.code ? formatRoomCode(room.code) : code}
               </Text>
               <Text style={styles.roomDetails}>
                 {room?.edition || 'Classic'} — {room?.maxPlayers || 4} joueurs max
@@ -394,9 +320,15 @@ export default function JoinRoomScreen() {
                           <Text style={styles.lobbyPlayerName} numberOfLines={1}>
                             {player.displayName ?? player.name ?? 'Joueur'}
                           </Text>
-                          <Text style={styles.lobbyPlayerStatus}>
-                            {player.isHost ? 'Hôte' : player.isReady ? 'Prêt' : 'En attente'}
-                          </Text>
+                          {player.startupName ? (
+                            <Text style={styles.lobbyStartupName} numberOfLines={1}>
+                              {player.startupName}
+                            </Text>
+                          ) : (
+                            <Text style={styles.lobbyPlayerStatus}>
+                              {player.isHost ? 'Hôte' : player.isReady ? 'Prêt' : 'En attente'}
+                            </Text>
+                          )}
                         </View>
                         <View style={[
                           styles.lobbyReadyBadge,
@@ -416,7 +348,37 @@ export default function JoinRoomScreen() {
             )}
           </DynamicGradientBorder>
         </Animated.View>
+        {/* Startup Selection Button */}
+        <Animated.View entering={FadeInDown.delay(300).duration(500)} style={styles.startupBtnWrapper}>
+          <Pressable
+            style={[styles.startupSelectBtn, hasSelectedStartup && styles.startupSelectBtnDone]}
+            onPress={() => setShowStartupModal(true)}
+          >
+            <Ionicons
+              name={hasSelectedStartup ? 'checkmark-circle' : 'rocket-outline'}
+              size={20}
+              color={hasSelectedStartup ? '#4CAF50' : '#FFBC40'}
+            />
+            <Text style={[styles.startupSelectText, hasSelectedStartup && styles.startupSelectTextDone]}>
+              {hasSelectedStartup ? myPlayer?.startupName ?? 'Projet choisi' : 'Choisir mon projet'}
+            </Text>
+            {!hasSelectedStartup && (
+              <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.4)" />
+            )}
+          </Pressable>
+        </Animated.View>
       </ScrollView>
+
+      {/* Startup Selection Modal */}
+      <StartupSelectionModal
+        visible={showStartupModal}
+        edition={edition}
+        userStartups={userStartups}
+        defaultProjects={defaultProjects}
+        playerName={user?.displayName}
+        onSelect={handleStartupSelected}
+        onClose={() => setShowStartupModal(false)}
+      />
 
       {/* Bottom - Ready button */}
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + SPACING[4] }]}>
@@ -620,6 +582,12 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.45)',
     marginTop: 2,
   },
+  lobbyStartupName: {
+    fontFamily: FONTS.body,
+    fontSize: 11,
+    color: '#FFBC40',
+    marginTop: 2,
+  },
   lobbyReadyBadge: {
     width: 28,
     height: 28,
@@ -655,5 +623,32 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.5)',
     textAlign: 'center',
     marginTop: SPACING[2],
+  },
+  startupBtnWrapper: {
+    marginTop: SPACING[4],
+  },
+  startupSelectBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[2],
+    backgroundColor: 'rgba(255, 188, 64, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 188, 64, 0.25)',
+    borderRadius: 14,
+    paddingVertical: SPACING[3],
+    paddingHorizontal: SPACING[4],
+  },
+  startupSelectBtnDone: {
+    borderColor: 'rgba(76, 175, 80, 0.3)',
+    backgroundColor: 'rgba(76, 175, 80, 0.08)',
+  },
+  startupSelectText: {
+    flex: 1,
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.sm,
+    color: '#FFBC40',
+  },
+  startupSelectTextDone: {
+    color: '#4CAF50',
   },
 });

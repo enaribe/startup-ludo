@@ -5,7 +5,7 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { memo, useMemo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { DynamicGradientBorder, GameButton } from '@/components/ui';
 import { COLORS } from '@/styles/colors';
@@ -52,58 +52,45 @@ export const ChallengeHomeCard = memo(function ChallengeHomeCard({
   return (
     <Animated.View entering={FadeInDown.delay(600).duration(500)}>
       <Pressable onPress={handlePress}>
-        <DynamicGradientBorder borderRadius={16} fill="rgba(0, 0, 0, 0.35)">
+        <DynamicGradientBorder borderRadius={24} fill="rgba(10, 25, 41, 0.6)">
+          {/* Banner image at top */}
+          {challenge.bannerUrl ? (
+            <Image
+              source={{ uri: challenge.bannerUrl }}
+              style={styles.banner}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={styles.bannerFallback}>
+              <Ionicons name="leaf" size={32} color="#4CAF50" />
+              <Text style={styles.bannerFallbackText}>{challenge.name}</Text>
+            </View>
+          )}
+
           <View style={styles.container}>
-            {/* Header - Toujours visible */}
-            <View style={styles.header}>
-              <View style={[styles.logoContainer, { backgroundColor: challenge.primaryColor + '20' }]}>
-                <Ionicons name="trophy-outline" size={32} color={challenge.primaryColor} />
-              </View>
-              <View style={styles.headerInfo}>
-                <Text style={styles.challengeName}>{challenge.name}</Text>
-                <Text style={styles.organizationName}>{challenge.organization}</Text>
-              </View>
+            {/* Organization */}
+            <Text style={styles.organizationName}>{challenge.organization}</Text>
+
+            {/* Level & XP Info */}
+            <View style={styles.levelXpRow}>
+              <Text style={styles.levelText}>
+                Niveau {enrollment?.currentLevel || 1} - {currentLevel?.name || 'Découverte'}
+              </Text>
+              <Text style={styles.xpText}>{enrollment?.totalXp || 0} XP</Text>
             </View>
 
-            {/* Description - Toujours visible */}
-            <Text style={styles.description} numberOfLines={2}>
-              {challenge.description}
-            </Text>
+            {/* Progress Bar */}
+            <View style={styles.progressBarContainer}>
+              <View style={[styles.progressBarFill, { width: `${levelProgressPercent}%` }]} />
+            </View>
 
-            {/* Progression (si inscrit) ou Stats (si non inscrit) */}
-            {isEnrolled && enrollment ? (
-              <View style={styles.progressContainer}>
-                <View style={styles.levelInfo}>
-                  <Text style={styles.levelText}>
-                    Niveau {enrollment.currentLevel} - {currentLevel?.name}
-                  </Text>
-                  <Text style={styles.xpText}>{enrollment.totalXp.toLocaleString()} XP</Text>
-                </View>
-                <View style={styles.progressBarContainer}>
-                  <View style={[styles.progressBarFill, { width: `${levelProgressPercent}%` }]} />
-                </View>
-              </View>
-            ) : (
-              <View style={styles.statsRow}>
-                <View style={styles.stat}>
-                  <Text style={styles.statValue}>{challenge.totalLevels}</Text>
-                  <Text style={styles.statLabel}>Niveaux</Text>
-                </View>
-                <View style={styles.statDivider} />
-                <View style={styles.stat}>
-                  <Text style={styles.statValue}>{challenge.totalXpRequired.toLocaleString()}</Text>
-                  <Text style={styles.statLabel}>XP a gagner</Text>
-                </View>
-              </View>
-            )}
-
-            {/* Bouton unique - texte et couleur adaptatifs */}
-            <GameButton
-              title={isEnrolled ? "CONTINUER" : "REJOINDRE"}
-              variant={isEnrolled ? "green" : "yellow"}
-              fullWidth
-              onPress={handlePress}
-            />
+            {/* Action Link/Button at bottom center */}
+            <View style={styles.actionContainer}>
+              <Ionicons name="trophy-outline" size={14} color="#FFBC40" />
+              <Text style={styles.actionText}>
+                {isEnrolled ? "Continuer" : "Rejoindre"}
+              </Text>
+            </View>
           </View>
         </DynamicGradientBorder>
       </Pressable>
@@ -112,99 +99,75 @@ export const ChallengeHomeCard = memo(function ChallengeHomeCard({
 });
 
 const styles = StyleSheet.create({
-  container: {
-    padding: SPACING[4],
-    gap: SPACING[3],
+  banner: {
+    width: '100%',
+    aspectRatio: 355 / 112,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  logoContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: BORDER_RADIUS.lg,
+  bannerFallback: {
+    width: '100%',
+    aspectRatio: 355 / 112,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    backgroundColor: 'rgba(76, 175, 80, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  headerInfo: {
-    flex: 1,
-    marginLeft: SPACING[3],
-    justifyContent: 'center',
-  },
-  challengeName: {
-    fontFamily: FONTS.title,
-    fontSize: FONT_SIZES.lg,
-    color: COLORS.text,
-  },
-  organizationName: {
-    fontFamily: FONTS.body,
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.textSecondary,
-    marginTop: 2,
-  },
-  description: {
-    fontFamily: FONTS.body,
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.textSecondary,
-    lineHeight: 20,
-  },
-  // Stats (non inscrit)
-  statsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
-    borderRadius: BORDER_RADIUS.lg,
-    paddingVertical: SPACING[3],
-  },
-  stat: {
-    alignItems: 'center',
-  },
-  statValue: {
-    fontFamily: FONTS.title,
-    fontSize: FONT_SIZES.lg,
-    color: COLORS.primary,
-  },
-  statLabel: {
-    fontFamily: FONTS.body,
-    fontSize: FONT_SIZES.xs,
-    color: COLORS.textSecondary,
-    marginTop: 2,
-  },
-  statDivider: {
-    width: 1,
-    height: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  // Progression (inscrit)
-  progressContainer: {
     gap: SPACING[2],
   },
-  levelInfo: {
+  bannerFallbackText: {
+    fontFamily: FONTS.title,
+    fontSize: 16,
+    color: '#FFFFFF',
+    textTransform: 'uppercase',
+  },
+  container: {
+    paddingHorizontal: SPACING[4],
+    paddingVertical: SPACING[3],
+    gap: SPACING[2],
+  },
+  organizationName: {
+    fontFamily: FONTS.bodyMedium,
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.6)',
+  },
+  levelXpRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   levelText: {
     fontFamily: FONTS.bodySemiBold,
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.primary,
+    fontSize: 12,
+    color: '#FFBC40',
   },
   xpText: {
     fontFamily: FONTS.bodyBold,
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.primary,
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.7)',
   },
   progressBarContainer: {
     height: 6,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: BORDER_RADIUS.full,
+    borderRadius: 3,
     overflow: 'hidden',
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: COLORS.primary,
-    borderRadius: BORDER_RADIUS.full,
+    backgroundColor: '#FFBC40',
+    borderRadius: 3,
+  },
+  actionContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingTop: SPACING[1],
+  },
+  actionText: {
+    fontFamily: FONTS.title,
+    fontSize: 14,
+    color: '#FFBC40',
   },
 });

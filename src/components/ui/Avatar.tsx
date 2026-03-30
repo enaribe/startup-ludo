@@ -1,11 +1,14 @@
-import { memo } from 'react';
-import { View, Text, Image, type ViewStyle } from 'react-native';
+import { memo, useId } from 'react';
+import { View, Text, Image, StyleSheet, type ViewStyle } from 'react-native';
+import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
 import { COLORS } from '@/styles/colors';
 import { BORDER_RADIUS } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import type { PlayerColor } from '@/types';
 
 type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+
+type AvatarVariant = 'default' | 'homeHeader';
 
 interface AvatarProps {
   source?: string | null;
@@ -14,6 +17,11 @@ interface AvatarProps {
   playerColor?: PlayerColor;
   showBorder?: boolean;
   borderColor?: string;
+  /**
+   * En-tête accueil : dégradé radial bleu (comme boutons bleus), bordure blanche, initiales blanches.
+   * Ignore toujours la photo de profil (ex. Google) pour garder le même rendu que sans OAuth.
+   */
+  variant?: AvatarVariant;
   style?: ViewStyle;
 }
 
@@ -70,8 +78,10 @@ export const Avatar = memo(function Avatar({
   playerColor,
   showBorder = false,
   borderColor: borderColorProp,
+  variant = 'default',
   style,
 }: AvatarProps) {
+  const gradientId = useId().replace(/:/g, '_');
   const dimension = SIZE_MAP[size];
   const fontSize = FONT_SIZE_MAP[size];
   const borderColor = borderColorProp ?? (playerColor ? COLORS.players[playerColor] : COLORS.primary);
@@ -92,6 +102,55 @@ export const Avatar = memo(function Avatar({
       borderColor,
     }),
   };
+
+  // En-tête accueil : même palette que GameButton variant blue (#2A5A8A → #1A3A5E), radial + anneau blanc
+  if (variant === 'homeHeader') {
+    const initials = getInitials(name);
+    const titleSize = Math.min(fontSize + 3, dimension * 0.42);
+    return (
+      <View
+        style={[
+          {
+            width: dimension,
+            height: dimension,
+            borderRadius: dimension / 2,
+            borderWidth: 2,
+            borderColor: '#FFFFFF',
+            overflow: 'hidden',
+            justifyContent: 'center',
+            alignItems: 'center',
+          },
+          style,
+        ]}
+      >
+        <Svg width={dimension} height={dimension} style={StyleSheet.absoluteFill}>
+          <Defs>
+            <RadialGradient id={gradientId} cx="50%" cy="50%" r="55%">
+              <Stop offset="0%" stopColor="#3A6B9E" />
+              <Stop offset="45%" stopColor="#2A5A8A" />
+              <Stop offset="100%" stopColor="#1A3A5E" />
+            </RadialGradient>
+          </Defs>
+          <Circle
+            cx={dimension / 2}
+            cy={dimension / 2}
+            r={dimension / 2}
+            fill={`url(#${gradientId})`}
+          />
+        </Svg>
+        <Text
+          style={{
+            fontFamily: FONTS.title,
+            fontSize: titleSize,
+            color: '#FFFFFF',
+            textAlign: 'center',
+          }}
+        >
+          {initials}
+        </Text>
+      </View>
+    );
+  }
 
   if (source) {
     return (

@@ -35,6 +35,7 @@ export interface RemoteEventResult {
   playerId: string;
   ok: boolean;
   reward: number;
+  selectedIndex?: number;
 }
 
 /** Info about a remote duel score (pour synchroniser les scores en duel online) */
@@ -50,6 +51,8 @@ export interface RemoteDuelResult {
   challengerScore: number;
   opponentScore: number;
   winnerId: string | null;
+  challengerReward: number;
+  opponentReward: number;
 }
 
 /** Info about a remote emoji reaction */
@@ -239,11 +242,12 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
         }
         case 'e': {
           // Remote event result: show the answer/result
-          const result = action.d as { ok: boolean; r: number };
+          const result = action.d as { ok: boolean; r: number; si?: number };
           setRemoteEventResult({
             playerId: action.p,
             ok: result.ok ?? false,
             reward: result.r ?? 0,
+            selectedIndex: result.si,
           });
           // Ne pas appeler applyRemoteAction pour 'e' ici : le store sera mis à jour
           // par applyRemoteAction ci-dessous (case 'e' dans le store applique tokens + resolveEvent)
@@ -264,6 +268,8 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
             challengerScore: Number(rawData.challengerScore ?? 0),
             opponentScore: Number(rawData.opponentScore ?? 0),
             winnerId: rawData.winnerId ? String(rawData.winnerId) : null,
+            challengerReward: Number(rawData.challengerReward ?? 0),
+            opponentReward: Number(rawData.opponentReward ?? 0),
           };
           console.log('[useOnlineGame] Résultat duel reçu (spectateur):', data);
           setRemoteDuelResult(data);
@@ -516,7 +522,7 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
   );
 
   const resolveEvent = useCallback(
-    (result: { ok: boolean; reward: number }) => {
+    (result: { ok: boolean; reward: number; selectedIndex?: number }) => {
       if (!userId) return;
 
       // Apply locally
@@ -527,11 +533,11 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
       }
       storeResolveEvent();
 
-      // Broadcast
+      // Broadcast (si = selected index pour affichage spectateur)
       multiplayerSync.sendAction({
         t: 'e',
         p: userId,
-        d: { ok: result.ok, r: result.reward },
+        d: { ok: result.ok, r: result.reward, si: result.selectedIndex },
       });
     },
     [userId, storeAddTokens, storeRemoveTokens, storeResolveEvent]
@@ -648,6 +654,8 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
           challengerScore: result.challengerScore,
           opponentScore: result.opponentScore,
           winnerId: result.winnerId,
+          challengerReward: result.challengerReward,
+          opponentReward: result.opponentReward,
         },
       });
     },

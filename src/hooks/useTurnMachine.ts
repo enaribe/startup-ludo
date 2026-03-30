@@ -11,7 +11,7 @@
 import type { MoveResult, ValidMove } from '@/services/game/GameEngine';
 import type { GameState, Player } from '@/types';
 import * as Haptics from 'expo-haptics';
-import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 
 // ===== CONSTANTS =====
 
@@ -42,13 +42,14 @@ type TurnAction =
 /** Unified action interface — resolves online/local split once */
 export interface TurnActions {
   rollDice: () => number;
+  setDiceValue?: (value: number) => void;
   executeMove: (pawnIndex: number) => MoveResult | null;
   exitHome: (pawnIndex: number) => MoveResult | null;
   nextTurn: () => void;
   grantExtraTurn: () => void;
   handleCapture: (capturedPlayerId: string, capturedPawnIndex: number) => void;
   endGame: (winnerId: string) => void;
-  resolveEvent: (result: { ok: boolean; reward: number }) => void;
+  resolveEvent: (result: { ok: boolean; reward: number; selectedIndex?: number }) => void;
   broadcastEvent: (eventType: string, eventData: Record<string, unknown>) => void;
   getValidMoves: () => ValidMove[];
   checkWinCondition: (playerId: string) => boolean;
@@ -77,6 +78,9 @@ export interface UseTurnMachineReturn {
     onDiceComplete: (value: number) => void;
   };
   handleEventResolve: () => void;
+  chosenDiceValue: number | null;
+  hasUsedDiceChoice: boolean;
+  setChosenDiceValue: (value: number) => void;
 }
 
 // ===== INITIAL STATE =====
@@ -237,6 +241,16 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
   const [turnState, dispatch] = useReducer(turnReducer, initialTurnState);
   const timers = useTimerMap();
 
+  // ===== DICE CHOICE STATE =====
+  const [chosenDiceValue, setChosenDiceValueState] = useState<number | null>(null);
+  const [hasUsedDiceChoice, setHasUsedDiceChoice] = useState(false);
+  const chosenDiceValueRef = useRef<number | null>(null);
+
+  const setChosenDiceValue = useCallback((value: number) => {
+    chosenDiceValueRef.current = value;
+    setChosenDiceValueState(value);
+  }, []);
+
   // Keep fresh refs to avoid stale closures in timer callbacks
   const actionsRef = useRef(actions);
   actionsRef.current = actions;
@@ -265,7 +279,24 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
     if (!currentPlayerRef.current) return 0;
     if (currentPlayerRef.current.isAI) return 0;
 
-    const value = actionsRef.current.rollDice();
+    // Use chosen value if set (one-time use)
+    const chosen = chosenDiceValueRef.current;
+    let value: number;
+    if (chosen !== null) {
+      // Apply chosen value directly to game state, bypassing random
+      if (actionsRef.current.setDiceValue) {
+        actionsRef.current.setDiceValue(chosen);
+      } else {
+        actionsRef.current.rollDice();
+      }
+      value = chosen;
+      chosenDiceValueRef.current = null;
+      setChosenDiceValueState(null);
+      setHasUsedDiceChoice(true);
+    } else {
+      value = actionsRef.current.rollDice();
+    }
+
     dispatch({ type: 'ROLL_START', value });
 
     if (hapticsEnabled) {
@@ -494,5 +525,8 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
     dispatch,
     diceProps,
     handleEventResolve,
+    chosenDiceValue,
+    hasUsedDiceChoice,
+    setChosenDiceValue,
   };
 }

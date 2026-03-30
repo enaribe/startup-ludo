@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Dimensions, FlatList, Image, Pressable, ScrollView, StyleSheet, Text, View, type ViewToken } from 'react-native';
@@ -11,10 +12,10 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Path } from 'react-native-svg';
 
 import { ChallengeHomeCard, EnrollmentFormModal } from '@/components/challenges';
-import { AdBanner } from '@/components/home';
-import { Avatar, DynamicGradientBorder, GradientBorder, RadialBackground } from '@/components/ui';
+import { Avatar, DynamicGradientBorder, RadialBackground } from '@/components/ui';
 import { formatXP, getLevelFromXP, getRankFromXP, getRankProgress } from '@/config/progression';
 import { ALL_CHALLENGES, refreshChallengesFromFirestore } from '@/data/challenges';
 import { useAuthStore, useChallengeStore, useUserStore } from '@/stores';
@@ -31,6 +32,46 @@ function formatShortValue(value: number): string {
   if (abs >= 1e3) return (value / 1e3).toFixed(1).replace(/\.0$/, '') + 'k';
   return String(Math.round(value));
 }
+
+// Texte avec contour (stroke) simulé par empilement de Text décalés
+const OutlinedText = memo(function OutlinedText({
+  text,
+  style,
+  outlineColor,
+  outlineWidth = 2,
+}: {
+  text: string;
+  style: object;
+  outlineColor: string;
+  outlineWidth?: number;
+}) {
+  const offsets = [
+    { x: -outlineWidth, y: -outlineWidth },
+    { x: 0, y: -outlineWidth },
+    { x: outlineWidth, y: -outlineWidth },
+    { x: outlineWidth, y: 0 },
+    { x: outlineWidth, y: outlineWidth },
+    { x: 0, y: outlineWidth },
+    { x: -outlineWidth, y: outlineWidth },
+    { x: -outlineWidth, y: 0 },
+  ];
+  return (
+    <View>
+      {offsets.map((offset, i) => (
+        <Text
+          key={i}
+          style={[style, { color: outlineColor, position: 'absolute', left: offset.x, top: offset.y }]}
+          numberOfLines={1}
+        >
+          {text}
+        </Text>
+      ))}
+      <Text style={[style, { color: '#FFFFFF' }]} numberOfLines={1}>
+        {text}
+      </Text>
+    </View>
+  );
+});
 
 // Rayons tournants sous le logo
 const SpinningRays = memo(function SpinningRays() {
@@ -152,173 +193,158 @@ export default function HomeScreen() {
     router.push('/(game)/mode-selection');
   };
 
-  // Calcul de la hauteur du header fixe (safe area + logo + marge + profile + marge + stats + marge bas + paddingBottom)
-  const headerTopPadding = insets.top + 10;
-  const headerHeight = headerTopPadding + 120 + 4 + 68 + 15 + 78 + 20 + 12;
+  // Hauteur réservée sous le header fixe (alignée sur le layout compact ci-dessous)
+  const headerHeight = insets.top + 188;
 
   return (
     <View style={styles.container}>
       {/* Background Radial Gradient SVG */}
       <RadialBackground />
 
-      {/* Header Fixe */}
-      <View style={[styles.fixedHeader, { paddingTop: headerTopPadding }]}>
-        {/* Top Row: Logo + Settings */}
+      {/* Header Fixe — bordure gradient (design system) */}
+      <View style={styles.fixedHeaderOuter}>
+        <DynamicGradientBorder
+          borderRadius={32}
+          fill="#0A1929"
+          boxWidth={width}
+          style={styles.headerGradientBorder}
+        >
+          <View
+            style={[
+              styles.fixedHeaderInner,
+              { paddingTop: insets.top + 6 },
+            ]}
+          >
+        {/* Top Row: Avatar + Logo + Settings */}
         <View style={styles.headerTopRow}>
-          {/* Spacer for balance */}
-          <View style={styles.headerSpacer} />
-
-          {/* Logo avec rayons tournants */}
-          <Animated.View entering={FadeInDown.duration(500)} style={styles.logoContainer}>
-            <SpinningRays />
-            <Image
-              source={require('../../../assets/images/logostartupludo.png')}
-              style={styles.logo}
-              resizeMode="contain"
-            />
+          {/* Avatar (Left) */}
+          <Animated.View entering={FadeInDown.delay(100).duration(500)}>
+            <Pressable onPress={() => router.push('/(tabs)/profil')}>
+              <Avatar
+                name={displayName}
+                size="sm"
+                variant="homeHeader"
+              />
+            </Pressable>
           </Animated.View>
 
-          {/* Settings Icon */}
+          {/* Logo (Center) */}
+          <View style={styles.logoWrapper}>
+            {/* <View style={styles.classiqueTag}>
+              <Text style={styles.classiqueTagText}>CLASSIQUE</Text>
+            </View> */}
+            <Animated.View entering={FadeInDown.duration(500)} style={styles.logoContainer}>
+              <SpinningRays />
+              <Image
+                source={require('../../../assets/images/logostartupludo.png')}
+                style={styles.logo}
+                resizeMode="contain"
+              />
+            </Animated.View>
+          </View>
+
+          {/* Settings Icon (Right) */}
           <Animated.View entering={FadeInDown.delay(100).duration(400)}>
             <Pressable
               onPress={() => router.push('/settings')}
               style={styles.settingsButton}
             >
-              <GradientBorder boxHeight={40} boxWidth={40} borderRadius={20} fill="rgba(0, 0, 0, 0.2)">
-                <View style={styles.settingsIconContainer}>
-                  <Ionicons name="settings-outline" size={20} color="#FFBC40" />
-                </View>
-              </GradientBorder>
+              <View style={styles.settingsIconCircle}>
+                <Ionicons name="settings-outline" size={22} color="rgba(255,255,255,0.6)" />
+              </View>
             </Pressable>
           </Animated.View>
         </View>
 
-        {/* Profile Card */}
-        <Animated.View entering={FadeInDown.delay(100).duration(500)}>
-          <Pressable onPress={() => router.push('/(tabs)/profil')}>
-            <GradientBorder boxHeight={68} borderRadius={15} style={styles.profileCard} fill="rgba(0, 0, 0, 0.15)">
-              <View style={styles.profileCardContent}>
-                <View style={styles.avatarContainer}>
-                  <Avatar
-                    name={displayName}
-                    source={user?.photoURL}
-                    size="md"
-                    showBorder
-                    borderColor="#FFFFFF"
-                  />
-                </View>
-                <View style={styles.profileInfo}>
-                  <Text style={styles.profileName}>{displayName}</Text>
-                  <Text style={styles.profileLevel}>Niveau {levelInfo.level} - {rankInfo.title}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color="#FFBC40" />
-              </View>
-            </GradientBorder>
-          </Pressable>
-        </Animated.View>
+        {/* Stats Row */}
+        <View style={styles.statsRow}>
+          <View style={styles.statItem}>
+            <Text style={styles.statValueLuckiest}>{startupsCount}</Text>
+            <Text style={styles.statLabel}>Entreprises</Text>
+          </View>
 
-        {/* Stats Grid */}
-        <View style={styles.statsGrid}>
-          <Animated.View entering={FadeInDown.delay(200).duration(500)}>
-            <GradientBorder boxHeight={78} boxWidth={(width - 36 - 20) / 3} borderRadius={15} fill="rgba(0, 0, 0, 0.15)">
-              <View style={styles.statBoxContent}>
-                <Text style={styles.statValueLuckiest}>{startupsCount}</Text>
-                <Text style={styles.statLabel}>Entreprises</Text>
-              </View>
-            </GradientBorder>
-          </Animated.View>
+          <View style={styles.statDivider} />
 
-          <Animated.View entering={FadeInDown.delay(300).duration(500)}>
-            <GradientBorder boxHeight={78} boxWidth={(width - 36 - 20) / 3} borderRadius={15} fill="rgba(0, 0, 0, 0.15)">
-              <View style={styles.statBoxContent}>
-                <Text style={styles.statValueLuckiest}>{formatShortValue(portfolioValue)}€</Text>
-                <Text style={styles.statLabel}>Valorisation</Text>
-              </View>
-            </GradientBorder>
-          </Animated.View>
+          <View style={styles.statItem}>
+            <Text style={styles.statValueLuckiest} numberOfLines={1} adjustsFontSizeToFit>
+              {formatShortValue(portfolioValue)}€
+            </Text>
+            <Text style={styles.statLabel}>Valorisation</Text>
+          </View>
 
-          <Animated.View entering={FadeInDown.delay(400).duration(500)}>
-            <GradientBorder boxHeight={78} boxWidth={(width - 36 - 20) / 3} borderRadius={15} fill="rgba(0, 0, 0, 0.15)">
-              <View style={styles.statBoxContent}>
-                <Text style={styles.xpValue}>{formatXP(totalXP)} / 15,000 XP</Text>
-                <View style={styles.xpBarContainer}>
-                  <View style={[styles.xpBarFill, { width: `${rankProgress}%` }]} />
-                </View>
-                <Text style={styles.statLabel}>Progression</Text>
-              </View>
-            </GradientBorder>
-          </Animated.View>
+          <View style={styles.statDivider} />
+
+          <View style={[styles.statItem, styles.statItemXp]}>
+            <Text style={styles.xpTextValue} numberOfLines={1} adjustsFontSizeToFit>
+              {formatXP(totalXP)} / 15,000 XP
+            </Text>
+            <View style={styles.xpBarContainer}>
+              <View style={[styles.xpBarFill, { width: `${rankProgress}%` }]} />
+            </View>
+          </View>
         </View>
+          </View>
+        </DynamicGradientBorder>
       </View>
 
       {/* Contenu scrollable */}
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: headerHeight }
+          { paddingTop: headerHeight + 12 }
         ]}
         showsVerticalScrollIndicator={false}
       >
         {/* Play Button */}
         <Animated.View entering={FadeInDown.delay(500).duration(500)}>
           <Pressable onPress={handlePlay}>
-            <GradientBorder style={styles.playButton} boxHeight={105} borderRadius={20} fill="rgba(0, 0, 0, 0.35)">
-              <View style={styles.playButtonContent}>
-                <View style={styles.playIconTriangle}>
-                  <Ionicons name="play" size={48} color="#FFBC40" />
+            <View style={styles.playButtonContainer}>
+              <LinearGradient
+                colors={['#FFDC64', '#F0B432']}
+                style={styles.playButtonGradient}
+              >
+                <View style={styles.playButtonContent}>
+                  <View style={styles.diceIconContainer}>
+                    <Svg width="48" height="51" viewBox="0 0 48 51" fill="none">
+                      <Path
+                        fillRule="evenodd"
+                        clipRule="evenodd"
+                        d="M9.26707 2.76963L2.74966 9.34487C-0.24989 12.371 -0.249887 17.2774 2.74967 20.3036L9.26707 26.8788C12.2666 29.905 17.1299 29.905 20.1294 26.8788L26.6468 20.3036C29.6464 17.2774 29.6464 12.371 26.6468 9.34486L20.1294 2.76962C17.1299 -0.256544 12.2666 -0.256541 9.26707 2.76963ZM12.4285 5.24234C11.1786 6.50324 11.1786 8.54757 12.4285 9.80847C13.6783 11.0694 15.7046 11.0694 16.9544 9.80847L16.9675 9.79532C18.2173 8.53442 18.2173 6.49009 16.9675 5.22919C15.7177 3.96828 13.6913 3.96828 12.4415 5.22919L12.4285 5.24234ZM5.18704 17.1138C3.93723 15.8529 3.93723 13.8086 5.18704 12.5477L5.20008 12.5345C6.44989 11.2736 8.47624 11.2736 9.72605 12.5345C10.9759 13.7954 10.9759 15.8398 9.72605 17.1007L9.71302 17.1138C8.4632 18.3747 6.43686 18.3747 5.18704 17.1138ZM12.4285 19.8538C11.1786 21.1147 11.1786 23.1591 12.4285 24.42C13.6783 25.6809 15.7046 25.6809 16.9544 24.42L16.9675 24.4068C18.2173 23.1459 18.2173 21.1016 16.9675 19.8407C15.7177 18.5798 13.6913 18.5798 12.4415 19.8407L12.4285 19.8538ZM19.6702 17.1138C18.4204 15.8529 18.4204 13.8086 19.6702 12.5477L19.6832 12.5345C20.933 11.2736 22.9594 11.2736 24.2092 12.5345C25.459 13.7954 25.459 15.8398 24.2092 17.1007L24.1962 17.1138C22.9463 18.3747 20.92 18.3747 19.6702 17.1138Z"
+                        fill="white"
+                      />
+                      <Path
+                        fillRule="evenodd"
+                        clipRule="evenodd"
+                        d="M22.9213 33.4522V42.751C22.9213 47.0307 26.3602 50.5 30.6022 50.5H39.8192C44.0612 50.5 47.5 47.0307 47.5 42.751V33.4522C47.5 29.1726 44.0612 25.7032 39.8192 25.7032H30.6022C26.3601 25.7032 22.9213 29.1726 22.9213 33.4522ZM26.8898 32.9449C26.8898 34.7281 28.3227 36.1737 30.0902 36.1737C31.8577 36.1737 33.2905 34.7281 33.2905 32.9449V32.9263C33.2905 31.1432 31.8577 29.6976 30.0902 29.6976C28.3227 29.6976 26.8898 31.1432 26.8898 32.9263V32.9449ZM40.3313 46.5061C38.5638 46.5062 37.1309 45.0606 37.1309 43.2774V43.2588C37.1309 41.4756 38.5638 40.0301 40.3313 40.0301C42.0988 40.0301 43.5316 41.4756 43.5316 43.2588V43.2774C43.5316 45.0606 42.0988 46.5061 40.3313 46.5061Z"
+                        fill="white"
+                      />
+                      <Path
+                        d="M46.9999 33.4518C46.9998 29.4442 43.7808 26.2029 39.8192 26.2028H30.6024C26.6407 26.2028 23.4208 29.4442 23.4208 33.4518V42.7506C23.4208 46.7583 26.6407 49.9997 30.6024 49.9997H39.8192C43.7808 49.9996 46.9999 46.7583 46.9999 42.7506V33.4518ZM43.0311 43.2585C43.0311 41.7472 41.8181 40.5299 40.3309 40.5299C38.8438 40.5301 37.6307 41.7473 37.6307 43.2585V43.277C37.6307 44.7882 38.8438 46.0054 40.3309 46.0055C41.8181 46.0055 43.0311 44.7882 43.0311 43.277V43.2585ZM32.7899 32.9264C32.7899 31.4152 31.5769 30.1969 30.0897 30.1969C28.6026 30.1971 27.3895 31.4153 27.3895 32.9264V32.945C27.3897 34.4559 28.6028 35.6733 30.0897 35.6735C31.5768 35.6735 32.7897 34.456 32.7899 32.945V32.9264ZM8.91197 2.41764C12.1071 -0.805879 17.2891 -0.80588 20.4842 2.41764L27.0018 8.99283C30.1943 12.2139 30.1943 17.4339 27.0018 20.6549L20.4842 27.2301C17.2891 30.4537 12.1071 30.4537 8.91197 27.2301L2.39439 20.6549C-0.798127 17.4339 -0.798136 12.2139 2.39439 8.99283L8.91197 2.41764ZM19.7743 3.12174C16.9703 0.29292 12.4259 0.29292 9.62193 3.12174L3.10436 9.69693C0.298451 12.5281 0.298459 17.1197 3.10436 19.9508L9.62193 26.526C12.4259 29.3549 16.9703 29.3549 19.7743 26.526L26.2919 19.9508C29.0978 17.1197 29.0978 12.5281 26.2919 9.69693L19.7743 3.12174ZM12.0858 19.488C13.5311 18.0298 15.8767 18.0301 17.3221 19.488C18.7651 20.9438 18.7651 23.3027 17.3221 24.7585L17.3094 24.7721C15.864 26.2301 13.5185 26.2293 12.0731 24.7712C10.6304 23.3154 10.6303 20.9573 12.0731 19.5016L12.0858 19.488ZM16.6122 20.1921C15.558 19.1288 13.8509 19.1288 12.7967 20.1921L12.7831 20.2057C11.7267 21.2718 11.7265 23.0021 12.7831 24.068C13.8373 25.1316 15.5453 25.1315 16.5995 24.068L16.6122 24.0544C17.6688 22.9883 17.6688 21.258 16.6122 20.1921ZM4.84459 12.1823C6.29001 10.724 8.63549 10.7241 10.0809 12.1823C11.5239 13.6381 11.5239 15.997 10.0809 17.4528L10.0682 17.4655C8.62281 18.9237 6.27733 18.9237 4.83189 17.4655C3.3889 16.0097 3.3889 13.6508 4.83189 12.195L4.84459 12.1823ZM19.328 12.1823C20.7734 10.724 23.1189 10.724 24.5643 12.1823C26.0072 13.6381 26.0073 15.997 24.5643 17.4528L24.5506 17.4645C23.1053 18.9227 20.7607 18.9236 19.3153 17.4655C17.8723 16.0097 17.8723 13.6508 19.3153 12.195L19.328 12.1823ZM9.37096 12.8864C8.3168 11.8229 6.60974 11.823 5.55553 12.8864L5.54186 12.8991C4.48527 13.965 4.48536 15.6954 5.54186 16.7614C6.596 17.8249 8.30307 17.8248 9.35728 16.7614L9.37096 16.7487C10.4275 15.6827 10.4274 13.9524 9.37096 12.8864ZM23.8544 12.8864C22.8002 11.8228 21.0921 11.8228 20.0379 12.8864L20.0253 12.8991C18.9686 13.9651 18.9686 15.6954 20.0253 16.7614C21.0794 17.8249 22.7865 17.8249 23.8407 16.7614L23.8544 16.7487C24.9108 15.6828 24.9107 13.9524 23.8544 12.8864ZM12.0858 4.87662C13.5311 3.41846 15.8767 3.41865 17.3221 4.87662C18.7651 6.33243 18.7651 8.69133 17.3221 10.1471L17.3094 10.1598C15.864 11.6181 13.5185 11.6181 12.0731 10.1598C10.6304 8.70407 10.6304 6.34604 12.0731 4.89029L12.0858 4.87662ZM16.6122 5.58072C15.558 4.51732 13.8509 4.5174 12.7967 5.58072L12.7831 5.5944C11.7269 6.6603 11.727 8.38981 12.7831 9.45572C13.8373 10.5193 15.5453 10.5193 16.5995 9.45572L16.6122 9.44303C17.6688 8.37702 17.6688 6.64673 16.6122 5.58072ZM44.0311 43.277C44.0311 45.3322 42.3787 47.0055 40.3309 47.0055C38.2832 47.0054 36.6307 45.3321 36.6307 43.277V43.2585C36.6307 41.2034 38.2832 39.5301 40.3309 39.5299C42.3787 39.5299 44.0311 41.2033 44.0311 43.2585V43.277ZM47.9999 42.7506C47.9999 47.3022 44.3414 50.9996 39.8192 50.9997H30.6024C26.0801 50.9997 22.4208 47.3023 22.4208 42.7506V33.4518C22.4208 28.9002 26.0801 25.2028 30.6024 25.2028H39.8192C44.3414 25.2029 47.9998 28.9003 47.9999 33.4518V42.7506ZM33.7899 32.945C33.7897 35 32.1374 36.6735 30.0897 36.6735C28.0422 36.6733 26.3897 34.9999 26.3895 32.945V32.9264C26.3895 30.8714 28.0421 29.1971 30.0897 29.1969C32.1375 29.1969 33.7899 30.8713 33.7899 32.9264V32.945Z"
+                        fill="#AC700C"
+                      />
+                    </Svg>
+                  </View>
+                  <View style={styles.playButtonTextWrapper}>
+                    <OutlinedText
+                      text="NOUVELLE PARTIE"
+                      style={styles.playButtonTitle}
+                      outlineColor="#172735"
+                      outlineWidth={1.2}
+                    />
+                    <Text style={styles.playButtonSubtitle}>Rejoins ou crée une partie avec tes amis</Text>
+                  </View>
                 </View>
-                <View style={styles.playButtonTextWrapper}>
-                  <Text style={styles.playButtonTitle}>NOUVELLE PARTIE</Text>
-                  <Text style={styles.playButtonSubtitle}>Rejoins ou crée une partie avec tes amis</Text>
-                </View>
-              </View>
-            </GradientBorder>
+              </LinearGradient>
+            </View>
           </Pressable>
-        </Animated.View>
-
-        {/* Banniere Publicitaire */}
-        <Animated.View entering={FadeInDown.delay(550).duration(500)}>
-          <AdBanner
-            // imageUrl sera fourni depuis Firestore/config admin
-            // Pour l'instant on affiche le placeholder
-            showPlaceholder={true}
-          />
         </Animated.View>
 
         {/* Challenge Section */}
         <View style={styles.challengeHeader}>
-          <View style={styles.challengeHeaderLeft}>
-            <Text style={styles.challengeHeaderTitle}>
-              {enrolledChallenges.length > 1 ? 'MES PROGRAMMES' : enrolledChallenges.length === 1 ? 'MON PROGRAMME' : 'PROGRAMMES'}
-            </Text>
-            {enrolledChallenges.length > 0 && (
-              <Pressable
-                style={styles.viewAllButton}
-                onPress={() => router.push('/(challenges)/challenge-explorer')}
-              >
-                <Text style={styles.viewAllButtonText}>Voir tous</Text>
-                <Ionicons name="arrow-forward" size={12} color="#FFBC40" />
-              </Pressable>
-            )}
-          </View>
-          {enrolledChallenges.length > 1 && (
-            <View style={styles.challengeNav}>
-              <Pressable
-                style={[styles.challengeNavBtn, activeIndex > 0 && styles.challengeNavBtnActive]}
-                onPress={() => scrollToIndex(activeIndex - 1)}
-                disabled={activeIndex === 0}
-              >
-                <Ionicons name="chevron-back" size={14} color={activeIndex > 0 ? '#FFBC40' : 'rgba(255,255,255,0.2)'} />
-              </Pressable>
-              <Pressable
-                style={[styles.challengeNavBtn, activeIndex < enrolledChallenges.length - 1 && styles.challengeNavBtnActive]}
-                onPress={() => scrollToIndex(activeIndex + 1)}
-                disabled={activeIndex === enrolledChallenges.length - 1}
-              >
-                <Ionicons name="chevron-forward" size={14} color={activeIndex < enrolledChallenges.length - 1 ? '#FFBC40' : 'rgba(255,255,255,0.2)'} />
-              </Pressable>
-            </View>
-          )}
+          <Text style={styles.challengeHeaderTitle}>CHALLENGE EN COURS</Text>
+          <Pressable onPress={() => router.push('/(challenges)/challenge-explorer')}>
+            <Text style={styles.voirPlusText}>VOIR PLUS</Text>
+          </Pressable>
         </View>
 
         {enrolledChallenges.length > 0 ? (
@@ -376,26 +402,22 @@ export default function HomeScreen() {
         ) : (
           <View style={styles.challengeCardWrapper}>
             <Animated.View entering={FadeInDown.delay(600).duration(500)}>
-              <DynamicGradientBorder borderRadius={16} fill="rgba(0, 0, 0, 0.35)">
-                <View style={styles.challengeCardContent}>
-                  <View style={{ alignItems: 'center', paddingVertical: 20 }}>
-                    <Ionicons name="school-outline" size={48} color="rgba(255, 188, 64, 0.3)" />
-                    <Text style={[styles.challengeNameText, { marginTop: 12 }]}>
-                      AUCUN PROGRAMME INSCRIT
-                    </Text>
-                    <Text style={[styles.challengeDescText, { textAlign: 'center', marginTop: 6, marginBottom: 16 }]}>
-                      Explorez et inscrivez-vous à un programme pour commencer votre parcours entrepreneurial.
-                    </Text>
-                    <Pressable
-                      style={styles.exploreChallengesButton}
-                      onPress={() => router.push('/(challenges)/challenge-explorer')}
-                    >
-                      <Text style={styles.exploreChallengesButtonText}>EXPLORER LES PROGRAMMES</Text>
-                      <Ionicons name="arrow-forward" size={18} color="#0C243E" />
-                    </Pressable>
+              <Pressable onPress={() => router.push('/(challenges)/challenge-explorer')}>
+                <DynamicGradientBorder borderRadius={16} fill="rgba(0, 0, 0, 0.35)">
+                  <View style={styles.emptyCardContent}>
+                    <View style={styles.emptyCardLeft}>
+                      <View style={styles.emptyLogoContainer}>
+                        <Ionicons name="school-outline" size={26} color="rgba(255, 188, 64, 0.6)" />
+                      </View>
+                      <View style={styles.emptyCardInfo}>
+                        <Text style={styles.emptyCardTitle}>AUCUN PROGRAMME</Text>
+                        <Text style={styles.emptyCardSub}>Explorez et rejoignez un programme</Text>
+                      </View>
+                    </View>
+                    <Ionicons name="arrow-forward" size={16} color="#FFBC40" />
                   </View>
-                </View>
-              </DynamicGradientBorder>
+                </DynamicGradientBorder>
+              </Pressable>
             </Animated.View>
           </View>
         )}
@@ -417,147 +439,166 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0C243E',
   },
-  fixedHeader: {
+  fixedHeaderOuter: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     zIndex: 10,
+    overflow: 'visible',
+  },
+  headerGradientBorder: {
+    width: '100%',
+    alignSelf: 'stretch',
+  },
+  fixedHeaderInner: {
     paddingHorizontal: 18,
-    paddingBottom: 12,
-    backgroundColor: '#0A1929',
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    paddingBottom: 14,
     overflow: 'visible',
   },
   headerTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 4,
+    alignItems: 'center',
+    marginBottom: 10,
   },
-  headerSpacer: {
-    width: 40,
+  logoWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  classiqueTag: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginBottom: -10,
+    zIndex: 2,
+  },
+  classiqueTagText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 8,
+    color: '#FFFFFF',
+    letterSpacing: 1,
   },
   settingsButton: {
-    marginTop: 10,
+    width: 40,
+    height: 40,
   },
-  settingsIconContainer: {
-    width: '100%',
-    height: '100%',
+  settingsIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   logoContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    height: 120,
+    height: 72,
     overflow: 'visible',
   },
   raysWrapper: {
     position: 'absolute',
-    width: 260,
-    height: 260,
+    width: 150,
+    height: 150,
     justifyContent: 'center',
     alignItems: 'center',
   },
   raysImage: {
-    width: 260,
-    height: 260,
-    opacity: 0.6,
+    width: 150,
+    height: 150,
+    opacity: 0.3,
   },
   logo: {
-    width: 140,
-    height: 100,
+    width: 100,
+    height: 56,
     zIndex: 1,
   },
   scrollContent: {
     paddingHorizontal: 18,
     paddingBottom: 150,
   },
-  profileCard: {
-    marginBottom: 15,
-  },
-  profileCardContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    paddingHorizontal: 16,
-    height: 68,
-  },
-  avatarContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 25,
-    padding: 1,
-  },
-  profileInfo: {
-    flex: 1,
-    marginLeft: 13,
-  },
-  profileName: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
-  },
-  profileLevel: {
-    fontFamily: FONTS.bodyMedium,
-    fontSize: 10,
-    color: 'rgba(255, 255, 255, 0.6)',
-  },
   // Stats
-  statsGrid: {
+  statsRow: {
     flexDirection: 'row',
+    alignItems: 'stretch',
     justifyContent: 'space-between',
-    marginBottom: 0,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    marginTop: 0,
   },
-  statBoxContent: {
-    padding: 10,
+  statItem: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: (width - 36 - 20) / 3,
-    height: 78,
+    flex: 1,
+    minWidth: 0,
+    paddingHorizontal: 6,
+  },
+  statItemXp: {
+    paddingHorizontal: 4,
+  },
+  statDivider: {
+    width: 1,
+    alignSelf: 'stretch',
+    marginVertical: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    marginHorizontal: 4,
   },
   statValueLuckiest: {
     fontFamily: FONTS.title,
-    fontSize: 24,
+    fontSize: 17,
     color: '#FFBC40',
-  },
-  xpValue: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: 8,
-    color: '#FFBC40',
-    marginBottom: 2,
+    textAlign: 'center',
   },
   statLabel: {
     fontFamily: FONTS.bodyMedium,
-    fontSize: 10,
-    color: '#FFFFFF',
-    marginTop: 2,
+    fontSize: 9,
+    color: 'rgba(255, 255, 255, 0.85)',
+    marginTop: 3,
+    textAlign: 'center',
+  },
+  xpTextValue: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 9,
+    color: '#FFBC40',
+    marginBottom: 3,
+    textAlign: 'center',
+    width: '100%',
   },
   xpBarContainer: {
-    width: '85%',
-    height: 4,
+    width: '100%',
+    maxWidth: 112,
+    height: 5,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 2,
-    marginVertical: 4,
+    borderRadius: 3,
     overflow: 'hidden',
   },
   xpBarFill: {
     height: '100%',
     backgroundColor: '#FFBC40',
-    borderRadius: 2,
+    borderRadius: 3,
   },
   // Play Button
-  playButton: {
-    marginBottom: 30,
+  playButtonContainer: {
+    borderRadius: 24,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  playButtonGradient: {
+    width: '100%',
   },
   playButtonContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 25,
-    paddingVertical: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+    height: 100,
   },
-  playIconTriangle: {
+  diceIconContainer: {
     width: 60,
     height: 60,
     justifyContent: 'center',
@@ -569,14 +610,13 @@ const styles = StyleSheet.create({
   },
   playButtonTitle: {
     fontFamily: FONTS.title,
-    fontSize: 24,
-    color: '#FFBC40',
-    letterSpacing: 1,
+    fontSize: 26,
+    letterSpacing: 0.5,
   },
   playButtonSubtitle: {
-    fontFamily: FONTS.body,
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.6)',
+    fontFamily: FONTS.bodyMedium,
+    fontSize: 13,
+    color: 'rgba(12, 36, 62, 0.7)',
     marginTop: 2,
   },
   // Challenge
@@ -584,30 +624,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginVertical: 15,
-  },
-  challengeHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
+    marginTop: 30,
+    marginBottom: 15,
   },
   challengeHeaderTitle: {
     fontFamily: FONTS.title,
-    fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.4)',
+    fontSize: 16,
+    color: '#FFFFFF',
   },
-  viewAllButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(255, 188, 64, 0.1)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  viewAllButtonText: {
-    fontFamily: FONTS.bodyMedium,
-    fontSize: 11,
+  voirPlusText: {
+    fontFamily: FONTS.title,
+    fontSize: 14,
     color: '#FFBC40',
   },
   challengeNav: {
@@ -716,18 +743,18 @@ const styles = StyleSheet.create({
   pagination: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 6,
-    marginTop: 10,
+    gap: 8,
+    marginTop: 20,
   },
   dot: {
-    width: 12,
-    height: 5,
-    borderRadius: 2.5,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   dotActive: {
     backgroundColor: '#FFBC40',
-    width: 24,
+    width: 30,
   },
   // Tab Bar
   tabBar: {
@@ -790,19 +817,41 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: '#F35145',
   },
-  exploreChallengesButton: {
+  emptyCardContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#FFBC40',
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 12,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
-  exploreChallengesButtonText: {
+  emptyCardLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  emptyLogoContainer: {
+    width: 52,
+    height: 52,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 188, 64, 0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 188, 64, 0.15)',
+  },
+  emptyCardInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  emptyCardTitle: {
     fontFamily: FONTS.title,
-    fontSize: 14,
-    color: '#0C243E',
-    letterSpacing: 0.5,
+    fontSize: 15,
+    color: '#FFFFFF',
+  },
+  emptyCardSub: {
+    fontFamily: FONTS.body,
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.5)',
+    marginTop: 2,
   },
 });

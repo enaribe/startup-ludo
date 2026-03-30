@@ -5,9 +5,7 @@
  * - Firestore: @react-native-firebase/firestore
  * - Realtime Database: @react-native-firebase/database
  */
-import firestore, {
-  FirebaseFirestoreTypes,
-} from '@react-native-firebase/firestore';
+import { getFirestore, FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
 import database from '@react-native-firebase/database';
 
 // Environment detection
@@ -221,4 +219,4 @@ export interface RealtimeEmojiReaction {
 
 // ===== NATIVE MODULE EXPORTS =====
 // Export the native modules directly for use in services
-export { firestore, database };
+export { getFirestore, database };

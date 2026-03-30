@@ -1,8 +1,8 @@
 import { memo, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Dimensions, Modal as RNModal } from 'react-native';
-import Animated, { SlideInUp, FadeIn, FadeOut } from 'react-native-reanimated';
+import { View, Text, StyleSheet, Pressable, ScrollView, Dimensions } from 'react-native';
+import Animated, { SlideInUp, FadeIn } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import { DynamicGradientBorder } from '@/components/ui';
+import { DynamicGradientBorder, Modal } from '@/components/ui';
 import { GameButton } from '@/components/ui/GameButton';
 import { CustomIdeaModal } from './CustomIdeaModal';
 import { COLORS } from '@/styles/colors';
@@ -11,7 +11,9 @@ import { SPACING, BORDER_RADIUS } from '@/styles/spacing';
 import type { Startup, TargetCard, MissionCard } from '@/types';
 import type { DefaultProject } from '@/data/defaultProjects';
 
-const { width: screenWidth } = Dimensions.get('window');
+const { width: screenWidth, height: windowHeight } = Dimensions.get('window');
+/** Hauteur max de la liste : plus d’items visibles sans scroll (écran × ~40 %, plafonné) */
+const SCROLL_LIST_MAX_HEIGHT = Math.min(windowHeight * 0.4, 340);
 
 interface StartupSelectionModalProps {
   visible: boolean;
@@ -84,43 +86,39 @@ export const StartupSelectionModal = memo(function StartupSelectionModal({
   };
 
   return (
-    <RNModal transparent visible={visible} animationType="none" onRequestClose={handleClose}>
-      <Animated.View
-        entering={FadeIn.duration(200)}
-        exiting={FadeOut.duration(150)}
-        style={styles.overlay}
-      >
-        <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
-
-        <Animated.View entering={SlideInUp.duration(280).springify().damping(32)} style={styles.container}>
+    <>
+      <Modal visible={visible} onClose={handleClose} closeOnBackdrop showCloseButton={false} bareContent>
+        <Animated.View entering={SlideInUp.duration(280)} style={styles.card}>
           <DynamicGradientBorder
             borderRadius={24}
-            fill="rgba(10, 25, 41, 0.95)"
-            boxWidth={screenWidth - 32}
+            fill="#0A1929"
+            boxWidth={screenWidth - 36}
           >
             <View style={styles.inner}>
               {/* Close button */}
               <Pressable onPress={handleClose} style={styles.closeButton}>
-                <Ionicons name="close" size={22} color="rgba(255,255,255,0.7)" />
+                <Ionicons name="close" size={18} color="rgba(255,255,255,0.7)" />
               </Pressable>
 
               {/* Header Icon + Title */}
               <View style={styles.header}>
                 <View style={styles.iconCircle}>
-                  <Ionicons name="rocket-outline" size={40} color={COLORS.events.quiz} />
+                  <Ionicons name="rocket-outline" size={26} color={COLORS.events.quiz} />
                 </View>
                 <Text style={styles.title}>IDEATION</Text>
                 {playerName && (
-                  <Text style={styles.subtitle}>{playerName}, choisis ton projet !</Text>
+                  <Text style={styles.subtitle} numberOfLines={1}>
+                    {playerName}, choisis ton projet !
+                  </Text>
                 )}
               </View>
 
               {/* Bouton Ajouter une idée - EN HAUT */}
               <Animated.View entering={FadeIn.delay(100)}>
                 <Pressable onPress={() => setShowCustomIdeaModal(true)} style={styles.addIdeaButton}>
-                  <Ionicons name="add-circle" size={24} color={COLORS.primary} />
-                  <Text style={styles.addIdeaButtonText}>Créer une nouvelle idée</Text>
-                  <Ionicons name="chevron-forward" size={20} color={COLORS.primary} />
+                  <Ionicons name="add-circle" size={18} color={COLORS.primary} />
+                  <Text style={styles.addIdeaButtonText}>Nouvelle idée</Text>
+                  <Ionicons name="chevron-forward" size={16} color={COLORS.primary} />
                 </Pressable>
               </Animated.View>
 
@@ -148,7 +146,7 @@ export const StartupSelectionModal = memo(function StartupSelectionModal({
                       ]}
                     >
                       <View style={styles.projectIconWrap}>
-                        <Ionicons name="briefcase" size={20} color={COLORS.events.quiz} />
+                        <Ionicons name="briefcase" size={16} color={COLORS.events.quiz} />
                       </View>
                       <View style={styles.projectInfo}>
                         <Text style={styles.projectName} numberOfLines={1}>
@@ -165,7 +163,7 @@ export const StartupSelectionModal = memo(function StartupSelectionModal({
                       </View>
                       {selectedId === startup.id && (
                         <View style={styles.checkBadge}>
-                          <Ionicons name="checkmark" size={14} color={COLORS.white} />
+                          <Ionicons name="checkmark" size={12} color={COLORS.white} />
                         </View>
                       )}
                     </View>
@@ -196,19 +194,19 @@ export const StartupSelectionModal = memo(function StartupSelectionModal({
                     ]}
                   >
                     <View style={[styles.projectIconWrap, styles.defaultIconWrap]}>
-                      <Ionicons name="bulb-outline" size={20} color="rgba(255,255,255,0.6)" />
+                      <Ionicons name="bulb-outline" size={16} color="rgba(255,255,255,0.6)" />
                     </View>
                     <View style={styles.projectInfo}>
                       <Text style={styles.projectName} numberOfLines={1}>
                         {project.name}
                       </Text>
-                      <Text style={styles.projectDesc} numberOfLines={2}>
+                      <Text style={styles.projectDesc} numberOfLines={1}>
                         {project.description}
                       </Text>
                     </View>
                     {selectedId === project.id && (
                       <View style={styles.checkBadge}>
-                        <Ionicons name="checkmark" size={14} color={COLORS.white} />
+                        <Ionicons name="checkmark" size={12} color={COLORS.white} />
                       </View>
                     )}
                   </View>
@@ -225,47 +223,43 @@ export const StartupSelectionModal = memo(function StartupSelectionModal({
                   onPress={handleConfirm}
                   variant="yellow"
                   fullWidth
+                  size="sm"
                   disabled={!selectedId}
                 />
               </View>
             </View>
           </DynamicGradientBorder>
         </Animated.View>
-      </Animated.View>
+      </Modal>
 
-      {/* Custom Idea Modal */}
       <CustomIdeaModal
         visible={showCustomIdeaModal}
         editionSectors={editionSectors}
         onConfirm={handleCustomIdeaConfirm}
         onClose={() => setShowCustomIdeaModal(false)}
       />
-    </RNModal>
+    </>
   );
 });
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  container: {
-    width: screenWidth - 32,
-    maxHeight: '85%',
+  /** Modal plus compacte pour limiter le scroll */
+  card: {
+    width: '92%',
+    maxWidth: 380,
+    maxHeight: '72%',
   },
   inner: {
-    paddingVertical: SPACING[5],
-    paddingHorizontal: SPACING[4],
+    paddingVertical: SPACING[3],
+    paddingHorizontal: SPACING[3],
   },
   closeButton: {
     position: 'absolute',
-    top: SPACING[4],
-    right: SPACING[4],
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    top: SPACING[2],
+    right: SPACING[2],
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
@@ -273,84 +267,86 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    marginBottom: SPACING[3],
+    marginBottom: SPACING[2],
   },
   iconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: 'rgba(74, 144, 226, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: SPACING[3],
+    marginBottom: SPACING[2],
   },
   title: {
     fontFamily: FONTS.title,
-    fontSize: FONT_SIZES.xl,
+    fontSize: FONT_SIZES.lg,
     color: '#FFFFFF',
-    letterSpacing: 2,
+    letterSpacing: 1.5,
     textAlign: 'center',
   },
   subtitle: {
     fontFamily: FONTS.bodyMedium,
-    fontSize: FONT_SIZES.base,
+    fontSize: FONT_SIZES.sm,
     color: 'rgba(255, 255, 255, 0.7)',
     textAlign: 'center',
-    marginTop: SPACING[2],
+    marginTop: SPACING[1],
+    paddingHorizontal: SPACING[2],
   },
   addIdeaButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255, 188, 64, 0.15)',
-    borderRadius: BORDER_RADIUS.lg,
-    paddingVertical: SPACING[3],
-    paddingHorizontal: SPACING[4],
-    borderWidth: 1.5,
+    borderRadius: BORDER_RADIUS.md,
+    paddingVertical: SPACING[2],
+    paddingHorizontal: SPACING[3],
+    borderWidth: 1,
     borderColor: 'rgba(255, 188, 64, 0.3)',
     gap: SPACING[2],
   },
   addIdeaButtonText: {
     fontFamily: FONTS.bodySemiBold,
-    fontSize: FONT_SIZES.base,
+    fontSize: FONT_SIZES.sm,
     color: COLORS.primary,
     flex: 1,
   },
   divider: {
     height: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    marginVertical: SPACING[4],
+    marginVertical: SPACING[2],
   },
   scrollView: {
     flexGrow: 0,
-    maxHeight: 350,
+    maxHeight: SCROLL_LIST_MAX_HEIGHT,
   },
   content: {
     paddingBottom: SPACING[2],
   },
   section: {
     width: '100%',
-    marginBottom: SPACING[3],
+    marginBottom: SPACING[2],
   },
   sectionLabel: {
     fontFamily: FONTS.bodySemiBold,
-    fontSize: FONT_SIZES.sm,
+    fontSize: FONT_SIZES.xs,
     color: 'rgba(255, 255, 255, 0.6)',
     textTransform: 'uppercase',
-    letterSpacing: 1.2,
-    marginBottom: SPACING[3],
+    letterSpacing: 1,
+    marginBottom: SPACING[2],
     textAlign: 'center',
   },
   cardWrapper: {
-    marginBottom: SPACING[2],
+    marginBottom: SPACING[1],
   },
   projectCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING[3],
-    borderWidth: 1.5,
+    borderRadius: BORDER_RADIUS.md,
+    paddingVertical: SPACING[2],
+    paddingHorizontal: SPACING[2],
+    borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   projectCardSelected: {
@@ -358,13 +354,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(74, 144, 226, 0.15)',
   },
   projectIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: 'rgba(74, 144, 226, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: SPACING[3],
+    marginRight: SPACING[2],
   },
   defaultIconWrap: {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
@@ -390,8 +386,8 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.body,
     fontSize: FONT_SIZES.xs,
     color: 'rgba(255, 255, 255, 0.5)',
-    marginTop: 2,
-    lineHeight: 16,
+    marginTop: 1,
+    lineHeight: 14,
   },
   valorBadge: {
     backgroundColor: 'rgba(255, 188, 64, 0.2)',
@@ -406,15 +402,15 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
   },
   checkBadge: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     backgroundColor: COLORS.events.quiz,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: SPACING[2],
+    marginLeft: SPACING[1],
   },
   buttonWrapper: {
-    paddingTop: SPACING[4],
+    paddingTop: SPACING[2],
   },
 });

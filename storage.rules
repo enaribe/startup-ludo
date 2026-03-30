@@ -1,0 +1,44 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.email == 'startupludo@concree.com' ||
+        request.auth.token.admin == true
+      );
+    }
+
+    function isValidImage() {
+      return request.resource.contentType.matches('image/.*')
+        && request.resource.size < 5 * 1024 * 1024; // max 5 Mo
+    }
+
+    // Challenge images (bannières, logos) — admin uniquement en écriture, lecture publique
+    match /challenges/{programId}/{fileName} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidImage();
+      allow delete: if isAdmin();
+    }
+
+    // Avatars utilisateurs — lecture publique, écriture par le propriétaire uniquement
+    match /avatars/{userId}/{fileName} {
+      allow read: if true;
+      allow write: if isAuthenticated()
+        && request.auth.uid == userId
+        && isValidImage();
+      allow delete: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Tout le reste est interdit
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

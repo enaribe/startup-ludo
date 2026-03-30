@@ -4,7 +4,7 @@
  * Used to hot-swap local JSON data with remote Firestore data.
  */
 
-import firestore from '@react-native-firebase/firestore';
+import { getFirestore, collection, getDocs } from '@react-native-firebase/firestore';
 import { FIRESTORE_COLLECTIONS, firebaseLog } from './config';
 import type { Edition, EditionId } from '@/data/types';
 
@@ -16,9 +16,7 @@ let cachedEditions: Record<EditionId, Edition> | null = null;
  */
 export async function fetchEditionsFromFirestore(): Promise<Record<EditionId, Edition>> {
   try {
-    const snapshot = await firestore()
-      .collection(FIRESTORE_COLLECTIONS.editions)
-      .get();
+    const snapshot = await getDocs(collection(getFirestore(), FIRESTORE_COLLECTIONS.editions));
 
     const editions: Record<string, Edition> = {};
 
