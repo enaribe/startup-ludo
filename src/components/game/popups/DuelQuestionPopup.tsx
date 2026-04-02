@@ -14,6 +14,7 @@ import { COLORS } from '@/styles/colors';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { SPACING, BORDER_RADIUS, SHADOWS } from '@/styles/spacing';
 import { useSettingsStore } from '@/stores';
+import { usePlaySoundOnOpen } from '@/hooks/useSound';
 import type { DuelQuestion } from '@/types';
 
 interface DuelQuestionPopupProps {
@@ -39,6 +40,7 @@ export const DuelQuestionPopup = memo(function DuelQuestionPopup({
   onClose,
 }: DuelQuestionPopupProps) {
   const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
+  usePlaySoundOnOpen(visible && questions.length > 0, 'popup-open');
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<number[]>([]);

@@ -1,4 +1,4 @@
-import { memo, useEffect } from 'react';
+import { memo, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import Animated, {
   SlideInUp,
@@ -18,6 +18,7 @@ import { COLORS } from '@/styles/colors';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { SPACING, BORDER_RADIUS, SHADOWS } from '@/styles/spacing';
 import { useSettingsStore } from '@/stores';
+import { useSound, usePlaySoundOnOpen } from '@/hooks/useSound';
 import type { Player, DuelResult } from '@/types';
 
 interface DuelResultPopupProps {
@@ -44,7 +45,23 @@ export const DuelResultPopup = memo(function DuelResultPopup({
   onClose,
 }: DuelResultPopupProps) {
   const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
+  const { play: playSound } = useSound();
+  usePlaySoundOnOpen(visible && isWaitingForOpponent && !result, 'popup-open');
+
+  const duelResultSoundPlayed = useRef(false);
   const contentOpacity = useSharedValue(0);
+
+  useEffect(() => {
+    if (!visible) {
+      duelResultSoundPlayed.current = false;
+      return;
+    }
+    if (!result || isWaitingForOpponent) return;
+    if (duelResultSoundPlayed.current) return;
+    duelResultSoundPlayed.current = true;
+    if (result.winnerId === null) return;
+    playSound(result.winnerId === currentPlayerId ? 'victory' : 'defeat');
+  }, [visible, result, isWaitingForOpponent, currentPlayerId, playSound]);
 
   useEffect(() => {
     if (visible && result) {

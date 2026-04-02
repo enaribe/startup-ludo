@@ -1,4 +1,10 @@
-export { useSound, usePlaySound, type SoundName } from './useSound';
+export {
+  useSound,
+  usePlaySound,
+  usePlaySoundOnOpen,
+  type SoundName,
+} from './useSound';
+export { useBackgroundMusic } from './useBackgroundMusic';
 export {
   useHaptics,
   useButtonHaptic,

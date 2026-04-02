@@ -21,6 +21,7 @@ import { ALL_CHALLENGES, refreshChallengesFromFirestore } from '@/data/challenge
 import { useAuthStore, useChallengeStore, useUserStore } from '@/stores';
 import { FONTS } from '@/styles/typography';
 import type { Challenge, EnrollmentFormData } from '@/types/challenge';
+import { formatFCFARaw } from '@/utils/currency';
 
 const { width } = Dimensions.get('window');
 
@@ -267,7 +268,7 @@ export default function HomeScreen() {
 
           <View style={styles.statItem}>
             <Text style={styles.statValueLuckiest} numberOfLines={1} adjustsFontSizeToFit>
-              {formatShortValue(portfolioValue)}€
+              {formatFCFARaw(portfolioValue)}
             </Text>
             <Text style={styles.statLabel}>Valorisation</Text>
           </View>
@@ -281,6 +282,7 @@ export default function HomeScreen() {
             <View style={styles.xpBarContainer}>
               <View style={[styles.xpBarFill, { width: `${rankProgress}%` }]} />
             </View>
+            {/* <Text style={styles.statLabel}>Progression</Text> */}
           </View>
         </View>
           </View>
@@ -525,20 +527,21 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     alignItems: 'stretch',
-    justifyContent: 'space-between',
+    justifyContent: 'space-evenly',
     paddingVertical: 8,
     paddingHorizontal: 8,
     marginTop: 0,
   },
   statItem: {
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-evenly',
     flex: 1,
     minWidth: 0,
     paddingHorizontal: 6,
   },
   statItemXp: {
     paddingHorizontal: 4,
+    justifyContent: 'space-evenly',
   },
   statDivider: {
     width: 1,

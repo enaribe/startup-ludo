@@ -1,3 +1,4 @@
+export { LocalModeIcon, OnlineModeIcon } from './ModeSelectionIcons';
 export { GameBoard, PathCell, HomeZone, Pawn, CenterZone } from './GameBoard';
 export { Dice } from './Dice';
 export { PlayerCard } from './PlayerCard';

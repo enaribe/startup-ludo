@@ -5,6 +5,7 @@ import { Modal } from '@/components/ui/Modal';
 import { COLORS } from '@/styles/colors';
 import { BORDER_RADIUS, SHADOWS, SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
+import { usePlaySoundOnOpen } from '@/hooks/useSound';
 import type { Player } from '@/types';
 import { memo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -29,6 +30,8 @@ export const DuelPreparePopup = memo(function DuelPreparePopup({
   isOnline = false,
   onStart,
 }: DuelPreparePopupProps) {
+  usePlaySoundOnOpen(visible && !!challenger && !!opponent, 'popup-open');
+
   if (!challenger || !opponent) return null;
 
   // Déterminer qui doit jouer

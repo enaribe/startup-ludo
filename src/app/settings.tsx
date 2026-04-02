@@ -159,9 +159,11 @@ export default function SettingsScreen() {
 
   const {
     soundEnabled,
+    musicEnabled,
     hapticsEnabled,
     notifications,
     setSoundEnabled,
+    setMusicEnabled,
     setHapticsEnabled,
     setNotifications,
   } = useSettingsStore();
@@ -276,6 +278,14 @@ export default function SettingsScreen() {
             subtitle="Effets sonores du jeu"
             value={soundEnabled}
             onToggle={setSoundEnabled}
+          />
+          <SettingRow
+            icon="musical-notes"
+            iconColor="#FFBC40"
+            title="Musique"
+            subtitle="Musique de fond"
+            value={musicEnabled}
+            onToggle={setMusicEnabled}
           />
           <SettingRow
             icon="phone-portrait"

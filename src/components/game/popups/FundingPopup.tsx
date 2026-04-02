@@ -19,6 +19,7 @@ import { COLORS } from '@/styles/colors';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { SPACING, BORDER_RADIUS, SHADOWS } from '@/styles/spacing';
 import { useSettingsStore } from '@/stores';
+import { usePlaySoundOnOpen } from '@/hooks/useSound';
 import type { FundingEvent } from '@/types';
 
 interface FundingPopupProps {
@@ -37,6 +38,7 @@ export const FundingPopup = memo(function FundingPopup({
   isSpectator = false,
 }: FundingPopupProps) {
   const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
+  usePlaySoundOnOpen(visible && !!funding, 'popup-open');
 
   const iconScale = useSharedValue(0);
   const iconFloat = useSharedValue(0);

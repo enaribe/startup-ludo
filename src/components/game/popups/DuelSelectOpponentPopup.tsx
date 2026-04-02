@@ -7,6 +7,7 @@ import { PopupDuelIcon } from '@/components/game/popups/PopupIcons';
 import { COLORS } from '@/styles/colors';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { SPACING, BORDER_RADIUS, SHADOWS } from '@/styles/spacing';
+import { usePlaySoundOnOpen } from '@/hooks/useSound';
 import type { Player } from '@/types';
 
 interface DuelSelectOpponentPopupProps {
@@ -24,6 +25,8 @@ export const DuelSelectOpponentPopup = memo(function DuelSelectOpponentPopup({
   onSelectOpponent,
   onClose,
 }: DuelSelectOpponentPopupProps) {
+  usePlaySoundOnOpen(visible, 'popup-open');
+
   return (
     <Modal
       visible={visible}

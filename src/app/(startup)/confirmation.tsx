@@ -13,13 +13,15 @@ import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { useUserStore, useSettingsStore, useAuthStore } from '@/stores';
 import { addStartup as firestoreAddStartup, updateUserStats } from '@/services/firebase/firestore';
+import { formatFCFARaw } from '@/utils/currency';
 import { TARGET_CARDS, MISSION_CARDS, SECTOR_CARDS } from '@/constants/ideation';
 import { XP_REWARDS } from '@/config/progression';
 import type { Startup, TargetCard, MissionCard } from '@/types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-const BASE_VALUATION = 50_000;
+// Valorisation initiale en FCFA à la création du projet
+const BASE_VALUATION = 10_000; // 10 000 FCFA de base (modulé par les multiplicateurs de cartes)
 
 const SECTOR_INFO: Record<string, { name: string; icon: string }> = {
   fintech: { name: 'Fintech', icon: 'cash' },
@@ -54,10 +56,7 @@ function formatDate(timestamp: number): string {
 }
 
 function formatValorisation(val: number): string {
-  if (val >= 1_000_000) {
-    return `${(val / 1_000_000).toFixed(1).replace('.0', '')}M€`;
-  }
-  return `${Math.round(val / 1000)}K€`;
+  return formatFCFARaw(val);
 }
 
 export default function StartupConfirmationScreen() {

@@ -25,6 +25,7 @@ import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import type { Startup } from '@/types';
+import { formatFCFARaw } from '@/utils/currency';
 
 const HEADER_CONTENT_HEIGHT = 82;
 const { width: screenWidth } = Dimensions.get('window');
@@ -58,13 +59,7 @@ interface RankedItem {
 function formatScore(item: RankedItem): string {
   if (item.type === 'startup') {
     const val = item.valorisation ?? item.score;
-    if (val >= 1_000_000) {
-      return `${(val / 1_000_000).toFixed(1).replace('.0', '')}M€`;
-    }
-    if (val >= 1000) {
-      return `${Math.round(val / 1000)}K€`;
-    }
-    return `${val}€`;
+    return formatFCFARaw(val);
   }
   return `${item.score.toLocaleString()} xp`;
 }
@@ -474,13 +469,7 @@ export default function ClassementScreen() {
 /* ───────────────── Helpers ───────────────── */
 
 function formatStartupValorisation(val: number): string {
-  if (val >= 1_000_000) {
-    return `${(val / 1_000_000).toFixed(1).replace('.0', '')}M€`;
-  }
-  if (val >= 1000) {
-    return `${Math.round(val / 1000)}K€`;
-  }
-  return `${val}€`;
+  return formatFCFARaw(val);
 }
 
 /* ───────────────── Profile Popup ───────────────── */

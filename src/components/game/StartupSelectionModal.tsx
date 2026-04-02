@@ -10,6 +10,7 @@ import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { SPACING, BORDER_RADIUS } from '@/styles/spacing';
 import type { Startup, TargetCard, MissionCard } from '@/types';
 import type { DefaultProject } from '@/data/defaultProjects';
+import { formatFCFARaw } from '@/utils/currency';
 
 const { width: screenWidth, height: windowHeight } = Dimensions.get('window');
 /** Hauteur max de la liste : plus d’items visibles sans scroll (écran × ~40 %, plafonné) */
@@ -158,7 +159,7 @@ export const StartupSelectionModal = memo(function StartupSelectionModal({
                       </View>
                       <View style={styles.valorBadge}>
                         <Text style={styles.valorText}>
-                          {Math.round((startup.valorisation ?? 0) / 1000)}k
+                          {formatFCFARaw(startup.valorisation ?? 0)}
                         </Text>
                       </View>
                       {selectedId === startup.id && (

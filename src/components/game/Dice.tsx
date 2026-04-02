@@ -10,6 +10,7 @@ import Animated, {
 import * as Haptics from 'expo-haptics';
 import { COLORS } from '@/styles/colors';
 import { useSettingsStore } from '@/stores';
+import { useSound } from '@/hooks/useSound';
 
 interface DiceProps {
   value: number | null;
@@ -63,6 +64,7 @@ export const Dice = memo(function Dice({
   onRollComplete,
 }: DiceProps) {
   const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
+  const { play: playSound } = useSound();
   const [internalRolling, setInternalRolling] = useState(false);
   const [displayValue, setDisplayValue] = useState(value ?? 1);
 
@@ -94,6 +96,7 @@ export const Dice = memo(function Dice({
 
     setInternalRolling(true);
     triggerHaptic();
+    playSound('dice-roll');
 
     // Get the final value
     const finalValue = onRoll?.() ?? Math.floor(Math.random() * 6) + 1;
@@ -128,6 +131,7 @@ export const Dice = memo(function Dice({
     disabled,
     isRolling,
     triggerHaptic,
+    playSound,
     onRoll,
     handleRollComplete,
     scale,

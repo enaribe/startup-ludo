@@ -19,6 +19,7 @@ import { COLORS } from '@/styles/colors';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { SPACING, BORDER_RADIUS, SHADOWS } from '@/styles/spacing';
 import { useSettingsStore } from '@/stores';
+import { usePlaySoundOnOpen } from '@/hooks/useSound';
 import type { OpportunityEvent, ChallengeEvent } from '@/types';
 
 type EventData = OpportunityEvent | ChallengeEvent;
@@ -42,6 +43,7 @@ export const EventPopup = memo(function EventPopup({
   isSpectator = false,
 }: EventPopupProps) {
   const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
+  usePlaySoundOnOpen(visible && !!event, 'popup-open');
 
   const isOpportunity = eventType === 'opportunity';
 

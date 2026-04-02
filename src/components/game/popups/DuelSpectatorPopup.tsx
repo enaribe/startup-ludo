@@ -14,6 +14,7 @@ import { PopupDuelIcon } from '@/components/game/popups/PopupIcons';
 import { COLORS } from '@/styles/colors';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { SPACING, BORDER_RADIUS, SHADOWS } from '@/styles/spacing';
+import { usePlaySoundOnOpen } from '@/hooks/useSound';
 import type { Player } from '@/types';
 
 interface DuelSpectatorPopupProps {
@@ -29,6 +30,8 @@ export const DuelSpectatorPopup = memo(function DuelSpectatorPopup({
   opponent,
   onClose,
 }: DuelSpectatorPopupProps) {
+  usePlaySoundOnOpen(visible, 'popup-open');
+
   const pulseAnim = useSharedValue(1);
 
   useEffect(() => {

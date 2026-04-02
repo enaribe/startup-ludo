@@ -19,6 +19,7 @@ import Animated, {
 import { Ionicons } from '@expo/vector-icons';
 import type { PlayerColor } from '@/types';
 import { COLORS } from '@/styles/colors';
+import { useSound } from '@/hooks/useSound';
 
 interface PawnProps {
   color: PlayerColor;
@@ -53,6 +54,7 @@ export const Pawn = memo(function Pawn({
   onAnimationComplete,
   onPress,
 }: PawnProps) {
+  const { play: playSound } = useSound();
   const pawnSize = cellSize * 0.7;
   const isFirstRender = useRef(true);
   const lastTargetRef = useRef<string>('');
@@ -105,6 +107,8 @@ export const Pawn = memo(function Pawn({
 
     lastTargetRef.current = targetKey;
 
+    playSound('pawn-move');
+
     // Annuler les animations en cours pour éviter les conflits
     try {
       cancelAnimation(translateX);
@@ -148,7 +152,7 @@ export const Pawn = memo(function Pawn({
       bounce.value = 0;
       handleAnimationComplete();
     }
-  }, [targetX, targetY, pawnSize, pawnIndex, handleAnimationComplete, translateX, translateY, bounce]);
+  }, [targetX, targetY, pawnSize, pawnIndex, handleAnimationComplete, playSound, translateX, translateY, bounce]);
 
   // Animation de pulsation pour pion actif
   useEffect(() => {

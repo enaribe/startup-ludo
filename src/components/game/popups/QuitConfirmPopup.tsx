@@ -7,6 +7,7 @@ import { GameButton } from '@/components/ui/GameButton';
 import { COLORS } from '@/styles/colors';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { SPACING, BORDER_RADIUS, SHADOWS } from '@/styles/spacing';
+import { usePlaySoundOnOpen } from '@/hooks/useSound';
 
 interface QuitConfirmPopupProps {
   visible: boolean;
@@ -21,6 +22,8 @@ export const QuitConfirmPopup = memo(function QuitConfirmPopup({
   onConfirm,
   isOnline = false,
 }: QuitConfirmPopupProps) {
+  usePlaySoundOnOpen(visible, 'popup-open');
+
   return (
     <Modal
       visible={visible}

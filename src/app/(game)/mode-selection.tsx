@@ -1,37 +1,26 @@
-import { useState, useEffect } from 'react';
-import { View, Text, Pressable, Modal, StyleSheet, Dimensions } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInDown, FadeOut, SlideInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import Svg, { Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { Dimensions, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeInDown, FadeOut, SlideInUp } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { LocalModeIcon, OnlineModeIcon } from '@/components/game/ModeSelectionIcons';
+import { DynamicGradientBorder, GameButton, RadialBackground } from '@/components/ui';
+import { useAuthStore, useSettingsStore, useUserStore } from '@/stores';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
-import { useAuthStore, useUserStore, useSettingsStore } from '@/stores';
-import { DynamicGradientBorder, GameButton } from '@/components/ui';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const THEME = {
   accent: '#FFBC40',
   cardFill: 'rgba(0, 0, 0, 0.35)',
   text: '#FFFFFF',
-  textSecondary: 'rgba(255, 255, 255, 0.6)',
+  textSecondary: 'rgba(255, 255, 255, 0.65)',
+  textMuted: 'rgba(127, 142, 158, 0.95)',
 };
-
-const Background = () => (
-  <Svg style={StyleSheet.absoluteFill} width={SCREEN_WIDTH} height={SCREEN_HEIGHT}>
-    <Defs>
-      <RadialGradient id="radialBg" cx="50%" cy="50%" r="80%">
-        <Stop offset="0%" stopColor="#0F3A6B" stopOpacity="1" />
-        <Stop offset="100%" stopColor="#081A2A" stopOpacity="1" />
-      </RadialGradient>
-    </Defs>
-    <Rect width="100%" height="100%" fill="url(#radialBg)" />
-  </Svg>
-);
 
 export default function GameModeSelectionScreen() {
   const router = useRouter();
@@ -107,11 +96,13 @@ export default function GameModeSelectionScreen() {
 
   const contentWidth = SCREEN_WIDTH - SPACING[4] * 2;
 
+  const headerBlockHeight = insets.top + 72;
+
   return (
     <View style={styles.container}>
-      <Background />
+      <RadialBackground />
 
-      {/* Header */}
+      {/* Header — titre centré, retour jaune */}
       <View
         style={[
           styles.headerContainer,
@@ -120,45 +111,26 @@ export default function GameModeSelectionScreen() {
             backgroundColor: '#0A1929',
             borderBottomLeftRadius: 24,
             borderBottomRightRadius: 24,
-          }
+          },
         ]}
       >
-        <View style={styles.headerContent}>
-          <Pressable onPress={handleBack} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={THEME.text} />
+        <View style={styles.headerRow}>
+          <Pressable onPress={handleBack} style={styles.backButton} hitSlop={8}>
+            <Ionicons name="chevron-back" size={26} color={THEME.accent} />
           </Pressable>
-          <Text style={[styles.headerTitle, { color: THEME.text }]}>NOUVELLE PARTIE</Text>
+          <View style={styles.headerTitleWrap} pointerEvents="none">
+            <Text style={styles.headerTitle}>NOUVELLE PARTIE</Text>
+          </View>
+          <View style={styles.headerRightSpacer} />
         </View>
       </View>
 
-      <View style={[styles.contentContainer, { paddingTop: insets.top + 80 + SPACING[4] }]}>
-        
-        {/* Badge Mode de jeu */}
-        <Animated.View
-          entering={FadeInDown.delay(100).duration(500)}
-          style={{
-            alignSelf: 'center',
-            backgroundColor: 'rgba(255, 188, 64, 0.15)',
-            paddingHorizontal: SPACING[4],
-            paddingVertical: SPACING[2],
-            borderRadius: 20,
-            marginBottom: SPACING[6],
-            borderWidth: 1,
-            borderColor: 'rgba(255, 188, 64, 0.3)',
-          }}
-        >
-          <Text
-            style={{
-              fontFamily: FONTS.bodySemiBold,
-              fontSize: FONT_SIZES.sm,
-              color: THEME.accent,
-            }}
-          >
-            SÉLECTIONNE LE MODE DE JEU
-          </Text>
+      <View style={[styles.contentContainer, { paddingTop: headerBlockHeight + SPACING[5] }]}>
+        <Animated.View entering={FadeInDown.delay(100).duration(500)} style={styles.subtitleWrap}>
+          <Text style={styles.subtitle}>Sélectionner le mode de jeu</Text>
         </Animated.View>
 
-        {/* Option: Partie Locale */}
+        {/* Partie locale — icône téléphone jaune */}
         <Animated.View entering={FadeInDown.delay(200).duration(500)}>
           <Pressable onPress={handleLocalGame}>
             <DynamicGradientBorder
@@ -168,70 +140,65 @@ export default function GameModeSelectionScreen() {
               style={{ marginBottom: SPACING[4] }}
             >
               <View style={styles.cardContent}>
-                <View style={[styles.iconBox, { backgroundColor: 'rgba(255, 188, 64, 0.15)' }]}>
-                  <Ionicons name="people" size={32} color={THEME.accent} />
+                <View style={styles.iconColumn}>
+                  <LocalModeIcon size={40} />
                 </View>
 
                 <View style={styles.cardTextContainer}>
-                  <Text style={[styles.cardTitle, { color: THEME.text }]}>Partie Locale</Text>
-                  <Text style={[styles.cardDescription, { color: THEME.textSecondary }]}>
+                  <Text style={styles.cardTitle}>PARTIE LOCALE</Text>
+                  <Text style={styles.cardDescription}>
                     Joue avec tes amis sur le même appareil, chacun son tour.
                   </Text>
 
                   <View style={styles.tagsRow}>
-                    <View style={[styles.tag, { backgroundColor: 'rgba(255, 255, 255, 0.1)' }]}>
-                      <Ionicons name="people-outline" size={12} color={THEME.textSecondary} />
-                      <Text style={[styles.tagText, { color: THEME.textSecondary }]}>2-4 Joueurs</Text>
+                    <View style={styles.tag}>
+                      <Ionicons name="people-outline" size={12} color={THEME.textMuted} />
+                      <Text style={styles.tagText}>2-4 joueurs</Text>
                     </View>
                   </View>
                 </View>
-
-                <Ionicons name="chevron-forward" size={24} color={THEME.textSecondary} />
               </View>
             </DynamicGradientBorder>
           </Pressable>
         </Animated.View>
 
-        {/* Option: Partie en Ligne */}
+        {/* Partie en ligne — icône signal bleu */}
         <Animated.View entering={FadeInDown.delay(300).duration(500)}>
           <Pressable onPress={handleOnlineGame}>
             <DynamicGradientBorder
               borderRadius={24}
               fill={THEME.cardFill}
               boxWidth={contentWidth}
-              style={{ opacity: isGuest ? 0.8 : 1 }}
+              style={{ opacity: isGuest ? 0.85 : 1 }}
             >
               <View style={styles.cardContent}>
-                <View style={[styles.iconBox, { backgroundColor: 'rgba(31, 145, 208, 0.15)' }]}>
-                  <Ionicons name="globe" size={32} color="#1F91D0" />
+                <View style={styles.iconColumn}>
+                  <OnlineModeIcon size={52} />
                 </View>
 
                 <View style={styles.cardTextContainer}>
-                  <Text style={[styles.cardTitle, { color: THEME.text }]}>Partie en Ligne</Text>
-                  <Text style={[styles.cardDescription, { color: THEME.textSecondary }]}>
+                  <Text style={styles.cardTitle}>PARTIE EN LIGNE</Text>
+                  <Text style={styles.cardDescription}>
                     Affronte des joueurs du monde entier en temps réel.
                   </Text>
 
                   <View style={styles.tagsRow}>
-                    <View style={[styles.tag, { backgroundColor: 'rgba(255, 255, 255, 0.1)' }]}>
-                      <Ionicons name="trophy-outline" size={12} color={THEME.textSecondary} />
-                      <Text style={[styles.tagText, { color: THEME.textSecondary }]}>Classement</Text>
+                    <View style={styles.tag}>
+                      <Ionicons name="trophy-outline" size={12} color={THEME.textMuted} />
+                      <Text style={styles.tagText}>Classement</Text>
                     </View>
-                    {isGuest && (
-                      <View style={[styles.tag, { backgroundColor: 'rgba(255, 107, 107, 0.2)' }]}>
+                    {isGuest ? (
+                      <View style={[styles.tag, styles.tagGuest]}>
                         <Ionicons name="lock-closed" size={12} color="#FF6B6B" />
-                        <Text style={[styles.tagText, { color: '#FF6B6B' }]}>Compte requis</Text>
+                        <Text style={[styles.tagText, styles.tagTextGuest]}>Compte requis</Text>
                       </View>
-                    )}
+                    ) : null}
                   </View>
                 </View>
-
-                <Ionicons name="chevron-forward" size={24} color={THEME.textSecondary} />
               </View>
             </DynamicGradientBorder>
           </Pressable>
         </Animated.View>
-
       </View>
 
       {/* Popup - Aucun projet (design system) */}
@@ -351,6 +318,7 @@ export default function GameModeSelectionScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#0C243E',
   },
   headerContainer: {
     position: 'absolute',
@@ -361,10 +329,11 @@ const styles = StyleSheet.create({
     paddingBottom: SPACING[4],
     paddingHorizontal: SPACING[4],
   },
-  headerContent: {
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING[4],
+    justifyContent: 'space-between',
+    minHeight: 44,
   },
   backButton: {
     width: 40,
@@ -372,45 +341,71 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(5, 25, 50, 0.75)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  headerTitleWrap: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 48,
+  },
+  headerRightSpacer: {
+    width: 40,
+    height: 40,
   },
   headerTitle: {
     fontFamily: FONTS.title,
-    fontSize: 24,
-    color: '#FFFFFF',
+    fontSize: 22,
+    color: THEME.text,
+    textAlign: 'center',
+    letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
   contentContainer: {
     paddingHorizontal: SPACING[4],
   },
+  subtitleWrap: {
+    marginBottom: SPACING[6],
+    alignItems: 'center',
+  },
+  subtitle: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.base,
+    color: THEME.accent,
+    textAlign: 'center',
+  },
   cardContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: SPACING[4],
+    paddingVertical: SPACING[5],
+    paddingHorizontal: SPACING[4],
+    gap: SPACING[4],
   },
-  iconBox: {
-    width: 60,
-    height: 60,
-    borderRadius: 16,
-    justifyContent: 'center',
+  iconColumn: {
+    width: 56,
     alignItems: 'center',
-    marginRight: SPACING[4],
+    justifyContent: 'center',
   },
   cardTextContainer: {
     flex: 1,
-    marginRight: SPACING[2],
+    minWidth: 0,
   },
   cardTitle: {
     fontFamily: FONTS.title,
-    fontSize: 18,
-    marginBottom: 4,
+    fontSize: FONT_SIZES.xl,
+    marginBottom: SPACING[2],
+    color: THEME.text,
+    letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
   cardDescription: {
     fontFamily: FONTS.body,
-    fontSize: 12,
-    marginBottom: 8,
-    lineHeight: 18,
+    fontSize: FONT_SIZES.sm,
+    marginBottom: SPACING[3],
+    lineHeight: 20,
+    color: THEME.textSecondary,
   },
   tagsRow: {
     flexDirection: 'row',
@@ -420,14 +415,27 @@ const styles = StyleSheet.create({
   tag: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    gap: 5,
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  tagGuest: {
+    backgroundColor: 'rgba(255, 107, 107, 0.15)',
+    borderColor: 'rgba(255, 107, 107, 0.25)',
   },
   tagText: {
     fontFamily: FONTS.bodySemiBold,
     fontSize: 10,
+    color: THEME.textMuted,
+    textTransform: 'capitalize',
+  },
+  tagTextGuest: {
+    color: '#FF6B6B',
+    textTransform: 'none',
   },
   // Modal "Aucun projet" (conservé tel quel pour l’instant)
   // Popups (design system)

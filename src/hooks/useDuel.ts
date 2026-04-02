@@ -72,11 +72,21 @@ export function useDuel({
   onDuelComplete,
 }: UseDuelOptions): UseDuelReturn {
   const [duelState, setDuelState] = useState<DuelState | null>(null);
+  const duelStateRef = useRef<DuelState | null>(null);
   const [result, setResult] = useState<DuelResult | null>(null);
   const hasReceivedRemoteScoreRef = useRef(false);
   const safetyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Track my local score before remote arrives */
   const myLocalScoreRef = useRef<number | null>(null);
+
+  // Keep ref in sync so callbacks with stale closures (e.g. setTimeout) see latest state
+  const setDuelStateSync = useCallback((updater: DuelState | null | ((prev: DuelState | null) => DuelState | null)) => {
+    setDuelState((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      duelStateRef.current = next;
+      return next;
+    });
+  }, []);
 
   // Helpers
   const getPlayerById = useCallback((id: string) => {
@@ -139,7 +149,7 @@ export function useDuel({
     logDuel('Starting safety timeout for waiting phase');
     safetyTimerRef.current = setTimeout(() => {
       logDuel('Safety timeout expired — auto-resolving duel');
-      setDuelState((prev) => {
+      setDuelStateSync((prev) => {
         if (!prev || prev.phase !== 'waiting') return prev;
         // Use stored scores if available, otherwise give 0 to the non-responding player
         const challengerScore = prev.challengerScore > 0 ? prev.challengerScore : (myRole === 'challenger' ? (myLocalScoreRef.current ?? 0) : 0);
@@ -178,7 +188,7 @@ export function useDuel({
     myLocalScoreRef.current = null;
 
     if (otherPlayers.length === 1 && otherPlayers[0]) {
-      setDuelState({
+      setDuelStateSync({
         challengerId,
         opponentId: otherPlayers[0].id,
         questions,
@@ -190,7 +200,7 @@ export function useDuel({
         currentQuestionIndex: 0,
       });
     } else {
-      setDuelState({
+      setDuelStateSync({
         challengerId,
         opponentId: '',
         questions,
@@ -210,7 +220,7 @@ export function useDuel({
     logDuel('startDuelWithQuestions', { challengerId, opponentId, questionsLength: questions.length });
     hasReceivedRemoteScoreRef.current = false;
     myLocalScoreRef.current = null;
-    setDuelState({
+    setDuelStateSync({
       challengerId,
       opponentId,
       questions,
@@ -222,14 +232,14 @@ export function useDuel({
       currentQuestionIndex: 0,
     });
     setResult(null);
-  }, []);
+  }, [setDuelStateSync]);
 
   // Join duel online (opponent side) — same questions, goes to intro then answering
   const joinDuel = useCallback((challengerId: string, opponentId: string, questions: DuelQuestion[]) => {
     logDuel('joinDuel', { challengerId, opponentId, questionsLength: questions.length });
     hasReceivedRemoteScoreRef.current = false;
     myLocalScoreRef.current = null;
-    setDuelState({
+    setDuelStateSync({
       challengerId,
       opponentId,
       questions,
@@ -242,12 +252,12 @@ export function useDuel({
       currentQuestionIndex: 0,
     });
     setResult(null);
-  }, []);
+  }, [setDuelStateSync]);
 
   // Select opponent (3+ players)
   const selectOpponent = useCallback((opponentId: string) => {
     if (!duelState) return;
-    setDuelState((prev) => {
+    setDuelStateSync((prev) => {
       if (!prev) return prev;
       return { ...prev, opponentId, phase: 'intro' };
     });
@@ -256,7 +266,7 @@ export function useDuel({
   // Start answering — universal function for online mode (both players call this)
   const startAnswering = useCallback(() => {
     logDuel('startAnswering called', { isOnline });
-    setDuelState((prev) => {
+    setDuelStateSync((prev) => {
       if (!prev) {
         logDuel('startAnswering: no prev state');
         return prev;
@@ -275,7 +285,7 @@ export function useDuel({
   // Legacy: start challenger turn (works for local mode + backward compat)
   const startChallengerTurn = useCallback(() => {
     logDuel('startChallengerTurn called');
-    setDuelState((prev) => {
+    setDuelStateSync((prev) => {
       if (!prev) return prev;
       const questions = prev.questions?.length ? prev.questions : getRandomDuelQuestions(3);
       return {
@@ -288,12 +298,12 @@ export function useDuel({
 
   // Submit my answers (online mode — works for both challenger and opponent)
   const submitMyAnswers = useCallback((answers: number[], score: number) => {
-    if (!duelState) return;
+    if (!duelStateRef.current && !duelState) return;
     logDuel('submitMyAnswers', { myRole, score, isOnline });
 
     myLocalScoreRef.current = score;
 
-    setDuelState((prev) => {
+    setDuelStateSync((prev) => {
       if (!prev) return prev;
 
       // Update my score in the state
@@ -325,11 +335,13 @@ export function useDuel({
 
   // Legacy: submit challenger answers (local + AI mode)
   const submitChallengerAnswers = useCallback((answers: number[], score: number) => {
-    if (!duelState) return;
+    // Use ref to avoid stale closure in setTimeout calls from play screen
+    const currentState = duelStateRef.current ?? duelState;
+    if (!currentState) return;
 
-    const opponentPlayer = getPlayerById(duelState.opponentId);
+    const opponentPlayer = getPlayerById(currentState.opponentId);
 
-    setDuelState((prev) => {
+    setDuelStateSync((prev) => {
       if (!prev) return prev;
 
       // AI opponent — calculate immediately
@@ -381,7 +393,7 @@ export function useDuel({
 
   // Start opponent turn (local mode only)
   const startOpponentTurn = useCallback(() => {
-    setDuelState((prev) => {
+    setDuelStateSync((prev) => {
       if (!prev) return prev;
       const questions = prev.questions?.length ? prev.questions : getRandomDuelQuestions(3);
       return {
@@ -400,7 +412,7 @@ export function useDuel({
     if (isOnline) {
       // In online mode, opponent should use submitMyAnswers instead
       myLocalScoreRef.current = score;
-      setDuelState((prev) => {
+      setDuelStateSync((prev) => {
         if (!prev) return prev;
         const next = {
           ...prev,
@@ -429,7 +441,7 @@ export function useDuel({
       score
     );
 
-    setDuelState((prev) => {
+    setDuelStateSync((prev) => {
       if (!prev) return prev;
       return {
         ...prev,
@@ -454,7 +466,7 @@ export function useDuel({
       safetyTimerRef.current = null;
     }
 
-    setDuelState((prev) => {
+    setDuelStateSync((prev) => {
       if (!prev) return prev;
       const isRemoteScore = playerId === prev.challengerId || playerId === prev.opponentId;
       if (!isRemoteScore) return prev;
@@ -487,7 +499,7 @@ export function useDuel({
       clearTimeout(safetyTimerRef.current);
       safetyTimerRef.current = null;
     }
-    setDuelState(null);
+    setDuelStateSync(null);
   }, []);
 
   const resetDuel = useCallback(() => {
@@ -497,7 +509,7 @@ export function useDuel({
     }
     hasReceivedRemoteScoreRef.current = false;
     myLocalScoreRef.current = null;
-    setDuelState(null);
+    setDuelStateSync(null);
     setResult(null);
   }, []);
 

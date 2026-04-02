@@ -27,6 +27,7 @@ import { refreshDefaultProjectsFromFirestore } from '@/data/defaultProjects';
 import { refreshChallengesFromFirestore } from '@/data/challenges';
 import { clearCache } from '@/services/firebase/cacheHelper';
 import { refreshIdeationFromFirestore } from '@/constants/ideation';
+import { useBackgroundMusic } from '@/hooks/useBackgroundMusic';
 
 // Keep splash screen visible while loading resources
 SplashScreen.preventAutoHideAsync();
@@ -36,6 +37,8 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
+  useBackgroundMusic();
+
   const [fontsLoaded, fontError] = useFonts({
     LuckiestGuy_400Regular,
     OpenSans_400Regular,

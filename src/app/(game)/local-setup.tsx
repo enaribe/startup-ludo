@@ -13,7 +13,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 
-import { FONTS } from '@/styles/typography';
+import { SPACING } from '@/styles/spacing';
+import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { useGameStore, useAuthStore, useUserStore } from '@/stores';
 import { RadialBackground, DynamicGradientBorder, GameButton } from '@/components/ui';
 import { StartupSelectionModal } from '@/components/game/StartupSelectionModal';
@@ -23,6 +24,8 @@ import type { PlayerColor } from '@/types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CONTENT_WIDTH = SCREEN_WIDTH - 36;
+const EDITION_TILE_GAP = 12;
+const EDITION_TILE_WIDTH = (CONTENT_WIDTH - EDITION_TILE_GAP) / 2;
 
 // Couleurs des joueurs (toutes)
 const ALL_PLAYER_COLORS: { color: PlayerColor; hex: string; name: string }[] = [
@@ -245,6 +248,10 @@ export default function LocalSetupScreen() {
   const isNextDisabled = step === 3 && !allPlayersSelected;
 
   const headerTopPadding = insets.top + 10;
+  const scrollPaddingTop =
+    step === 2
+      ? headerTopPadding + 108
+      : headerTopPadding + (maxSteps > 1 ? 110 : 80);
 
   return (
     <View style={styles.container}>
@@ -252,30 +259,61 @@ export default function LocalSetupScreen() {
 
       {/* Fixed Header */}
       <View style={[styles.fixedHeader, { paddingTop: headerTopPadding }]}>
-        <View style={styles.headerRow}>
-          <Pressable onPress={handleBack} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
-          </Pressable>
-          <Text style={styles.headerTitle}>PARTIE LOCALE</Text>
-        </View>
+        {step === 2 ? (
+          <>
+            <View style={styles.editionHeaderTopRow}>
+              <Pressable onPress={handleBack} style={styles.editionBackBtn} hitSlop={8}>
+                <Ionicons name="chevron-back" size={26} color="#FFBC40" />
+              </Pressable>
+              <View style={styles.editionHeaderTitleWrap} pointerEvents="none">
+                <Text style={styles.editionHeaderTitle}>NOUVELLE PARTIE</Text>
+              </View>
+              <View style={styles.editionHeaderSpacer} />
+            </View>
+            <View style={styles.editionStepRow}>
+              <View style={styles.stepDashGroup}>
+                {Array.from({ length: maxSteps }).map((_, i) => (
+                  <View
+                    key={i}
+                    style={[
+                      styles.stepDash,
+                      i < step ? styles.stepDashFilled : styles.stepDashEmpty,
+                    ]}
+                  />
+                ))}
+              </View>
+              <Text style={styles.editionStepLabel}>
+                Étape {step}/{maxSteps}
+              </Text>
+            </View>
+          </>
+        ) : (
+          <>
+            <View style={styles.headerRow}>
+              <Pressable onPress={handleBack} style={styles.backButton}>
+                <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
+              </Pressable>
+              <Text style={styles.headerTitle}>PARTIE LOCALE</Text>
+            </View>
 
-        {/* Step indicator inside header */}
-        {maxSteps > 1 && (
-          <View style={styles.stepIndicatorRow}>
-            {Array.from({ length: maxSteps }).map((_, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.stepDot,
-                  step >= i + 1 ? styles.stepDotActive : styles.stepDotInactive,
-                  step === i + 1 && styles.stepDotCurrent,
-                ]}
-              />
-            ))}
-            <Text style={styles.stepLabel}>
-              Étape {step}/{maxSteps}
-            </Text>
-          </View>
+            {maxSteps > 1 && (
+              <View style={styles.stepIndicatorRow}>
+                {Array.from({ length: maxSteps }).map((_, i) => (
+                  <View
+                    key={i}
+                    style={[
+                      styles.stepDot,
+                      step >= i + 1 ? styles.stepDotActive : styles.stepDotInactive,
+                      step === i + 1 && styles.stepDotCurrent,
+                    ]}
+                  />
+                ))}
+                <Text style={styles.stepLabel}>
+                  Étape {step}/{maxSteps}
+                </Text>
+              </View>
+            )}
+          </>
         )}
       </View>
 
@@ -283,7 +321,7 @@ export default function LocalSetupScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: headerTopPadding + (maxSteps > 1 ? 110 : 80), paddingBottom: insets.bottom + 120 },
+          { paddingTop: scrollPaddingTop, paddingBottom: insets.bottom + 120 },
         ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -454,51 +492,63 @@ export default function LocalSetupScreen() {
           </>
         )}
 
-        {/* STEP 2: Edition Selection */}
+        {/* STEP 2: Choix d'édition — grille 2 colonnes (maquette) */}
         {step === 2 && (
           <Animated.View entering={FadeInDown.delay(100).duration(500)}>
-            <Text style={styles.sectionTitle}>CHOIX DE L'ÉDITION</Text>
-            <Text style={styles.sectionSubtitle}>
+            <Text style={styles.editionScreenTitle}>CHOIX DE L'ÉDITION</Text>
+            <Text style={styles.editionScreenSubtitle}>
               Sélectionnez l'édition thématique pour votre partie
             </Text>
 
-            <View style={styles.editionList}>
+            <View style={styles.editionGrid}>
               {getEditionList().map((edition, index) => {
                 const isSelected = selectedEdition === edition.id;
+                const iconName = edition.icon;
                 return (
                   <Animated.View
                     key={edition.id}
-                    entering={FadeInDown.delay(150 + index * 80).duration(400)}
+                    entering={FadeInDown.delay(120 + index * 60).duration(400)}
+                    style={styles.editionGridItem}
                   >
                     <Pressable
                       onPress={() => setSelectedEdition(edition.id)}
+                      style={styles.editionGridItemPress}
                     >
                       <DynamicGradientBorder
                         borderRadius={16}
-                        fill={isSelected ? 'rgba(255, 188, 64, 0.12)' : 'rgba(0, 0, 0, 0.35)'}
-                        boxWidth={CONTENT_WIDTH}
+                        fill={
+                          isSelected
+                            ? 'rgba(255, 188, 64, 0.12)'
+                            : 'rgba(0, 0, 0, 0.35)'
+                        }
+                        boxWidth={EDITION_TILE_WIDTH}
+                        style={styles.editionTileGradient}
                       >
-                        <View style={[styles.editionCard, isSelected && styles.editionCardSelected]}>
-                          <View style={styles.editionIcon}>
+                        <View style={styles.editionTileInner}>
+                          {isSelected ? (
+                            <View style={styles.editionTileCheckBadge}>
+                              <Ionicons name="checkmark" size={12} color="#FFFFFF" />
+                            </View>
+                          ) : null}
+                          <View style={styles.editionTileIconWrap}>
                             <Ionicons
-                              name="extension-puzzle"
-                              size={24}
-                              color={isSelected ? '#FFBC40' : 'rgba(255,255,255,0.6)'}
+                              name={iconName}
+                              size={34}
+                              color={isSelected ? '#FFBC40' : '#7F8E9E'}
                             />
                           </View>
-                          <View style={styles.editionInfo}>
-                            <Text style={[styles.editionName, isSelected && styles.editionNameSelected]}>
-                              {edition.name}
-                            </Text>
-                            <Text style={styles.editionDescription}>
-                              {edition.description || 'Édition personnalisée'}
-                            </Text>
-                          </View>
-                          {isSelected && (
-                            <View style={styles.editionCheck}>
-                              <Ionicons name="checkmark-circle" size={24} color="#FFBC40" />
-                            </View>
-                          )}
+                          <Text
+                            style={[styles.editionTileName, isSelected && styles.editionTileNameSelected]}
+                            numberOfLines={2}
+                          >
+                            {edition.name.replace(/^Édition\s+/i, '')}
+                          </Text>
+                          <Text
+                            style={[styles.editionTileDesc, isSelected && styles.editionTileDescSelected]}
+                            numberOfLines={3}
+                          >
+                            {edition.description || 'Édition personnalisée'}
+                          </Text>
                         </View>
                       </DynamicGradientBorder>
                     </Pressable>
@@ -665,6 +715,149 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: 'rgba(255,255,255,0.4)',
     marginLeft: 6,
+  },
+
+  // ── Header étape « choix d'édition » (maquette) ──
+  editionHeaderTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 44,
+  },
+  editionBackBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(5, 25, 50, 0.75)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  editionHeaderTitleWrap: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 48,
+  },
+  editionHeaderSpacer: {
+    width: 40,
+    height: 40,
+  },
+  editionHeaderTitle: {
+    fontFamily: FONTS.title,
+    fontSize: 21,
+    color: '#FFFFFF',
+    textAlign: 'center',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  editionStepRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: SPACING[3],
+    paddingHorizontal: 2,
+  },
+  stepDashGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  stepDash: {
+    height: 4,
+    borderRadius: 2,
+    width: 28,
+  },
+  stepDashFilled: {
+    backgroundColor: '#FFBC40',
+  },
+  stepDashEmpty: {
+    backgroundColor: 'rgba(10, 37, 69, 0.9)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  editionStepLabel: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.sm,
+    color: '#FFBC40',
+  },
+  editionScreenTitle: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES['2xl'],
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+    marginBottom: SPACING[2],
+    textTransform: 'uppercase',
+  },
+  editionScreenSubtitle: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.sm,
+    color: '#7F8E9E',
+    marginBottom: SPACING[5],
+    lineHeight: 20,
+  },
+  editionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  editionGridItem: {
+    width: EDITION_TILE_WIDTH,
+    marginBottom: EDITION_TILE_GAP,
+  },
+  editionGridItemPress: {
+    width: '100%',
+  },
+  editionTileGradient: {
+    width: EDITION_TILE_WIDTH,
+  },
+  editionTileInner: {
+    position: 'relative',
+    paddingHorizontal: SPACING[3],
+    paddingVertical: SPACING[4],
+    paddingTop: SPACING[5],
+    minHeight: 172,
+    alignItems: 'center',
+  },
+  editionTileCheckBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#FFBC40',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2,
+  },
+  editionTileIconWrap: {
+    marginBottom: SPACING[3],
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  editionTileName: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES.sm,
+    color: '#7F8E9E',
+    textAlign: 'center',
+    marginBottom: SPACING[2],
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  editionTileNameSelected: {
+    color: '#FFBC40',
+  },
+  editionTileDesc: {
+    fontFamily: FONTS.body,
+    fontSize: 11,
+    color: '#7F8E9E',
+    textAlign: 'center',
+    lineHeight: 16,
+  },
+  editionTileDescSelected: {
+    color: '#FFBC40',
   },
 
   // ── Content ──
@@ -843,48 +1036,6 @@ const styles = StyleSheet.create({
   },
   colorSquareUsed: {
     opacity: 0.35,
-  },
-
-  // ── Edition Selection (Step 2) ──
-  editionList: {
-    gap: 10,
-  },
-  editionCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-  },
-  editionCardSelected: {
-    // Additional styles applied when selected
-  },
-  editionIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14,
-  },
-  editionInfo: {
-    flex: 1,
-  },
-  editionName: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: 15,
-    color: '#FFFFFF',
-  },
-  editionNameSelected: {
-    color: '#FFBC40',
-  },
-  editionDescription: {
-    fontFamily: FONTS.body,
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.4)',
-    marginTop: 3,
-  },
-  editionCheck: {
-    marginLeft: 8,
   },
 
   // ── Ideation (Step 3) ──

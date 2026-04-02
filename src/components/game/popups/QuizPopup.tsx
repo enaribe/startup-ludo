@@ -16,6 +16,7 @@ import { COLORS } from '@/styles/colors';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { SPACING, BORDER_RADIUS, SHADOWS } from '@/styles/spacing';
 import { useSettingsStore } from '@/stores';
+import { useSound, usePlaySoundOnOpen } from '@/hooks/useSound';
 import type { QuizEvent } from '@/types';
 
 interface QuizPopupProps {
@@ -37,8 +38,11 @@ export const QuizPopup = memo(function QuizPopup({
   spectatorResult,
 }: QuizPopupProps) {
   const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
+  const { play: playSound } = useSound();
+  usePlaySoundOnOpen(visible && !!quiz, 'popup-open');
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [hasAnswered, setHasAnswered] = useState(false);
+  const [showCorrectHighlight, setShowCorrectHighlight] = useState(false);
   const [, setTimeRemaining] = useState(30);
 
   const timerProgress = useSharedValue(1);
@@ -51,6 +55,7 @@ export const QuizPopup = memo(function QuizPopup({
     if (visible && quiz) {
       setSelectedAnswer(null);
       setHasAnswered(false);
+      setShowCorrectHighlight(false);
       setTimeRemaining(quiz.timeLimit || 30);
       timerProgress.value = 1;
       resultScale.value = 0;
@@ -82,13 +87,15 @@ export const QuizPopup = memo(function QuizPopup({
   useEffect(() => {
     if (!isSpectator || !spectatorResult || !quiz) return;
     setHasAnswered(true);
-    // Si correct : montrer la bonne réponse. Si faux : montrer l'index choisi (rouge) ou la bonne réponse si index inconnu
     if (spectatorResult.ok) {
       setSelectedAnswer(quiz.correctAnswer);
+      setShowCorrectHighlight(true);
     } else {
       setSelectedAnswer(spectatorResult.selectedIndex !== undefined && spectatorResult.selectedIndex >= 0
         ? spectatorResult.selectedIndex
         : -1);
+      setShowCorrectHighlight(false);
+      setTimeout(() => setShowCorrectHighlight(true), 700);
     }
     resultScale.value = withTiming(1, { duration: 220 });
     badgeBounce.value = withTiming(1, { duration: 220 });
@@ -97,12 +104,15 @@ export const QuizPopup = memo(function QuizPopup({
   const handleTimeUp = useCallback(() => {
     if (hasAnswered || !quiz) return;
     setHasAnswered(true);
+    setShowCorrectHighlight(false);
+    setTimeout(() => setShowCorrectHighlight(true), 700);
     resultScale.value = withTiming(1, { duration: 220 });
     badgeBounce.value = withTiming(1, { duration: 220 });
     if (hapticsEnabled) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    playSound('quiz-wrong');
     const delay = quiz.explanation ? 3000 : 1500;
     setTimeout(() => onAnswer(false, quiz.reward, -1), delay);
-  }, [hasAnswered, quiz, hapticsEnabled, onAnswer, resultScale, badgeBounce]);
+  }, [hasAnswered, quiz, hapticsEnabled, onAnswer, playSound, resultScale, badgeBounce]);
 
   const handleSelectAnswer = useCallback(
     (index: number) => {
@@ -111,16 +121,23 @@ export const QuizPopup = memo(function QuizPopup({
       setHasAnswered(true);
       const isCorrect = index === quiz.correctAnswer;
       const reward = quiz.reward;
+      if (isCorrect) {
+        setShowCorrectHighlight(true);
+      } else {
+        setShowCorrectHighlight(false);
+        setTimeout(() => setShowCorrectHighlight(true), 700);
+      }
       resultScale.value = withTiming(1, { duration: 220 });
       badgeBounce.value = withTiming(1, { duration: 220 });
       if (hapticsEnabled) {
         if (isCorrect) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         else Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
+      playSound(isCorrect ? 'quiz-correct' : 'quiz-wrong');
       const delay = quiz.explanation ? 3000 : 1500;
       setTimeout(() => onAnswer(isCorrect, reward, index), delay);
     },
-    [hasAnswered, quiz, hapticsEnabled, onAnswer, resultScale, badgeBounce]
+    [hasAnswered, quiz, hapticsEnabled, onAnswer, playSound, resultScale, badgeBounce]
   );
 
   const timerAnimStyle = useAnimatedStyle(() => {
@@ -200,7 +217,7 @@ export const QuizPopup = memo(function QuizPopup({
               const isCorrectOption = index === quiz.correctAnswer;
               const isSelected = selectedAnswer === index;
               const isSelectedWrong = isSelected && !isCorrectOption;
-              const showAsCorrect = hasAnswered && isCorrectOption;
+              const showAsCorrect = hasAnswered && isCorrectOption && showCorrectHighlight;
 
               // Styles conditionnels
               const pillStyle = !hasAnswered

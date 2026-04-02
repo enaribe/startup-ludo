@@ -31,6 +31,8 @@ import { useGameStore, useAuthStore, useUserStore, useChallengeStore } from '@/s
 import { XP_REWARDS, getChallengeXPReward } from '@/config/progression';
 import { updateUserStats, updateChallengeEnrollment, saveGameSession, updateStartupValorisation } from '@/services/firebase/firestore';
 import { isOwnStartup } from '@/data/defaultProjects';
+import { formatFCFARaw } from '@/utils/currency';
+import { useSound } from '@/hooks/useSound';
 
 const { width: screenWidth } = Dimensions.get('window');
 const contentWidth = screenWidth - SPACING[4] * 2;
@@ -128,6 +130,8 @@ export default function ResultsScreen() {
   const isGuest = user?.isGuest ?? true;
   const isOnline = params.isOnline === 'true' || params.mode === 'online';
   const hasAppliedRewards = useRef(false);
+  const endGameSoundPlayed = useRef(false);
+  const { play: playEndGameSound } = useSound();
 
   const [showConvertPopup, setShowConvertPopup] = useState(false);
 
@@ -146,6 +150,15 @@ export default function ResultsScreen() {
   const myPlayer = game?.players.find((p) => p.id === userId);
   const myRank = myPlayer ? sortedPlayers.findIndex((p) => p.id === myPlayer.id) + 1 : 0;
   const isWinner = userId != null && game?.winner === userId;
+
+  // Son fin de partie (une fois : victoire / défaite selon le gagnant)
+  useEffect(() => {
+    if (endGameSoundPlayed.current) return;
+    if (!game || game.status !== 'finished' || userId == null) return;
+    if (game.winner === null) return;
+    endGameSoundPlayed.current = true;
+    playEndGameSound(game.winner === userId ? 'victory' : 'defeat');
+  }, [game, userId, playEndGameSound]);
 
   // XP calculation
   const { total: xpGained, breakdown: xpBreakdown } = computeXP(
@@ -174,10 +187,10 @@ export default function ResultsScreen() {
   // Calcul de la valorisation (toujours appliquee si l'utilisateur a un projet)
   const hasAnyStartup = myStartup !== null;
   const valorisationBefore = myStartup?.valorisation ?? 0;
+  // Gain en FCFA : 6250 FCFA par jeton (8 jetons = 50 000 FCFA max)
+  // Online : bonus ×1.5
   const valorisationGain = hasAnyStartup
-    ? isWinner
-      ? (myPlayer?.tokens ?? 0) * 5000 * (isOnline ? 2 : 1)
-      : (myPlayer?.tokens ?? 0) * 2000 * (isOnline ? 2 : 1)
+    ? Math.round((myPlayer?.tokens ?? 0) * 6250 * (isOnline ? 1.5 : 1))
     : 0;
   const valorisationAfter = valorisationBefore + valorisationGain;
   const defaultProjectXPBonus = !usedOwnStartup && myPlayer?.startupId ? 5 : 0;
@@ -490,19 +503,19 @@ export default function ResultsScreen() {
                   <View style={styles.valorisationCol}>
                     <Text style={styles.valorisationLabel}>Avant</Text>
                     <Text style={styles.valorisationValue}>
-                      {valorisationBefore.toLocaleString('fr-FR')} C
+                      {formatFCFARaw(valorisationBefore)}
                     </Text>
                   </View>
                   <View style={styles.valorisationArrow}>
                     <Ionicons name="arrow-forward" size={20} color={COLORS.success} />
                     <Text style={styles.valorisationGain}>
-                      +{valorisationGain.toLocaleString('fr-FR')}
+                      +{formatFCFARaw(valorisationGain)}
                     </Text>
                   </View>
                   <View style={styles.valorisationCol}>
                     <Text style={styles.valorisationLabel}>Apres</Text>
                     <Text style={styles.valorisationAfterText}>
-                      {valorisationAfter.toLocaleString('fr-FR')} C
+                      {formatFCFARaw(valorisationAfter)}
                     </Text>
                   </View>
                 </View>

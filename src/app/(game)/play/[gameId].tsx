@@ -29,7 +29,7 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { RadialBackground } from '@/components/ui';
 import { eventManager } from '@/services/game/EventManager';
-import { useGameStore, useSettingsStore, useAuthStore } from '@/stores';
+import { useGameStore, useSettingsStore, useAuthStore, useAudioUiStore } from '@/stores';
 import { useOnlineGame } from '@/hooks/useOnlineGame';
 import { useTurnMachine, type TurnActions } from '@/hooks/useTurnMachine';
 import { useDuel } from '@/hooks/useDuel';
@@ -83,6 +83,14 @@ export default function PlayScreen() {
   const insets = useSafeAreaInsets();
   const { sizes, spacing } = useResponsiveLayout();
   const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
+  const setBgmGameplayDuck = useAudioUiStore((s) => s.setBgmGameplayDuck);
+
+  /** Musique de fond plus basse pendant la partie ; les SFX gardent leur volume */
+  useEffect(() => {
+    setBgmGameplayDuck(true);
+    return () => setBgmGameplayDuck(false);
+  }, [setBgmGameplayDuck]);
+
   const params = useLocalSearchParams<{ mode?: string; roomId?: string }>();
   const isOnline = params.mode === 'online';
   const userId = useAuthStore((s) => s.user?.id) ?? null;
