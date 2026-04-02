@@ -2,10 +2,10 @@ import { create } from 'zustand';
 
 /**
  * État UI audio non persisté (pas AsyncStorage).
- * Pendant une partie, la musique de fond est abaissée ; les SFX gardent leur volume via `useSound`.
+ * Pendant une partie, la musique de fond est coupée ; les SFX gardent leur volume via `useSound`.
  */
 interface AudioUiState {
-  /** True tant que l’écran de jeu actif est monté */
+  /** True tant que l’écran de jeu actif est monté (BGM arrêtée) */
   bgmGameplayDuck: boolean;
   setBgmGameplayDuck: (duck: boolean) => void;
 }

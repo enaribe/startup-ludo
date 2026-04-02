@@ -14,3 +14,5 @@ export { Tag } from './Tag';
 export { StatCard } from './StatCard';
 export { ScreenHeader } from './ScreenHeader';
 export { FAB } from './FAB';
+export { InfoModal } from './InfoModal';
+export type { InfoSection } from './InfoModal';

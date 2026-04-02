@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { useGameStore, useAuthStore, useUserStore } from '@/stores';
+import { EditionTileIcon } from '@/components/icons';
 import { RadialBackground, DynamicGradientBorder, GameButton } from '@/components/ui';
 import { StartupSelectionModal } from '@/components/game/StartupSelectionModal';
 import { getDefaultProjectsForEdition, getMatchingUserStartups } from '@/data/defaultProjects';
@@ -503,7 +504,6 @@ export default function LocalSetupScreen() {
             <View style={styles.editionGrid}>
               {getEditionList().map((edition, index) => {
                 const isSelected = selectedEdition === edition.id;
-                const iconName = edition.icon;
                 return (
                   <Animated.View
                     key={edition.id}
@@ -531,10 +531,11 @@ export default function LocalSetupScreen() {
                             </View>
                           ) : null}
                           <View style={styles.editionTileIconWrap}>
-                            <Ionicons
-                              name={iconName}
+                            <EditionTileIcon
+                              editionId={edition.id}
+                              editionName={edition.name}
                               size={34}
-                              color={isSelected ? '#FFBC40' : '#7F8E9E'}
+                              color={isSelected ? '#FFBC40' : '#71808E'}
                             />
                           </View>
                           <Text

@@ -636,9 +636,12 @@ export default function ResultsScreen() {
             title="NOUVELLE PARTIE"
             onPress={handlePlayAgain}
           />
-          <Pressable style={styles.backButton} onPress={handleGoHome}>
-            <Text style={styles.backButtonText}>Retour a l'accueil</Text>
-          </Pressable>
+          <GameButton
+            variant="blue"
+            fullWidth
+            title="RETOUR À L'ACCUEIL"
+            onPress={handleGoHome}
+          />
         </Animated.View>
       </ScrollView>
 
@@ -1013,18 +1016,6 @@ const styles = StyleSheet.create({
   // Actions
   actionsBlock: {
     gap: SPACING[3],
-  },
-  backButton: {
-    paddingVertical: SPACING[4],
-    borderRadius: 16,
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: COLORS.border,
-  },
-  backButtonText: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: FONT_SIZES.md,
-    color: COLORS.text,
   },
 
   // Modal

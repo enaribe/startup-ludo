@@ -15,7 +15,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
 import { ChallengeHomeCard, EnrollmentFormModal } from '@/components/challenges';
-import { Avatar, DynamicGradientBorder, RadialBackground } from '@/components/ui';
+import { Avatar, DynamicGradientBorder, InfoModal, RadialBackground } from '@/components/ui';
+import type { InfoSection } from '@/components/ui';
+
 import { formatXP, getLevelFromXP, getRankFromXP, getRankProgress } from '@/config/progression';
 import { ALL_CHALLENGES, refreshChallengesFromFirestore } from '@/data/challenges';
 import { useAuthStore, useChallengeStore, useUserStore } from '@/stores';
@@ -98,6 +100,24 @@ const SpinningRays = memo(function SpinningRays() {
   );
 });
 
+const HOME_INFO_SECTIONS: InfoSection[] = [
+  {
+    icon: 'star',
+    title: 'XP & NIVEAU',
+    body: "Gagne de l'XP en jouant des parties. Plus tu accumules d'XP, plus ton niveau monte et tu débloques de nouveaux rangs.",
+  },
+  {
+    icon: 'briefcase',
+    title: 'PORTFOLIO',
+    body: 'La valorisation totale de tes startups créées lors des parties. Chaque levée de fonds augmente la valeur de ton entreprise.',
+  },
+  {
+    icon: 'school',
+    title: 'PROGRAMMES',
+    body: 'Des défis thématiques pour progresser sur des compétences entrepreneuriales spécifiques. Rejoins un programme pour débloquer des niveaux spéciaux.',
+  },
+];
+
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -112,6 +132,7 @@ export default function HomeScreen() {
   const userId = user?.id ?? '';
 
   const [showEnrollmentForm, setShowEnrollmentForm] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
   const [challengesLoaded, setChallengesLoaded] = useState(false);
 
   // Récupérer uniquement les challenges inscrits de l'utilisateur
@@ -244,15 +265,10 @@ export default function HomeScreen() {
             </Animated.View>
           </View>
 
-          {/* Settings Icon (Right) */}
+          {/* Info Icon (Right) */}
           <Animated.View entering={FadeInDown.delay(100).duration(400)}>
-            <Pressable
-              onPress={() => router.push('/settings')}
-              style={styles.settingsButton}
-            >
-              <View style={styles.settingsIconCircle}>
-                <Ionicons name="settings-outline" size={22} color="rgba(255,255,255,0.6)" />
-              </View>
+            <Pressable onPress={() => setShowInfo(true)} style={styles.infoButton}>
+              <Ionicons name="information-circle-outline" size={24} color="#FFBC40" />
             </Pressable>
           </Animated.View>
         </View>
@@ -432,6 +448,16 @@ export default function HomeScreen() {
         onSubmit={handleEnrollmentFormSubmit}
         onClose={() => setShowEnrollmentForm(false)}
       />
+
+      {/* Info Modal */}
+      <InfoModal
+        visible={showInfo}
+        onClose={() => setShowInfo(false)}
+        title="ACCUEIL"
+        headerIcon="home"
+        description="Ton tableau de bord personnel. Suis ta progression et accède à tes programmes d'entraînement."
+        sections={HOME_INFO_SECTIONS}
+      />
     </View>
   );
 }
@@ -482,19 +508,11 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     letterSpacing: 1,
   },
-  settingsButton: {
+  infoButton: {
     width: 40,
     height: 40,
-  },
-  settingsIconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   logoContainer: {
     alignItems: 'center',

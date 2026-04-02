@@ -137,7 +137,7 @@ export default function PlayScreen() {
   const [challengeData, setChallengeData] = useState<ChallengeEvent | null>(null);
   const [duelTriggered, setDuelTriggered] = useState(false);
   const [isEventSpectator, setIsEventSpectator] = useState(false);
-  const [aiSpectatorResult, setAiSpectatorResult] = useState<{ ok: boolean; reward: number } | null>(null);
+  const [aiSpectatorResult, setAiSpectatorResult] = useState<{ ok: boolean; reward: number; selectedIndex?: number } | null>(null);
   const [spectatorDuelChallengerId, setSpectatorDuelChallengerId] = useState<string | null>(null);
   const [spectatorDuelOpponentId, setSpectatorDuelOpponentId] = useState<string | null>(null);
 
@@ -295,7 +295,15 @@ export default function PlayScreen() {
             const aiCorrect = Math.random() < 0.6;
             const quizEv = event.data as QuizEvent;
             const reward = quizEv.reward;
-            const result = { ok: aiCorrect, reward };
+            const optionsCount = quizEv.options.length;
+            let selectedIndex: number;
+            if (aiCorrect) {
+              selectedIndex = quizEv.correctAnswer;
+            } else {
+              const wrongOptions = Array.from({ length: optionsCount }, (_, i) => i).filter(i => i !== quizEv.correctAnswer);
+              selectedIndex = wrongOptions[Math.floor(Math.random() * wrongOptions.length)] ?? 0;
+            }
+            const result = { ok: aiCorrect, reward, selectedIndex };
             setQuizData(quizEv);
             // Show quiz question first, then after 1.5s show AI's answer (green/red feedback)
             setTimeout(() => setAiSpectatorResult(result), 1500);

@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { memo, useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   Dimensions,
@@ -19,18 +19,22 @@ import {
   DynamicGradientBorder,
   FAB,
   GameButton,
+  InfoModal,
   Modal,
   RadialBackground,
 } from '@/components/ui';
+import type { InfoSection } from '@/components/ui';
 import { deleteStartup } from '@/services/firebase/firestore';
 import { useAuthStore, useUserStore } from '@/stores';
 import { COLORS } from '@/styles/colors';
-import { SPACING } from '@/styles/spacing';
+import { BORDER_RADIUS, SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import type { Startup } from '@/types';
 import { formatFCFARaw } from '@/utils/currency';
 
 const { width: screenWidth } = Dimensions.get('window');
+const POPUP_CARD_INNER_W = screenWidth - 36 - SPACING[5] * 2;
+const POPUP_DETAIL_PAGE_W = POPUP_CARD_INNER_W - 40;
 
 function formatValorisationPopup(value: number): string {
   return formatFCFARaw(value);
@@ -44,6 +48,61 @@ function formatDateDDMMYYYY(ts: number): string {
   return `${day}/${month}/${year}`;
 }
 
+const SECTOR_PILL_RADIUS = BORDER_RADIUS.lg;
+
+const sectorPillStyles = StyleSheet.create({
+  inner: {
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+  },
+  text: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.white,
+  },
+});
+
+const StartupSectorPill = memo(function StartupSectorPill({ label }: { label: string }) {
+  const [measuredWidth, setMeasuredWidth] = useState(0);
+
+  useEffect(() => {
+    setMeasuredWidth(0);
+  }, [label]);
+
+  const inner = (
+    <View style={sectorPillStyles.inner}>
+      <Text style={sectorPillStyles.text}>{label}</Text>
+    </View>
+  );
+
+  if (measuredWidth <= 0) {
+    return (
+      <View
+        style={{ alignSelf: 'flex-start' }}
+        onLayout={(e) => {
+          const { width } = e.nativeEvent.layout;
+          if (width > 0) {
+            setMeasuredWidth(width);
+          }
+        }}
+      >
+        {inner}
+      </View>
+    );
+  }
+
+  return (
+    <DynamicGradientBorder
+      boxWidth={measuredWidth}
+      borderRadius={SECTOR_PILL_RADIUS}
+      fill="rgba(0, 0, 0, 0.35)"
+      style={{ alignSelf: 'flex-start' }}
+    >
+      {inner}
+    </DynamicGradientBorder>
+  );
+});
+
 function StartupDetailPopup({
   startup,
   onClose,
@@ -53,8 +112,14 @@ function StartupDetailPopup({
   onClose: () => void;
   onDelete?: () => void;
 }) {
+  const [detailPageIndex, setDetailPageIndex] = useState(0);
   const valorisationStr = formatValorisationPopup(startup.valorisation ?? startup.tokensInvested ?? 0);
   const createdAtStr = formatDateDDMMYYYY(startup.createdAt);
+  const descriptionRaw = startup.description?.trim() ?? '';
+  const descriptionDisplay =
+    descriptionRaw.length > 0
+      ? descriptionRaw
+      : 'Aucune description pour le moment.';
 
   return (
     <Modal
@@ -84,83 +149,143 @@ function StartupDetailPopup({
             {/* 1. Header */}
             <View style={popupStyles.header}>
               <View style={popupStyles.iconBadge}>
-                <RocketIcon color="#1F91D0" size={75} />
+                <RocketIcon color="#1F91D0" size={75} withShadow={false} />
               </View>
               <Text style={popupStyles.startupName}>{startup.name}</Text>
             </View>
 
             {/* 2. Tableau stats : Valorisation | Niveau */}
             <View style={popupStyles.statsRow}>
-              <View style={popupStyles.statCol}>
-                <Text style={popupStyles.statValue}>{valorisationStr}</Text>
+              <View style={popupStyles.statColHeader}>
+                <Text
+                  style={popupStyles.statValue}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {valorisationStr}
+                </Text>
                 <Text style={popupStyles.statLabel}>Valorisation</Text>
               </View>
               <View style={popupStyles.statSeparator} />
-              <View style={popupStyles.statCol}>
-                <Text style={popupStyles.statValueNiv}>NIV. {startup.level}</Text>
+              <View style={popupStyles.statColHeader}>
+                <Text style={popupStyles.statValueNiv} numberOfLines={1}>
+                  NIV. {startup.level}
+                </Text>
                 <Text style={popupStyles.statLabel}>Niveau</Text>
               </View>
             </View>
 
-            {/* 3. Detail Block (Card) */}
+            {/* 3. Description (swipe) | Informations */}
             <View style={popupStyles.detailCard}>
-              <View style={popupStyles.detailRow}>
-                <View style={popupStyles.detailLeft}>
-                  <Ionicons name="people" size={16} color="#7F8E9E" />
-                  <Text style={popupStyles.detailLabel}>Cible</Text>
+              <ScrollView
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                decelerationRate="fast"
+                style={{ width: POPUP_DETAIL_PAGE_W, alignSelf: 'center' }}
+                onMomentumScrollEnd={(e) => {
+                  const pageW = e.nativeEvent.layoutMeasurement.width;
+                  const x = e.nativeEvent.contentOffset.x;
+                  if (pageW > 0) {
+                    setDetailPageIndex(Math.round(x / pageW));
+                  }
+                }}
+              >
+                <View style={[popupStyles.detailSwipePage, { width: POPUP_DETAIL_PAGE_W }]}>
+                  <Text style={popupStyles.detailSwipeTitle}>Description</Text>
+                  <ScrollView
+                    nestedScrollEnabled
+                    showsVerticalScrollIndicator={false}
+                    style={popupStyles.detailVerticalScroll}
+                    contentContainerStyle={popupStyles.detailVerticalScrollContent}
+                  >
+                    <Text style={popupStyles.detailDescriptionText}>{descriptionDisplay}</Text>
+                  </ScrollView>
                 </View>
-                <Text style={popupStyles.detailValue}>
-                  {startup.targetCard?.title ?? 'Non définie'}
-                </Text>
-              </View>
 
-              <View style={popupStyles.detailRow}>
-                <View style={popupStyles.detailLeft}>
-                  <Ionicons name="flag" size={16} color="#7F8E9E" />
-                  <Text style={popupStyles.detailLabel}>Mission</Text>
-                </View>
-                <Text style={popupStyles.detailValue}>
-                  {startup.missionCard?.title ?? 'Non définie'}
-                </Text>
-              </View>
+                <View style={[popupStyles.detailSwipePage, { width: POPUP_DETAIL_PAGE_W }]}>
+                  <Text style={popupStyles.detailSwipeTitle}>Informations</Text>
+                  <ScrollView
+                    nestedScrollEnabled
+                    showsVerticalScrollIndicator={false}
+                    style={popupStyles.detailVerticalScroll}
+                    contentContainerStyle={popupStyles.detailVerticalScrollContent}
+                  >
+                    <View style={popupStyles.detailRow}>
+                      <View style={popupStyles.detailLeft}>
+                        <Ionicons name="people" size={16} color="#7F8E9E" />
+                        <Text style={popupStyles.detailLabel}>Cible</Text>
+                      </View>
+                      <Text style={popupStyles.detailValue}>
+                        {startup.targetCard?.title ?? 'Non définie'}
+                      </Text>
+                    </View>
 
-              <View style={popupStyles.detailRow}>
-                <View style={popupStyles.detailLeft}>
-                  <Ionicons name="business" size={16} color="#7F8E9E" />
-                  <Text style={popupStyles.detailLabel}>Secteur</Text>
-                </View>
-                <Text style={[popupStyles.detailValue, popupStyles.detailValueWrap]} numberOfLines={2}>
-                  {startup.sector}
-                </Text>
-              </View>
+                    <View style={popupStyles.detailRow}>
+                      <View style={popupStyles.detailLeft}>
+                        <Ionicons name="flag" size={16} color="#7F8E9E" />
+                        <Text style={popupStyles.detailLabel}>Mission</Text>
+                      </View>
+                      <Text style={popupStyles.detailValue}>
+                        {startup.missionCard?.title ?? 'Non définie'}
+                      </Text>
+                    </View>
 
-              <View style={popupStyles.detailRow}>
-                <View style={popupStyles.detailLeft}>
-                  <Ionicons name="calendar" size={16} color="#7F8E9E" />
-                  <Text style={popupStyles.detailLabel}>Crée le</Text>
-                </View>
-                <Text style={popupStyles.detailValue}>{createdAtStr}</Text>
-              </View>
+                    <View style={popupStyles.detailRow}>
+                      <View style={popupStyles.detailLeft}>
+                        <Ionicons name="business" size={16} color="#7F8E9E" />
+                        <Text style={popupStyles.detailLabel}>Secteur</Text>
+                      </View>
+                      <Text style={[popupStyles.detailValue, popupStyles.detailValueWrap]} numberOfLines={2}>
+                        {startup.sector}
+                      </Text>
+                    </View>
 
-              <View style={popupStyles.detailRow}>
-                <View style={popupStyles.detailLeft}>
-                  <Ionicons name="diamond" size={16} color="#7F8E9E" />
-                  <Text style={popupStyles.detailLabel}>Tokens investis</Text>
-                </View>
-                <Text style={popupStyles.detailValue}>
-                  {startup.tokensInvested.toLocaleString()}
-                </Text>
-              </View>
+                    <View style={popupStyles.detailRow}>
+                      <View style={popupStyles.detailLeft}>
+                        <Ionicons name="calendar" size={16} color="#7F8E9E" />
+                        <Text style={popupStyles.detailLabel}>Crée le</Text>
+                      </View>
+                      <Text style={popupStyles.detailValue}>{createdAtStr}</Text>
+                    </View>
 
-              {startup.creatorName ? (
-                <View style={popupStyles.detailRow}>
-                  <View style={popupStyles.detailLeft}>
-                    <Ionicons name="person" size={16} color="#7F8E9E" />
-                    <Text style={popupStyles.detailLabel}>Créateur</Text>
-                  </View>
-                  <Text style={popupStyles.detailValue}>{startup.creatorName}</Text>
+                    <View style={popupStyles.detailRow}>
+                      <View style={popupStyles.detailLeft}>
+                        <Ionicons name="diamond" size={16} color="#7F8E9E" />
+                        <Text style={popupStyles.detailLabel}>Tokens investis</Text>
+                      </View>
+                      <Text style={popupStyles.detailValue}>
+                        {startup.tokensInvested.toLocaleString()}
+                      </Text>
+                    </View>
+
+                    {startup.creatorName ? (
+                      <View style={popupStyles.detailRow}>
+                        <View style={popupStyles.detailLeft}>
+                          <Ionicons name="person" size={16} color="#7F8E9E" />
+                          <Text style={popupStyles.detailLabel}>Créateur</Text>
+                        </View>
+                        <Text style={popupStyles.detailValue}>{startup.creatorName}</Text>
+                      </View>
+                    ) : null}
+                  </ScrollView>
                 </View>
-              ) : null}
+              </ScrollView>
+
+              <View style={popupStyles.detailPagerDots}>
+                <View
+                  style={[
+                    popupStyles.detailPagerDot,
+                    detailPageIndex === 0 && popupStyles.detailPagerDotActive,
+                  ]}
+                />
+                <View
+                  style={[
+                    popupStyles.detailPagerDot,
+                    detailPageIndex === 1 && popupStyles.detailPagerDotActive,
+                  ]}
+                />
+              </View>
             </View>
 
             {/* 4. Actions */}
@@ -221,42 +346,96 @@ const popupStyles = StyleSheet.create({
   },
   statsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'stretch',
     justifyContent: 'center',
-    gap: 20,
     marginBottom: SPACING[5],
   },
-  statCol: {
+  statColHeader: {
+    flex: 1,
+    flexBasis: 0,
+    minWidth: 0,
+    flexDirection: 'column',
     alignItems: 'center',
     gap: 4,
   },
   statSeparator: {
-    width: 1,
-    height: 32,
+    alignSelf: 'center',
+    width: StyleSheet.hairlineWidth,
+    height: 22,
+    flexGrow: 0,
+    flexShrink: 0,
+    marginHorizontal: 0,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
   statValue: {
     fontFamily: FONTS.title,
     fontSize: 24,
     color: COLORS.primary,
+    textAlign: 'center',
+    maxWidth: '100%',
   },
   statValueNiv: {
     fontFamily: FONTS.title,
     fontSize: 20,
     color: COLORS.primary,
+    textAlign: 'center',
+    maxWidth: '100%',
   },
   statLabel: {
     fontFamily: FONTS.bodyMedium,
     fontSize: 10,
     color: COLORS.white,
+    textAlign: 'center',
   },
   detailCard: {
     backgroundColor: 'rgba(0, 0, 0, 0.2)',
     borderRadius: 15,
     paddingVertical: 27,
     paddingHorizontal: 20,
-    gap: 24,
     marginBottom: SPACING[5],
+  },
+  detailSwipePage: {
+    minHeight: 200,
+    maxHeight: 300,
+  },
+  detailSwipeTitle: {
+    fontFamily: FONTS.title,
+    fontSize: 16,
+    color: COLORS.primary,
+    marginBottom: SPACING[2],
+    textAlign: 'center',
+  },
+  detailVerticalScroll: {
+    maxHeight: 260,
+  },
+  detailVerticalScrollContent: {
+    gap: 24,
+    paddingBottom: SPACING[2],
+  },
+  detailDescriptionText: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.base,
+    lineHeight: 22,
+    color: 'rgba(255,255,255,0.85)',
+  },
+  detailPagerDots: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: SPACING[3],
+  },
+  detailPagerDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+  },
+  detailPagerDotActive: {
+    backgroundColor: COLORS.primary,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   detailRow: {
     flexDirection: 'row',
@@ -301,6 +480,24 @@ const popupStyles = StyleSheet.create({
 
 const MAX_STARTUPS = 3;
 
+const PORTFOLIO_INFO_SECTIONS: InfoSection[] = [
+  {
+    icon: 'rocket',
+    title: 'STARTUPS',
+    body: `Tu peux créer jusqu'à ${MAX_STARTUPS} startups. Chaque startup est définie par un secteur, une cible et une mission.`,
+  },
+  {
+    icon: 'trending-up',
+    title: 'VALORISATION',
+    body: "La valorisation augmente chaque fois que ta startup lève des fonds lors d'une partie. Elle représente la valeur totale de ton entreprise.",
+  },
+  {
+    icon: 'bar-chart',
+    title: 'NIVEAU',
+    body: "Le niveau de ta startup progresse avec les levées de fonds. Un niveau élevé reflète une startup mature et bien financée.",
+  },
+];
+
 // Header height: safeArea + title + stats + padding (version compacte)
 const HEADER_CONTENT_HEIGHT = 132;
 
@@ -310,6 +507,7 @@ export default function PortfolioScreen() {
   const profile = useUserStore((state) => state.profile);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedStartup, setSelectedStartup] = useState<Startup | null>(null);
+  const [showInfo, setShowInfo] = useState(false);
 
   const startups = profile?.startups ?? [];
   const totalValorisation = startups.reduce((sum, s) => sum + s.tokensInvested, 0);
@@ -339,20 +537,28 @@ export default function PortfolioScreen() {
       <View style={[styles.fixedHeader, { paddingTop: headerTopPadding }]}>
         <Animated.View entering={FadeInDown.duration(500)} style={styles.headerTopRow}>
           <Text style={styles.headerTitle}>mon PORTFOLIO</Text>
-          <Pressable style={styles.settingsBtn}>
-            <Ionicons name="alert-circle-outline" size={24} color="#FFBC40" />
+          <Pressable style={styles.settingsBtn} onPress={() => setShowInfo(true)}>
+            <Ionicons name="information-circle-outline" size={24} color="#FFBC40" />
           </Pressable>
         </Animated.View>
 
         <Animated.View entering={FadeInDown.delay(100).duration(500)}>
           <View style={styles.statsRow}>
-            <View style={styles.statCol}>
-              <Text style={styles.statValue}>{formatValorisation(totalValorisation)}</Text>
+            <View style={styles.statColHeader}>
+              <Text
+                style={styles.statValue}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {formatValorisation(totalValorisation)}
+              </Text>
               <Text style={styles.statLabel}>Valorisations</Text>
             </View>
             <View style={styles.statDivider} />
-            <View style={styles.statCol}>
-              <Text style={styles.statValue}>{startups.length}/{MAX_STARTUPS}</Text>
+            <View style={styles.statColHeader}>
+              <Text style={styles.statValue} numberOfLines={1}>
+                {startups.length}/{MAX_STARTUPS}
+              </Text>
               <Text style={styles.statLabel}>Entreprises</Text>
             </View>
           </View>
@@ -402,7 +608,7 @@ export default function PortfolioScreen() {
                     <View style={styles.startupCard}>
                       {/* Header */}
                       <View style={styles.startupHeader}>
-                        <RocketIcon color="#1F91D0" size={52} />
+                        <RocketIcon color="#1F91D0" size={52} withShadow={false} />
                         <View style={styles.startupInfo}>
                           <Text style={styles.startupName}>{startup.name}</Text>
                           <Text style={styles.startupDesc} numberOfLines={2}>
@@ -413,9 +619,7 @@ export default function PortfolioScreen() {
 
                       {/* Tags */}
                       <View style={styles.tagsRow}>
-                        <View style={styles.sectorPill}>
-                          <Text style={styles.sectorPillText}>{startup.sector}</Text>
-                        </View>
+                        <StartupSectorPill label={startup.sector} />
                         <Text style={styles.dateText}>
                           Crée il y'a {Math.floor((Date.now() - startup.createdAt) / (1000 * 60 * 60 * 24 * 7))} semaine{Math.floor((Date.now() - startup.createdAt) / (1000 * 60 * 60 * 24 * 7)) !== 1 ? 's' : ''}
                         </Text>
@@ -423,15 +627,21 @@ export default function PortfolioScreen() {
 
                       {/* Footer stats */}
                       <View style={styles.startupFooter}>
-                        <View style={styles.footerStat}>
-                          <Text style={styles.footerStatValue}>
+                        <View style={styles.footerStatValorisation}>
+                          <Text
+                            style={styles.footerStatValue}
+                            numberOfLines={1}
+                            ellipsizeMode="tail"
+                          >
                             {formatValorisation(startup.tokensInvested)}
                           </Text>
                           <Text style={styles.footerStatLabel}>Valorisation</Text>
                         </View>
                         <View style={styles.footerDivider} />
-                        <View style={styles.footerStat}>
-                          <Text style={styles.footerStatValueGreen}>NIV. {startup.level}</Text>
+                        <View style={styles.footerStatNiveau}>
+                          <Text style={styles.footerStatValueGreen} numberOfLines={1}>
+                            NIV. {startup.level}
+                          </Text>
                           <Text style={styles.footerStatLabel}>Niveau</Text>
                         </View>
                       </View>
@@ -483,6 +693,16 @@ export default function PortfolioScreen() {
           }}
         />
       )}
+
+      {/* Info Modal */}
+      <InfoModal
+        visible={showInfo}
+        onClose={() => setShowInfo(false)}
+        title="MON PORTFOLIO"
+        headerIcon="briefcase"
+        description="Ton portfolio regroupe toutes les startups que tu as créées et développées en jouant."
+        sections={PORTFOLIO_INFO_SECTIONS}
+      />
     </View>
   );
 }
@@ -536,29 +756,39 @@ const styles = StyleSheet.create({
   },
   statsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
+    alignItems: 'stretch',
+    justifyContent: 'center',
     paddingVertical: 2,
   },
-  statCol: {
+  statColHeader: {
     flex: 1,
+    flexBasis: 0,
+    minWidth: 0,
+    flexDirection: 'column',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   statValue: {
     fontFamily: FONTS.title,
     fontSize: 19,
     color: COLORS.primary,
+    textAlign: 'center',
+    maxWidth: '100%',
   },
   statLabel: {
     fontFamily: FONTS.body,
     fontSize: FONT_SIZES['xs'],
     color: COLORS.white,
+    textAlign: 'center',
   },
   statDivider: {
-    width: 1,
-    height: 74,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    alignSelf: 'center',
+    width: StyleSheet.hairlineWidth,
+    height: 22,
+    flexGrow: 0,
+    flexShrink: 0,
+    marginHorizontal: 0,
+    backgroundColor: 'rgba(255,255,255,0.22)',
   },
   sectionTitle: {
     marginTop: SPACING[4],
@@ -630,19 +860,6 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 12,
   },
-  sectorPill: {
-    borderRadius: 30,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-  },
-  sectorPillText: {
-    fontFamily: FONTS.body,
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.white,
-  },
   dateText: {
     fontFamily: FONTS.body,
     fontSize: FONT_SIZES.xs,
@@ -650,24 +867,42 @@ const styles = StyleSheet.create({
   },
   startupFooter: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'flex-start',
     paddingTop: 6,
     marginTop: 0,
   },
-  footerStat: {
+  footerStatValorisation: {
+    flexGrow: 0,
+    flexShrink: 1,
+    minWidth: 0,
+    paddingRight: SPACING[2],
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: 12,
+  },
+  footerStatNiveau: {
     flex: 1,
+    minWidth: 0,
+    paddingLeft: SPACING[2],
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 12,
   },
   footerDivider: {
-    width: 1,
-    height: 44,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    alignSelf: 'center',
+    width: StyleSheet.hairlineWidth,
+    height: 22,
+    flexGrow: 0,
+    flexShrink: 0,
+    marginHorizontal: 0,
+    backgroundColor: 'rgba(255,255,255,0.22)',
   },
   footerStatValue: {
+    flexShrink: 1,
+    minWidth: 0,
     fontFamily: FONTS.title,
     fontSize: FONT_SIZES.xl,
     color: '#FFBC40',
@@ -678,6 +913,7 @@ const styles = StyleSheet.create({
     color: '#FFBC40',
   },
   footerStatLabel: {
+    flexShrink: 0,
     fontFamily: FONTS.bodyMedium,
     fontSize: FONT_SIZES.sm,
     color: COLORS.white,

@@ -13,15 +13,6 @@ const BGM_SOURCE = require('../../assets/sounds/song1.mp3');
 /** Volume musique de fond hors partie (0–1) */
 const BGM_VOLUME = 0.35;
 
-/**
- * Pendant une partie : volume BGM multiplié par ce ratio (dé, popups, etc. restent au niveau normal via `useSound`).
- */
-const BGM_GAMEPLAY_DUCK_RATIO = 0.18;
-
-function getBgmVolume(gameplayDuck: boolean): number {
-  return gameplayDuck ? BGM_VOLUME * BGM_GAMEPLAY_DUCK_RATIO : BGM_VOLUME;
-}
-
 export function useBackgroundMusic(): void {
   const musicEnabled = useSettingsStore((state) => state.musicEnabled);
   const isHydrated = useSettingsStore((state) => state.isHydrated);
@@ -30,11 +21,12 @@ export function useBackgroundMusic(): void {
 
   useEffect(() => {
     if (!isHydrated) return;
-    const volume = getBgmVolume(bgmGameplayDuck);
     try {
       player.loop = true;
-      player.volume = volume;
-      if (musicEnabled) {
+      if (bgmGameplayDuck) {
+        player.pause();
+      } else if (musicEnabled) {
+        player.volume = BGM_VOLUME;
         player.play();
       } else {
         player.pause();

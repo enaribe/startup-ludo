@@ -33,6 +33,7 @@ import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EnrollmentFormModal } from '@/components/challenges';
+import { SectorActivityIcon } from '@/components/icons';
 import { DynamicGradientBorder, GameButton, RadialBackground } from '@/components/ui';
 import { ALL_CHALLENGES } from '@/data/challenges';
 import { useAuthStore, useChallengeStore } from '@/stores';
@@ -214,21 +215,13 @@ const SectorCard = memo(function SectorCard({ sector, index }: SectorCardProps) 
         {innerW > 0 ? (
           <DynamicGradientBorder borderRadius={15} fill={CARD_FILL} boxWidth={innerW}>
             <View style={styles.sectorCardInner}>
-              <Ionicons
-                name={(sector.iconName as keyof typeof Ionicons.glyphMap) || 'leaf-outline'}
-                size={34}
-                color={sector.color}
-              />
+              <SectorActivityIcon size={34} />
               <Text style={styles.sectorName} numberOfLines={2}>{sector.name}</Text>
             </View>
           </DynamicGradientBorder>
         ) : (
           <View style={styles.sectorCardInner}>
-            <Ionicons
-              name={(sector.iconName as keyof typeof Ionicons.glyphMap) || 'leaf-outline'}
-              size={34}
-              color={sector.color}
-            />
+            <SectorActivityIcon size={34} />
             <Text style={styles.sectorName} numberOfLines={2}>{sector.name}</Text>
           </View>
         )}
@@ -679,6 +672,9 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 90,
     maxWidth: 120,
+  },
+  sectorCardMeasure: {
+    width: '100%',
   },
   sectorCardInner: {
     backgroundColor: 'rgba(0,0,0,0.2)',

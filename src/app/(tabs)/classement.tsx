@@ -2,12 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { memo, useCallback, useEffect, useState } from 'react';
-import { Dimensions, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
-  FadeIn,
   FadeInDown,
-  FadeOut,
   SlideInUp,
   useAnimatedStyle,
   useSharedValue,
@@ -18,7 +16,9 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/common/EmptyState';
-import { Avatar, DynamicGradientBorder, GameButton, RadialBackground, ScreenHeader } from '@/components/ui';
+import { RocketIcon } from '@/components/icons';
+import { Avatar, DynamicGradientBorder, GameButton, InfoModal, RadialBackground, ScreenHeader } from '@/components/ui';
+import type { InfoSection } from '@/components/ui';
 import { useAuthStore, useSettingsStore, useUserStore } from '@/stores';
 import { useLeaderboardCache } from '@/hooks/useLeaderboardCache';
 import { COLORS } from '@/styles/colors';
@@ -29,6 +29,10 @@ import { formatFCFARaw } from '@/utils/currency';
 
 const HEADER_CONTENT_HEIGHT = 82;
 const { width: screenWidth } = Dimensions.get('window');
+
+/** Largeurs swipe détail — alignées sur StartupDetailPopup (portfolio) */
+const PROFILE_POPUP_CARD_INNER_W = screenWidth - 36 - SPACING[5] * 2;
+const PROFILE_POPUP_DETAIL_PAGE_W = PROFILE_POPUP_CARD_INNER_W - 40;
 
 const FILTERS = [
   { id: 'joueurs', label: 'JOUEURS', icon: 'people' as const },
@@ -64,6 +68,24 @@ function formatScore(item: RankedItem): string {
   return `${item.score.toLocaleString()} xp`;
 }
 
+const CLASSEMENT_INFO_SECTIONS: InfoSection[] = [
+  {
+    icon: 'people',
+    title: 'JOUEURS',
+    body: "Les joueurs sont classés par XP accumulés en jouant des parties. Plus tu joues et gagnes, plus tu montes dans le classement.",
+  },
+  {
+    icon: 'rocket',
+    title: 'ENTREPRISES',
+    body: "Les entreprises sont classées par valorisation. Elle augmente chaque fois que ta startup lève des fonds lors d'une partie.",
+  },
+  {
+    icon: 'refresh-circle',
+    title: 'MISE À JOUR',
+    body: "Le classement est mis en cache pendant 5 minutes. Tire vers le bas pour forcer une actualisation.",
+  },
+];
+
 export default function ClassementScreen() {
   const insets = useSafeAreaInsets();
   const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
@@ -73,6 +95,7 @@ export default function ClassementScreen() {
   const [activeFilter, setActiveFilter] = useState('joueurs');
   const [selectedProfile, setSelectedProfile] = useState<{ item: RankedItem; rank: number } | null>(null);
   const [followedIds, setFollowedIds] = useState<Set<string>>(new Set());
+  const [showInfo, setShowInfo] = useState(false);
 
   // Utiliser le hook de cache
   const { players: remotePlayers, startups: remoteStartups, isRefreshing, refresh } = useLeaderboardCache();
@@ -251,8 +274,8 @@ export default function ClassementScreen() {
           <ScreenHeader
             title="CLASSEMENT GLOBAL"
             rightElement={
-              <Pressable style={styles.settingsBtn}>
-                <Ionicons name="settings-outline" size={22} color="rgba(255,255,255,0.6)" />
+              <Pressable style={styles.infoBtn} onPress={() => setShowInfo(true)}>
+                <Ionicons name="information-circle-outline" size={24} color="#FFBC40" />
               </Pressable>
             }
           />
@@ -462,6 +485,16 @@ export default function ClassementScreen() {
           onClose={handleCloseProfile}
         />
       )}
+
+      {/* Info Modal */}
+      <InfoModal
+        visible={showInfo}
+        onClose={() => setShowInfo(false)}
+        title="CLASSEMENT GLOBAL"
+        headerIcon="trophy"
+        description="Le classement regroupe tous les joueurs et entreprises de la plateforme."
+        sections={CLASSEMENT_INFO_SECTIONS}
+      />
     </View>
   );
 }
@@ -483,142 +516,272 @@ interface ProfilePopupProps {
 }
 
 function ProfilePopup({ item, rank, isFollowed, onToggleFollow, onClose }: ProfilePopupProps) {
+  const [detailPageIndex, setDetailPageIndex] = useState(0);
   const isUser = item.type === 'user';
+  const showFollowCta = isUser && !item.isCurrentUser;
+
+  useEffect(() => {
+    setDetailPageIndex(0);
+  }, [item.id]);
 
   return (
-    <Modal transparent visible animationType="none" onRequestClose={onClose}>
-      <Animated.View
-        entering={FadeIn.duration(200)}
-        exiting={FadeOut.duration(150)}
-        style={styles.popupOverlay}
-      >
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+    <Modal
+      visible
+      onClose={onClose}
+      onRequestClose={onClose}
+      closeOnBackdrop
+      showCloseButton={false}
+      bareContent
+    >
+      {/* Aligné StartupDetailPopup (portfolio) : SlideInUp 280ms */}
+      <Animated.View entering={SlideInUp.duration(280)} style={portfolioPopupStyles.centered}>
+        <DynamicGradientBorder borderRadius={24} fill="#0A1929" boxWidth={screenWidth - 36}>
+          <View style={portfolioPopupStyles.card}>
+            <Pressable style={portfolioPopupStyles.closeBtn} onPress={onClose} hitSlop={8}>
+              <Ionicons name="close" size={20} color="rgba(255,255,255,0.6)" />
+            </Pressable>
 
-        <Animated.View
-          entering={SlideInUp.duration(100).springify().damping(32)}
-          style={styles.popupContainer}
-        >
-          <DynamicGradientBorder
-            borderRadius={24}
-            fill="rgba(10, 25, 41, 0.95)"
-            boxWidth={screenWidth - 36}
-          >
-            <View style={styles.popupInner}>
-              {/* Close button */}
-              <Pressable onPress={onClose} style={styles.popupClose}>
-                <Ionicons name="close" size={20} color="rgba(255,255,255,0.6)" />
-              </Pressable>
-
-              {/* Avatar + Name */}
-              <View style={styles.popupHeader}>
-                <View style={styles.popupAvatar}>
-                  {isUser && item.avatar ? (
-                    <Avatar name={item.name} size="lg" source={item.avatar} />
-                  ) : (
-                    <Ionicons
-                      name={isUser ? 'person' : 'rocket'}
-                      size={28}
-                      color="#FFF"
-                    />
-                  )}
-                </View>
-
-                <Text style={styles.popupName}>{item.name}</Text>
-
-                <View style={styles.popupRankBadge}>
-                  <Text style={styles.popupRankText}>
-                    #{rank} {isUser ? (item.rank || '') : (item.sector || '')}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.popupDivider} />
-
-              {/* Stats */}
-              {isUser ? (
-                <View style={styles.popupStatsRow}>
-                  <PopupStat value={String(item.level || 1)} label="Niveau" />
-                  <View style={styles.popupStatSep} />
-                  <PopupStat value={item.score.toLocaleString()} label="XP" />
-                  <View style={styles.popupStatSep} />
-                  <PopupStat value={String(item.startupCount || 0)} label="Startups" />
-                </View>
-              ) : (
-                <View style={styles.popupStatsRow}>
-                  <PopupStat value={formatScore(item)} label="Valorisation" />
-                  <View style={styles.popupStatSep} />
-                  <PopupStat value={item.sector || '-'} label="Secteur" />
-                  {item.creatorName ? (
-                    <>
-                      <View style={styles.popupStatSep} />
-                      <PopupStat value={item.creatorName} label="Createur" />
-                    </>
-                  ) : null}
-                </View>
-              )}
-
-              {/* Extra stats for users */}
-              {isUser ? (
-                <>
-                  <View style={styles.popupDivider} />
-                  <View style={styles.popupDetailRows}>
-                    <PopupDetailRow icon="game-controller" label="Parties jouees" value={String(item.gamesPlayed || 0)} />
-                    <View style={styles.popupDetailSep} />
-                    <PopupDetailRow icon="trophy" label="Victoires" value={String(item.gamesWon || 0)} />
-                    <View style={styles.popupDetailSep} />
-                    <PopupDetailRow
-                      icon="star"
-                      label="Taux de victoire"
-                      value={`${item.gamesPlayed ? Math.round(((item.gamesWon || 0) / item.gamesPlayed) * 100) : 0}%`}
-                      highlight
-                    />
-                  </View>
-                </>
-              ) : null}
-
-              {/* Follow button */}
-              <View style={styles.popupActions}>
-                {isUser && !item.isCurrentUser ? (
-                  <GameButton
-                    title={isFollowed ? 'SUIVI' : 'SUIVRE'}
-                    variant={isFollowed ? 'blue' : 'yellow'}
-                    fullWidth
-                    onPress={onToggleFollow}
-                  />
+            <View style={portfolioPopupStyles.header}>
+              <View style={portfolioPopupStyles.iconBadge}>
+                {isUser && item.avatar ? (
+                  <Avatar name={item.name} size="lg" source={item.avatar} />
+                ) : isUser ? (
+                  <Ionicons name="person" size={64} color={COLORS.primary} />
                 ) : (
-                  <GameButton
-                    title="FERMER"
-                    variant="blue"
-                    fullWidth
-                    onPress={onClose}
-                  />
+                  <RocketIcon color="#1F91D0" size={75} withShadow={false} />
                 )}
               </View>
+              <Text style={portfolioPopupStyles.startupName}>{item.name}</Text>
+              {item.subtitle ? (
+                <Text style={portfolioPopupStyles.rankSubtitle}>{item.subtitle}</Text>
+              ) : null}
             </View>
-          </DynamicGradientBorder>
-        </Animated.View>
+
+            {isUser ? (
+              <>
+                <View style={portfolioPopupStyles.detailCard}>
+                  <ScrollView
+                    key={`profile-swipe-${item.id}`}
+                    horizontal
+                    pagingEnabled
+                    showsHorizontalScrollIndicator={false}
+                    decelerationRate="fast"
+                    style={{ width: PROFILE_POPUP_DETAIL_PAGE_W, alignSelf: 'center' }}
+                    onMomentumScrollEnd={(e) => {
+                      const pageW = e.nativeEvent.layoutMeasurement.width;
+                      const x = e.nativeEvent.contentOffset.x;
+                      if (pageW > 0) {
+                        setDetailPageIndex(Math.round(x / pageW));
+                      }
+                    }}
+                  >
+                    <View style={[portfolioPopupStyles.detailSwipePage, { width: PROFILE_POPUP_DETAIL_PAGE_W }]}>
+                      <Text style={portfolioPopupStyles.detailSwipeTitle}>Synthèse</Text>
+                      <ScrollView
+                        nestedScrollEnabled
+                        showsVerticalScrollIndicator={false}
+                        style={portfolioPopupStyles.detailVerticalScroll}
+                        contentContainerStyle={portfolioPopupStyles.detailVerticalScrollContent}
+                      >
+                        <View style={portfolioPopupStyles.statsLinear}>
+                          <ProfileLinearStat label="XP" value={item.score.toLocaleString()} />
+                          <View style={portfolioPopupStyles.statLineSep} />
+                          <ProfileLinearStat label="Niveau" value={`NIV. ${item.level || 1}`} />
+                          <View style={portfolioPopupStyles.statLineSep} />
+                          <ProfileLinearStat label="Startups" value={String(item.startupCount ?? 0)} />
+                          <View style={portfolioPopupStyles.statLineSep} />
+                          <ProfileLinearStat label="Rang" value={`#${rank}`} />
+                        </View>
+                      </ScrollView>
+                    </View>
+
+                    <View style={[portfolioPopupStyles.detailSwipePage, { width: PROFILE_POPUP_DETAIL_PAGE_W }]}>
+                      <Text style={portfolioPopupStyles.detailSwipeTitle}>Performance</Text>
+                      <ScrollView
+                        nestedScrollEnabled
+                        showsVerticalScrollIndicator={false}
+                        style={portfolioPopupStyles.detailVerticalScroll}
+                        contentContainerStyle={portfolioPopupStyles.detailVerticalScrollContent}
+                      >
+                        <ProfilePortfolioDetailRow
+                          icon="medal-outline"
+                          label="Ligue"
+                          value={item.rank?.trim() || '—'}
+                        />
+                        <ProfilePortfolioDetailRow
+                          icon="game-controller"
+                          label="Parties jouées"
+                          value={String(item.gamesPlayed || 0)}
+                        />
+                        <ProfilePortfolioDetailRow
+                          icon="trophy"
+                          label="Victoires"
+                          value={String(item.gamesWon || 0)}
+                        />
+                        <ProfilePortfolioDetailRow
+                          icon="star"
+                          label="Taux de victoire"
+                          value={`${item.gamesPlayed ? Math.round(((item.gamesWon || 0) / item.gamesPlayed) * 100) : 0}%`}
+                          highlight
+                        />
+                      </ScrollView>
+                    </View>
+                  </ScrollView>
+
+                  <View style={portfolioPopupStyles.detailPagerDots}>
+                    <View
+                      style={[
+                        portfolioPopupStyles.detailPagerDot,
+                        detailPageIndex === 0 && portfolioPopupStyles.detailPagerDotActive,
+                      ]}
+                    />
+                    <View
+                      style={[
+                        portfolioPopupStyles.detailPagerDot,
+                        detailPageIndex === 1 && portfolioPopupStyles.detailPagerDotActive,
+                      ]}
+                    />
+                  </View>
+                </View>
+              </>
+            ) : (
+              <>
+                <View style={portfolioPopupStyles.detailCard}>
+                  <ScrollView
+                    key={`profile-swipe-startup-${item.id}`}
+                    horizontal
+                    pagingEnabled
+                    showsHorizontalScrollIndicator={false}
+                    decelerationRate="fast"
+                    style={{ width: PROFILE_POPUP_DETAIL_PAGE_W, alignSelf: 'center' }}
+                    onMomentumScrollEnd={(e) => {
+                      const pageW = e.nativeEvent.layoutMeasurement.width;
+                      const x = e.nativeEvent.contentOffset.x;
+                      if (pageW > 0) {
+                        setDetailPageIndex(Math.round(x / pageW));
+                      }
+                    }}
+                  >
+                    <View style={[portfolioPopupStyles.detailSwipePage, { width: PROFILE_POPUP_DETAIL_PAGE_W }]}>
+                      <Text style={portfolioPopupStyles.detailSwipeTitle}>À propos</Text>
+                      <ScrollView
+                        nestedScrollEnabled
+                        showsVerticalScrollIndicator={false}
+                        style={portfolioPopupStyles.detailVerticalScroll}
+                        contentContainerStyle={portfolioPopupStyles.detailVerticalScrollContent}
+                      >
+                        <View style={portfolioPopupStyles.statsLinear}>
+                          <ProfileLinearStat label="Valorisation" value={formatScore(item)} />
+                          <View style={portfolioPopupStyles.statLineSep} />
+                          <ProfileLinearStat label="Secteur" value={item.sector || '—'} multiline />
+                        </View>
+                        <Text style={portfolioPopupStyles.detailDescriptionText}>
+                          {item.subtitle?.trim()
+                            ? item.subtitle
+                            : 'Aucune description pour cette entreprise.'}
+                        </Text>
+                      </ScrollView>
+                    </View>
+
+                    <View style={[portfolioPopupStyles.detailSwipePage, { width: PROFILE_POPUP_DETAIL_PAGE_W }]}>
+                      <Text style={portfolioPopupStyles.detailSwipeTitle}>Créateur</Text>
+                      <ScrollView
+                        nestedScrollEnabled
+                        showsVerticalScrollIndicator={false}
+                        style={portfolioPopupStyles.detailVerticalScroll}
+                        contentContainerStyle={portfolioPopupStyles.detailVerticalScrollContent}
+                      >
+                        <ProfilePortfolioDetailRow
+                          icon="person"
+                          label="Nom"
+                          value={item.creatorName?.trim() || '—'}
+                        />
+                      </ScrollView>
+                    </View>
+                  </ScrollView>
+
+                  <View style={portfolioPopupStyles.detailPagerDots}>
+                    <View
+                      style={[
+                        portfolioPopupStyles.detailPagerDot,
+                        detailPageIndex === 0 && portfolioPopupStyles.detailPagerDotActive,
+                      ]}
+                    />
+                    <View
+                      style={[
+                        portfolioPopupStyles.detailPagerDot,
+                        detailPageIndex === 1 && portfolioPopupStyles.detailPagerDotActive,
+                      ]}
+                    />
+                  </View>
+                </View>
+              </>
+            )}
+
+            <View style={portfolioPopupStyles.actionsColumn}>
+              {showFollowCta ? (
+                <GameButton
+                  title={isFollowed ? 'SUIVI' : 'SUIVRE'}
+                  variant={isFollowed ? 'blue' : 'yellow'}
+                  fullWidth
+                  onPress={onToggleFollow}
+                />
+              ) : null}
+              <GameButton title="FERMER" variant="blue" fullWidth onPress={onClose} />
+            </View>
+          </View>
+        </DynamicGradientBorder>
       </Animated.View>
     </Modal>
   );
 }
 
-function PopupStat({ value, label }: { value: string; label: string }) {
+function ProfileLinearStat({
+  label,
+  value,
+  multiline,
+}: {
+  label: string;
+  value: string;
+  multiline?: boolean;
+}) {
   return (
-    <View style={styles.popupStatItem}>
-      <Text style={styles.popupStatValue} numberOfLines={1}>{value}</Text>
-      <Text style={styles.popupStatLabel}>{label}</Text>
+    <View style={portfolioPopupStyles.statLine}>
+      <Text style={portfolioPopupStyles.statLineLabel}>{label}</Text>
+      <Text
+        style={portfolioPopupStyles.statLineValue}
+        numberOfLines={multiline ? 3 : 1}
+        ellipsizeMode="tail"
+      >
+        {value}
+      </Text>
     </View>
   );
 }
 
-function PopupDetailRow({ icon, label, value, highlight }: { icon: string; label: string; value: string; highlight?: boolean }) {
+function ProfilePortfolioDetailRow({
+  icon,
+  label,
+  value,
+  highlight,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: string;
+  highlight?: boolean;
+}) {
   return (
-    <View style={styles.popupDetailRow}>
-      <View style={styles.popupDetailLabel}>
-        <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={14} color={COLORS.textSecondary} />
-        <Text style={styles.popupDetailLabelText}>{label}</Text>
+    <View style={portfolioPopupStyles.detailRow}>
+      <View style={portfolioPopupStyles.detailLeft}>
+        <Ionicons name={icon} size={16} color="#7F8E9E" />
+        <Text style={portfolioPopupStyles.detailLabel}>{label}</Text>
       </View>
-      <Text style={highlight ? styles.popupDetailValueHighlight : styles.popupDetailValue}>{value}</Text>
+      <Text
+        style={highlight ? portfolioPopupStyles.detailValueHighlight : portfolioPopupStyles.detailValue}
+        numberOfLines={2}
+      >
+        {value}
+      </Text>
     </View>
   );
 }
@@ -859,30 +1022,30 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
   },
-  settingsBtn: {
+  infoBtn: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
   },
 
-  /* Profile Popup */
-  popupOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+});
+
+/** Styles alignés sur StartupDetailPopup (portfolio.tsx) */
+const portfolioPopupStyles = StyleSheet.create({
+  centered: {
+    width: '100%',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 18,
   },
-  popupContainer: {
-    width: '100%',
-  },
-  popupInner: {
+  card: {
+    width: screenWidth - 36,
     padding: SPACING[5],
+    position: 'relative',
   },
-  popupClose: {
+  closeBtn: {
     position: 'absolute',
     top: SPACING[3],
     right: SPACING[3],
@@ -894,104 +1057,140 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 1,
   },
-  popupHeader: {
+  header: {
     alignItems: 'center',
     marginBottom: SPACING[4],
+    marginTop: SPACING[2],
   },
-  popupAvatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: COLORS.primary,
+  iconBadge: {
     marginBottom: SPACING[3],
   },
-  popupName: {
+  startupName: {
     fontFamily: FONTS.title,
-    fontSize: FONT_SIZES.xl,
-    color: COLORS.text,
+    fontSize: 24,
+    color: COLORS.white,
     textAlign: 'center',
-    letterSpacing: 0.5,
-    marginBottom: SPACING[2],
   },
-  popupRankBadge: {
-    backgroundColor: 'rgba(255, 188, 64, 0.15)',
-    paddingHorizontal: SPACING[3],
-    paddingVertical: SPACING[1],
-    borderRadius: 12,
+  rankSubtitle: {
+    fontFamily: FONTS.body,
+    fontSize: 11,
+    color: '#7F8E9E',
+    textAlign: 'center',
+    marginTop: SPACING[2],
+    lineHeight: 16,
   },
-  popupRankText: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: FONT_SIZES.xs,
+  statsLinear: {
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    borderRadius: 15,
+    paddingVertical: SPACING[3],
+    paddingHorizontal: SPACING[4],
+  },
+  detailSwipePage: {
+    minHeight: 200,
+    maxHeight: 300,
+  },
+  detailSwipeTitle: {
+    fontFamily: FONTS.title,
+    fontSize: 16,
     color: COLORS.primary,
+    marginBottom: SPACING[2],
+    textAlign: 'center',
   },
-  popupDivider: {
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    marginVertical: SPACING[4],
+  detailVerticalScroll: {
+    maxHeight: 260,
   },
-  popupStatsRow: {
+  detailVerticalScrollContent: {
+    gap: 24,
+    paddingBottom: SPACING[2],
+  },
+  detailDescriptionText: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.base,
+    lineHeight: 22,
+    color: 'rgba(255,255,255,0.85)',
+  },
+  detailPagerDots: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    gap: 8,
+    marginTop: SPACING[3],
   },
-  popupStatItem: {
-    flex: 1,
-    alignItems: 'center',
+  detailPagerDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.25)',
   },
-  popupStatValue: {
-    fontFamily: FONTS.title,
-    fontSize: FONT_SIZES.xl,
-    color: COLORS.primary,
-    marginBottom: 2,
+  detailPagerDotActive: {
+    backgroundColor: COLORS.primary,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
-  popupStatLabel: {
-    fontFamily: FONTS.body,
-    fontSize: FONT_SIZES.xs,
-    color: COLORS.textSecondary,
-  },
-  popupStatSep: {
-    width: 1,
-    height: 32,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  popupDetailRows: {
-    gap: 0,
-  },
-  popupDetailRow: {
+  statLine: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: SPACING[2],
+    gap: SPACING[3],
+    paddingVertical: SPACING[3],
   },
-  popupDetailLabel: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING[2],
+  statLineLabel: {
+    fontFamily: FONTS.bodyMedium,
+    fontSize: 12,
+    color: '#7F8E9E',
+    flexShrink: 0,
   },
-  popupDetailLabelText: {
-    fontFamily: FONTS.body,
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.textSecondary,
-  },
-  popupDetailValue: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.text,
-  },
-  popupDetailValueHighlight: {
+  statLineValue: {
     fontFamily: FONTS.title,
     fontSize: FONT_SIZES.md,
     color: COLORS.primary,
+    textAlign: 'right',
+    flex: 1,
   },
-  popupDetailSep: {
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  statLineSep: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
-  popupActions: {
-    marginTop: SPACING[5],
+  detailCard: {
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    borderRadius: 15,
+    paddingVertical: 27,
+    paddingHorizontal: 20,
+    marginBottom: SPACING[5],
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: SPACING[2],
+  },
+  detailLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexShrink: 0,
+  },
+  detailLabel: {
+    fontFamily: FONTS.body,
+    fontSize: 11,
+    color: '#7F8E9E',
+  },
+  detailValue: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 11,
+    color: COLORS.white,
+    flex: 1,
+    textAlign: 'right',
+  },
+  detailValueHighlight: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES.md,
+    color: COLORS.primary,
+    flex: 1,
+    textAlign: 'right',
+  },
+  actionsColumn: {
+    gap: SPACING[3],
   },
 });
