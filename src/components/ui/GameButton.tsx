@@ -13,7 +13,6 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
-  runOnJS,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -58,21 +57,21 @@ export const GameButton = memo(function GameButton({
   }, [hapticsEnabled]);
 
   const handlePressIn = useCallback(() => {
-    'worklet';
+    if (disabled || loading) return;
     scale.value = withSpring(0.92, { damping: 10, stiffness: 400 });
-  }, [scale]);
+  }, [scale, disabled, loading]);
 
   const handlePressOut = useCallback(() => {
-    'worklet';
     scale.value = withSpring(1, { damping: 10, stiffness: 400 });
   }, [scale]);
 
   const handlePress = useCallback(
     (event: GestureResponderEvent) => {
-      runOnJS(triggerHaptic)();
+      if (disabled || loading) return;
+      triggerHaptic();
       onPress?.(event);
     },
-    [onPress, triggerHaptic]
+    [onPress, triggerHaptic, disabled, loading]
   );
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -102,7 +101,7 @@ export const GameButton = memo(function GameButton({
       onPress={handlePress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
-      disabled={isDisabled}
+      accessibilityState={{ disabled: isDisabled }}
       style={[
         styles.container,
         isYellow && styles.containerYellow,

@@ -5,35 +5,36 @@
  * GameButton et les assets existants (shape.png, logostartupludo.png).
  */
 
-import { useState, useCallback, useEffect, memo } from 'react';
-import { View, StyleSheet, Dimensions, Image } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { memo, useCallback, useEffect, useState } from 'react';
+import { Dimensions, Image, StyleSheet, View } from 'react-native';
 import Animated, {
-  FadeInDown,
+  Easing,
   FadeIn,
+  FadeInDown,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
   withTiming,
-  Easing,
 } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Circle } from 'react-native-svg';
 
-import { FONTS, FONT_SIZES } from '@/styles/typography';
-import { SPACING } from '@/styles/spacing';
-import { GameButton } from '@/components/ui/GameButton';
-import { RadialBackground } from '@/components/ui/RadialBackground';
-import { useAuthStore } from '@/stores/useAuthStore';
 import { LoadingScreen } from '@/components/common/LoadingScreen';
 import { PrivacyPolicyModal } from '@/components/common/PrivacyPolicyModal';
+import { GameButton } from '@/components/ui/GameButton';
+import { RadialBackground } from '@/components/ui/RadialBackground';
 import { usePrivacyAcceptance } from '@/hooks/usePrivacyAcceptance';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { SPACING } from '@/styles/spacing';
+import { FONTS, FONT_SIZES } from '@/styles/typography';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // Import des assets
 const shapeImage = require('@/../assets/images/shape.png');
 const logoImage = require('@/../assets/images/logostartupludo.png');
-const splashIcon = require('@/../assets/images/iconludo.png');
+const splashIcon = require('@/../assets/images/ludol.png');
 
 // Rayons tournants sous le logo (comme dans home.tsx)
 const SpinningRays = memo(function SpinningRays() {
@@ -55,6 +56,52 @@ const SpinningRays = memo(function SpinningRays() {
         style={styles.raysImage}
         resizeMode="contain"
       />
+    </Animated.View>
+  );
+});
+
+const CircularLoader = memo(function CircularLoader({ size }: { size: number }) {
+  const rotation = useSharedValue(0);
+  const strokeWidth = 6;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+
+  useEffect(() => {
+    rotation.value = withRepeat(
+      withTiming(360, { duration: 1500, easing: Easing.linear }),
+      -1,
+      false
+    );
+  }, [rotation]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${rotation.value}deg` }],
+  }));
+
+  return (
+    <Animated.View style={[{ width: size, height: size, position: 'absolute' }, animatedStyle]}>
+      <Svg width={size} height={size}>
+        {/* Track */}
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="rgba(26, 58, 94, 0.6)"
+          strokeWidth={strokeWidth}
+          fill="none"
+        />
+        {/* Progress */}
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="#FFDC64"
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeDasharray={`${circumference * 0.4} ${circumference * 0.6}`}
+          fill="none"
+        />
+      </Svg>
     </Animated.View>
   );
 });
@@ -135,10 +182,12 @@ export default function WelcomeScreen() {
     return (
       <View style={[styles.container, styles.splashContainer]}>
         <RadialBackground centerColor="#0F3A6B" edgeColor="#081A2A" />
+        <SpinningRays />
         <Animated.View 
           entering={FadeIn.duration(800)}
           style={styles.splashContent}
         >
+          <CircularLoader size={SCREEN_WIDTH * 0.45} />
           <Image
             source={splashIcon}
             style={styles.splashIcon}
@@ -308,7 +357,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   splashIcon: {
-    width: SCREEN_WIDTH * 0.4,
-    height: SCREEN_WIDTH * 0.4,
+    width: SCREEN_WIDTH * 0.25,
+    height: SCREEN_WIDTH * 0.25,
   },
 });

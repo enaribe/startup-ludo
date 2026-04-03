@@ -411,6 +411,14 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
         // Dispatch move complete after animation
         timers.set('moveComplete', () => {
           setAnimating(false);
+          // Déclencher le callback event DIRECTEMENT ici, avant le dispatch,
+          // pour éviter la race condition Android sur useEffect([turnState.phase]).
+          // Le useEffect phase='event' ci-dessous est conservé pour le multijoueur
+          // en ligne (remoteEvent), mais ne fera rien en solo car onEventRef
+          // est déjà appelé ici.
+          if (result!.triggeredEvent && !rolledSix) {
+            onEventRef.current(result!.triggeredEvent);
+          }
           dispatch({ type: 'MOVE_COMPLETE', result: result!, rolledSix });
         }, animDelay);
       } else {
@@ -424,19 +432,11 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [turnState.phase]);
 
-  // ===== EFFECT: Phase 'event' → trigger event popup =====
-
-  useEffect(() => {
-    if (turnState.phase !== 'event') return;
-    if (!currentPlayer) return;
-
-    const eventType = turnState.moveResult?.triggeredEvent;
-    if (eventType) {
-      onEventRef.current(eventType);
-    }
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [turnState.phase]);
+  // ===== EFFECT: Phase 'event' → (no-op) =====
+  // Le déclenchement du popup est maintenant fait directement dans le timer
+  // moveComplete ci-dessus pour éviter la race condition Android.
+  // Ce useEffect est conservé uniquement pour ne pas casser la machine à états
+  // (la phase 'event' doit exister pour que EVENT_RESOLVED fonctionne).
 
   // ===== EFFECT: Phase 'ending' → grant extra turn or next turn =====
 
@@ -484,9 +484,15 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
 
     // Player changed — reset machine for the new player
     activePlayerIdRef.current = playerId;
-    timers.clearAll();
-    dispatch({ type: 'RESET' });
-    setAnimating(false);
+    // Ne pas clearAll() ici : les timers du nouveau tour (moveComplete, etc.)
+    // peuvent déjà être en attente sur Android où les re-renders sont décalés.
+    // On dispatche RESET seulement si la machine n'est pas déjà à idle
+    // (TURN_ENDED l'a déjà reset proprement dans ce cas).
+    if (turnStateRef.current.phase !== 'idle') {
+      timers.clearAll();
+      dispatch({ type: 'RESET' });
+      setAnimating(false);
+    }
     clearSelection();
 
     // eslint-disable-next-line react-hooks/exhaustive-deps

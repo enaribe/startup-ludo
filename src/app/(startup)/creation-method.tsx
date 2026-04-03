@@ -4,9 +4,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
     Dimensions,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -33,12 +30,13 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { DynamicGradientBorder, GameButton, RadialBackground } from '@/components/ui';
+import { DynamicGradientBorder, GameButton, RadialBackground, Modal } from '@/components/ui';
 import { generateStartupIdeas } from '@/services/ai';
 import { useSettingsStore } from '@/stores';
 import { FONTS } from '@/styles/typography';
+import { COLORS } from '@/styles/colors';
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { height: SCREEN_HEIGHT, width: screenWidth } = Dimensions.get('window');
 
 type GeneratedIdea = { id: string; title: string; description: string };
 
@@ -237,6 +235,7 @@ interface IdeaCardProps {
 }
 
 const IdeaCard = memo(function IdeaCard({ idea, index, isSelected, onSelect }: IdeaCardProps) {
+  const [expanded, setExpanded] = useState(false);
   const scale = useSharedValue(1);
 
   const handlePressIn = useCallback(() => {
@@ -251,6 +250,12 @@ const IdeaCard = memo(function IdeaCard({ idea, index, isSelected, onSelect }: I
     transform: [{ scale: scale.value }],
   }));
 
+  const toggleExpand = useCallback(() => {
+    setExpanded((v) => !v);
+  }, []);
+
+  const showExpandToggle = idea.description.length > 120;
+
   return (
     <Animated.View
       entering={FadeIn.delay(index * 50).duration(160)}
@@ -261,33 +266,59 @@ const IdeaCard = memo(function IdeaCard({ idea, index, isSelected, onSelect }: I
         fill={isSelected ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.35)'}
         style={ideaStyles.cardBorder}
       >
-        <Pressable
-          onPress={() => onSelect(index)}
-          onPressIn={handlePressIn}
-          onPressOut={handlePressOut}
-          style={ideaStyles.cardInner}
-        >
-          <View style={ideaStyles.cardHeader}>
-            <View style={[ideaStyles.numberBadge, isSelected && ideaStyles.numberBadgeSelected]}>
-              <Text style={[ideaStyles.numberText, isSelected && ideaStyles.numberTextSelected]}>
-                {index + 1}
-              </Text>
+        <View style={ideaStyles.cardInner}>
+          <Pressable
+            onPress={() => onSelect(index)}
+            onPressIn={handlePressIn}
+            onPressOut={handlePressOut}
+            style={ideaStyles.cardSelectArea}
+          >
+            <View style={ideaStyles.cardHeader}>
+              <View style={[ideaStyles.numberBadge, isSelected && ideaStyles.numberBadgeSelected]}>
+                <Text style={[ideaStyles.numberText, isSelected && ideaStyles.numberTextSelected]}>
+                  {index + 1}
+                </Text>
+              </View>
+              <View style={ideaStyles.cardTextWrapper}>
+                <Text style={[ideaStyles.cardTitle, isSelected && ideaStyles.cardTitleSelected]} numberOfLines={2}>
+                  {idea.title}
+                </Text>
+                <Text
+                  style={ideaStyles.cardDesc}
+                  numberOfLines={expanded || !showExpandToggle ? undefined : 3}
+                >
+                  {idea.description}
+                </Text>
+              </View>
+              {isSelected && (
+                <Animated.View entering={ZoomIn.duration(250)} style={ideaStyles.checkIcon}>
+                  <Ionicons name="checkmark-circle" size={24} color="#FFBC40" />
+                </Animated.View>
+              )}
             </View>
-            <View style={ideaStyles.cardTextWrapper}>
-              <Text style={[ideaStyles.cardTitle, isSelected && ideaStyles.cardTitleSelected]} numberOfLines={2}>
-                {idea.title}
+          </Pressable>
+
+          {showExpandToggle ? (
+            <Pressable
+              onPress={toggleExpand}
+              style={({ pressed }) => [
+                ideaStyles.expandRow,
+                pressed && ideaStyles.expandRowPressed,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={expanded ? 'Réduire la description' : 'Afficher la description complète'}
+            >
+              <Text style={ideaStyles.expandRowText}>
+                {expanded ? 'Voir moins' : 'Voir la description complète'}
               </Text>
-              <Text style={ideaStyles.cardDesc} numberOfLines={2}>
-                {idea.description}
-              </Text>
-            </View>
-            {isSelected && (
-              <Animated.View entering={ZoomIn.duration(250)} style={ideaStyles.checkIcon}>
-                <Ionicons name="checkmark-circle" size={24} color="#FFBC40" />
-              </Animated.View>
-            )}
-          </View>
-        </Pressable>
+              <Ionicons
+                name={expanded ? 'chevron-up' : 'chevron-down'}
+                size={18}
+                color="#FFBC40"
+              />
+            </Pressable>
+          ) : null}
+        </View>
       </DynamicGradientBorder>
     </Animated.View>
   );
@@ -302,7 +333,12 @@ const ideaStyles = StyleSheet.create({
     width: '100%',
   },
   cardInner: {
-    padding: 16,
+    overflow: 'hidden',
+  },
+  cardSelectArea: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -349,6 +385,25 @@ const ideaStyles = StyleSheet.create({
   },
   checkIcon: {
     marginTop: 2,
+  },
+  expandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  expandRowPressed: {
+    opacity: 0.85,
+  },
+  expandRowText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 12,
+    color: '#FFBC40',
   },
 });
 
@@ -668,44 +723,36 @@ export default function CreationMethodScreen() {
       {/* ═══════════ POPUP IA ═══════════ */}
       <Modal
         visible={showAIPopup}
-        transparent
-        animationType="fade"
-        statusBarTranslucent
+        onClose={isGenerating ? () => {} : handleCloseAIPopup}
+        closeOnBackdrop={!isGenerating}
+        showCloseButton={false}
+        bareContent
       >
-        <View style={styles.popupOverlay}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={isGenerating ? undefined : handleCloseAIPopup} />
-          <Animated.View
-            entering={SlideInUp.duration(120).springify().damping(26)}
-            exiting={FadeOut.duration(100)}
-            style={styles.popupWrapper}
+        <Animated.View entering={SlideInUp.duration(280)} style={styles.popupCentered}>
+          <DynamicGradientBorder
+            borderRadius={24}
+            fill="#0A1929"
+            boxWidth={screenWidth - 36}
           >
-            <DynamicGradientBorder
-              borderRadius={24}
-              fill="#0D2744"
-              style={styles.popupCardBorder}
-            >
-              <View style={styles.popupCardInner}>
-                {/* Header */}
-                <View style={styles.popupHeader}>
-                  <View style={styles.popupHeaderLeft}>
-                    <View style={styles.popupTambaliIcon}>
-                      <Ionicons name="diamond" size={16} color="#FFBC40" />
-                    </View>
-                    <Text style={styles.popupHeaderTitle}>
-                      {isGenerating ? 'TAMBALI' : 'CHOISISSEZ UNE IDÉE'}
-                    </Text>
-                  </View>
-                  {!isGenerating && (
-                    <Pressable onPress={handleCloseAIPopup} hitSlop={12} style={styles.popupCloseBtn}>
-                      <Ionicons name="close" size={22} color="rgba(255,255,255,0.6)" />
-                    </Pressable>
-                  )}
+            <View style={styles.popupCard}>
+              {!isGenerating && (
+                <Pressable onPress={handleCloseAIPopup} hitSlop={8} style={styles.popupCloseBtn}>
+                  <Ionicons name="close" size={20} color="rgba(255,255,255,0.6)" />
+                </Pressable>
+              )}
+
+              {/* Header */}
+              <View style={styles.popupHeaderCentered}>
+                <View style={styles.popupIconBadge}>
+                  <Ionicons name="diamond" size={32} color="#FFBC40" />
                 </View>
+                <Text style={styles.popupTitleCentered}>
+                  {isGenerating ? 'TAMBALI' : 'CHOISISSEZ UNE IDÉE'}
+                </Text>
+              </View>
 
-                <View style={styles.popupDivider} />
-
-                {/* Body */}
-                <View style={styles.popupBody}>
+              {/* Body */}
+              <View style={styles.popupBody}>
                 {isGenerating ? (
                   <Animated.View entering={FadeIn.duration(200)} style={styles.popupLoadingCenter}>
                     <AISpinner />
@@ -751,52 +798,40 @@ export default function CreationMethodScreen() {
                   </>
                 ) : null}
                 </View>
-              </View>
-            </DynamicGradientBorder>
-          </Animated.View>
-        </View>
+            </View>
+          </DynamicGradientBorder>
+        </Animated.View>
       </Modal>
 
       {/* ═══════════ POPUP MANUEL ═══════════ */}
       <Modal
         visible={showManualPopup}
-        transparent
-        animationType="fade"
-        statusBarTranslucent
+        onClose={handleCloseManualPopup}
+        closeOnBackdrop
+        showCloseButton={false}
+        bareContent
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.popupOverlay}
-        >
-          <Pressable style={StyleSheet.absoluteFill} onPress={handleCloseManualPopup} />
-          <Animated.View
-            entering={SlideInUp.duration(120).springify().damping(26)}
-            exiting={FadeOut.duration(100)}
-            style={styles.popupWrapper}
+        <Animated.View entering={SlideInUp.duration(280)} style={styles.popupCentered}>
+          <DynamicGradientBorder
+            borderRadius={24}
+            fill="#0A1929"
+            boxWidth={screenWidth - 36}
           >
-            <DynamicGradientBorder
-              borderRadius={24}
-              fill="#0D2744"
-              style={styles.popupCardBorder}
-            >
-              <View style={styles.popupCardInner}>
-                {/* Header */}
-                <View style={styles.popupHeader}>
-                  <View style={styles.popupHeaderLeft}>
-                    <View style={styles.popupManualIcon}>
-                      <Ionicons name="create" size={16} color="#1F91D0" />
-                    </View>
-                    <Text style={styles.popupHeaderTitle}>CRÉER UN PROJET</Text>
-                  </View>
-                  <Pressable onPress={handleCloseManualPopup} hitSlop={12} style={styles.popupCloseBtn}>
-                    <Ionicons name="close" size={22} color="rgba(255,255,255,0.6)" />
-                  </Pressable>
+            <View style={styles.popupCard}>
+              <Pressable onPress={handleCloseManualPopup} hitSlop={8} style={styles.popupCloseBtn}>
+                <Ionicons name="close" size={20} color="rgba(255,255,255,0.6)" />
+              </Pressable>
+
+              {/* Header */}
+              <View style={styles.popupHeaderCentered}>
+                <View style={styles.popupIconBadgeManual}>
+                  <Ionicons name="create" size={32} color="#1F91D0" />
                 </View>
+                <Text style={styles.popupTitleCentered}>CRÉER UN PROJET</Text>
+              </View>
 
-                <View style={styles.popupDivider} />
-
-                {/* Body */}
-                <View style={styles.popupBody}>
+              {/* Body */}
+              <View style={styles.popupBody}>
                 <Text style={styles.manualSubtitle}>
                   Décrivez votre idée de startup en quelques mots
                 </Text>
@@ -873,10 +908,9 @@ export default function CreationMethodScreen() {
                   />
                 </Animated.View>
               </View>
-              </View>
-            </DynamicGradientBorder>
-          </Animated.View>
-        </KeyboardAvoidingView>
+            </View>
+          </DynamicGradientBorder>
+        </Animated.View>
       </Modal>
     </View>
   );
@@ -995,73 +1029,61 @@ const styles = StyleSheet.create({
   },
 
   /* ── Popup shared ── */
-  popupOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+  popupCentered: {
+    width: '100%',
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 18,
+  },
+  popupCard: {
+    width: screenWidth - 36,
     padding: 20,
-  },
-  popupWrapper: {
-    width: '100%',
-    maxWidth: 360,
-    maxHeight: SCREEN_HEIGHT * 0.82,
-  },
-  popupCardBorder: {
-    width: '100%',
-    overflow: 'hidden',
-  },
-  popupCardInner: {
-    overflow: 'hidden',
-  },
-  popupHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-  },
-  popupHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  popupTambaliIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255, 188, 64, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  popupManualIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    backgroundColor: 'rgba(31, 145, 208, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  popupHeaderTitle: {
-    fontFamily: FONTS.title,
-    fontSize: 15,
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
+    position: 'relative',
   },
   popupCloseBtn: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  popupHeaderCentered: {
+    alignItems: 'center',
+    marginBottom: 16,
+    marginTop: 8,
+  },
+  popupIconBadge: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 188, 64, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 12,
   },
-  popupDivider: {
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  popupIconBadgeManual: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: 'rgba(31, 145, 208, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  popupTitleCentered: {
+    fontFamily: FONTS.title,
+    fontSize: 20,
+    color: COLORS.white,
+    textAlign: 'center',
+    letterSpacing: 1,
   },
   popupBody: {
-    padding: 20,
+    paddingTop: 8,
   },
 
   /* ── AI Loading ── */

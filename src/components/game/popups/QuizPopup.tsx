@@ -116,7 +116,7 @@ export const QuizPopup = memo(function QuizPopup({
 
   const handleSelectAnswer = useCallback(
     (index: number) => {
-      if (hasAnswered || !quiz) return;
+      if (hasAnswered || isSpectator || !quiz) return;
       setSelectedAnswer(index);
       setHasAnswered(true);
       const isCorrect = index === quiz.correctAnswer;
@@ -137,7 +137,7 @@ export const QuizPopup = memo(function QuizPopup({
       const delay = quiz.explanation ? 3000 : 1500;
       setTimeout(() => onAnswer(isCorrect, reward, index), delay);
     },
-    [hasAnswered, quiz, hapticsEnabled, onAnswer, playSound, resultScale, badgeBounce]
+    [hasAnswered, isSpectator, quiz, hapticsEnabled, onAnswer, playSound, resultScale, badgeBounce]
   );
 
   const timerAnimStyle = useAnimatedStyle(() => {
@@ -243,13 +243,12 @@ export const QuizPopup = memo(function QuizPopup({
                 <Pressable
                   key={index}
                   onPress={() => handleSelectAnswer(index)}
-                  disabled={isSpectator || hasAnswered}
                 >
                   {({ pressed }) => (
                     <View
                       style={[
                         styles.optionPill,
-                        pressed && !hasAnswered && styles.optionPillPressed,
+                        pressed && !hasAnswered && !isSpectator && styles.optionPillPressed,
                         pillStyle,
                       ]}
                     >

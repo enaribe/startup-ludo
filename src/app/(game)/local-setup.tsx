@@ -6,18 +6,19 @@
  * Étape 3: Phase d'idéation (choix du projet de startup)
  */
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, memo } from 'react';
 import { View, Text, Pressable, ScrollView, TextInput, StyleSheet, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 
+import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { useGameStore, useAuthStore, useUserStore } from '@/stores';
 import { EditionTileIcon } from '@/components/icons';
-import { RadialBackground, DynamicGradientBorder, GameButton } from '@/components/ui';
+import { RadialBackground, DynamicGradientBorder, GameButton, GradientBorder } from '@/components/ui';
 import { StartupSelectionModal } from '@/components/game/StartupSelectionModal';
 import { getDefaultProjectsForEdition, getMatchingUserStartups } from '@/data/defaultProjects';
 import { getEditionList } from '@/data';
@@ -27,6 +28,10 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CONTENT_WIDTH = SCREEN_WIDTH - 36;
 const EDITION_TILE_GAP = 12;
 const EDITION_TILE_WIDTH = (CONTENT_WIDTH - EDITION_TILE_GAP) / 2;
+const IDEATION_GRID_GAP = 12;
+const IDEATION_CARD_WIDTH = (CONTENT_WIDTH - IDEATION_GRID_GAP) / 2;
+const IDEATION_PLAYER_PILL_W = 84;
+const IDEATION_PLAYER_PILL_H = 30;
 
 // Couleurs des joueurs (toutes)
 const ALL_PLAYER_COLORS: { color: PlayerColor; hex: string; name: string }[] = [
@@ -47,7 +52,169 @@ interface StartupSelection {
   startupId: string;
   startupName: string;
   isDefaultProject: boolean;
+  sector?: string;
 }
+
+/** Initiales pour l'avatar (2 caractères max) */
+function getPlayerInitials(name: string): string {
+  const t = name.trim();
+  if (!t) return '?';
+  const parts = t.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return `${parts[0]![0] ?? ''}${parts[1]![0] ?? ''}`.toUpperCase();
+  }
+  return t.slice(0, 2).toUpperCase();
+}
+
+/** Assombrit un hex (#RRGGBB) pour l'ombre « sticker » sous le titre */
+function darkenHex(hex: string, factor: number): string {
+  const raw = hex.replace('#', '').trim();
+  if (raw.length !== 6) return '#1a4d2a';
+  const r = Number.parseInt(raw.slice(0, 2), 16);
+  const g = Number.parseInt(raw.slice(2, 4), 16);
+  const b = Number.parseInt(raw.slice(4, 6), 16);
+  if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) return '#1a4d2a';
+  const f = (c: number) => Math.max(0, Math.min(255, Math.round(c * factor)));
+  const h = (c: number) => c.toString(16).padStart(2, '0');
+  return `#${h(f(r))}${h(f(g))}${h(f(b))}`;
+}
+
+const ideationStartupTitleStyles = StyleSheet.create({
+  outer: {
+    width: '100%',
+    alignSelf: 'stretch',
+    alignItems: 'flex-start',
+    justifyContent: 'flex-start',
+    paddingRight: 4,
+    paddingBottom: 2,
+  },
+  base: {
+    fontFamily: FONTS.title,
+    fontSize: 18,
+    textAlign: 'left',
+    letterSpacing: 0.6,
+    lineHeight: 22,
+  },
+});
+
+/** Contour coloré épais (2px) — maquette titre projet */
+const TITLE_STROKE_OFFSETS: readonly { x: number; y: number }[] = [
+  { x: -2, y: -2 },
+  { x: 0, y: -2 },
+  { x: 2, y: -2 },
+  { x: 2, y: 0 },
+  { x: 2, y: 2 },
+  { x: 0, y: 2 },
+  { x: -2, y: 2 },
+  { x: -2, y: 0 },
+];
+
+const TITLE_SHADOW_OFFSET = { x: 3, y: 4 };
+
+/**
+ * Nom de projet style maquette : blanc, contour vert joueur, ombre vert foncé décalée (effet sticker).
+ */
+const IdeationStartupTitle = memo(function IdeationStartupTitle({
+  text,
+  themeColor,
+}: {
+  text: string;
+  themeColor: string;
+}) {
+  const baseStyle = ideationStartupTitleStyles.base;
+  const displayText = text.toUpperCase();
+  const shadowColor = darkenHex(themeColor, 0.42);
+  return (
+    <View style={ideationStartupTitleStyles.outer}>
+      <Text
+        style={[
+          baseStyle,
+          {
+            color: shadowColor,
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            width: '100%',
+            zIndex: 0,
+            transform: [
+              { translateX: TITLE_SHADOW_OFFSET.x },
+              { translateY: TITLE_SHADOW_OFFSET.y },
+            ],
+          },
+        ]}
+        numberOfLines={2}
+      >
+        {displayText}
+      </Text>
+      {TITLE_STROKE_OFFSETS.map((offset, i) => (
+        <Text
+          key={i}
+          style={[
+            baseStyle,
+            {
+              color: themeColor,
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              width: '100%',
+              zIndex: 1,
+              transform: [{ translateX: offset.x }, { translateY: offset.y }],
+            },
+          ]}
+          numberOfLines={2}
+        >
+          {displayText}
+        </Text>
+      ))}
+      <Text style={[baseStyle, { color: '#FFFFFF', zIndex: 2 }]} numberOfLines={2}>
+        {displayText}
+      </Text>
+    </View>
+  );
+});
+
+const IDEATION_AVATAR_SIZE = 48;
+
+const ideationAvatarInitialStyles = StyleSheet.create({
+  circle: {
+    width: IDEATION_AVATAR_SIZE,
+    height: IDEATION_AVATAR_SIZE,
+    borderRadius: IDEATION_AVATAR_SIZE / 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  glyph: {
+    fontFamily: FONTS.title,
+    fontSize: 20,
+    letterSpacing: 0.5,
+    textAlign: 'center',
+    includeFontPadding: false,
+  },
+});
+
+/** Initiales maquette : cercle plein couleur joueur, texte bleu nuit (sans contour) */
+const IdeationAvatarInitials = memo(function IdeationAvatarInitials({
+  initials,
+  circleColor,
+}: {
+  initials: string;
+  circleColor: string;
+}) {
+  const h = IDEATION_AVATAR_SIZE;
+  const glyphBox = {
+    width: h,
+    height: h,
+    lineHeight: h,
+  };
+  return (
+    <View style={[ideationAvatarInitialStyles.circle, { backgroundColor: circleColor }]}>
+      <Text style={[ideationAvatarInitialStyles.glyph, glyphBox, { color: COLORS.background }]}>
+        {initials}
+      </Text>
+    </View>
+  );
+});
 
 interface PlayerSetup {
   name: string;
@@ -560,7 +727,7 @@ export default function LocalSetupScreen() {
           </Animated.View>
         )}
 
-        {/* STEP 3: Phase d'Ideation */}
+        {/* STEP 3: Phase d'Ideation — grille 2×2 (maquette) */}
         {step === 3 && (
           <Animated.View entering={FadeInDown.delay(100).duration(500)}>
             <Text style={styles.sectionTitle}>PHASE D'IDÉATION</Text>
@@ -568,58 +735,90 @@ export default function LocalSetupScreen() {
               Chaque joueur choisit un projet avec lequel jouer
             </Text>
 
-            <View style={styles.ideationList}>
+            <View style={styles.ideationGrid}>
               {players.map((player, index) => {
                 const selection = startupSelections[index];
                 const isCurrent = currentSelectingPlayer === index && !selection;
-                const playerColor = ALL_PLAYER_COLORS.find((c) => c.color === player.color)?.hex ?? '#FFFFFF';
+                const themeHex =
+                  ALL_PLAYER_COLORS.find((c) => c.color === player.color)?.hex ?? '#FFBC40';
+
+                const openChooser = () => {
+                  if (!player.isAI) {
+                    setCurrentSelectingPlayer(index);
+                    setShowStartupModal(true);
+                  }
+                };
 
                 return (
                   <Animated.View
                     key={`ideation-${index}`}
                     entering={FadeInDown.delay(150 + index * 80).duration(400)}
+                    style={styles.ideationGridItem}
                   >
-                    <DynamicGradientBorder
-                      borderRadius={16}
-                      fill={selection ? 'rgba(255, 188, 64, 0.08)' : 'rgba(0, 0, 0, 0.35)'}
-                      boxWidth={CONTENT_WIDTH}
+                    <Pressable
+                      onPress={openChooser}
+                      disabled={player.isAI}
+                      style={({ pressed }) => [
+                        styles.ideationCardPressable,
+                        !player.isAI && pressed && styles.ideationCardPressablePressed,
+                      ]}
                     >
-                      <View style={styles.ideationCard}>
-                        <View style={[styles.ideationAvatar, { borderColor: playerColor }]}>
-                          <Ionicons
-                            name={player.isAI ? 'hardware-chip' : 'person'}
-                            size={18}
-                            color={playerColor}
-                          />
-                        </View>
-                        <View style={styles.ideationInfo}>
-                          <Text style={styles.ideationPlayerName}>{player.name}</Text>
-                          {selection ? (
-                            <Text style={styles.ideationProjectName}>{selection.startupName}</Text>
-                          ) : isCurrent ? (
-                            <Text style={styles.ideationWaiting}>En attente de choix...</Text>
-                          ) : (
-                            <Text style={styles.ideationWaiting}>—</Text>
-                          )}
-                        </View>
-                        {selection ? (
-                          <View style={styles.ideationCheck}>
-                            <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+                      <DynamicGradientBorder
+                        borderRadius={24}
+                        fill="rgba(22, 37, 59, 0.92)"
+                        boxWidth={IDEATION_CARD_WIDTH}
+                      >
+                        <View style={styles.ideationCardInner}>
+                          <View style={styles.ideationCardTopRow}>
+                            <View>
+                              {player.isAI ? (
+                                <View style={[styles.ideationAvatarCircle, { backgroundColor: themeHex }]}>
+                                  <Ionicons name="sparkles" size={22} color="#FFFFFF" />
+                                </View>
+                              ) : (
+                                <IdeationAvatarInitials
+                                  initials={getPlayerInitials(player.name)}
+                                  circleColor={themeHex}
+                                />
+                              )}
+                            </View>
+                            <GradientBorder
+                              boxWidth={IDEATION_PLAYER_PILL_W}
+                              boxHeight={IDEATION_PLAYER_PILL_H}
+                              borderRadius={IDEATION_PLAYER_PILL_H / 2}
+                              fill="rgba(0, 0, 0, 0.35)"
+                              style={styles.ideationPlayerPillWrap}
+                            >
+                              <View style={styles.ideationPlayerPillInner}>
+                                <Text style={[styles.ideationPlayerPillText, { color: themeHex }]}>
+                                  Joueur {index + 1}
+                                </Text>
+                              </View>
+                            </GradientBorder>
                           </View>
-                        ) : !player.isAI ? (
-                          <Pressable
-                            style={styles.ideationChooseBtn}
-                            onPress={() => {
-                              setCurrentSelectingPlayer(index);
-                              setShowStartupModal(true);
-                            }}
-                          >
-                            <Ionicons name="rocket-outline" size={16} color="#FFBC40" />
-                            <Text style={styles.ideationChooseText}>Choisir</Text>
-                          </Pressable>
-                        ) : null}
-                      </View>
-                    </DynamicGradientBorder>
+
+                          <View style={styles.ideationTitleBlock}>
+                            {selection ? (
+                              <IdeationStartupTitle text={selection.startupName} themeColor={themeHex} />
+                            ) : isCurrent ? (
+                              <Text style={styles.ideationPlaceholder}>En attente...</Text>
+                            ) : (
+                              <Text style={styles.ideationPlaceholder}>—</Text>
+                            )}
+                          </View>
+
+                          <Text style={styles.ideationSubtitle} numberOfLines={1}>
+                            {player.isAI ? 'IA' : player.name}
+                          </Text>
+
+                          {!player.isAI && isCurrent && !selection ? (
+                            <View style={styles.ideationTapHint}>
+                              <Text style={styles.ideationTapHintText}>Appuyer pour choisir</Text>
+                            </View>
+                          ) : null}
+                        </View>
+                      </DynamicGradientBorder>
+                    </Pressable>
                   </Animated.View>
                 );
               })}
@@ -1039,62 +1238,86 @@ const styles = StyleSheet.create({
     opacity: 0.35,
   },
 
-  // ── Ideation (Step 3) ──
-  ideationList: {
-    gap: 10,
-  },
-  ideationCard: {
+  // ── Ideation (Step 3) — grille 2×2 maquette ──
+  ideationGrid: {
     flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginTop: SPACING[2],
   },
-  ideationAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 2,
+  ideationGridItem: {
+    width: IDEATION_CARD_WIDTH,
+    marginBottom: IDEATION_GRID_GAP,
+  },
+  ideationCardPressable: {
+    borderRadius: 24,
+  },
+  ideationCardPressablePressed: {
+    opacity: 0.92,
+    transform: [{ scale: 0.98 }],
+  },
+  ideationCardInner: {
+    paddingHorizontal: SPACING[3],
+    paddingTop: SPACING[2],
+    paddingBottom: SPACING[2],
+    minHeight: 138,
+    position: 'relative',
+  },
+  ideationCardTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: SPACING[3],
+  },
+  ideationAvatarCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
   },
-  ideationInfo: {
-    flex: 1,
+  /** Haut droite, même ligne de base que le cercle d’initiales (pas flex-end qui alignait en bas) */
+  ideationPlayerPillWrap: {
+    alignSelf: 'flex-start',
   },
-  ideationPlayerName: {
+  ideationPlayerPillInner: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+  },
+  ideationPlayerPillText: {
     fontFamily: FONTS.bodySemiBold,
+    fontSize: 11,
+    letterSpacing: 0.3,
+  },
+  ideationTitleBlock: {
+    justifyContent: 'flex-start',
+    marginBottom: 0,
+    alignSelf: 'stretch',
+  },
+  ideationPlaceholder: {
+    fontFamily: FONTS.body,
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.35)',
+    textAlign: 'left',
+    alignSelf: 'stretch',
+  },
+  ideationSubtitle: {
+    fontFamily: FONTS.body,
     fontSize: 14,
     color: '#FFFFFF',
+    textAlign: 'left',
+    alignSelf: 'stretch',
   },
-  ideationProjectName: {
+  ideationTapHint: {
+    marginTop: SPACING[1],
+    alignItems: 'flex-start',
+  },
+  ideationTapHintText: {
     fontFamily: FONTS.body,
-    fontSize: 12,
-    color: '#FFBC40',
-    marginTop: 2,
-  },
-  ideationWaiting: {
-    fontFamily: FONTS.body,
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.35)',
-    marginTop: 2,
-  },
-  ideationCheck: {
-    marginLeft: 8,
-  },
-  ideationChooseBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(255, 188, 64, 0.15)',
-    borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    marginLeft: 8,
-  },
-  ideationChooseText: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: 12,
-    color: '#FFBC40',
+    fontSize: 10,
+    color: 'rgba(255, 188, 64, 0.85)',
   },
 
   // ── Bottom Bar (bouton seul, pas de fond) ──

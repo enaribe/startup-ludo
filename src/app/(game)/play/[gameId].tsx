@@ -253,6 +253,21 @@ export default function PlayScreen() {
   // Ref for handleEventResolve — allows handleTriggeredEvent to call it without circular dependency
   const handleEventResolveRef = useRef<() => void>(() => {});
 
+  // Refs pour les timers IA — permet de les annuler si un nouvel événement arrive
+  const aiResultTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const aiCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearAiTimers = useCallback(() => {
+    if (aiResultTimerRef.current) {
+      clearTimeout(aiResultTimerRef.current);
+      aiResultTimerRef.current = null;
+    }
+    if (aiCloseTimerRef.current) {
+      clearTimeout(aiCloseTimerRef.current);
+      aiCloseTimerRef.current = null;
+    }
+  }, []);
+
   // ===== EVENT HANDLER (called by turn machine when phase enters 'event') =====
 
   const handleTriggeredEvent = useCallback(
@@ -278,18 +293,22 @@ export default function PlayScreen() {
         setAiSpectatorResult(null);
 
         const resolveAndClose = (result: { ok: boolean; reward: number }) => {
+          clearAiTimers();
+          setAiSpectatorResult(null);
+          setIsEventSpectator(false);
           actions.resolveEvent(result);
           setQuizData(null);
           setFundingData(null);
           setOpportunityData(null);
           setChallengeData(null);
           setDuelTriggered(false);
-          setIsEventSpectator(false);
-          setAiSpectatorResult(null);
           handleEventResolveRef.current();
         };
 
         // Show the same popups as for human, then auto-resolve after delay
+        // Annuler les timers du tour précédent avant d'en créer de nouveaux
+        clearAiTimers();
+
         switch (event.type) {
           case 'quiz': {
             const aiCorrect = Math.random() < 0.6;
@@ -305,28 +324,26 @@ export default function PlayScreen() {
             }
             const result = { ok: aiCorrect, reward, selectedIndex };
             setQuizData(quizEv);
-            // Show quiz question first, then after 1.5s show AI's answer (green/red feedback)
-            setTimeout(() => setAiSpectatorResult(result), 1500);
-            // Then close after another 2s (total 3.5s)
-            setTimeout(() => resolveAndClose(result), 3500);
+            aiResultTimerRef.current = setTimeout(() => setAiSpectatorResult(result), 1500);
+            aiCloseTimerRef.current = setTimeout(() => resolveAndClose(result), 3500);
             break;
           }
           case 'funding': {
             const fundingEv = event.data as FundingEvent;
             setFundingData(fundingEv);
-            setTimeout(() => resolveAndClose({ ok: true, reward: fundingEv.amount }), 2500);
+            aiCloseTimerRef.current = setTimeout(() => resolveAndClose({ ok: true, reward: fundingEv.amount }), 2500);
             break;
           }
           case 'opportunity': {
             const oppEv = event.data as OpportunityEvent;
             setOpportunityData(oppEv);
-            setTimeout(() => resolveAndClose({ ok: oppEv.effect === 'tokens', reward: oppEv.value }), 2500);
+            aiCloseTimerRef.current = setTimeout(() => resolveAndClose({ ok: oppEv.effect === 'tokens', reward: oppEv.value }), 2500);
             break;
           }
           case 'challenge': {
             const chalEv = event.data as ChallengeEvent;
             setChallengeData(chalEv);
-            setTimeout(() => resolveAndClose({ ok: false, reward: chalEv.value }), 2500);
+            aiCloseTimerRef.current = setTimeout(() => resolveAndClose({ ok: false, reward: chalEv.value }), 2500);
             break;
           }
           case 'duel': {
@@ -357,6 +374,8 @@ export default function PlayScreen() {
       }
 
       // ===== HUMAN PLAYER: show popups as usual =====
+      clearAiTimers();
+      setAiSpectatorResult(null);
       triggerEvent(gameEvent);
       setIsEventSpectator(false);
 
@@ -647,8 +666,9 @@ export default function PlayScreen() {
       if (disconnectTimerRef.current) {
         clearTimeout(disconnectTimerRef.current);
       }
+      clearAiTimers();
     };
-  }, [isOnline, onlineGame.opponentDisconnected, userId, game?.id, router, onlineGame]);
+  }, [isOnline, onlineGame.opponentDisconnected, userId, game?.id, router, onlineGame, clearAiTimers]);
 
   // ===== ONLINE: Detect game ended (forfeit from remote) =====
 
@@ -1125,6 +1145,7 @@ export default function PlayScreen() {
 
       {/* Event Popups */}
       <QuizPopup
+        key={quizData?.id ?? 'quiz-idle'}
         visible={!!quizData}
         quiz={quizData}
         onAnswer={handleQuizAnswer}
