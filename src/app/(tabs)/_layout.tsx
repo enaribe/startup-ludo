@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Tabs, useRouter } from 'expo-router';
-import { Platform, View, StyleSheet, Animated } from 'react-native';
+import { Platform, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
@@ -165,10 +165,7 @@ export default function TabsLayout() {
           title: 'CLASSEMENT',
           tabBarIcon: ({ color, focused }) => (
             <AnimatedTabIcon focused={focused}>
-              <View>
-                <ClassementIcon color={color} size={26} />
-                <View style={styles.notifDot} />
-              </View>
+              <ClassementIcon color={color} size={26} />
             </AnimatedTabIcon>
           ),
         }}
@@ -188,15 +185,3 @@ export default function TabsLayout() {
     </Tabs>
   );
 }
-
-const styles = StyleSheet.create({
-  notifDot: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#F35145',
-  }
-});

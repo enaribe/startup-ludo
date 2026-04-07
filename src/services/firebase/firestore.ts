@@ -58,7 +58,7 @@ export const createUserProfile = async (
     // Create user document
     await setDoc(doc(getFirestore(), FIRESTORE_COLLECTIONS.users, userId), userData);
 
-    // Create user stats document
+    // Create user stats document (displayName + avatarUrl dénormalisés pour éviter les N+1 dans le classement)
     const statsData: FirestoreUserStats = {
       id: userId,
       xp: 0,
@@ -70,6 +70,8 @@ export const createUserProfile = async (
       monthlyXP: 0,
       lastGameAt: null,
       updatedAt: now,
+      displayName: data.displayName,
+      avatarUrl: data.photoURL ?? null,
     };
 
     await setDoc(doc(getFirestore(), FIRESTORE_COLLECTIONS.userStats, userId), statsData);
@@ -169,10 +171,21 @@ export const updateFirestoreUserProfile = async (
   try {
     firebaseLog('Updating user profile', { userId, updates });
 
-    await updateDoc(doc(getFirestore(), FIRESTORE_COLLECTIONS.users, userId), {
-      ...updates,
-      updatedAt: serverTimestamp(),
-    });
+    const db = getFirestore();
+    // Met à jour users/ + maintient la dénormalisation dans userStats/ en parallèle
+    const writes: Promise<void>[] = [
+      updateDoc(doc(db, FIRESTORE_COLLECTIONS.users, userId), {
+        ...updates,
+        updatedAt: serverTimestamp(),
+      }),
+    ];
+    if (updates.displayName !== undefined || updates.avatarUrl !== undefined) {
+      const statsUpdates: Record<string, unknown> = { updatedAt: serverTimestamp() };
+      if (updates.displayName !== undefined) statsUpdates.displayName = updates.displayName;
+      if (updates.avatarUrl !== undefined) statsUpdates.avatarUrl = updates.avatarUrl;
+      writes.push(updateDoc(doc(db, FIRESTORE_COLLECTIONS.userStats, userId), statsUpdates));
+    }
+    await Promise.all(writes);
 
     firebaseLog('User profile updated successfully');
   } catch (error) {
@@ -352,12 +365,13 @@ export interface LeaderboardEntry {
 }
 
 // Get leaderboard (all-time, weekly, or monthly)
+// Stratégie : si displayName est dénormalisé dans userStats → 1 seule requête.
+// Sinon → lectures parallèles via Promise.all (évite la boucle séquentielle).
 export const getLeaderboard = async (
   type: 'allTime' | 'weekly' | 'monthly' = 'allTime',
   limitCount: number = 50
 ): Promise<LeaderboardEntry[]> => {
   try {
-    console.log('[Firestore] getLeaderboard: Starting fetch...', { type, limitCount });
     firebaseLog('Fetching leaderboard', { type, limit: limitCount });
 
     const orderField = type === 'weekly' ? 'weeklyXP' : type === 'monthly' ? 'monthlyXP' : 'xp';
@@ -370,33 +384,56 @@ export const getLeaderboard = async (
       )
     );
 
-    // Fetch user display names
-    const entries: LeaderboardEntry[] = [];
-    let rank = 1;
+    const statsDocs = snapshot.docs;
+    const allStats = statsDocs.map((d) => d.data() as FirestoreUserStats);
 
-    for (const statDoc of snapshot.docs) {
-      const stats = statDoc.data() as FirestoreUserStats;
-      const userSnap = await getDoc(doc(getFirestore(), FIRESTORE_COLLECTIONS.users, stats.id));
+    // Identifier les docs qui n'ont pas encore displayName dénormalisé
+    const missingIndices: number[] = [];
+    allStats.forEach((s, i) => { if (!s.displayName) missingIndices.push(i); });
 
-      if (userSnap.exists) {
-        const userData = userSnap.data() as FirestoreUser;
-        entries.push({
-          id: stats.id,
-          displayName: userData.displayName,
-          avatarUrl: userData.avatarUrl,
-          xp: type === 'weekly' ? stats.weeklyXP : type === 'monthly' ? stats.monthlyXP : stats.xp,
-          level: stats.level,
-          gamesWon: stats.gamesWon,
-          rank: rank++,
-        });
-      }
+    // Charger les profils manquants en parallèle (au lieu de séquentiellement)
+    let missingUserSnaps: Awaited<ReturnType<typeof getDoc>>[] = [];
+    if (missingIndices.length > 0) {
+      const db = getFirestore();
+      missingUserSnaps = await Promise.all(
+        missingIndices.map((i) => getDoc(doc(db, FIRESTORE_COLLECTIONS.users, allStats[i].id)))
+      );
     }
 
-    console.log('[Firestore] getLeaderboard: Success, count:', entries.length);
+    const entries: LeaderboardEntry[] = [];
+    let rank = 1;
+    let missingCursor = 0;
+
+    for (let i = 0; i < allStats.length; i++) {
+      const stats = allStats[i];
+      let displayName: string;
+      let avatarUrl: string | null;
+
+      if (stats.displayName) {
+        displayName = stats.displayName;
+        avatarUrl = stats.avatarUrl ?? null;
+      } else {
+        const userSnap = missingUserSnaps[missingCursor++];
+        if (!userSnap?.exists) continue;
+        const userData = userSnap.data() as FirestoreUser;
+        displayName = userData.displayName;
+        avatarUrl = userData.avatarUrl;
+      }
+
+      entries.push({
+        id: stats.id,
+        displayName,
+        avatarUrl,
+        xp: type === 'weekly' ? stats.weeklyXP : type === 'monthly' ? stats.monthlyXP : stats.xp,
+        level: stats.level,
+        gamesWon: stats.gamesWon,
+        rank: rank++,
+      });
+    }
+
     firebaseLog('Leaderboard fetched successfully', { count: entries.length });
     return entries;
   } catch (error) {
-    console.error('[Firestore] getLeaderboard: ERROR', error);
     firebaseLog('Failed to fetch leaderboard', error);
     throw new Error(getFirebaseErrorMessage(error));
   }
@@ -614,6 +651,7 @@ export const subscribeToUserProfile = (
 };
 
 // Subscribe to leaderboard changes
+// Même stratégie que getLeaderboard : pas de join si displayName dénormalisé, sinon Promise.all.
 export const subscribeToLeaderboard = (
   type: 'allTime' | 'weekly' | 'monthly',
   callback: (entries: LeaderboardEntry[]) => void,
@@ -630,25 +668,47 @@ export const subscribeToLeaderboard = (
       limit(limitCount)
     ),
     async (snapshot) => {
+      const allStats = snapshot.docs.map((d) => d.data() as FirestoreUserStats);
+      const missingIndices: number[] = [];
+      allStats.forEach((s, i) => { if (!s.displayName) missingIndices.push(i); });
+
+      let missingUserSnaps: Awaited<ReturnType<typeof getDoc>>[] = [];
+      if (missingIndices.length > 0) {
+        const db = getFirestore();
+        missingUserSnaps = await Promise.all(
+          missingIndices.map((i) => getDoc(doc(db, FIRESTORE_COLLECTIONS.users, allStats[i].id)))
+        );
+      }
+
       const entries: LeaderboardEntry[] = [];
       let rank = 1;
+      let missingCursor = 0;
 
-      for (const statDoc of snapshot.docs) {
-        const stats = statDoc.data() as FirestoreUserStats;
-        const userSnap = await getDoc(doc(getFirestore(), FIRESTORE_COLLECTIONS.users, stats.id));
+      for (let i = 0; i < allStats.length; i++) {
+        const stats = allStats[i];
+        let displayName: string;
+        let avatarUrl: string | null;
 
-        if (userSnap.exists) {
+        if (stats.displayName) {
+          displayName = stats.displayName;
+          avatarUrl = stats.avatarUrl ?? null;
+        } else {
+          const userSnap = missingUserSnaps[missingCursor++];
+          if (!userSnap?.exists) continue;
           const userData = userSnap.data() as FirestoreUser;
-          entries.push({
-            id: stats.id,
-            displayName: userData.displayName,
-            avatarUrl: userData.avatarUrl,
-            xp: type === 'weekly' ? stats.weeklyXP : type === 'monthly' ? stats.monthlyXP : stats.xp,
-            level: stats.level,
-            gamesWon: stats.gamesWon,
-            rank: rank++,
-          });
+          displayName = userData.displayName;
+          avatarUrl = userData.avatarUrl;
         }
+
+        entries.push({
+          id: stats.id,
+          displayName,
+          avatarUrl,
+          xp: type === 'weekly' ? stats.weeklyXP : type === 'monthly' ? stats.monthlyXP : stats.xp,
+          level: stats.level,
+          gamesWon: stats.gamesWon,
+          rank: rank++,
+        });
       }
 
       callback(entries);

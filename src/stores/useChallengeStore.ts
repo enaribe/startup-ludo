@@ -9,19 +9,19 @@
  * - Livrables (secteur, pitch, business plan)
  */
 
-import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import { immer } from 'zustand/middleware/immer';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setChallengeEnrollment } from '@/services/firebase/firestore';
 import type {
-  Challenge,
-  ChallengeEnrollment,
-  ChallengeDeliverables,
-  EnrollmentFormData,
-  EnrollmentStatus,
-  ChampionStatus,
+    Challenge,
+    ChallengeDeliverables,
+    ChallengeEnrollment,
+    ChampionStatus,
+    EnrollmentFormData,
+    EnrollmentStatus,
 } from '@/types/challenge';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
+import { immer } from 'zustand/middleware/immer';
 
 interface ChallengeStoreState {
   challenges: Challenge[];

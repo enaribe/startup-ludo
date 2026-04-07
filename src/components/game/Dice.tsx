@@ -145,6 +145,12 @@ export const Dice = memo(function Dice({
     }
   }, [value, isRolling]);
 
+  // Son du dé : animation pilotée de l’extérieur (IA, en ligne) — comme handlePress
+  useEffect(() => {
+    if (!externalRolling || internalRolling) return;
+    playSound('dice-roll');
+  }, [externalRolling, internalRolling, playSound]);
+
   // Handle external rolling (remote player dice animation)
   useEffect(() => {
     if (!externalRolling || internalRolling) return;

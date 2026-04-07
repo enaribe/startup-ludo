@@ -25,6 +25,7 @@ import {
   type UserProfile,
 } from '@/services/firebase';
 import { useUserStore } from './useUserStore';
+import { useSocialStore } from './useSocialStore';
 
 interface AuthState {
   user: User | null;
@@ -142,6 +143,11 @@ export const useAuthStore = create<AuthStore>()(
             });
 
             // Load user profile from Firestore
+            // Load social data (non-bloquant)
+            if (!authUser.isGuest) {
+              useSocialStore.getState().loadFollowing(authUser.id);
+              useSocialStore.getState().loadFollowCounts(authUser.id);
+            }
             try {
               const profile = await getUserProfile(authUser.id);
               if (profile) {
@@ -191,6 +197,7 @@ export const useAuthStore = create<AuthStore>()(
               state.isInitialized = true;
             });
             useUserStore.getState().reset();
+            useSocialStore.getState().reset();
           }
         });
 

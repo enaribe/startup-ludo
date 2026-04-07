@@ -10,6 +10,7 @@ import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { useAuthStore, useUserStore } from '@/stores';
+import { useSocialStore } from '@/stores/useSocialStore';
 import { RadialBackground, DynamicGradientBorder } from '@/components/ui';
 import { getRankFromXP, getXPForNextRank } from '@/config/progression';
 
@@ -104,6 +105,8 @@ export default function ProfilScreen() {
   const displayName = user?.displayName || profile?.displayName || 'Joueur';
   const displayRank = rankInfo.title;
 
+  const followCounts = useSocialStore((s) => s.followCounts);
+
   const handleMenuPress = (itemId: string) => {
     switch (itemId) {
       case 'settings':
@@ -122,6 +125,7 @@ export default function ProfilScreen() {
         router.push('/help' as never);
         break;
       case 'network':
+        router.push('/network' as never);
         break;
     }
   };
@@ -165,9 +169,9 @@ export default function ProfilScreen() {
 
           <Text style={styles.userName}>{displayName}</Text>
 
-          <Pressable style={styles.followersPill}>
+          <Pressable style={styles.followersPill} onPress={() => router.push('/network' as never)}>
             <Ionicons name="person" size={18} color={COLORS.primary} style={styles.followersPillIcon} />
-            <Text style={styles.followersPillText}>0 SUIVEURS</Text>
+            <Text style={styles.followersPillText}>{followCounts.followersCount} SUIVEUR{followCounts.followersCount !== 1 ? 'S' : ''}</Text>
           </Pressable>
         </Animated.View>
 

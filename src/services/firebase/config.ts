@@ -141,6 +141,9 @@ export interface FirestoreUserStats {
   monthlyXP: number;
   lastGameAt: FirebaseTimestamp | FirebaseFirestoreTypes.Timestamp | null;
   updatedAt: FirebaseTimestamp | FirebaseFirestoreTypes.Timestamp;
+  // Dénormalisé depuis users/ pour éviter les N+1 dans le classement
+  displayName?: string;
+  avatarUrl?: string | null;
 }
 
 // Realtime Database room structure

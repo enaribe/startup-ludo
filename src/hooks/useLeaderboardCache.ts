@@ -4,15 +4,15 @@ import { getLeaderboard, getAllStartups } from '@/services/firebase/firestore';
 import type { Startup } from '@/types';
 
 const CACHE_KEYS = {
-  PLAYERS: '@leaderboard_players',
-  STARTUPS: '@leaderboard_startups',
-  PLAYERS_TIMESTAMP: '@leaderboard_players_timestamp',
-  STARTUPS_TIMESTAMP: '@leaderboard_startups_timestamp',
+  PLAYERS: '@leaderboard_players_v2',
+  STARTUPS: '@leaderboard_startups_v2',
+  PLAYERS_TIMESTAMP: '@leaderboard_players_ts_v2',
+  STARTUPS_TIMESTAMP: '@leaderboard_startups_ts_v2',
 };
 
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
 
-interface LeaderboardEntry {
+export interface LeaderboardEntry {
   id: string;
   displayName: string;
   xp: number;
@@ -21,14 +21,23 @@ interface LeaderboardEntry {
   avatarUrl?: string | null;
 }
 
+// Cache mémoire : survit aux remontages de composant sans repasser par AsyncStorage
+type MemCache = {
+  players: LeaderboardEntry[];
+  startups: Startup[];
+  playersTs: number;
+  startupsTs: number;
+} | null;
+let _memCache: MemCache = null;
+
 export function useLeaderboardCache() {
-  const [players, setPlayers] = useState<LeaderboardEntry[]>([]);
-  const [startups, setStartups] = useState<Startup[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [players, setPlayers] = useState<LeaderboardEntry[]>(_memCache?.players ?? []);
+  const [startups, setStartups] = useState<Startup[]>(_memCache?.startups ?? []);
+  const [isLoading, setIsLoading] = useState(_memCache === null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const isFetchingRef = useRef(false);
 
-  const saveToCache = useCallback(async (
+  const persistCache = useCallback(async (
     playersData?: LeaderboardEntry[],
     startupsData?: Startup[]
   ) => {
@@ -48,8 +57,8 @@ export function useLeaderboardCache() {
         );
       }
       await Promise.all(promises);
-    } catch (error) {
-      console.error('[useLeaderboardCache] Failed to save to cache:', error);
+    } catch {
+      // non-bloquant
     }
   }, []);
 
@@ -64,22 +73,40 @@ export function useLeaderboardCache() {
         getLeaderboard('allTime', 100),
         getAllStartups(100),
       ]);
+
+      const now = Date.now();
+      _memCache = { players: entries, startups: startupsData, playersTs: now, startupsTs: now };
+
       setPlayers(entries);
       setStartups(startupsData);
-      await saveToCache(entries, startupsData);
-    } catch (error) {
-      console.error('[useLeaderboardCache] Failed to fetch from Firestore:', error);
+      void persistCache(entries, startupsData);
+    } catch {
+      // silencieux — on garde l'état actuel
     } finally {
       isFetchingRef.current = false;
       setIsRefreshing(false);
       setIsLoading(false);
     }
-  }, [saveToCache]);
+  }, [persistCache]);
 
   useEffect(() => {
+    // Si le cache mémoire est encore frais, pas de chargement initial
+    if (_memCache) {
+      const now = Date.now();
+      const fresh =
+        now - _memCache.playersTs < CACHE_DURATION &&
+        now - _memCache.startupsTs < CACHE_DURATION;
+      if (fresh) {
+        setIsLoading(false);
+        // Rafraîchissement silencieux en arrière-plan
+        void fetchFromFirestore(false);
+        return;
+      }
+    }
+
     const init = async () => {
       try {
-        const [cachedPlayers, cachedStartups, playersTimestamp, startupsTimestamp] = await Promise.all([
+        const [cachedPlayers, cachedStartups, playersTs, startupsTs] = await Promise.all([
           AsyncStorage.getItem(CACHE_KEYS.PLAYERS),
           AsyncStorage.getItem(CACHE_KEYS.STARTUPS),
           AsyncStorage.getItem(CACHE_KEYS.PLAYERS_TIMESTAMP),
@@ -89,50 +116,47 @@ export function useLeaderboardCache() {
         const now = Date.now();
         let playersFromCache = false;
         let startupsFromCache = false;
+        let parsedPlayers: LeaderboardEntry[] | undefined;
+        let parsedStartups: Startup[] | undefined;
 
-        if (cachedPlayers && playersTimestamp) {
-          const timestamp = parseInt(playersTimestamp, 10);
-          if (now - timestamp < CACHE_DURATION) {
-            setPlayers(JSON.parse(cachedPlayers) as LeaderboardEntry[]);
-            playersFromCache = true;
-          }
+        if (cachedPlayers && playersTs && now - parseInt(playersTs, 10) < CACHE_DURATION) {
+          parsedPlayers = JSON.parse(cachedPlayers) as LeaderboardEntry[];
+          setPlayers(parsedPlayers);
+          playersFromCache = true;
         }
 
-        if (cachedStartups && startupsTimestamp) {
-          const timestamp = parseInt(startupsTimestamp, 10);
-          if (now - timestamp < CACHE_DURATION) {
-            setStartups(JSON.parse(cachedStartups) as Startup[]);
-            startupsFromCache = true;
-          }
+        if (cachedStartups && startupsTs && now - parseInt(startupsTs, 10) < CACHE_DURATION) {
+          parsedStartups = JSON.parse(cachedStartups) as Startup[];
+          setStartups(parsedStartups);
+          startupsFromCache = true;
         }
 
-        // Si les deux sont en cache valide, afficher immédiatement sans attendre Firestore
-        if (playersFromCache && startupsFromCache) {
+        if (playersFromCache && startupsFromCache && parsedPlayers && parsedStartups) {
+          // Peupler le cache mémoire depuis AsyncStorage
+          _memCache = {
+            players: parsedPlayers,
+            startups: parsedStartups,
+            playersTs: parseInt(playersTs!, 10),
+            startupsTs: parseInt(startupsTs!, 10),
+          };
           setIsLoading(false);
-          // Rafraîchir en arrière-plan sans bloquer l'UI
-          fetchFromFirestore(false);
+          // Rafraîchissement silencieux en arrière-plan
+          void fetchFromFirestore(false);
         } else {
-          // Pas de cache valide : fetch Firestore et attendre
           await fetchFromFirestore(false);
         }
-      } catch (error) {
-        console.error('[useLeaderboardCache] Init error:', error);
+      } catch {
         await fetchFromFirestore(false);
       }
     };
 
-    init();
+    void init();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const refresh = useCallback(async () => {
     await fetchFromFirestore(true);
   }, [fetchFromFirestore]);
 
-  return {
-    players,
-    startups,
-    isLoading,
-    isRefreshing,
-    refresh,
-  };
+  return { players, startups, isLoading, isRefreshing, refresh };
 }

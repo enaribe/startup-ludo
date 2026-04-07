@@ -9,6 +9,7 @@
  * - showpopup.mp3 → ouverture popups (quiz, opportunité, duel, financement…)
  * - winn.mp3      → victoire
  * - lose.mp3      → défaite
+ * - tour.mp3      → passage de tour à un autre joueur (pas au lancer du dé)
  * - song1.mp3     → musique de fond (voir useBackgroundMusic, musicEnabled)
  *
  * Utilise expo-audio. Respecte soundEnabled du store.
@@ -26,7 +27,8 @@ export type SoundName =
   | 'dice-roll'
   | 'popup-open'
   | 'victory'
-  | 'defeat';
+  | 'defeat'
+  | 'tour';
 
 const SOUND_FILES: Record<SoundName, AudioSource> = {
   'quiz-correct': require('../../assets/sounds/correctt.mp3'),
@@ -36,6 +38,7 @@ const SOUND_FILES: Record<SoundName, AudioSource> = {
   'popup-open': require('../../assets/sounds/showpopup.mp3'),
   victory: require('../../assets/sounds/winn.mp3'),
   defeat: require('../../assets/sounds/lose.mp3'),
+  tour: require('../../assets/sounds/tour.mp3'),
 };
 
 interface UseSoundReturn {

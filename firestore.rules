@@ -125,5 +125,20 @@ service cloud.firestore {
       allow read: if true;  // Public read - no sensitive data
       allow write: if isAdmin();
     }
+
+    // Follows collection - relations de suivi entre joueurs
+    // followId = "{followerId}_{followingId}"
+    match /follows/{followId} {
+      // Lecture publique pour pouvoir afficher les abonnés/abonnements
+      allow read: if isAuthenticated();
+      // Création : seul l'auteur peut créer son propre follow
+      allow create: if isAuthenticated() &&
+                      request.resource.data.followerId == request.auth.uid;
+      // Suppression : seul l'auteur peut se désabonner
+      allow delete: if isAuthenticated() &&
+                      resource.data.followerId == request.auth.uid;
+      // Pas de mise à jour (on crée ou on supprime)
+      allow update: if false;
+    }
   }
 }

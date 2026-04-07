@@ -17,9 +17,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/common/EmptyState';
 import { RocketIcon } from '@/components/icons';
-import { Avatar, DynamicGradientBorder, GameButton, InfoModal, RadialBackground, ScreenHeader } from '@/components/ui';
+import {
+  Avatar,
+  DynamicGradientBorder,
+  GameButton,
+  InfoModal,
+  Modal,
+  RadialBackground,
+  ScreenHeader,
+} from '@/components/ui';
 import type { InfoSection } from '@/components/ui';
 import { useAuthStore, useSettingsStore, useUserStore } from '@/stores';
+import { useSocialStore } from '@/stores/useSocialStore';
 import { useLeaderboardCache } from '@/hooks/useLeaderboardCache';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
@@ -90,12 +99,36 @@ export default function ClassementScreen() {
   const insets = useSafeAreaInsets();
   const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
   const currentUserId = useAuthStore((state) => state.user?.id);
+  const isGuest = useAuthStore((state) => state.user?.isGuest ?? true);
   const currentUserName = useAuthStore((state) => state.user?.displayName);
   const localProfile = useUserStore((state) => state.profile);
   const [activeFilter, setActiveFilter] = useState('joueurs');
   const [selectedProfile, setSelectedProfile] = useState<{ item: RankedItem; rank: number } | null>(null);
-  const [followedIds, setFollowedIds] = useState<Set<string>>(new Set());
   const [showInfo, setShowInfo] = useState(false);
+
+  const toggleFollow = useSocialStore((s) => s.toggleFollow);
+  const loadFollowing = useSocialStore((s) => s.loadFollowing);
+
+  const selectedFollowTargetId =
+    selectedProfile?.item.type === 'user' && !selectedProfile.item.isCurrentUser
+      ? selectedProfile.item.id
+      : null;
+  const isProfileFollowed = useSocialStore((s) =>
+    selectedFollowTargetId ? !!s.followingIds[selectedFollowTargetId] : false
+  );
+
+  useEffect(() => {
+    if (!currentUserId) return;
+    void loadFollowing(currentUserId);
+  }, [currentUserId, loadFollowing]);
+
+  useEffect(() => {
+    if (!currentUserId || !selectedProfile) return;
+    const item = selectedProfile.item;
+    if (item.type === 'user' && !item.isCurrentUser) {
+      void loadFollowing(currentUserId);
+    }
+  }, [selectedProfile?.item.id, currentUserId, loadFollowing]);
 
   // Utiliser le hook de cache
   const { players: remotePlayers, startups: remoteStartups, isRefreshing, refresh } = useLeaderboardCache();
@@ -246,20 +279,16 @@ export default function ClassementScreen() {
     setSelectedProfile(null);
   }, []);
 
-  const handleToggleFollow = useCallback((id: string) => {
-    if (hapticsEnabled) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    }
-    setFollowedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
+  const handleToggleFollow = useCallback(
+    (id: string) => {
+      if (!currentUserId || isGuest) return;
+      if (hapticsEnabled) {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       }
-      return next;
-    });
-  }, [hapticsEnabled]);
+      void toggleFollow(currentUserId, id);
+    },
+    [currentUserId, isGuest, hapticsEnabled, toggleFollow]
+  );
 
   const headerTopPadding = insets.top + 10;
   const headerHeight = headerTopPadding + HEADER_CONTENT_HEIGHT;
@@ -480,7 +509,8 @@ export default function ClassementScreen() {
         <ProfilePopup
           item={selectedProfile.item}
           rank={selectedProfile.rank}
-          isFollowed={followedIds.has(selectedProfile.item.id)}
+          isFollowed={isProfileFollowed}
+          isGuest={isGuest}
           onToggleFollow={() => handleToggleFollow(selectedProfile.item.id)}
           onClose={handleCloseProfile}
         />
@@ -511,11 +541,12 @@ interface ProfilePopupProps {
   item: RankedItem;
   rank: number;
   isFollowed: boolean;
+  isGuest: boolean;
   onToggleFollow: () => void;
   onClose: () => void;
 }
 
-function ProfilePopup({ item, rank, isFollowed, onToggleFollow, onClose }: ProfilePopupProps) {
+function ProfilePopup({ item, rank, isFollowed, isGuest, onToggleFollow, onClose }: ProfilePopupProps) {
   const [detailPageIndex, setDetailPageIndex] = useState(0);
   const isUser = item.type === 'user';
   const showFollowCta = isUser && !item.isCurrentUser;
@@ -721,9 +752,10 @@ function ProfilePopup({ item, rank, isFollowed, onToggleFollow, onClose }: Profi
             <View style={portfolioPopupStyles.actionsColumn}>
               {showFollowCta ? (
                 <GameButton
-                  title={isFollowed ? 'SUIVI' : 'SUIVRE'}
+                  title={isFollowed ? 'NE PLUS SUIVRE' : 'SUIVRE'}
                   variant={isFollowed ? 'blue' : 'yellow'}
                   fullWidth
+                  disabled={isGuest}
                   onPress={onToggleFollow}
                 />
               ) : null}

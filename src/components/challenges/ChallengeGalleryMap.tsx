@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { memo, useCallback, useEffect, useMemo } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   Dimensions,
   Pressable,
@@ -436,9 +436,19 @@ export const ChallengeGalleryMap = memo(function ChallengeGalleryMap({
     return { currentLevelY: foundY, contentHeight: y };
   }, [items]);
 
+  // Auto-scroll vers le bas au montage
+  const scrollRef = useRef<ScrollView>(null);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      scrollRef.current?.scrollToEnd({ animated: true });
+    }, 400);
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <View style={styles.container}>
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}

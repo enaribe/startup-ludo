@@ -19,3 +19,13 @@ export {
 } from './firestore';
 export type { UserProfile } from '@/types';
 export * from './realtimeDb';
+export {
+  followUser,
+  unfollowUser,
+  isFollowing,
+  getFollowing,
+  getFollowers,
+  getFollowCounts,
+  searchUsers as searchSocialUsers,
+  type SocialUser,
+} from './socialService';

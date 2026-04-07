@@ -105,12 +105,19 @@ export type GeneratedGameEvent =
 
 // ===== CONSTANTES =====
 
+const FIXED_POINTS = {
+  quiz: { reward: 1, penalty: 0 },
+  challenge: 2,
+  opportunity: 2,
+  funding: 4,
+} as const;
+
 const DEFAULT_QUIZ_CONFIG = {
   timeLimit: 30,
   rewards: {
-    facile: { reward: 2, penalty: 0 },
-    moyen: { reward: 3, penalty: 1 },
-    difficile: { reward: 5, penalty: 2 },
+    facile: { reward: FIXED_POINTS.quiz.reward, penalty: FIXED_POINTS.quiz.penalty },
+    moyen: { reward: FIXED_POINTS.quiz.reward, penalty: FIXED_POINTS.quiz.penalty },
+    difficile: { reward: FIXED_POINTS.quiz.reward, penalty: FIXED_POINTS.quiz.penalty },
   } as Record<DifficultyLevel, { reward: number; penalty: number }>,
 };
 
@@ -224,7 +231,6 @@ export class EventManager {
 
     // Déterminer la difficulté
     const quizDifficulty = quiz.difficulty ?? this.inferDifficulty(quiz);
-    const config = DEFAULT_QUIZ_CONFIG.rewards[quizDifficulty] ?? { reward: 2, penalty: 0 };
 
     return {
       type: 'quiz',
@@ -235,8 +241,8 @@ export class EventManager {
         options: quiz.options,
         correctAnswer: quiz.correctAnswer,
         difficulty: quizDifficulty,
-        reward: quiz.rewardTokens ?? config.reward,
-        penalty: quiz.penaltyTokens ?? config.penalty,
+        reward: FIXED_POINTS.quiz.reward,
+        penalty: FIXED_POINTS.quiz.penalty,
         timeLimit: quiz.timeLimit ?? DEFAULT_QUIZ_CONFIG.timeLimit,
         explanation: quiz.explanation || undefined,
       },
@@ -264,8 +270,8 @@ export class EventManager {
         name: funding.title,
         description: funding.description,
         type: this.inferFundingType(funding.title),
-        amount: funding.tokens,
-        rarity: this.inferRarity(funding.tokens),
+        amount: FIXED_POINTS.funding,
+        rarity: this.inferRarity(FIXED_POINTS.funding),
       },
     };
   }
@@ -316,8 +322,8 @@ export class EventManager {
         title: opportunity.title,
         description: opportunity.description,
         effect: 'tokens',
-        value: opportunity.tokens,
-        rarity: this.inferRarity(opportunity.tokens),
+        value: FIXED_POINTS.opportunity,
+        rarity: this.inferRarity(FIXED_POINTS.opportunity),
       },
     };
   }
@@ -343,8 +349,8 @@ export class EventManager {
         title: challenge.title,
         description: challenge.description,
         effect: 'loseTokens',
-        value: Math.abs(challenge.tokens),
-        rarity: this.inferRarity(Math.abs(challenge.tokens)),
+        value: FIXED_POINTS.challenge,
+        rarity: this.inferRarity(FIXED_POINTS.challenge),
       },
     };
   }
@@ -367,7 +373,7 @@ export class EventManager {
           this.usedOpportunityIds.add(opp.id);
           return {
             type: 'opportunity',
-            data: { id: opp.id, title: opp.title, description: opp.description, effect: 'tokens', value: opp.tokens, rarity: this.inferRarity(opp.tokens) },
+            data: { id: opp.id, title: opp.title, description: opp.description, effect: 'tokens', value: FIXED_POINTS.opportunity, rarity: this.inferRarity(FIXED_POINTS.opportunity) },
           };
         }
       }
@@ -376,7 +382,7 @@ export class EventManager {
         this.usedChallengeIds.add(chal.id);
         return {
           type: 'challenge',
-          data: { id: chal.id, title: chal.title, description: chal.description, effect: 'loseTokens', value: Math.abs(chal.tokens), rarity: this.inferRarity(Math.abs(chal.tokens)) },
+          data: { id: chal.id, title: chal.title, description: chal.description, effect: 'loseTokens', value: FIXED_POINTS.challenge, rarity: this.inferRarity(FIXED_POINTS.challenge) },
         };
       }
     }
@@ -398,8 +404,8 @@ export class EventManager {
           title: event.data.title,
           description: event.data.description,
           effect: 'tokens',
-          value: event.data.tokens,
-          rarity: this.inferRarity(event.data.tokens),
+          value: FIXED_POINTS.opportunity,
+          rarity: this.inferRarity(FIXED_POINTS.opportunity),
         },
       };
     } else {
@@ -411,8 +417,8 @@ export class EventManager {
           title: event.data.title,
           description: event.data.description,
           effect: 'loseTokens',
-          value: Math.abs(event.data.tokens),
-          rarity: this.inferRarity(Math.abs(event.data.tokens)),
+          value: FIXED_POINTS.challenge,
+          rarity: this.inferRarity(FIXED_POINTS.challenge),
         },
       };
     }
@@ -461,8 +467,8 @@ export class EventManager {
         ],
         correctAnswer: 1,
         difficulty: 'facile',
-        reward: 2,
-        penalty: 0,
+        reward: FIXED_POINTS.quiz.reward,
+        penalty: FIXED_POINTS.quiz.penalty,
         timeLimit: 30,
       },
     };
@@ -476,8 +482,8 @@ export class EventManager {
         name: 'Investisseur Providentiel',
         description: 'Un investisseur croit en ton projet !',
         type: 'investisseur',
-        amount: 3,
-        rarity: 'common',
+        amount: FIXED_POINTS.funding,
+        rarity: this.inferRarity(FIXED_POINTS.funding),
       },
     };
   }
@@ -506,8 +512,8 @@ export class EventManager {
         title: 'Partenariat stratégique',
         description: 'Une grande entreprise veut collaborer avec toi !',
         effect: 'tokens',
-        value: 3,
-        rarity: 'common',
+        value: FIXED_POINTS.opportunity,
+        rarity: this.inferRarity(FIXED_POINTS.opportunity),
       },
     };
   }
@@ -520,8 +526,8 @@ export class EventManager {
         title: 'Problème de trésorerie',
         description: 'Des dépenses imprévues affectent ton budget.',
         effect: 'loseTokens',
-        value: 2,
-        rarity: 'common',
+        value: FIXED_POINTS.challenge,
+        rarity: this.inferRarity(FIXED_POINTS.challenge),
       },
     };
   }

@@ -10,6 +10,7 @@
 
 import type { MoveResult, ValidMove } from '@/services/game/GameEngine';
 import type { GameState, Player } from '@/types';
+import { useSound } from '@/hooks/useSound';
 import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 
@@ -230,6 +231,8 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
   const {
     game,
     currentPlayer,
+    isOnline,
+    userId,
     actions,
     onEvent,
     onWin,
@@ -238,8 +241,13 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
     clearSelection,
   } = params;
 
+  const { play: playSound } = useSound();
+
   const [turnState, dispatch] = useReducer(turnReducer, initialTurnState);
   const timers = useTimerMap();
+
+  /** Ref pour jouer tour.mp3 une fois au changement de joueur actif (passage de tour) */
+  const tourSoundPrevPlayerIdRef = useRef<string | null>(null);
 
   // ===== DICE CHOICE STATE =====
   const [chosenDiceValue, setChosenDiceValueState] = useState<number | null>(null);
@@ -465,6 +473,37 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [turnState.phase]);
+
+  // ===== EFFECT: Son « tour » quand le tour passe à un autre joueur =====
+
+  useEffect(() => {
+    if (!game || game.status !== 'playing') return;
+    const pid = currentPlayer?.id ?? null;
+    if (!pid) return;
+
+    if (tourSoundPrevPlayerIdRef.current === null) {
+      tourSoundPrevPlayerIdRef.current = pid;
+      return;
+    }
+    if (tourSoundPrevPlayerIdRef.current === pid) return;
+
+    tourSoundPrevPlayerIdRef.current = pid;
+
+    const humanCount = game.players.filter((p) => !p.isAI).length;
+    let shouldPlayTour = false;
+
+    if (isOnline && userId) {
+      shouldPlayTour = pid !== userId;
+    } else if (humanCount > 1) {
+      shouldPlayTour = true;
+    } else {
+      shouldPlayTour = currentPlayer?.isAI === true;
+    }
+
+    if (shouldPlayTour) {
+      playSound('tour');
+    }
+  }, [game?.status, game?.players, currentPlayer?.id, currentPlayer?.isAI, isOnline, userId, playSound]);
 
   // ===== EFFECT: Detect active player change → reset machine =====
   // When the current player changes (new player's turn), reset the

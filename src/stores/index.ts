@@ -9,3 +9,4 @@ export {
   selectActiveEnrollment,
   selectIsEnrolled,
 } from './useChallengeStore';
+export { useSocialStore } from './useSocialStore';

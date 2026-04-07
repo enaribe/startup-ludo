@@ -6,33 +6,33 @@
  * Design system: RadialBackground, DynamicGradientBorder, GameButton, COLORS/FONTS/SPACING
  */
 
-import { useState, useEffect, useRef } from 'react';
-import { View, Text, Pressable, ScrollView, Modal, Dimensions, StyleSheet } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, {
-  FadeInDown,
-  FadeInUp,
-  useAnimatedStyle,
-  withTiming,
-  withDelay,
-  withSequence,
-  useSharedValue,
-  Easing,
-} from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
+import { Dimensions, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import Animated, {
+    Easing,
+    FadeInDown,
+    FadeInUp,
+    useAnimatedStyle,
+    useSharedValue,
+    withDelay,
+    withSequence,
+    withTiming,
+} from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { DynamicGradientBorder, GameButton, RadialBackground } from '@/components/ui';
+import { Avatar } from '@/components/ui/Avatar';
+import { XP_REWARDS, getChallengeXPReward } from '@/config/progression';
+import { isOwnStartup } from '@/data/defaultProjects';
+import { useSound } from '@/hooks/useSound';
+import { saveGameSession, updateChallengeEnrollment, updateStartupValorisation, updateUserStats } from '@/services/firebase/firestore';
+import { useAuthStore, useChallengeStore, useGameStore, useUserStore } from '@/stores';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
-import { Avatar } from '@/components/ui/Avatar';
-import { RadialBackground, DynamicGradientBorder, GameButton } from '@/components/ui';
-import { useGameStore, useAuthStore, useUserStore, useChallengeStore } from '@/stores';
-import { XP_REWARDS, getChallengeXPReward } from '@/config/progression';
-import { updateUserStats, updateChallengeEnrollment, saveGameSession, updateStartupValorisation } from '@/services/firebase/firestore';
-import { isOwnStartup } from '@/data/defaultProjects';
 import { formatFCFARaw } from '@/utils/currency';
-import { useSound } from '@/hooks/useSound';
 
 const { width: screenWidth } = Dimensions.get('window');
 const contentWidth = screenWidth - SPACING[4] * 2;
@@ -113,7 +113,7 @@ export default function ResultsScreen() {
     isOnline?: string;
   }>();
 
-  const { game, resetGame } = useGameStore();
+  const { game, resetGame, initGame } = useGameStore();
   const user = useAuthStore((state) => state.user);
   const profile = useUserStore((state) => state.profile);
   const addXP = useUserStore((s) => s.addXP);
@@ -126,6 +126,8 @@ export default function ResultsScreen() {
   const challengeAddXp = useChallengeStore((s) => s.addXp);
   const checkAndUnlockNextSubLevel = useChallengeStore((s) => s.checkAndUnlockNextSubLevel);
   const checkAndUnlockNextLevel = useChallengeStore((s) => s.checkAndUnlockNextLevel);
+  const challenges = useChallengeStore((s) => s.challenges);
+  const enrollments = useChallengeStore((s) => s.enrollments);
 
   const isGuest = user?.isGuest ?? true;
   const isOnline = params.isOnline === 'true' || params.mode === 'online';
@@ -134,6 +136,8 @@ export default function ResultsScreen() {
   const { play: playEndGameSound } = useSound();
 
   const [showConvertPopup, setShowConvertPopup] = useState(false);
+  const [showXpNeededMessage, setShowXpNeededMessage] = useState(false);
+  const [xpNeededAmount, setXpNeededAmount] = useState(0);
 
   // Animations
   const xpAnimValue = useSharedValue(0);
@@ -335,6 +339,67 @@ export default function ResultsScreen() {
     }
   };
 
+  // Challenge: Rejouer le même sous-niveau
+  const handleChallengeReplay = () => {
+    if (!game?.challengeContext) return;
+    const ctx = game.challengeContext;
+    const playerId = user?.id || 'player_0';
+    resetGame();
+    initGame('solo', 'classic', [
+      { id: playerId, name: user?.displayName || 'Vous', color: 'green' as const, isAI: false, isHost: true, isConnected: true },
+      { id: 'ai_challenge', name: 'IA Challenge', color: 'blue' as const, isAI: true, isHost: false, isConnected: true },
+    ], {
+      challengeId: ctx.challengeId,
+      enrollmentId: ctx.enrollmentId,
+      levelNumber: ctx.levelNumber,
+      subLevelNumber: ctx.subLevelNumber,
+      sectorId: ctx.sectorId,
+    });
+    const gameId = `challenge_${Date.now()}`;
+    router.replace(`/(game)/play/${gameId}`);
+  };
+
+  // Challenge: Passer au niveau suivant
+  const handleNextLevel = () => {
+    if (!game?.challengeContext) return;
+    const ctx = game.challengeContext;
+    const enrollment = enrollments.find((e) => e.id === ctx.enrollmentId);
+    if (!enrollment) return;
+    const challenge = challenges.find((c) => c.id === ctx.challengeId);
+    if (!challenge) return;
+
+    // Vérifier si le sous-niveau/niveau suivant est débloqué
+    const isUnlocked = enrollment.currentLevel !== ctx.levelNumber || enrollment.currentSubLevel !== ctx.subLevelNumber;
+
+    if (!isUnlocked) {
+      // Calculer l'XP restant pour débloquer
+      const level = challenge.levels.find((l) => l.number === ctx.levelNumber);
+      const currentSub = level?.subLevels.find((s) => s.number === ctx.subLevelNumber);
+      if (currentSub && level) {
+        const currentXp = enrollment.xpByLevel[ctx.levelNumber] ?? 0;
+        const remaining = currentSub.xpRequired - currentXp;
+        setXpNeededAmount(Math.max(0, remaining));
+        setShowXpNeededMessage(true);
+      }
+      return;
+    }
+
+    const playerId = user?.id || 'player_0';
+    resetGame();
+    initGame('solo', 'classic', [
+      { id: playerId, name: user?.displayName || 'Vous', color: 'green' as const, isAI: false, isHost: true, isConnected: true },
+      { id: 'ai_challenge', name: 'IA Challenge', color: 'blue' as const, isAI: true, isHost: false, isConnected: true },
+    ], {
+      challengeId: ctx.challengeId,
+      enrollmentId: ctx.enrollmentId,
+      levelNumber: enrollment.currentLevel,
+      subLevelNumber: enrollment.currentSubLevel,
+      sectorId: ctx.sectorId,
+    });
+    const gameId = `challenge_${Date.now()}`;
+    router.replace(`/(game)/play/${gameId}`);
+  };
+
   const handleConvert = () => {
     setShowConvertPopup(false);
     resetGame();
@@ -369,7 +434,7 @@ export default function ResultsScreen() {
           </Animated.View>
           <Text style={styles.title}>Partie terminee !</Text>
           <Text style={styles.subtitle}>
-            {isOnline ? 'Multijoueur en ligne' : 'Partie locale'}
+            {isChallengeGame ? 'Partie Challenge' : isOnline ? 'Multijoueur en ligne' : 'Partie locale'}
           </Text>
         </Animated.View>
 
@@ -630,18 +695,51 @@ export default function ResultsScreen() {
 
         {/* Action Buttons */}
         <Animated.View entering={FadeInUp.delay(900).duration(500)} style={styles.actionsBlock}>
-          <GameButton
-            variant="yellow"
-            fullWidth
-            title="NOUVELLE PARTIE"
-            onPress={handlePlayAgain}
-          />
-          <GameButton
-            variant="blue"
-            fullWidth
-            title="RETOUR À L'ACCUEIL"
-            onPress={handleGoHome}
-          />
+          {isChallengeGame ? (
+            <>
+              <GameButton
+                variant="yellow"
+                fullWidth
+                title="REJOUER"
+                onPress={handleChallengeReplay}
+              />
+              <GameButton
+                variant="blue"
+                fullWidth
+                title="NIVEAU SUIVANT"
+                onPress={handleNextLevel}
+              />
+              {showXpNeededMessage && (
+                <View style={styles.xpNeededBanner}>
+                  <Ionicons name="lock-closed" size={16} color={COLORS.primary} />
+                  <Text style={styles.xpNeededText}>
+                    Il te manque {xpNeededAmount.toLocaleString()} XP pour debloquer le niveau suivant. Rejoue pour en gagner !
+                  </Text>
+                </View>
+              )}
+              <GameButton
+                variant="red"
+                fullWidth
+                title="RETOUR À L'ACCUEIL"
+                onPress={handleGoHome}
+              />
+            </>
+          ) : (
+            <>
+              <GameButton
+                variant="yellow"
+                fullWidth
+                title="NOUVELLE PARTIE"
+                onPress={handlePlayAgain}
+              />
+              <GameButton
+                variant="blue"
+                fullWidth
+                title="RETOUR À L'ACCUEIL"
+                onPress={handleGoHome}
+              />
+            </>
+          )}
         </Animated.View>
       </ScrollView>
 
@@ -1016,6 +1114,21 @@ const styles = StyleSheet.create({
   // Actions
   actionsBlock: {
     gap: SPACING[3],
+  },
+  xpNeededBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[2],
+    backgroundColor: 'rgba(255, 188, 64, 0.12)',
+    paddingHorizontal: SPACING[3],
+    paddingVertical: SPACING[3],
+    borderRadius: 12,
+  },
+  xpNeededText: {
+    flex: 1,
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.primary,
   },
 
   // Modal
