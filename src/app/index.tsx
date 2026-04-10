@@ -5,7 +5,8 @@
  * GameButton et les assets existants (shape.png, logostartupludo.png).
  */
 
-import { useRouter } from 'expo-router';
+import Constants from 'expo-constants';
+import { Redirect, useRouter } from 'expo-router';
 import { memo, useCallback, useEffect, useState } from 'react';
 import { Dimensions, Image, StyleSheet, View } from 'react-native';
 import Animated, {
@@ -106,6 +107,8 @@ const CircularLoader = memo(function CircularLoader({ size }: { size: number }) 
   );
 });
 
+const IS_FORUM_MODE = Constants.expoConfig?.extra?.appMode === 'forum';
+
 export default function WelcomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -176,6 +179,11 @@ export default function WelcomeScreen() {
     }
     router.push('/(auth)/register');
   }, [router, accepted]);
+
+  // Mode forum : redirect immédiat, sans auth ni splash
+  if (IS_FORUM_MODE) {
+    return <Redirect href="/(forum)/welcome" />;
+  }
 
   // Splash Screen initial
   if (showSplash) {

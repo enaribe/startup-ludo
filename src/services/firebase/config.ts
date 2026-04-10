@@ -52,6 +52,9 @@ export const FIRESTORE_COLLECTIONS = {
   challenges: 'challenges',
   challengeEnrollments: 'challengeEnrollments',
   ideationCards: 'ideationCards',
+  /** Mode forum (build EAS forum) — sessions et stats agrégées, séparés du reste */
+  forumSessions: 'forumSessions',
+  forumLeaderboard: 'forumLeaderboard',
 } as const;
 
 // ===== ERROR HANDLING =====

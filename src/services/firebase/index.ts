@@ -1,5 +1,14 @@
 // Firebase Services - Main Export
 export * from './config';
+export {
+  saveForumSession,
+  updateForumLeaderboard,
+  getForumLeaderboard,
+  forumPlayerNameToDocId,
+  type ForumSession,
+  type ForumLeaderboardEntry,
+  type ForumLeaderboardPlayerInput,
+} from './forumService';
 export * from './auth';
 export * from './socialAuth';
 export {
