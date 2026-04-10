@@ -554,8 +554,6 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.xl,
     paddingVertical: SPACING[3],
     paddingHorizontal: SPACING[4],
-    borderLeftWidth: 3,
-    borderLeftColor: '#FF9800',
   },
   explanationHeader: {
     flexDirection: 'row',

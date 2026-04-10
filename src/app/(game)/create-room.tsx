@@ -14,14 +14,14 @@ import { Alert, Dimensions, Pressable, ScrollView, Share, StyleSheet, Text, Text
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { StartupSelectionModal } from '@/components/game/StartupSelectionModal';
 import { DynamicGradientBorder, GameButton, RadialBackground } from '@/components/ui';
 import { Avatar } from '@/components/ui/Avatar';
-import { StartupSelectionModal } from '@/components/game/StartupSelectionModal';
+import { getDefaultProjectsForEdition, getMatchingUserStartups } from '@/data/defaultProjects';
 import { useMultiplayer } from '@/hooks/useMultiplayer';
 import { useAuthStore, useUserStore } from '@/stores';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
-import { getDefaultProjectsForEdition, getMatchingUserStartups } from '@/data/defaultProjects';
 
 const { width: screenWidth } = Dimensions.get('window');
 const contentWidth = screenWidth - SPACING[4] * 2;

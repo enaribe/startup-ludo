@@ -452,8 +452,7 @@ export default function PlayScreen() {
   handleEventResolveRef.current = handleEventResolve;
 
   // ===== SHAKE TO ROLL (temporairement désactivé) =====
-  // Désactivé pour l’instant car le module natif requis (expo-sensors / ExponentPedometer)
-  // n’est pas encore disponible tant que tu n’as pas fait le build natif.
+  // Désactivé pour l’instant: la détection de secousse n’est pas active dans cette version.
 
   // ===== ONLINE: React to remote dice rolls =====
 
