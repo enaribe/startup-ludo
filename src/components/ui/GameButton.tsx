@@ -1,9 +1,10 @@
-import { memo, useCallback } from 'react';
+import { memo, useCallback, type ReactNode } from 'react';
 import {
   Pressable,
   Text,
   ActivityIndicator,
   StyleSheet,
+  View,
   type GestureResponderEvent,
   type PressableProps,
   type ViewStyle,
@@ -16,18 +17,21 @@ import Animated, {
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import { SPACING } from '@/styles/spacing';
 import { FONTS } from '@/styles/typography';
 import { useSettingsStore } from '@/stores';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 type GameButtonVariant = 'green' | 'yellow' | 'blue' | 'red';
-type GameButtonSize = 'default' | 'sm';
+type GameButtonSize = 'default' | 'sm' | 'lg';
 
 interface GameButtonProps extends Omit<PressableProps, 'style'> {
   title: string;
   variant?: GameButtonVariant;
   size?: GameButtonSize;
+  /** Icône ou décor à gauche du titre (non affiché en chargement) */
+  leftIcon?: ReactNode;
   loading?: boolean;
   disabled?: boolean;
   fullWidth?: boolean;
@@ -39,6 +43,7 @@ export const GameButton = memo(function GameButton({
   title,
   variant = 'green',
   size = 'default',
+  leftIcon,
   loading = false,
   disabled = false,
   fullWidth = false,
@@ -83,6 +88,7 @@ export const GameButton = memo(function GameButton({
   const isBlue = variant === 'blue';
   const isRed = variant === 'red';
   const isSmall = size === 'sm';
+  const isLarge = size === 'lg';
 
   // Bleu proche du conteneur / fond (radial #0F3A6B, background #0C243E, backgroundLight #194F8A)
   const gradientColors: [string, string] =
@@ -116,7 +122,12 @@ export const GameButton = memo(function GameButton({
     >
       <LinearGradient
         colors={gradientColors}
-        style={[styles.gradient, isSmall && styles.gradientSm]}
+        style={[
+          styles.gradient,
+          isSmall && styles.gradientSm,
+          isLarge && styles.gradientLg,
+          leftIcon ? styles.gradientWithIcon : undefined,
+        ]}
       >
         {loading ? (
           <ActivityIndicator
@@ -124,18 +135,22 @@ export const GameButton = memo(function GameButton({
             color={textColor}
           />
         ) : (
-          <Text
-            style={[
-              styles.text,
-              isSmall && styles.textSm,
-              isYellow && styles.textYellow,
-              (isBlue || isRed) && styles.textLight,
-              { color: textColor },
-              textStyle,
-            ]}
-          >
-            {title}
-          </Text>
+          <View style={[styles.labelRow, leftIcon && styles.labelRowWithIcon]}>
+            {leftIcon ? <View style={styles.leftIconSlot}>{leftIcon}</View> : null}
+            <Text
+              style={[
+                styles.text,
+                isSmall && styles.textSm,
+                isLarge && styles.textLg,
+                isYellow && styles.textYellow,
+                (isBlue || isRed) && styles.textLight,
+                { color: textColor },
+                textStyle,
+              ]}
+            >
+              {title}
+            </Text>
+          </View>
         )}
       </LinearGradient>
     </AnimatedPressable>
@@ -182,6 +197,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     minHeight: 38,
   },
+  gradientLg: {
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    minHeight: 52,
+  },
+  gradientWithIcon: {
+    paddingHorizontal: SPACING[4],
+  },
+  labelRow: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  labelRowWithIcon: {
+    flexDirection: 'row',
+    gap: SPACING[2],
+  },
+  leftIconSlot: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   text: {
     fontFamily: FONTS.title,
     fontSize: 16,
@@ -196,6 +231,10 @@ const styles = StyleSheet.create({
   textSm: {
     fontSize: 14,
     letterSpacing: 0.5,
+  },
+  textLg: {
+    fontSize: 18,
+    letterSpacing: 1.2,
   },
   textYellow: {
     color: '#1E325A',

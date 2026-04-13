@@ -273,7 +273,11 @@ export default function PlayScreen() {
   const handleTriggeredEvent = useCallback(
     (eventType: string) => {
       // Utilise l'édition du joueur courant (mode online) ou l'édition globale (mode solo/local)
-      const playerEdition = (currentPlayer?.edition || game?.edition || 'classic') as import('@/data').EditionId;
+      const raw =
+        game?.edition?.trim() ||
+        currentPlayer?.edition?.trim() ||
+        'classic';
+      const playerEdition = raw as import('@/data').EditionId;
 
       // Génère l'événement depuis l'édition du joueur
       const event = eventManager.generateEventForEdition(eventType as any, playerEdition);

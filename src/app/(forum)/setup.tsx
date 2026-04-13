@@ -1,18 +1,20 @@
 /**
  * ForumSetupScreen — Sélection du nombre de joueurs + saisie noms/startups
  *
- * Étape 1 : choix du nombre de joueurs (Solo / 2 / 3 / 4)
- * Étape 2..N : saisie Nom + Nom de startup pour chaque joueur (séquentiel)
- * → initGame() → push vers /(forum)/play
+ * Fond : plateau Ludo (aperçu) + flou + voile (toutes les étapes).
+ * Étape 1 : nombre de joueurs (Solo / 2 / 3 / 4)
+ * Étape 2.. : saisie Nom + Nom de startup (séquentiel)
+ * → initGame (édition Agriculture, id Firestore) → /(forum)/play
  */
 
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
-  Dimensions,
-  Image,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -20,18 +22,17 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import Animated, { FadeIn, FadeInDown, SlideInUp } from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { RadialBackground } from '@/components/ui/RadialBackground';
-import { GameButton } from '@/components/ui/GameButton';
+import { ForumSetupBoardBackdrop } from '@/components/forum';
+import { GameButton, RadialBackground } from '@/components/ui';
+import { useForumScale } from '@/hooks/useForumScale';
+import { useResponsiveLayout } from '@/hooks/useResponsiveLayout';
 import { useGameStore } from '@/stores/useGameStore';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import type { PlayerColor } from '@/types';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const logoImage = require('@/../assets/images/logostartupludo.png');
 
 // Couleurs assignées par nombre de joueurs (même logique que local-setup)
 const COLORS_BY_COUNT: Record<number, PlayerColor[]> = {
@@ -41,12 +42,11 @@ const COLORS_BY_COUNT: Record<number, PlayerColor[]> = {
   4: ['yellow', 'blue', 'green', 'red'],
 };
 
-const COLOR_HEX: Record<PlayerColor, string> = {
-  yellow: '#FFBC40',
-  blue: '#1F91D0',
-  green: '#4CAF50',
-  red: '#FF6B6B',
-};
+/** Id Firestore de l'édition Agriculture (contenu quiz/duels/etc. chargé comme le jeu classique). */
+const FORUM_EDITION_ID = 'agriculture' as const;
+
+const FORM_LABEL_NAVY = '#0C243E';
+const FORM_INPUT_BG = '#F3F4F6';
 
 interface PlayerDraft {
   name: string;
@@ -57,9 +57,15 @@ interface PlayerDraft {
 function PlayerCountSelector({
   selected,
   onSelect,
+  fs,
+  sp,
+  contentWidth,
 }: {
   selected: number | null;
   onSelect: (n: number) => void;
+  fs: (n: number) => number;
+  sp: (n: number) => number;
+  contentWidth: number;
 }) {
   const options = [
     { label: 'SOLO', value: 1 },
@@ -68,8 +74,10 @@ function PlayerCountSelector({
     { label: '4 JOUEURS', value: 4 },
   ];
 
+  const cellW = (contentWidth - sp(48) * 2 - sp(12)) / 2;
+
   return (
-    <View style={countStyles.grid}>
+    <View style={[countStyles.grid, { gap: sp(12), marginVertical: sp(20) }]}>
       {options.map((opt) => {
         const isSelected = selected === opt.value;
         return (
@@ -78,6 +86,11 @@ function PlayerCountSelector({
             onPress={() => onSelect(opt.value)}
             style={[
               countStyles.cell,
+              {
+                width: cellW,
+                paddingVertical: sp(16),
+                borderRadius: sp(14),
+              },
               isSelected && countStyles.cellSelected,
             ]}
             activeOpacity={0.75}
@@ -85,6 +98,7 @@ function PlayerCountSelector({
             <Text
               style={[
                 countStyles.cellText,
+                { fontSize: fs(FONT_SIZES.md) },
                 isSelected && countStyles.cellTextSelected,
               ]}
             >
@@ -101,32 +115,26 @@ const countStyles = StyleSheet.create({
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
     justifyContent: 'center',
-    marginVertical: SPACING[5],
   },
   cell: {
-    width: (SCREEN_WIDTH - SPACING[6] * 2 - 60) / 2,
-    paddingVertical: SPACING[4],
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: '#F3F4F6',
     borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.15)',
+    borderColor: 'rgba(12, 36, 62, 0.12)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   cellSelected: {
-    backgroundColor: 'rgba(255, 188, 64, 0.18)',
+    backgroundColor: 'rgba(255, 188, 64, 0.2)',
     borderColor: '#FFBC40',
   },
   cellText: {
     fontFamily: FONTS.title,
-    fontSize: FONT_SIZES.sm,
-    color: 'rgba(255,255,255,0.5)',
+    color: '#4A5568',
     letterSpacing: 0.5,
   },
   cellTextSelected: {
-    color: '#FFBC40',
+    color: '#0C243E',
   },
 });
 
@@ -134,52 +142,80 @@ const countStyles = StyleSheet.create({
 function PlayerForm({
   playerIndex,
   totalPlayers,
-  colorHex,
   draft,
   onChange,
   onContinue,
   isLast,
+  fs,
+  sp,
 }: {
   playerIndex: number;
   totalPlayers: number;
-  colorHex: string;
   draft: PlayerDraft;
   onChange: (field: 'name' | 'startupName', value: string) => void;
   onContinue: () => void;
   isLast: boolean;
+  fs: (n: number) => number;
+  sp: (n: number) => number;
 }) {
   const canContinue = draft.name.trim().length > 0 && draft.startupName.trim().length > 0;
 
   return (
-    <Animated.View entering={SlideInUp.duration(300).springify().damping(28)} style={formStyles.card}>
-      {/* Avatar initiales */}
-      <View style={[formStyles.avatarCircle, { backgroundColor: colorHex }]}>
-        <Text style={formStyles.avatarText}>
-          {draft.name.trim() ? draft.name.trim()[0]!.toUpperCase() : (playerIndex + 1).toString()}
-        </Text>
-      </View>
+    <Animated.View
+      entering={FadeInDown.duration(400)}
+      style={[
+        formStyles.card,
+        { borderRadius: sp(24), padding: sp(28) },
+      ]}
+    >
+      <Text style={[formStyles.title, { fontSize: fs(FONT_SIZES['2xl']), marginBottom: sp(20) }]}>
+        JOUEUR {playerIndex + 1}
+      </Text>
 
-      <Text style={[formStyles.title, { color: colorHex }]}>JOUEUR {playerIndex + 1}</Text>
-
-      <Text style={formStyles.label}>Votre nom</Text>
+      <Text style={[formStyles.label, { fontSize: fs(FONT_SIZES.base), marginBottom: sp(8) }]}>
+        Votre nom
+      </Text>
       <TextInput
-        style={formStyles.input}
+        style={[
+          formStyles.input,
+          {
+            borderRadius: sp(12),
+            paddingHorizontal: sp(16),
+            paddingVertical: sp(14),
+            fontSize: fs(FONT_SIZES.md),
+          },
+        ]}
         value={draft.name}
         onChangeText={(v) => onChange('name', v)}
         placeholder="Ex: Babacar Birane"
-        placeholderTextColor="rgba(0,0,0,0.35)"
+        placeholderTextColor="rgba(12, 36, 62, 0.35)"
         autoCapitalize="words"
         returnKeyType="next"
         maxLength={30}
       />
 
-      <Text style={formStyles.label}>Nom de votre Startup</Text>
+      <Text
+        style={[
+          formStyles.label,
+          { fontSize: fs(FONT_SIZES.base), marginBottom: sp(8), marginTop: sp(20) },
+        ]}
+      >
+        Nom de votre Entreprise Agricole
+      </Text>
       <TextInput
-        style={formStyles.input}
+        style={[
+          formStyles.input,
+          {
+            borderRadius: sp(12),
+            paddingHorizontal: sp(16),
+            paddingVertical: sp(14),
+            fontSize: fs(FONT_SIZES.md),
+          },
+        ]}
         value={draft.startupName}
         onChangeText={(v) => onChange('startupName', v)}
         placeholder="Ex: Design For Citizens"
-        placeholderTextColor="rgba(0,0,0,0.35)"
+        placeholderTextColor="rgba(12, 36, 62, 0.35)"
         autoCapitalize="words"
         returnKeyType="done"
         onSubmitEditing={canContinue ? onContinue : undefined}
@@ -189,14 +225,15 @@ function PlayerForm({
       <GameButton
         title={isLast ? 'COMMENCER' : 'CONTINUER'}
         variant="yellow"
+        size="lg"
         fullWidth
         onPress={onContinue}
         disabled={!canContinue}
-        style={formStyles.btn}
+        style={{ marginTop: sp(24) }}
       />
 
       {totalPlayers > 1 && (
-        <Text style={formStyles.progress}>
+        <Text style={[formStyles.progress, { fontSize: fs(FONT_SIZES.sm), marginTop: sp(16) }]}>
           {playerIndex + 1} / {totalPlayers}
         </Text>
       )}
@@ -206,62 +243,36 @@ function PlayerForm({
 
 const formStyles = StyleSheet.create({
   card: {
+    alignSelf: 'stretch',
     backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: SPACING[6],
-    marginHorizontal: SPACING[5],
-    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
     shadowRadius: 20,
     elevation: 12,
   },
-  avatarCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: SPACING[3],
-  },
-  avatarText: {
-    fontFamily: FONTS.title,
-    fontSize: 22,
-    color: '#FFFFFF',
-  },
   title: {
     fontFamily: FONTS.title,
-    fontSize: FONT_SIZES.xl,
-    marginBottom: SPACING[5],
-    letterSpacing: 0.5,
+    color: '#0C243E',
+    textAlign: 'center',
+    letterSpacing: 0.3,
   },
   label: {
     fontFamily: FONTS.bodySemiBold,
-    fontSize: FONT_SIZES.sm,
-    color: '#4A5568',
+    color: FORM_LABEL_NAVY,
     alignSelf: 'flex-start',
-    marginBottom: SPACING[1],
-    marginTop: SPACING[3],
   },
   input: {
     width: '100%',
-    backgroundColor: '#F3F4F6',
-    borderRadius: 10,
-    paddingHorizontal: SPACING[4],
-    paddingVertical: SPACING[3],
+    backgroundColor: FORM_INPUT_BG,
     fontFamily: FONTS.bodySemiBold,
-    fontSize: FONT_SIZES.base,
-    color: '#0C243E',
-  },
-  btn: {
-    marginTop: SPACING[5],
+    color: FORM_LABEL_NAVY,
   },
   progress: {
     fontFamily: FONTS.body,
-    fontSize: FONT_SIZES.xs,
-    color: 'rgba(0,0,0,0.35)',
-    marginTop: SPACING[3],
+    color: 'rgba(12, 36, 62, 0.45)',
+    textAlign: 'center',
+    alignSelf: 'center',
   },
 });
 
@@ -272,6 +283,8 @@ type Step = 'count' | 'players';
 export default function ForumSetupScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { sizes } = useResponsiveLayout();
+  const { fs, sp, contentWidth, hPad } = useForumScale();
   const initGame = useGameStore((s) => s.initGame);
 
   const [step, setStep] = useState<Step>('count');
@@ -279,7 +292,6 @@ export default function ForumSetupScreen() {
   const [currentPlayerIndex, setCurrentPlayerIndex] = useState(0);
   const [drafts, setDrafts] = useState<PlayerDraft[]>([]);
 
-  // ===== Étape 1 : valider le nombre de joueurs =====
   const handleCountConfirm = useCallback(() => {
     if (!playerCount) return;
     setDrafts(Array.from({ length: playerCount }, () => ({ name: '', startupName: '' })));
@@ -287,7 +299,24 @@ export default function ForumSetupScreen() {
     setStep('players');
   }, [playerCount]);
 
-  // ===== Mise à jour d'un champ draft =====
+  /** Retour : joueur précédent → nombre de joueurs → accueil forum */
+  const handleBack = useCallback(() => {
+    if (step === 'players') {
+      Keyboard.dismiss();
+      if (currentPlayerIndex > 0) {
+        setCurrentPlayerIndex((i) => i - 1);
+      } else {
+        setStep('count');
+      }
+      return;
+    }
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(forum)/welcome');
+    }
+  }, [step, currentPlayerIndex, router]);
+
   const handleDraftChange = useCallback((field: 'name' | 'startupName', value: string) => {
     setDrafts((prev) => {
       const next = [...prev];
@@ -296,7 +325,6 @@ export default function ForumSetupScreen() {
     });
   }, [currentPlayerIndex]);
 
-  // ===== Confirmer un joueur et passer au suivant (ou lancer le jeu) =====
   const handlePlayerConfirm = useCallback(() => {
     if (!playerCount) return;
     const isLast = currentPlayerIndex === playerCount - 1;
@@ -306,7 +334,32 @@ export default function ForumSetupScreen() {
       return;
     }
 
-    // Tous les joueurs saisis → lancer le jeu
+    if (playerCount === 1) {
+      const d = drafts[0]!;
+      initGame('solo', FORUM_EDITION_ID, [
+        {
+          id: 'forum-player-0',
+          name: d.name.trim() || 'Joueur 1',
+          color: 'green',
+          isAI: false,
+          startupName: d.startupName.trim() || 'Startup',
+          startupId: 'forum-startup-0',
+          isDefaultProject: true,
+        },
+        {
+          id: 'forum-ai-1',
+          name: 'IA',
+          color: 'blue',
+          isAI: true,
+          startupName: 'Startup IA',
+          startupId: 'forum-startup-ai',
+          isDefaultProject: true,
+        },
+      ]);
+      router.replace('/(forum)/play');
+      return;
+    }
+
     const colors = COLORS_BY_COUNT[playerCount]!;
     const players = drafts.map((d, i) => ({
       id: `forum-player-${i}`,
@@ -318,45 +371,74 @@ export default function ForumSetupScreen() {
       isDefaultProject: true,
     }));
 
-    initGame('local', 'classic', players);
+    initGame('local', FORUM_EDITION_ID, players);
     router.replace('/(forum)/play');
   }, [playerCount, currentPlayerIndex, drafts, initGame, router]);
 
-  const colors = playerCount ? COLORS_BY_COUNT[playerCount]! : [];
-  const currentColor = colors[currentPlayerIndex] ?? 'yellow';
-  const currentColorHex = COLOR_HEX[currentColor];
   const currentDraft = drafts[currentPlayerIndex] ?? { name: '', startupName: '' };
   const isLast = playerCount !== null && currentPlayerIndex === playerCount - 1;
+
+  const cardCountStyle = useMemo(() => ({
+    backgroundColor: '#FFFFFF' as const,
+    borderRadius: sp(24),
+    padding: sp(28),
+    shadowColor: '#000' as const,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 12,
+  }), [sp]);
 
   return (
     <View style={styles.container}>
       <RadialBackground centerColor="#0F3A6B" edgeColor="#081A2A" />
+      <ForumSetupBoardBackdrop />
 
-      {/* Header logo */}
-      <Animated.View
-        entering={FadeIn.duration(400)}
-        style={[styles.header, { paddingTop: insets.top + SPACING[3] }]}
+      <Pressable
+        onPress={handleBack}
+        style={[styles.backButtonWrap, { top: insets.top + SPACING[2], left: SPACING[4] }]}
+        hitSlop={12}
+        accessibilityRole="button"
+        accessibilityLabel="Retour"
       >
-        <Image source={logoImage} style={styles.headerLogo} resizeMode="contain" />
-      </Animated.View>
+        <View style={styles.backButtonInner}>
+          <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+        </View>
+      </Pressable>
 
       <KeyboardAvoidingView
-        style={styles.flex}
+        style={[styles.flex, styles.foregroundAboveBackdrop]}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={20}
       >
         <ScrollView
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + SPACING[8] }]}
+          contentContainerStyle={[
+            styles.scrollContent,
+            {
+              paddingTop: insets.top + sizes.header + SPACING[2],
+              paddingBottom: insets.bottom + sp(40),
+              paddingHorizontal: hPad,
+            },
+          ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* ===== ÉTAPE 1 : Sélection nombre de joueurs ===== */}
           {step === 'count' && (
-            <Animated.View entering={FadeInDown.duration(400)} style={styles.cardCount}>
-              <Text style={styles.cardTitle}>SÉLECTIONNER LE NOMBRE{'\n'}DE JOUEUR</Text>
+            <Animated.View entering={FadeInDown.duration(400)} style={cardCountStyle}>
+              <Text
+                style={[
+                  styles.cardTitle,
+                  { fontSize: fs(FONT_SIZES.xl), lineHeight: fs(FONT_SIZES.xl) * 1.35 },
+                ]}
+              >
+                SÉLECTIONNER LE NOMBRE{'\n'}DE JOUEUR
+              </Text>
               <PlayerCountSelector
                 selected={playerCount}
                 onSelect={setPlayerCount}
+                fs={fs}
+                sp={sp}
+                contentWidth={contentWidth}
               />
               <GameButton
                 title="COMMENCER"
@@ -368,17 +450,17 @@ export default function ForumSetupScreen() {
             </Animated.View>
           )}
 
-          {/* ===== ÉTAPE 2..N : Saisie joueur ===== */}
           {step === 'players' && (
             <PlayerForm
               key={currentPlayerIndex}
               playerIndex={currentPlayerIndex}
               totalPlayers={playerCount!}
-              colorHex={currentColorHex}
               draft={currentDraft}
               onChange={handleDraftChange}
               onContinue={handlePlayerConfirm}
               isLast={isLast}
+              fs={fs}
+              sp={sp}
             />
           )}
         </ScrollView>
@@ -391,39 +473,33 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  /** Au-dessus du fond flouté ; même zone que la flèche décorative du backdrop */
+  backButtonWrap: {
+    position: 'absolute',
+    zIndex: 3,
+  },
+  backButtonInner: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   flex: {
     flex: 1,
   },
-  header: {
-    alignItems: 'center',
-    paddingBottom: SPACING[2],
-  },
-  headerLogo: {
-    width: SCREEN_WIDTH * 0.45,
-    height: 60,
+  foregroundAboveBackdrop: {
+    zIndex: 2,
   },
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
-    paddingHorizontal: SPACING[5],
-    paddingTop: SPACING[4],
-  },
-  cardCount: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: SPACING[6],
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 12,
   },
   cardTitle: {
     fontFamily: FONTS.title,
-    fontSize: FONT_SIZES.lg,
     color: '#0C243E',
     textAlign: 'center',
-    lineHeight: FONT_SIZES.lg * 1.35,
     letterSpacing: 0.3,
   },
 });

@@ -133,7 +133,9 @@ export const PlayerCard = memo(function PlayerCard({
                 showBorder={false}
               />
               <View style={styles.textContainer}>
-                <Text style={styles.companyName}>concree</Text>
+                <Text style={styles.companyName} numberOfLines={1}>
+                  {player.startupName?.trim() || 'Startup'}
+                </Text>
                 <Text style={styles.userName} numberOfLines={1}>{player.name}</Text>
               </View>
             </View>

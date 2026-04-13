@@ -9,11 +9,20 @@
  * - Couleur du joueur pour les chemins finaux
  */
 
+import Constants from 'expo-constants';
 import { memo } from 'react';
 import { View, StyleSheet } from 'react-native';
 import type { PlayerColor } from '@/types';
 import { COLORS } from '@/styles/colors';
 import { QuizIcon, EventIcon, DuelIcon, FundingIcon } from './BoardIcons';
+import {
+  ForumDuelIcon,
+  ForumEventIcon,
+  ForumFundingIcon,
+  ForumQuizIcon,
+} from './ForumBoardIcons';
+
+const IS_FORUM_MODE = Constants.expoConfig?.extra?.appMode === 'forum';
 
 // Cases de départ → couleur du joueur
 const START_COLOR: Record<number, PlayerColor> = {
@@ -93,17 +102,66 @@ export const PathCell = memo(function PathCell({
       iconType = NORMAL_ICONS[circuitIndex % NORMAL_ICONS.length] ?? 'event';
     }
 
+    if (IS_FORUM_MODE) {
+      switch (iconType) {
+        case 'quiz':
+          return (
+            <View style={iconStyle}>
+              <ForumQuizIcon />
+            </View>
+          );
+        case 'funding':
+          return (
+            <View style={iconStyle}>
+              <ForumFundingIcon />
+            </View>
+          );
+        case 'duel':
+          return (
+            <View style={iconStyle}>
+              <ForumDuelIcon />
+            </View>
+          );
+        case 'opportunity':
+        case 'challenge':
+        case 'event':
+          return (
+            <View style={iconStyle}>
+              <ForumEventIcon />
+            </View>
+          );
+        default:
+          return null;
+      }
+    }
+
     switch (iconType) {
       case 'quiz':
-        return <View style={iconStyle}><QuizIcon /></View>;
+        return (
+          <View style={iconStyle}>
+            <QuizIcon />
+          </View>
+        );
       case 'funding':
-        return <View style={iconStyle}><FundingIcon /></View>;
+        return (
+          <View style={iconStyle}>
+            <FundingIcon />
+          </View>
+        );
       case 'duel':
-        return <View style={iconStyle}><DuelIcon /></View>;
+        return (
+          <View style={iconStyle}>
+            <DuelIcon />
+          </View>
+        );
       case 'opportunity':
       case 'challenge':
       case 'event':
-        return <View style={iconStyle}><EventIcon /></View>;
+        return (
+          <View style={iconStyle}>
+            <EventIcon />
+          </View>
+        );
       default:
         return null;
     }

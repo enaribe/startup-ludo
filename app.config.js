@@ -87,7 +87,12 @@ module.exports = {
     extra: {
       appMode: process.env.EXPO_PUBLIC_APP_MODE ?? 'normal',
       eventName: process.env.EXPO_PUBLIC_EVENT_NAME ?? '',
-      storeUrl: process.env.EXPO_PUBLIC_STORE_URL ?? '',
+      /** QR « Poursuivre ici » (forum) — surcharge possible via EXPO_PUBLIC_STORE_URL */
+      storeUrl:
+        process.env.EXPO_PUBLIC_STORE_URL?.trim() ||
+        (IS_FORUM
+          ? 'https://apps.apple.com/sn/app/startup-ludo/id6751894733?l=fr-FR'
+          : ''),
       router: {},
       eas: {
         projectId: '85630621-2ecd-450e-a7ff-e3df54cc76f2',

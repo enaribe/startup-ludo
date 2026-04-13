@@ -1,13 +1,17 @@
 /**
  * HomeZone - Zone maison du joueur
  *
- * Utilise les images yellowhouse, bluehouse, redhouse, greenhouse
+ * Mode classique : yellowhouse, bluehouse, redhouse, greenhouse
+ * Mode forum (appMode forum) : variantes *agri* pour les quatre couleurs
  */
 
+import Constants from 'expo-constants';
 import { memo } from 'react';
 import { Image, type ImageSourcePropType, StyleSheet, View } from 'react-native';
 import type { Player, PlayerColor } from '@/types';
 import { BOARD_SIZE } from '@/config/boardConfig';
+
+const IS_FORUM_MODE = Constants.expoConfig?.extra?.appMode === 'forum';
 
 interface HomeZoneProps {
   color: PlayerColor;
@@ -17,11 +21,19 @@ interface HomeZoneProps {
   player?: Player;
 }
 
-const HOUSE_IMAGES: Record<PlayerColor, ImageSourcePropType> = {
+const HOUSE_IMAGES_CLASSIC: Record<PlayerColor, ImageSourcePropType> = {
   yellow: require('../../../../assets/images/yellowhouse.png'),
   blue: require('../../../../assets/images/bluehouse.png'),
   red: require('../../../../assets/images/redhouse.png'),
   green: require('../../../../assets/images/greenhouse.png'),
+};
+
+/** Plateau forum uniquement — assets Agribusiness */
+const HOUSE_IMAGES_FORUM: Record<PlayerColor, ImageSourcePropType> = {
+  yellow: require('../../../../assets/images/yellowhouseagri.png'),
+  blue: require('../../../../assets/images/bluehouseagri.png'),
+  red: require('../../../../assets/images/redhouseagri.png'),
+  green: require('../../../../assets/images/greenhouseagri.png'),
 };
 
 export const HomeZone = memo(function HomeZone({
@@ -30,6 +42,8 @@ export const HomeZone = memo(function HomeZone({
   size,
   boardPadding,
 }: HomeZoneProps) {
+  const houseSource = (IS_FORUM_MODE ? HOUSE_IMAGES_FORUM : HOUSE_IMAGES_CLASSIC)[color];
+
   const cellSize = size / 5;
   // Inset pour ne pas coller aux cases du chemin, tout en restant aligné
   const inset = 3;
@@ -70,11 +84,7 @@ export const HomeZone = memo(function HomeZone({
         },
       ]}
     >
-      <Image
-        source={HOUSE_IMAGES[color]}
-        style={styles.image}
-        resizeMode="cover"
-      />
+      <Image source={houseSource} style={styles.image} resizeMode="cover" />
     </View>
   );
 });

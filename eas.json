@@ -71,6 +71,15 @@
         "EXPO_PUBLIC_EVENT_NAME": "Forum Dakar 2026",
         "EXPO_PUBLIC_STORE_URL": "https://play.google.com/store/apps/details?id=com.startupludo.app"
       }
+    },
+    "forum-preview": {
+      "extends": "preview",
+      "env": {
+        "APP_ENV": "preview",
+        "EXPO_PUBLIC_APP_MODE": "forum",
+        "EXPO_PUBLIC_EVENT_NAME": "Forum Dakar 2026",
+        "EXPO_PUBLIC_STORE_URL": "https://play.google.com/store/apps/details?id=com.startupludo.app"
+      }
     }
   },
   "submit": {

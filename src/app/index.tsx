@@ -180,7 +180,7 @@ export default function WelcomeScreen() {
     router.push('/(auth)/register');
   }, [router, accepted]);
 
-  // Mode forum : redirect immédiat, sans auth ni splash
+  // Mode forum : redirect immédiat vers l'accueil forum, sans auth ni splash
   if (IS_FORUM_MODE) {
     return <Redirect href="/(forum)/welcome" />;
   }

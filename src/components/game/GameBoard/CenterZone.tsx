@@ -1,14 +1,20 @@
 /**
  * CenterZone - Zone centrale du plateau (arrivée)
  *
- * Affiche le trophée et les pions qui ont terminé
+ * Mode forum : image Agribusiness (milieu.png) ; sinon logo Startup Ludo.
  */
 
+import Constants from 'expo-constants';
 import { memo } from 'react';
-import { Image, View, Text, StyleSheet } from 'react-native';
+import { Image, View, Text, StyleSheet, type ImageSourcePropType } from 'react-native';
 import type { PlayerColor } from '@/types';
 import { COLORS } from '@/styles/colors';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
+
+const IS_FORUM_MODE = Constants.expoConfig?.extra?.appMode === 'forum';
+
+const CENTER_IMAGE_DEFAULT: ImageSourcePropType = require('../../../../assets/images/logostartupludo.png');
+const CENTER_IMAGE_FORUM: ImageSourcePropType = require('../../../../assets/images/milieu.png');
 
 interface CenterZoneProps {
   size: number;
@@ -23,15 +29,16 @@ export const CenterZone = memo(function CenterZone({
   top,
   finishedPawns,
 }: CenterZoneProps) {
+  const centerSource = IS_FORUM_MODE ? CENTER_IMAGE_FORUM : CENTER_IMAGE_DEFAULT;
+  /** Logo large horizontal ; milieu.png plutôt carré */
+  const centerImageStyle = IS_FORUM_MODE
+    ? { width: size * 0.88, height: size * 0.88 }
+    : { width: size * 0.85, height: size * 0.45 };
+
   return (
     <View style={[styles.container, { width: size, height: size, left, top }]}>
-      {/* Centre : logo Startup Ludo */}
       <View style={styles.centerContent}>
-        <Image
-          source={require('../../../../assets/images/logostartupludo.png')}
-          style={{ width: size * 0.85, height: size * 0.45 }}
-          resizeMode="contain"
-        />
+        <Image source={centerSource} style={centerImageStyle} resizeMode="contain" />
       </View>
 
       {/* Cases vert / jaune / rouge / bleu (pions terminés) – au-dessus, sans bordure jaune */}

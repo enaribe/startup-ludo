@@ -1,0 +1,1 @@
+export { ForumSetupBoardBackdrop } from './ForumSetupBoardBackdrop';

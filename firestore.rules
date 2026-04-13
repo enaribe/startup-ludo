@@ -126,6 +126,25 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ===== MODE FORUM (borne événement — pas d'auth) =====
+
+    // Sessions de jeu forum : écriture publique (device partagé, pas de compte)
+    // Lecture réservée aux admins (dashboard/stats)
+    match /forumSessions/{sessionId} {
+      allow read: if isAdmin();
+      allow create: if true;   // device sans compte peut écrire
+      allow update, delete: if isAdmin();
+    }
+
+    // Classement forum : lecture publique (affiché sur la borne)
+    // Écriture publique (device sans compte met à jour les scores)
+    // Suppression/reset réservés aux admins
+    match /forumLeaderboard/{entryId} {
+      allow read: if true;
+      allow create, update: if true;  // upsert depuis le device forum
+      allow delete: if isAdmin();
+    }
+
     // Follows collection - relations de suivi entre joueurs
     // followId = "{followerId}_{followingId}"
     match /follows/{followId} {

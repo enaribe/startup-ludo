@@ -97,8 +97,7 @@ function getRandomItem<T>(items: T[]): T | null {
  * Récupère un quiz aléatoire d'une édition
  */
 export function getRandomQuiz(editionId: EditionId, difficulty?: DifficultyLevel): Quiz | null {
-  const edition = EDITIONS[editionId];
-  if (!edition) return null;
+  const edition = getEdition(editionId);
   const quizzes = difficulty
     ? edition.quizzes.filter(q => q.difficulty === difficulty)
     : edition.quizzes;
@@ -111,8 +110,7 @@ export function getRandomQuiz(editionId: EditionId, difficulty?: DifficultyLevel
  * Récupère une question de duel aléatoire
  */
 export function getRandomDuel(editionId: EditionId): Duel | null {
-  const edition = EDITIONS[editionId];
-  if (!edition) return null;
+  const edition = getEdition(editionId);
   return getRandomItem(edition.duels);
 }
 
@@ -121,8 +119,7 @@ export function getRandomDuel(editionId: EditionId): Duel | null {
  * Récupère un financement aléatoire
  */
 export function getRandomFunding(editionId: EditionId): Funding | null {
-  const edition = EDITIONS[editionId];
-  if (!edition) return null;
+  const edition = getEdition(editionId);
   return getRandomItem(edition.fundings);
 }
 
@@ -132,8 +129,7 @@ export function getRandomFunding(editionId: EditionId): Funding | null {
  * C'est la fonction principale pour la case "Événement"
  */
 export function getRandomEvent(editionId: EditionId): GameEvent | null {
-  const edition = EDITIONS[editionId];
-  if (!edition) return null;
+  const edition = getEdition(editionId);
   const { opportunities, challenges } = edition;
 
   // Si les deux tableaux sont vides, retourner null
@@ -174,8 +170,7 @@ export function getRandomEvent(editionId: EditionId): GameEvent | null {
  * Récupère une opportunité aléatoire (événement positif uniquement)
  */
 export function getRandomOpportunity(editionId: EditionId): Opportunity | null {
-  const edition = EDITIONS[editionId];
-  if (!edition) return null;
+  const edition = getEdition(editionId);
   return getRandomItem(edition.opportunities);
 }
 
@@ -183,8 +178,7 @@ export function getRandomOpportunity(editionId: EditionId): Opportunity | null {
  * Récupère un challenge aléatoire (événement négatif uniquement)
  */
 export function getRandomChallenge(editionId: EditionId): Challenge | null {
-  const edition = EDITIONS[editionId];
-  if (!edition) return null;
+  const edition = getEdition(editionId);
   return getRandomItem(edition.challenges);
 }
 
@@ -193,8 +187,7 @@ export function getRandomChallenge(editionId: EditionId): Challenge | null {
  * Récupère une idée de startup aléatoire
  */
 export function getRandomStartupIdea(editionId: EditionId): StartupIdea | null {
-  const edition = EDITIONS[editionId];
-  if (!edition) return null;
+  const edition = getEdition(editionId);
   return getRandomItem(edition.startupIdeas ?? []);
 }
 

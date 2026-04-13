@@ -1,40 +1,27 @@
 /**
- * ForumResultsScreen — Écran de fin de partie mode forum
- *
- * Affiche le classement par jetons, sans XP ni valorisation.
- * Bouton "COMMENCER" → nouvelle partie (retour setup)
- * Bouton "ACCUEIL" → welcome forum
+ * ForumResultsScreen — Fin de partie mode forum (maquette : carte gagnant vert, rangs bordure couleur, jetons)
  */
 
-import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
-import { useRouter } from 'expo-router';
-import { useEffect, useRef } from 'react';
-import { Dimensions, ScrollView, StyleSheet, Text, View } from 'react-native';
-import Animated, {
-  FadeInDown,
-  FadeInUp,
-  useAnimatedStyle,
-  useSharedValue,
-  withDelay,
-  withSequence,
-  withTiming,
-} from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useLayoutEffect, useRef } from 'react';
+import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ForumPlayLeafIcon, ForumTrophyIcon } from '@/components/icons';
 import { GameButton } from '@/components/ui/GameButton';
 import { RadialBackground } from '@/components/ui/RadialBackground';
+import { useForumScale } from '@/hooks/useForumScale';
 import { useSound } from '@/hooks/useSound';
 import { saveForumSession, updateForumLeaderboard } from '@/services/firebase/forumService';
 import { useGameStore } from '@/stores/useGameStore';
 import { SPACING } from '@/styles/spacing';
-import { FONTS, FONT_SIZES } from '@/styles/typography';
+import { FONT_SIZES, FONTS } from '@/styles/typography';
 import type { Player } from '@/types';
 
-const { width: screenWidth } = Dimensions.get('window');
-const contentWidth = screenWidth - SPACING[4] * 2;
 
-const MEDAL_COLORS = ['#FFD700', '#C0C0C0', '#CD7F32', '#6B8FBF'];
 const PLAYER_COLOR_HEX: Record<string, string> = {
   yellow: '#FFBC40',
   blue: '#1F91D0',
@@ -42,86 +29,197 @@ const PLAYER_COLOR_HEX: Record<string, string> = {
   red: '#FF6B6B',
 };
 
-// ===== Composant : carte joueur classement =====
-function RankCard({
+/** Données factices pour `?preview=1` (test UI sans jouer une partie) */
+const FORUM_PREVIEW_IDS = ['forum-prev-0', 'forum-prev-1', 'forum-prev-2', 'forum-prev-3'] as const;
+
+function seedForumResultsPreview(): void {
+  const { resetGame, initGame, addTokens, endGame } = useGameStore.getState();
+  resetGame();
+  initGame('local', 'classic', [
+    {
+      id: FORUM_PREVIEW_IDS[0],
+      name: 'PAPE ELHADJ',
+      color: 'green',
+      isAI: false,
+      startupName: 'Design for Citizens',
+      startupId: 'fp-s0',
+      isDefaultProject: true,
+    },
+    {
+      id: FORUM_PREVIEW_IDS[1],
+      name: 'BABACAR BIRANE',
+      color: 'yellow',
+      isAI: false,
+      startupName: 'Concree SAS',
+      startupId: 'fp-s1',
+      isDefaultProject: true,
+    },
+    {
+      id: FORUM_PREVIEW_IDS[2],
+      name: 'Joueur 3',
+      color: 'red',
+      isAI: false,
+      startupName: 'Fitwell',
+      startupId: 'fp-s2',
+      isDefaultProject: true,
+    },
+    {
+      id: FORUM_PREVIEW_IDS[3],
+      name: 'Joueur 4',
+      color: 'blue',
+      isAI: false,
+      startupName: 'Agro Trip',
+      startupId: 'fp-s3',
+      isDefaultProject: true,
+    },
+  ]);
+  addTokens(FORUM_PREVIEW_IDS[0], 8);
+  addTokens(FORUM_PREVIEW_IDS[1], 5);
+  addTokens(FORUM_PREVIEW_IDS[2], 3);
+  addTokens(FORUM_PREVIEW_IDS[3], 2);
+  endGame(FORUM_PREVIEW_IDS[0]);
+}
+
+/** Paire de jetons (cercles superposés) couleur joueur */
+function TokenPairIcon({ color, dotSize }: { color: string; dotSize: number }) {
+  const wrapW = dotSize + dotSize * 0.7;
+  const r = dotSize / 2;
+  return (
+    <View style={{ width: wrapW, height: dotSize, justifyContent: 'center' }} accessibilityLabel="Jetons">
+      <View style={{ position: 'absolute', left: 0, width: dotSize, height: dotSize, borderRadius: r, backgroundColor: color, opacity: 0.75 }} />
+      <View style={{ position: 'absolute', left: dotSize * 0.5, width: dotSize, height: dotSize, borderRadius: r, backgroundColor: color, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.45)' }} />
+    </View>
+  );
+}
+
+function RankRow({
   player,
   rank,
-  isWinner,
   delay,
+  fs,
+  sp,
+  contentWidth: cw,
 }: {
   player: Player;
   rank: number;
-  isWinner: boolean;
   delay: number;
+  fs: (n: number) => number;
+  sp: (n: number) => number;
+  contentWidth: number;
 }) {
   const colorHex = PLAYER_COLOR_HEX[player.color] ?? '#FFBC40';
-  const medalColor = MEDAL_COLORS[rank - 1] ?? '#6B8FBF';
-  const initials = player.name.trim().slice(0, 2).toUpperCase();
-
-  if (isWinner) {
-    return (
-      <Animated.View entering={FadeInUp.delay(delay).duration(500)} style={styles.winnerCard}>
-        <View style={[styles.winnerAvatar, { backgroundColor: colorHex }]}>
-          <Text style={styles.winnerAvatarText}>{initials}</Text>
-        </View>
-        <Text style={styles.winnerName}>{player.name.toUpperCase()}</Text>
-        <Text style={styles.winnerStartup}>{player.startupName ?? ''}</Text>
-      </Animated.View>
-    );
-  }
+  const badgeSize = sp(36);
 
   return (
-    <Animated.View entering={FadeInDown.delay(delay).duration(400)} style={styles.rankRow}>
-      {/* Rang */}
-      <View style={[styles.rankBadge, { backgroundColor: medalColor }]}>
-        <Text style={styles.rankBadgeText}>{rank}</Text>
+    <Animated.View
+      entering={FadeInDown.delay(delay).duration(420)}
+      style={[
+        styles.rankRow,
+        {
+          borderColor: colorHex,
+          borderRadius: sp(16),
+          paddingVertical: sp(14),
+          paddingHorizontal: sp(14),
+          gap: sp(12),
+          marginBottom: sp(10),
+          width: cw,
+        },
+      ]}
+    >
+      <View style={[styles.rankBadge, { backgroundColor: colorHex, width: badgeSize, height: badgeSize, borderRadius: badgeSize / 2 }]}>
+        <Text style={[styles.rankBadgeText, { fontSize: fs(FONT_SIZES.md) }]}>{rank}</Text>
       </View>
 
-      {/* Avatar */}
-      <View style={[styles.rankAvatar, { backgroundColor: colorHex }]}>
-        <Text style={styles.rankAvatarText}>{initials}</Text>
-      </View>
-
-      {/* Nom + startup */}
       <View style={styles.rankInfo}>
-        <Text style={styles.rankName}>{player.name.toUpperCase()}</Text>
-        <Text style={styles.rankStartup}>{player.startupName ?? ''}</Text>
+        <Text style={[styles.rankName, { fontSize: fs(FONT_SIZES.base) }]}>{player.name.toUpperCase()}</Text>
+        <Text style={[styles.rankStartup, { fontSize: fs(FONT_SIZES.sm) }]} numberOfLines={1}>
+          {player.startupName ?? ''}
+        </Text>
       </View>
 
-      {/* Jetons */}
       <View style={styles.rankTokens}>
-        <Text style={styles.rankTokensCount}>{player.tokens}</Text>
-        <Ionicons name="logo-usd" size={14} color="rgba(255,255,255,0.5)" />
+        <Text style={[styles.rankTokensCount, { color: colorHex, fontSize: fs(FONT_SIZES.xl) }]}>{player.tokens}</Text>
+        <TokenPairIcon color={colorHex} dotSize={sp(16)} />
       </View>
     </Animated.View>
   );
 }
 
-// ===== SCREEN PRINCIPAL =====
+function WinnerCard({
+  player,
+  delay,
+  fs,
+  sp,
+  contentWidth: cw,
+}: {
+  player: Player;
+  delay: number;
+  fs: (n: number) => number;
+  sp: (n: number) => number;
+  contentWidth: number;
+}) {
+  const startup = player.startupName?.trim() ?? '';
+  const circleSize = sp(60);
+
+  return (
+    <Animated.View
+      entering={FadeInUp.delay(delay).duration(520)}
+      style={[styles.winnerOuter, { width: cw, borderRadius: sp(22), marginBottom: sp(20) }]}
+    >
+      <LinearGradient
+        colors={['#6EDC8C', '#2FA653', '#1E7A3D']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.winnerGradient, { paddingVertical: sp(28), paddingHorizontal: sp(24) }]}
+      >
+        <View style={[styles.winnerRankCircle, { width: circleSize, height: circleSize, borderRadius: circleSize / 2, marginBottom: sp(12) }]}>
+          <Text style={[styles.winnerRankDigit, { fontSize: fs(FONT_SIZES['2xl']) }]}>1</Text>
+        </View>
+        <Text style={[styles.winnerName, { fontSize: fs(FONT_SIZES['2xl']), marginBottom: sp(10) }]}>
+          {player.name.toUpperCase()}
+        </Text>
+        {startup.length > 0 ? (
+          <View style={[styles.winnerPill, { paddingVertical: sp(8), paddingHorizontal: sp(16) }]}>
+            <Text style={[styles.winnerPillText, { fontSize: fs(FONT_SIZES.base) }]}>{startup}</Text>
+          </View>
+        ) : null}
+      </LinearGradient>
+    </Animated.View>
+  );
+}
 
 export default function ForumResultsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width: screenWidthDyn } = useWindowDimensions();
+  const { fs, sp, contentWidth } = useForumScale();
+  const params = useLocalSearchParams<{ preview?: string }>();
+  const isPreview = params.preview === '1';
+  const previewSeeded = useRef(false);
+
   const { game, resetGame } = useGameStore();
   const { play: playSound } = useSound();
   const soundPlayed = useRef(false);
   const forumFirestoreSynced = useRef(false);
 
-  const trophyScale = useSharedValue(0);
+  useLayoutEffect(() => {
+    if (!isPreview || previewSeeded.current) return;
+    previewSeeded.current = true;
+    seedForumResultsPreview();
+  }, [isPreview]);
 
-  // Données
   const sortedPlayers = game?.players.slice().sort((a, b) => b.tokens - a.tokens) ?? [];
   const winner = sortedPlayers[0] ?? null;
+  const editionLabel = game?.edition === 'classic' ? 'CLASSIQUE' : (game?.edition ?? '').toUpperCase();
 
-  // Son victoire
   useEffect(() => {
     if (soundPlayed.current || !game || game.status !== 'finished') return;
     soundPlayed.current = true;
     playSound('victory');
   }, [game, playSound]);
 
-  // Phase 3 — Firestore forum (collections dédiées, sans bloquer l’UI)
   useEffect(() => {
+    if (isPreview) return;
     if (!game || game.status !== 'finished' || forumFirestoreSynced.current) return;
     if (game.players.length === 0) return;
 
@@ -156,22 +254,7 @@ export default function ForumResultsScreen() {
         isWinner: p.id === winnerPlayer.id,
       }))
     ).catch(() => {});
-  }, [game]);
-
-  // Animation trophée
-  useEffect(() => {
-    trophyScale.value = withDelay(
-      200,
-      withSequence(
-        withTiming(1.2, { duration: 400 }),
-        withTiming(1.0, { duration: 200 })
-      )
-    );
-  }, [trophyScale]);
-
-  const trophyStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: trophyScale.value }],
-  }));
+  }, [game, isPreview]);
 
   const handleNewGame = () => {
     resetGame();
@@ -183,6 +266,12 @@ export default function ForumResultsScreen() {
     router.replace('/(forum)/welcome');
   };
 
+  const trophyW = Math.min(sp(100), screenWidthDyn * 0.28);
+
+  if (!isPreview && (!game || game.status !== 'finished')) {
+    return <Redirect href="/(forum)/welcome" />;
+  }
+
   return (
     <View style={styles.container}>
       <RadialBackground centerColor="#0F3A6B" edgeColor="#081A2A" />
@@ -190,62 +279,58 @@ export default function ForumResultsScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: insets.top + SPACING[6], paddingBottom: insets.bottom + SPACING[8] },
+          {
+            paddingTop: insets.top + sp(20),
+            paddingBottom: insets.bottom + sp(40),
+            paddingHorizontal: (screenWidthDyn - contentWidth) / 2,
+          },
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Titre */}
-        <Animated.View entering={FadeInDown.duration(500)} style={styles.titleSection}>
+        <Animated.View entering={FadeInDown.duration(480)} style={[styles.hero, { marginBottom: sp(20) }]}>
           <Animated.Image
             source={require('@/../assets/images/logostartupludo.png')}
-            style={[styles.headerLogo, { opacity: 0.9 }]}
+            style={[styles.headerLogo, { width: screenWidthDyn * 0.42, height: sp(56), marginBottom: sp(8) }]}
             resizeMode="contain"
           />
-          <Animated.View style={trophyStyle}>
-            <Text style={styles.trophyEmoji}>🏆</Text>
-          </Animated.View>
-          <Text style={styles.title}>PARTIE TERMINÉ</Text>
+          
+          <View style={[styles.trophyWrap, { marginBottom: sp(10) }]}>
+            <ForumTrophyIcon width={trophyW} />
+          </View>
+          <Text style={[styles.title, { fontSize: fs(FONT_SIZES['2xl']) }]}>PARTIE TERMINÉE</Text>
         </Animated.View>
 
-        {/* Carte gagnant */}
-        {winner && (
-          <RankCard
-            player={winner}
-            rank={1}
-            isWinner
-            delay={300}
-          />
-        )}
+        {winner ? (
+          <WinnerCard player={winner} delay={280} fs={fs} sp={sp} contentWidth={contentWidth} />
+        ) : null}
 
-        {/* Autres joueurs */}
-        <View style={[styles.rankList, { width: contentWidth }]}>
+        <View style={styles.rankList}>
           {sortedPlayers.slice(1).map((player, i) => (
-            <RankCard
+            <RankRow
               key={player.id}
               player={player}
               rank={i + 2}
-              isWinner={false}
-              delay={400 + i * 80}
+              delay={360 + i * 70}
+              fs={fs}
+              sp={sp}
+              contentWidth={contentWidth}
             />
           ))}
         </View>
 
-        {/* Boutons */}
-        <Animated.View entering={FadeInDown.delay(700).duration(500)} style={styles.buttons}>
+        <Animated.View
+          entering={FadeInDown.delay(620).duration(480)}
+          style={[styles.buttons, { width: contentWidth, gap: sp(12) }]}
+        >
           <GameButton
-            title="COMMENCER"
+            title="RECOMMENCER"
             variant="yellow"
+            size="lg"
             fullWidth
+            leftIcon={<ForumPlayLeafIcon width={sp(28)} height={sp(15)} />}
             onPress={handleNewGame}
-            style={styles.btn}
           />
-          <GameButton
-            title="ACCUEIL"
-            variant="blue"
-            fullWidth
-            onPress={handleHome}
-            style={styles.btn}
-          />
+          <GameButton title="ACCUEIL" variant="blue" fullWidth onPress={handleHome} />
         </Animated.View>
       </ScrollView>
     </View>
@@ -256,144 +341,109 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   scrollContent: {
     alignItems: 'center',
-    paddingHorizontal: SPACING[4],
   },
-  titleSection: {
+  hero: {
     alignItems: 'center',
-    marginBottom: SPACING[5],
   },
-  headerLogo: {
-    width: screenWidth * 0.45,
-    height: 50,
-    marginBottom: SPACING[4],
+  headerLogo: {},
+  editionTag: {
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 188, 64, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 188, 64, 0.45)',
   },
-  trophyEmoji: {
-    fontSize: 64,
-    marginBottom: SPACING[2],
-  },
-  title: {
-    fontFamily: FONTS.title,
-    fontSize: FONT_SIZES['2xl'],
+  editionTagText: {
+    fontFamily: FONTS.bodySemiBold,
     color: '#FFBC40',
     letterSpacing: 1,
-    textShadowColor: 'rgba(0,0,0,0.4)',
+  },
+  trophyWrap: {},
+  title: {
+    fontFamily: FONTS.title,
+    color: '#FFBC40',
+    letterSpacing: 1.2,
+    textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.35)',
     textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 6,
+    textShadowRadius: 8,
   },
-
-  // Carte gagnant
-  winnerCard: {
-    width: contentWidth,
-    backgroundColor: '#27AE60',
-    borderRadius: 20,
-    padding: SPACING[5],
-    alignItems: 'center',
-    marginBottom: SPACING[4],
+  winnerOuter: {
+    overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 10,
   },
-  winnerAvatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+  winnerGradient: {
+    alignItems: 'center',
+  },
+  winnerRankCircle: {
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: SPACING[2],
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.4)',
   },
-  winnerAvatarText: {
+  winnerRankDigit: {
     fontFamily: FONTS.title,
-    fontSize: 20,
-    color: '#FFFFFF',
+    color: '#1B5E20',
   },
   winnerName: {
     fontFamily: FONTS.title,
-    fontSize: FONT_SIZES.lg,
+    color: '#0D3D16',
+    letterSpacing: 0.6,
+    textAlign: 'center',
+  },
+  winnerPill: {
+    backgroundColor: '#0D4A1A',
+    borderRadius: 999,
+    maxWidth: '100%',
+  },
+  winnerPillText: {
+    fontFamily: FONTS.bodySemiBold,
     color: '#FFFFFF',
-    letterSpacing: 0.5,
-    marginBottom: SPACING[1],
+    textAlign: 'center',
   },
-  winnerStartup: {
-    fontFamily: FONTS.body,
-    fontSize: FONT_SIZES.sm,
-    color: 'rgba(255,255,255,0.8)',
-  },
-
-  // Liste classement
   rankList: {
-    gap: SPACING[3],
-    marginBottom: SPACING[5],
+    alignItems: 'center',
+    marginBottom: SPACING[6],
   },
   rankRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 14,
-    padding: SPACING[3],
-    gap: SPACING[3],
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    borderWidth: 1.5,
   },
   rankBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
   },
   rankBadgeText: {
     fontFamily: FONTS.title,
-    fontSize: FONT_SIZES.sm,
-    color: '#FFFFFF',
-  },
-  rankAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  rankAvatarText: {
-    fontFamily: FONTS.title,
-    fontSize: 13,
     color: '#FFFFFF',
   },
   rankInfo: {
     flex: 1,
+    minWidth: 0,
   },
   rankName: {
     fontFamily: FONTS.title,
-    fontSize: FONT_SIZES.sm,
     color: '#FFFFFF',
-    letterSpacing: 0.3,
+    letterSpacing: 0.4,
   },
   rankStartup: {
     fontFamily: FONTS.body,
-    fontSize: FONT_SIZES.xs,
     color: 'rgba(255,255,255,0.55)',
-    marginTop: 2,
+    marginTop: 3,
   },
   rankTokens: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
   },
   rankTokensCount: {
     fontFamily: FONTS.title,
-    fontSize: FONT_SIZES.base,
-    color: '#FFBC40',
   },
-
-  // Boutons
   buttons: {
-    width: contentWidth,
-    gap: SPACING[3],
-  },
-  btn: {
-    marginVertical: 0,
+    alignItems: 'stretch',
   },
 });

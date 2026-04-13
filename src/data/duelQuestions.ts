@@ -1,3 +1,5 @@
+import type { EditionId } from './types';
+import { getEdition } from './index';
 import type { DuelQuestion } from '@/types';
 
 // Questions de duel par défaut (fallback si l'édition n'a pas de duels)
@@ -133,15 +135,11 @@ export const DUEL_QUESTIONS: DuelQuestion[] = [
 export function getRandomDuelQuestions(count: number = 3, editionId?: string): DuelQuestion[] {
   let pool: DuelQuestion[] = DUEL_QUESTIONS;
 
-  // Si une édition est fournie, essayer d'utiliser ses duels
+  // Si une édition est fournie, essayer d'utiliser ses duels (getEdition = même repli que le jeu classique)
   if (editionId) {
     try {
-      // Import dynamique pour éviter les dépendances circulaires
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { EDITIONS } = require('@/data');
-      const edition = EDITIONS[editionId];
-      if (edition && Array.isArray(edition.duels) && edition.duels.length >= count) {
-        // Les duels de l'édition sont au format DuelQuestion (question/options/category)
+      const edition = getEdition(editionId as EditionId);
+      if (Array.isArray(edition.duels) && edition.duels.length >= count) {
         pool = edition.duels as DuelQuestion[];
       }
     } catch {
