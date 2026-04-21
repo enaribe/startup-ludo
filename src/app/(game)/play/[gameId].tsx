@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Switch, Text, View, type LayoutChangeEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Defs, LinearGradient as SvgLinearGradient, Rect, Stop } from 'react-native-svg';
 
 import { GameBoard } from '@/components/game/GameBoard';
 import { PlayerCard } from '@/components/game/PlayerCard';
@@ -17,6 +18,7 @@ import { DiceChoiceButton } from '@/components/game/DiceChoiceButton';
 import {
   EventPopup,
   FundingPopup,
+  MissedFinalEntryPopup,
   QuizPopup,
   QuitConfirmPopup,
   DuelSelectOpponentPopup,
@@ -26,8 +28,9 @@ import {
   DuelResultPopup,
 } from '@/components/game/popups';
 import { Button } from '@/components/ui/Button';
+import { GameButton } from '@/components/ui/GameButton';
 import { Modal } from '@/components/ui/Modal';
-import { RadialBackground } from '@/components/ui';
+import { GamePopup, RadialBackground } from '@/components/ui';
 import { eventManager } from '@/services/game/EventManager';
 import { useGameStore, useSettingsStore, useAuthStore, useAudioUiStore } from '@/stores';
 import { useOnlineGame } from '@/hooks/useOnlineGame';
@@ -127,8 +130,22 @@ export default function PlayScreen() {
     (s) => s.game ? s.game.players[s.game.currentPlayerIndex] ?? null : null
   );
 
+  // Settings
+  const soundEnabled = useSettingsStore((s) => s.soundEnabled);
+  const musicEnabled = useSettingsStore((s) => s.musicEnabled);
+  const toggleSound = useSettingsStore((s) => s.toggleSound);
+  const toggleMusic = useSettingsStore((s) => s.toggleMusic);
+  const toggleHaptics = useSettingsStore((s) => s.toggleHaptics);
+
   // Local state
   const [showQuitConfirm, setShowQuitConfirm] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [missedFinalEntry, setMissedFinalEntry] = useState<{ tokensNeeded: number } | null>(null);
+  const [boardWrapSize, setBoardWrapSize] = useState({ w: 0, h: 0 });
+  const handleBoardWrapLayout = useCallback((e: LayoutChangeEvent) => {
+    const { width, height } = e.nativeEvent.layout;
+    setBoardWrapSize({ w: width, h: height });
+  }, []);
 
   // Event popups state
   const [quizData, setQuizData] = useState<QuizEvent | null>(null);
@@ -194,7 +211,7 @@ export default function PlayScreen() {
     if (isOnline) {
       return {
         rollDice: onlineGame.rollDice,
-        // setDiceValue intentionally omitted for online: rollDice handles broadcast
+        setDiceValue: onlineGame.setDiceValue,
         executeMove: onlineGame.movePawn,
         exitHome: onlineGame.exitHome,
         nextTurn: () => onlineGame.endTurn(false),
@@ -446,6 +463,7 @@ export default function PlayScreen() {
     hapticsEnabled,
     setAnimating,
     clearSelection,
+    onMissedFinalEntry: (tokensNeeded) => setMissedFinalEntry({ tokensNeeded }),
   });
 
   // Keep ref in sync so handleTriggeredEvent (AI path) can call it without circular dependency
@@ -981,13 +999,44 @@ export default function PlayScreen() {
               resizeMode="contain"
             />
           </View>
-          <Pressable style={styles.headerButton}>
+          <Pressable style={styles.headerButton} onPress={() => setShowSettings(true)} hitSlop={8}>
             <Ionicons name="settings-outline" size={24} color="#FFFFFF" />
           </Pressable>
+          {/* Bordure gradient en bas du header */}
+          <View style={styles.headerBorderWrap} pointerEvents="none">
+            <Svg width="100%" height={1}>
+              <Defs>
+                <SvgLinearGradient id="hdr_grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <Stop offset="0%"   stopColor="#9A9A9A" stopOpacity="0" />
+                  <Stop offset="20%"  stopColor="#B0B0B0" stopOpacity="0.35" />
+                  <Stop offset="50%"  stopColor="#9A9A9A" stopOpacity="0.5" />
+                  <Stop offset="80%"  stopColor="#B0B0B0" stopOpacity="0.35" />
+                  <Stop offset="100%" stopColor="#9A9A9A" stopOpacity="0" />
+                </SvgLinearGradient>
+              </Defs>
+              <Rect x="0" y="0" width="100%" height="1" fill="url(#hdr_grad)" />
+            </Svg>
+          </View>
         </View>
 
-        {/* Board + PlayerCards */}
-        <View style={[styles.boardWrapper, { marginHorizontal: spacing.screen }]}>
+        {/* Board + PlayerCards — centré verticalement entre header et footer */}
+        <View style={styles.boardCenter}>
+        <View style={[styles.boardWrapper, { marginHorizontal: spacing.screen }]} onLayout={handleBoardWrapLayout}>
+          {/* Bordure gradient autour du plateau */}
+          {boardWrapSize.w > 0 && boardWrapSize.h > 0 && (
+            <Svg width={boardWrapSize.w} height={boardWrapSize.h} style={{ position: 'absolute', top: 0, left: 0 }} pointerEvents="none">
+              <Defs>
+                <SvgLinearGradient id="board_grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <Stop offset="0%"   stopColor="#9A9A9A" stopOpacity="0.3" />
+                  <Stop offset="25%"  stopColor="#707070" stopOpacity="0.2" />
+                  <Stop offset="50%"  stopColor="#B0B0B0" stopOpacity="0.35" />
+                  <Stop offset="75%"  stopColor="#606060" stopOpacity="0.2" />
+                  <Stop offset="100%" stopColor="#9A9A9A" stopOpacity="0.3" />
+                </SvgLinearGradient>
+              </Defs>
+              <Rect x="0.5" y="0.5" width={boardWrapSize.w - 1} height={boardWrapSize.h - 1} rx={20} ry={20} fill="transparent" stroke="url(#board_grad)" strokeWidth={1} />
+            </Svg>
+          )}
           {/* Top Players Row — yellow (top-left) and blue (top-right) */}
           <View style={styles.playersRow}>
             <View style={styles.playerSlot}>
@@ -1023,83 +1072,51 @@ export default function PlayScreen() {
             </View>
           </View>
 
-          {/* Boutons de test des popups (désactivés — décommenter pour debug) */}
-          {/* <View style={styles.testPopupsRow}>
-            <Pressable
-              style={styles.testPopupButton}
-              onPress={() => {
-                setIsEventSpectator(false);
-                setQuizData(MOCK_QUIZ);
-              }}
-            >
-              <Text style={styles.testPopupLabel}>Quiz</Text>
-            </Pressable>
-            <Pressable
-              style={styles.testPopupButton}
-              onPress={() => {
-                setIsEventSpectator(false);
-                setFundingData(MOCK_FUNDING);
-              }}
-            >
-              <Text style={styles.testPopupLabel}>Financement</Text>
-            </Pressable>
-            <Pressable
-              style={styles.testPopupButton}
-              onPress={() => {
-                setIsEventSpectator(false);
-                setOpportunityData(MOCK_OPPORTUNITY);
-              }}
-            >
-              <Text style={styles.testPopupLabel}>Opportunité</Text>
-            </Pressable>
-            <Pressable
-              style={styles.testPopupButton}
-              onPress={() => {
-                setIsEventSpectator(false);
-                setChallengeData(MOCK_CHALLENGE);
-              }}
-            >
-              <Text style={styles.testPopupLabel}>Challenge</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.testPopupButton, { backgroundColor: COLORS.success }]}
-              onPress={() => {
-                if (!currentPlayer) return;
-                setIsEventSpectator(false);
-                setDuelTriggered(true);
-                const otherPlayers = game?.players?.filter((p) => p.id !== currentPlayer.id) ?? [];
-                if (otherPlayers.length === 1) {
-                  const opponentId = otherPlayers[0]!.id;
-                  // L'attaquant (challenger) impose son édition pour le duel
-                  const questions = getRandomDuelQuestions(3, currentPlayer.edition || game?.edition);
-                  duel.startDuelWithQuestions(currentPlayer.id, opponentId, questions);
-                  if (isOnline) {
-                    onlineGame.broadcastDuelStart(currentPlayer.id, opponentId, questions as unknown as Record<string, unknown>[]);
-                  }
-                } else {
-                  duel.startDuel(currentPlayer.id);
-                }
-              }}
-            >
-              <Text style={[styles.testPopupLabel, { color: COLORS.white }]}>Duel</Text>
-            </Pressable>
-          </View> */}
+        </View>
         </View>
       </View>
 
       {/* Fixed Emoji Reaction Bar at bottom */}
-      <View style={[styles.emojiBarFooter, { paddingBottom: insets.bottom + SPACING[2] }]}>
-        <View style={styles.emojiBarRow}>
-          <EmojiReactionBar onEmojiPress={handleEmojiPress} />
-          {!currentPlayer?.isAI && (
+      <View style={[styles.emojiBarFooter, { paddingBottom: insets.bottom + SPACING[3] }]}>
+        {/* Bordure gradient en haut du footer */}
+        <View style={styles.footerBorderWrap} pointerEvents="none">
+          <Svg width="100%" height={1}>
+            <Defs>
+              <SvgLinearGradient id="ftr_grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <Stop offset="0%"   stopColor="#9A9A9A" stopOpacity="0" />
+                <Stop offset="20%"  stopColor="#B0B0B0" stopOpacity="0.35" />
+                <Stop offset="50%"  stopColor="#9A9A9A" stopOpacity="0.5" />
+                <Stop offset="80%"  stopColor="#B0B0B0" stopOpacity="0.35" />
+                <Stop offset="100%" stopColor="#9A9A9A" stopOpacity="0" />
+              </SvgLinearGradient>
+            </Defs>
+            <Rect x="0" y="0" width="100%" height="1" fill="url(#ftr_grad)" />
+          </Svg>
+        </View>
+        <EmojiReactionBar onEmojiPress={handleEmojiPress} />
+        {!currentPlayer?.isAI && (
+          <>
+            {/* Séparateur vertical gradient */}
+            <View style={styles.footerSeparator} pointerEvents="none">
+              <Svg width={1} height={36}>
+                <Defs>
+                  <SvgLinearGradient id="sep_grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <Stop offset="0%"   stopColor="#9A9A9A" stopOpacity="0" />
+                    <Stop offset="50%"  stopColor="#B0B0B0" stopOpacity="0.5" />
+                    <Stop offset="100%" stopColor="#9A9A9A" stopOpacity="0" />
+                  </SvgLinearGradient>
+                </Defs>
+                <Rect x="0" y="0" width="1" height="36" fill="url(#sep_grad)" />
+              </Svg>
+            </View>
             <DiceChoiceButton
               available={!hasUsedDiceChoice}
               chosenValue={chosenDiceValue}
               canUse={turnState.phase === 'idle'}
               onChoose={setChosenDiceValue}
             />
-          )}
-        </View>
+          </>
+        )}
       </View>
 
       {/* Emoji Reaction Overlay */}
@@ -1114,6 +1131,68 @@ export default function PlayScreen() {
         onCancel={() => setShowQuitConfirm(false)}
         onConfirm={handleQuit}
         isOnline={isOnline}
+      />
+
+      {/* Settings Popup */}
+      <GamePopup
+        visible={showSettings}
+        onRequestClose={() => setShowSettings(false)}
+        title="PARAMÈTRES"
+        icon={<Ionicons name="settings-outline" size={52} color="#FFBC40" />}
+        footer={
+          <View style={settingsStyles.footerWrap}>
+            <GameButton
+              title="Fermer"
+              onPress={() => setShowSettings(false)}
+              variant="blue"
+              fullWidth
+            />
+          </View>
+        }
+      >
+        <View style={settingsStyles.rows}>
+          <View style={settingsStyles.row}>
+            <Ionicons name="volume-high-outline" size={22} color="#FFFFFF" />
+            <Text style={settingsStyles.rowLabel}>Son (effets)</Text>
+            <Switch
+              value={soundEnabled}
+              onValueChange={toggleSound}
+              trackColor={{ false: '#334155', true: '#FFBC40' }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+          <View style={settingsStyles.separator} />
+          <View style={settingsStyles.row}>
+            <Ionicons name="musical-notes-outline" size={22} color="#FFFFFF" />
+            <Text style={settingsStyles.rowLabel}>Musique</Text>
+            <Switch
+              value={musicEnabled}
+              onValueChange={toggleMusic}
+              trackColor={{ false: '#334155', true: '#FFBC40' }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+          <View style={settingsStyles.separator} />
+          <View style={settingsStyles.row}>
+            <Ionicons name="phone-portrait-outline" size={22} color="#FFFFFF" />
+            <Text style={settingsStyles.rowLabel}>Vibrations</Text>
+            <Switch
+              value={hapticsEnabled}
+              onValueChange={toggleHaptics}
+              trackColor={{ false: '#334155', true: '#FFBC40' }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+        </View>
+      </GamePopup>
+
+      {/* Missed Final Entry Popup */}
+      <MissedFinalEntryPopup
+        visible={missedFinalEntry !== null}
+        onContinue={() => setMissedFinalEntry(null)}
+        tokensNeeded={missedFinalEntry?.tokensNeeded ?? 1}
+        currentPlayer={currentPlayer}
+        allPlayers={game?.players ?? []}
       />
 
       {/* Opponent Disconnected Modal (online) */}
@@ -1330,6 +1409,10 @@ const styles = StyleSheet.create({
     width: 120,
     height: 48,
   },
+  boardCenter: {
+    flex: 1,
+    justifyContent: 'center',
+  },
   boardWrapper: {
     backgroundColor: 'rgba(0, 0, 0, 0.25)',
     borderRadius: 20,
@@ -1350,28 +1433,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     position: 'relative',
     marginVertical: SPACING[1],
-  },
-  testPopupsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: SPACING[2],
-    paddingHorizontal: SPACING[2],
-    paddingVertical: SPACING[3],
-    marginTop: SPACING[2],
-  },
-  testPopupButton: {
-    backgroundColor: COLORS.card,
-    paddingVertical: SPACING[2],
-    paddingHorizontal: SPACING[3],
-    borderRadius: 12,
-    minWidth: 80,
-    alignItems: 'center',
-  },
-  testPopupLabel: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.text,
   },
   modalContent: {
     alignItems: 'center',
@@ -1414,20 +1475,70 @@ const styles = StyleSheet.create({
   noGameButton: {
     minWidth: 140,
   },
+  headerBorderWrap: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+  },
+  footerBorderWrap: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+  },
+  footerSeparator: {
+    width: 1,
+    height: 36,
+    alignSelf: 'center',
+    marginHorizontal: SPACING[4],
+  },
   emojiBarRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING[3],
+    justifyContent: 'space-between',
   },
   emojiBarFooter: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: SPACING[2],
-    backgroundColor: 'rgba(10, 25, 41, 0.95)',
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING[4],
+    paddingTop: SPACING[3],
+    backgroundColor: '#0A1929',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
+  },
+});
+
+const settingsStyles = StyleSheet.create({
+  rows: {
+    paddingHorizontal: SPACING[4],
+    paddingBottom: SPACING[2],
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: SPACING[3],
+    gap: SPACING[3],
+  },
+  rowLabel: {
+    flex: 1,
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.base,
+    color: '#FFFFFF',
+  },
+  separator: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  footerWrap: {
+    paddingHorizontal: SPACING[4],
+    paddingBottom: SPACING[3],
   },
 });

@@ -14,7 +14,7 @@ import { useRouter } from 'expo-router';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { RadialBackground, GradientBorder, DynamicGradientBorder } from '@/components/ui';
+import { RadialBackground, GradientBorder, DynamicGradientBorder, GuestGate } from '@/components/ui';
 import { useChallengeStore, useAuthStore } from '@/stores';
 import { getChallengeProgress, getLevelProgress } from '@/types/challenge';
 import type { Challenge, ChallengeEnrollment } from '@/types/challenge';
@@ -144,6 +144,7 @@ export default function MyProgramsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const user = useAuthStore((state) => state.user);
+  const isGuest = user?.isGuest ?? true;
 
   // Store
   const challenges = useChallengeStore((state) => state.challenges);
@@ -192,6 +193,15 @@ export default function MyProgramsScreen() {
     },
     [router]
   );
+
+  if (isGuest) {
+    return (
+      <GuestGate
+        featureName="Mes Programmes"
+        description="Crée un compte pour rejoindre des programmes, suivre ta progression et débloquer des niveaux exclusifs."
+      />
+    );
+  }
 
   return (
     <View style={styles.container}>

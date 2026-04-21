@@ -14,11 +14,11 @@ import { useRouter } from 'expo-router';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { RadialBackground, GradientBorder } from '@/components/ui';
+import { RadialBackground, GradientBorder, GuestGate } from '@/components/ui';
 import { ChallengeHomeCard, EnrollmentFormModal } from '@/components/challenges';
 import { useChallengeStore, useAuthStore } from '@/stores';
 import { getActiveChallenges, ALL_CHALLENGES } from '@/data/challenges';
-import type { EnrollmentFormData } from '@/types/challenge';
+import { useChallengeEnroll } from '@/hooks/useChallengeEnroll';
 import { COLORS } from '@/styles/colors';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { SPACING, BORDER_RADIUS } from '@/styles/spacing';
@@ -30,46 +30,50 @@ export default function ChallengeExplorerScreen() {
   const insets = useSafeAreaInsets();
   const user = useAuthStore((state) => state.user);
   const userId = user?.id ?? '';
+  const isGuest = user?.isGuest ?? true;
 
   // Store
   const enrollments = useChallengeStore((state) => state.enrollments);
-  const enrollInChallenge = useChallengeStore((s) => s.enrollInChallenge);
-  const submitEnrollmentForm = useChallengeStore((s) => s.submitEnrollmentForm);
-  const setActiveChallenge = useChallengeStore((s) => s.setActiveChallenge);
   const getEnrollmentForChallenge = useChallengeStore((s) => s.getEnrollmentForChallenge);
-  const getActiveChallenge = useChallengeStore((s) => s.getActiveChallenge);
-  const getActiveEnrollment = useChallengeStore((s) => s.getActiveEnrollment);
+
+  // Hook d'inscription partagé
+  const {
+    showEnrollmentForm,
+    activeChallengeName,
+    handleEnroll,
+    handleContinue,
+    handleFormSubmit: handleEnrollmentFormSubmit,
+    handleFormClose,
+  } = useChallengeEnroll();
 
   // State
   const [viewMode, setViewMode] = useState<ViewMode>('enrolled');
-  const [showEnrollmentForm, setShowEnrollmentForm] = useState(false);
 
-  // Challenges inscrits
+  // Challenges inscrits (actifs uniquement, filtrés par userId)
   const enrolledChallenges = useMemo(() => {
     if (!userId) return [];
     const userEnrollments = enrollments.filter((e) => e.userId === userId);
     const challengeIds = userEnrollments.map((e) => e.challengeId);
-    return ALL_CHALLENGES.filter((c) => challengeIds.includes(c.id));
+    return ALL_CHALLENGES.filter((c) => challengeIds.includes(c.id) && c.isActive);
   }, [enrollments, userId]);
 
-  // Challenges disponibles (non inscrits)
+  // Challenges disponibles (actifs, non inscrits)
   const availableChallenges = useMemo(() => {
-    if (!userId) return getActiveChallenges();
     const enrolledIds = enrolledChallenges.map((c) => c.id);
     return getActiveChallenges().filter((c) => !enrolledIds.includes(c.id));
-  }, [enrolledChallenges, userId]);
+  }, [enrolledChallenges]);
 
   // Challenges à afficher selon le mode
   const displayedChallenges = viewMode === 'enrolled' ? enrolledChallenges : availableChallenges;
 
-  const handleEnrollmentFormSubmit = (formData: EnrollmentFormData) => {
-    const enrollment = getActiveEnrollment();
-    if (enrollment) {
-      submitEnrollmentForm(enrollment.id, formData);
-      setShowEnrollmentForm(false);
-      router.push('/(challenges)/challenge-hub');
-    }
-  };
+  if (isGuest) {
+    return (
+      <GuestGate
+        featureName="Programmes"
+        description="Rejoins des programmes d'accompagnement, progresse niveau par niveau et développe tes compétences entrepreneuriales."
+      />
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -151,7 +155,7 @@ export default function ChallengeExplorerScreen() {
           // Liste des challenges
           <View style={styles.challengeList}>
             {displayedChallenges.map((challenge, index) => {
-              const enrollment = getEnrollmentForChallenge(challenge.id);
+              const enrollment = getEnrollmentForChallenge(challenge.id, userId);
               return (
                 <Animated.View
                   key={challenge.id}
@@ -161,20 +165,8 @@ export default function ChallengeExplorerScreen() {
                   <ChallengeHomeCard
                     challenge={challenge}
                     enrollment={enrollment ?? null}
-                    onEnroll={() => {
-                      if (!userId) return;
-                      enrollInChallenge(challenge.id, userId);
-                      setActiveChallenge(challenge.id);
-                      setShowEnrollmentForm(true);
-                    }}
-                    onContinue={() => {
-                      setActiveChallenge(challenge.id);
-                      if (enrollment && enrollment.formData == null) {
-                        setShowEnrollmentForm(true);
-                      } else {
-                        router.push('/(challenges)/challenge-hub');
-                      }
-                    }}
+                    onEnroll={() => handleEnroll(challenge.id)}
+                    onContinue={() => handleContinue(challenge.id)}
                   />
                 </Animated.View>
               );
@@ -186,9 +178,9 @@ export default function ChallengeExplorerScreen() {
       {/* Formulaire d'inscription au challenge */}
       <EnrollmentFormModal
         visible={showEnrollmentForm}
-        challengeName={getActiveChallenge()?.name ?? 'Programme'}
+        challengeName={activeChallengeName}
         onSubmit={handleEnrollmentFormSubmit}
-        onClose={() => setShowEnrollmentForm(false)}
+        onClose={handleFormClose}
       />
     </View>
   );

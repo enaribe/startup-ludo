@@ -22,6 +22,7 @@ import Animated, {
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { SPACING } from '@/styles/spacing';
 import type { GameEmoji } from './EmojiReactionBar';
+import { EmojiIcon } from './EmojiReactionBar';
 
 // ===== TYPES =====
 
@@ -132,7 +133,9 @@ const AnimatedEmoji = memo(function AnimatedEmoji({
 
   return (
     <Animated.View style={[styles.emojiContainer, animatedStyle, { marginTop: offsetY }]}>
-      <Text style={styles.bigEmoji}>{reaction.emoji}</Text>
+      <View style={styles.bigEmojiWrap}>
+        <EmojiIcon id={reaction.emoji} size={80} />
+      </View>
       <View style={styles.playerNameContainer}>
         <Text style={styles.playerName}>{reaction.playerName}</Text>
       </View>
@@ -153,11 +156,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     position: 'absolute',
   },
-  bigEmoji: {
-    fontSize: 80,
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 0, height: 4 },
-    textShadowRadius: 12,
+  bigEmojiWrap: {
+    width: 80,
+    height: 80,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   playerNameContainer: {
     marginTop: SPACING[2],

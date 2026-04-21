@@ -12,7 +12,7 @@ import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { useAuthStore, useUserStore } from '@/stores';
 import { useSocialStore } from '@/stores/useSocialStore';
 import { RadialBackground, DynamicGradientBorder } from '@/components/ui';
-import { getRankFromXP, getXPForNextRank } from '@/config/progression';
+import { getRankFromXP, getRankProgress, getXPForNextRank } from '@/config/progression';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -92,18 +92,13 @@ export default function ProfilScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
   const profile = useUserStore((state) => state.profile);
-  const levelProgress = useUserStore((state) => state.levelProgress);
 
   const totalXP = profile?.xp ?? 0;
-  const currentXP = levelProgress?.currentXP ?? 0;
-  const xpForNextLevel = levelProgress?.xpForNext ?? 100;
-  const xpProgress = xpForNextLevel > 0 ? (currentXP / xpForNextLevel) * 100 : 0;
-
   const rankInfo = getRankFromXP(totalXP);
   const nextRankInfo = getXPForNextRank(totalXP);
+  const xpProgress = getRankProgress(totalXP);
 
   const displayName = user?.displayName || profile?.displayName || 'Joueur';
-  const displayRank = rankInfo.title;
 
   const followCounts = useSocialStore((s) => s.followCounts);
 
@@ -183,21 +178,21 @@ export default function ProfilScreen() {
               boxWidth={contentWidth}
             >
               <View style={styles.cardContent}>
-                <Text style={styles.progressionTitleInCard}>PROGRESSION</Text>
-                <Text style={styles.progressionSubtitle}>
-                  <Text style={styles.rankHighlight}>{displayRank}</Text>
-                  {nextRankInfo.nextRank
-                    ? ` - Prochain: ${nextRankInfo.nextRank.title} (${nextRankInfo.xpNeeded.toLocaleString()} XP)`
-                    : ' - Rang max atteint !'}
-                </Text>
+                <View style={styles.progressionHeader}>
+                  <Text style={styles.progressionTitleInCard}>PROGRESSION</Text>
+                  <Text style={styles.rankBadge}>{rankInfo.title}</Text>
+                </View>
 
                 <View style={styles.progressBarContainer}>
-                  <View style={[styles.progressBarFill, { width: `${Math.max(0, Math.min(100, xpProgress))}%` }]} />
+                  <View style={[styles.progressBarFill, { width: `${xpProgress}%` }]} />
                 </View>
 
                 <View style={styles.xpRow}>
-                  <Text style={styles.xpText}>{currentXP.toLocaleString()} XP</Text>
-                  <Text style={styles.xpText}>{Math.max(0, xpForNextLevel - currentXP).toLocaleString()} XP restants</Text>
+                  <Text style={styles.xpText}>{totalXP.toLocaleString()} XP total</Text>
+                  {nextRankInfo.nextRank
+                    ? <Text style={styles.xpText}>{nextRankInfo.xpNeeded.toLocaleString()} XP → {nextRankInfo.nextRank.title}</Text>
+                    : <Text style={styles.xpText}>Rang maximum atteint 👑</Text>
+                  }
                 </View>
               </View>
             </DynamicGradientBorder>
@@ -330,23 +325,21 @@ const styles = StyleSheet.create({
   cardContent: {
     padding: SPACING[4],
   },
+  progressionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: SPACING[3],
+  },
   progressionTitleInCard: {
     fontFamily: FONTS.title,
     fontSize: FONT_SIZES.sm,
-    color: COLORS.white,
-    marginBottom: SPACING[2],
+    color: 'rgba(255,255,255,0.5)',
     textTransform: 'uppercase',
   },
-  progressionSubtitle: {
-    fontFamily: FONTS.body,
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.85)',
-    marginBottom: SPACING[3],
-    lineHeight: 18,
-  },
-  rankHighlight: {
+  rankBadge: {
     fontFamily: FONTS.bodySemiBold,
-    fontSize: 13,
+    fontSize: FONT_SIZES.sm,
     color: COLORS.primary,
   },
   progressBarContainer: {

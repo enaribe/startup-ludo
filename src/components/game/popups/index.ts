@@ -8,3 +8,7 @@ export { DuelQuestionPopup } from './DuelQuestionPopup';
 export { DuelResultPopup } from './DuelResultPopup';
 export { VictoryPopup } from './VictoryPopup';
 export { QuitConfirmPopup } from './QuitConfirmPopup';
+export { MissedFinalEntryPopup } from './MissedFinalEntryPopup';
+export { CreateStartupPromptPopup } from './CreateStartupPromptPopup';
+export { ReturnBonusPopup } from './ReturnBonusPopup';
+export { OnboardingModal } from './OnboardingModal';

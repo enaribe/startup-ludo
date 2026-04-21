@@ -24,8 +24,8 @@ import {
     PitchBuilderModal,
     SectorChoiceModal,
 } from '@/components/challenges';
-import { DynamicGradientBorder, GameButton, RadialBackground } from '@/components/ui';
-import { useChallengeStore } from '@/stores';
+import { DynamicGradientBorder, GameButton, GuestGate, RadialBackground } from '@/components/ui';
+import { useAuthStore, useChallengeStore } from '@/stores';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
@@ -298,6 +298,7 @@ export default function ChallengeHubScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ challengeId?: string }>();
   const insets = useSafeAreaInsets();
+  const isGuest = useAuthStore((state) => state.user?.isGuest ?? true);
 
   // Challenge store
   const challenges = useChallengeStore((state) => state.challenges);
@@ -527,6 +528,15 @@ export default function ChallengeHubScreen() {
     },
     [enrollment?.id, submitEnrollmentForm]
   );
+
+  if (isGuest) {
+    return (
+      <GuestGate
+        featureName="Programmes"
+        description="Rejoins des programmes d'accompagnement, progresse niveau par niveau et développe tes compétences entrepreneuriales."
+      />
+    );
+  }
 
   // Si pas de Challenge ou d'inscription, afficher un message
   if (!challenge || !enrollment) {

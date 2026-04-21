@@ -1,4 +1,4 @@
-import { PopupDuelIcon } from '@/components/game/popups/PopupIcons';
+import { DuelHeader, VsBadge } from '@/components/game/popups/DuelHeader';
 import { Avatar } from '@/components/ui/Avatar';
 import { GameButton } from '@/components/ui/GameButton';
 import { Modal } from '@/components/ui/Modal';
@@ -53,7 +53,6 @@ export const DuelPreparePopup = memo(function DuelPreparePopup({
     ? (!isOnline ? true : (isCurrentPlayerChallenger || isCurrentPlayerOpponent))
     : (!isOnline || isCurrentPlayerOpponent);
 
-  const title = isIntroPhase ? 'DUEL' : 'À TON TOUR';
   const message = isMyTurn
     ? 'Prépare-toi à répondre\naux 3 questions !'
     : `C'est au tour de\n${activePlayer.name}`;
@@ -67,13 +66,8 @@ export const DuelPreparePopup = memo(function DuelPreparePopup({
       bareContent
     >
       <Animated.View entering={SlideInUp.duration(280)} style={styles.card}>
+        <DuelHeader />
         <View style={styles.content}>
-          {/* Header: icône gauche + titre DuEL droite (design system) */}
-          <View style={styles.header}>
-            <PopupDuelIcon size={32} />
-            <Text style={styles.title}>{title}</Text>
-          </View>
-
           {/* Phase intro: deux cartes joueur + VS au centre */}
           {isIntroPhase && (
             <>
@@ -87,9 +81,7 @@ export const DuelPreparePopup = memo(function DuelPreparePopup({
                 </View>
               </Animated.View>
 
-              <View style={styles.vsCircle}>
-                <PopupDuelIcon size={28} />
-              </View>
+              <VsBadge />
 
               <Animated.View entering={SlideInRight.duration(280)} style={styles.playerCardRow}>
                 <View style={styles.avatarWrap}>
@@ -143,24 +135,10 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   content: {
-    paddingTop: SPACING[5],
+    paddingTop: SPACING[4],
     paddingBottom: SPACING[6],
     paddingHorizontal: SPACING[5],
     alignItems: 'center',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    width: '100%',
-    marginBottom: SPACING[4],
-    gap: SPACING[3],
-  },
-  title: {
-    fontFamily: FONTS.title,
-    fontSize: FONT_SIZES['2xl'],
-    color: COLORS.success,
-    letterSpacing: 2,
   },
   playerCardRow: {
     flexDirection: 'row',
@@ -193,15 +171,6 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.xs,
     color: '#8E99A4',
     marginTop: 2,
-  },
-  vsCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(28, 107, 59, 0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginVertical: SPACING[2],
   },
   messageBox: {
     backgroundColor: '#F8F9FA',

@@ -10,6 +10,7 @@
  */
 
 import { setChallengeEnrollment } from '@/services/firebase/firestore';
+import { ALL_CHALLENGES } from '@/data/challenges';
 import type {
     Challenge,
     ChallengeDeliverables,
@@ -38,7 +39,7 @@ interface ChallengeStoreActions {
   getActiveChallenge: () => Challenge | null;
   enrollInChallenge: (challengeId: string, userId: string, formData?: EnrollmentFormData) => ChallengeEnrollment;
   submitEnrollmentForm: (enrollmentId: string, formData: EnrollmentFormData) => void;
-  getEnrollmentForChallenge: (challengeId: string) => ChallengeEnrollment | undefined;
+  getEnrollmentForChallenge: (challengeId: string, userId?: string) => ChallengeEnrollment | undefined;
   getActiveEnrollment: () => ChallengeEnrollment | null;
   getUserEnrollments: (userId: string) => ChallengeEnrollment[];
   setEnrollments: (enrollments: ChallengeEnrollment[]) => void;
@@ -82,10 +83,12 @@ export const useChallengeStore = create<ChallengeStoreState & ChallengeStoreActi
         set((state) => {
           if (!state.challenges.some((c) => c.id === challenge.id)) state.challenges.push(challenge);
         }),
-      getChallengeById: (id) => get().challenges.find((c) => c.id === id),
+      getChallengeById: (id) =>
+        ALL_CHALLENGES.find((c) => c.id === id) ?? get().challenges.find((c) => c.id === id),
       getActiveChallenge: () => {
         const id = get().activeChallengeId;
-        return id ? get().challenges.find((c) => c.id === id) ?? null : null;
+        if (!id) return null;
+        return ALL_CHALLENGES.find((c) => c.id === id) ?? get().challenges.find((c) => c.id === id) ?? null;
       },
 
       enrollInChallenge: (challengeId, userId, formData) => {
@@ -135,8 +138,13 @@ export const useChallengeStore = create<ChallengeStoreState & ChallengeStoreActi
         }
       },
 
-      getEnrollmentForChallenge: (challengeId) =>
-        get().enrollments.find((e) => e.challengeId === challengeId),
+      getEnrollmentForChallenge: (challengeId, userId?) => {
+        const enrollments = get().enrollments;
+        if (userId) {
+          return enrollments.find((e) => e.challengeId === challengeId && e.userId === userId);
+        }
+        return enrollments.find((e) => e.challengeId === challengeId);
+      },
       getActiveEnrollment: () => {
         const id = get().activeChallengeId;
         return id ? get().enrollments.find((e) => e.challengeId === id) ?? null : null;

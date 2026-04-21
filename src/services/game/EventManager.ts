@@ -180,6 +180,8 @@ export class EventManager {
         return this.generateFundingEvent();
       case 'duel':
         return this.generateDuelEvent();
+      case 'event':
+        return this.generateRandomEvent();
       case 'opportunity':
         return this.generateOpportunityEvent();
       case 'challenge':

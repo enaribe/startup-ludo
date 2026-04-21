@@ -18,6 +18,7 @@ interface ProgressBarProps {
   size?: ProgressBarSize;
   variant?: ProgressBarVariant;
   playerColor?: keyof typeof COLORS.players;
+  color?: string;
   showLabel?: boolean;
   label?: string;
   showPercentage?: boolean;
@@ -44,6 +45,7 @@ export const ProgressBar = memo(function ProgressBar({
   size = 'md',
   variant = 'default',
   playerColor,
+  color,
   showLabel = false,
   label,
   showPercentage = false,
@@ -70,9 +72,10 @@ export const ProgressBar = memo(function ProgressBar({
 
   const height = SIZE_MAP[size];
   const barColor =
-    variant === 'player' && playerColor
+    color ??
+    (variant === 'player' && playerColor
       ? COLORS.players[playerColor]
-      : VARIANT_COLORS[variant];
+      : VARIANT_COLORS[variant]);
 
   return (
     <View style={[{ width: '100%' }, style]}>

@@ -104,7 +104,10 @@ export interface EnrollmentFormData {
   lastName: string;
   firstName: string;
   age: string;
+  pays: string;
   region: string;
+  genre: 'homme' | 'femme' | 'autre' | null;
+  situationHandicap: boolean | null;
   isCurrentEntrepreneur: boolean | null;
   planToStart: boolean | null;
   wantsContact: boolean | null;

@@ -1,5 +1,7 @@
 import { memo, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import Svg, { Defs, LinearGradient as SvgLinearGradient, Rect, Stop } from 'react-native-svg';
 import Animated, {
   SlideInUp,
   SlideInLeft,
@@ -11,7 +13,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { Modal } from '@/components/ui/Modal';
-import { PopupDuelIcon } from '@/components/game/popups/PopupIcons';
+import { DuelHeader, VsBadge } from '@/components/game/popups/DuelHeader';
 import { Avatar } from '@/components/ui/Avatar';
 import { GameButton } from '@/components/ui/GameButton';
 import { COLORS } from '@/styles/colors';
@@ -94,12 +96,8 @@ export const DuelResultPopup = memo(function DuelResultPopup({
     return (
       <Modal visible={visible} onClose={() => {}} closeOnBackdrop={false} showCloseButton={false} bareContent>
         <Animated.View entering={SlideInUp.duration(280)} style={styles.card}>
+          <DuelHeader />
           <View style={styles.content}>
-            <View style={styles.header}>
-              <PopupDuelIcon size={32} />
-              <Text style={[styles.title, { color: COLORS.warning }]}>EN ATTENTE</Text>
-            </View>
-
             <Animated.View entering={SlideInLeft.duration(280)} style={styles.playerCardRow}>
               <View style={styles.avatarWrap}>
                 <Avatar name={challenger.name} playerColor={challenger.color} size="md" showBorder />
@@ -110,9 +108,7 @@ export const DuelResultPopup = memo(function DuelResultPopup({
               </View>
             </Animated.View>
 
-            <View style={styles.vsCircle}>
-              <PopupDuelIcon size={28} />
-            </View>
+            <VsBadge />
 
             <Animated.View entering={SlideInRight.duration(280)} style={styles.playerCardRow}>
               <View style={styles.avatarWrap}>
@@ -141,25 +137,30 @@ export const DuelResultPopup = memo(function DuelResultPopup({
   // ===== RESULT STATE: show final scores =====
   if (!result) return null;
 
-  const isDraw = result.winnerId === null;
-  const isCurrentPlayerWinner = result.winnerId === currentPlayerId;
   const isCurrentPlayerChallenger = currentPlayerId === challenger.id;
   const currentPlayerReward = isCurrentPlayerChallenger ? result.challengerReward : result.opponentReward;
 
-  const statusText = isDraw ? 'ÉGALITÉ' : isCurrentPlayerWinner ? 'VICTOIRE' : 'DÉFAITE';
-  const statusColor = isDraw ? COLORS.warning : isCurrentPlayerWinner ? COLORS.success : COLORS.error;
   const challengerWon = result.challengerScore > result.opponentScore;
   const opponentWon = result.opponentScore > result.challengerScore;
+  const isDraw = result.winnerId === null;
+  const isWinner = result.winnerId === currentPlayerId;
+
+  const feedbackIconColor = isDraw ? '#FF9800' : '#ffffff';
+  const feedbackLabelColor = isDraw ? '#FF9800' : '#ffffff';
+  const feedbackRewardColor = isDraw ? (currentPlayerReward > 0 ? COLORS.primary : '#8E99A4') : '#ffffff';
+  const feedbackBg = isDraw ? 'rgba(255,152,0,0.08)' : 'transparent';
+  const feedbackBorder = isDraw ? 'rgba(255,152,0,0.25)' : isWinner ? '#2ECC71' : '#F35145';
+  const feedbackDividerColor = isDraw ? 'rgba(255,152,0,0.3)' : 'rgba(255,255,255,0.2)';
+  const feedbackIcon = isDraw ? 'remove-circle' : isWinner ? 'trophy' : 'close-circle';
+  const feedbackLabel = isDraw ? 'ÉGALITÉ' : isWinner ? 'VICTOIRE !' : 'DÉFAITE';
+  const feedbackGradStart = isWinner ? '#2ECC71' : '#F35145';
+  const feedbackGradEnd = isWinner ? '#1A9E50' : '#C0392B';
 
   return (
     <Modal visible={visible} onClose={onClose} closeOnBackdrop={false} showCloseButton={false} bareContent>
       <Animated.View entering={SlideInUp.duration(280)} style={styles.card}>
+        <DuelHeader />
         <View style={styles.content}>
-          <View style={styles.header}>
-            <PopupDuelIcon size={32} />
-            <Text style={[styles.title, { color: statusColor }]}>{statusText}</Text>
-          </View>
-
           <Animated.View entering={SlideInLeft.duration(280)} style={styles.playerCardRow}>
             <View style={styles.avatarWrap}>
               <Avatar name={challenger.name} playerColor={challenger.color} size="md" showBorder />
@@ -171,9 +172,7 @@ export const DuelResultPopup = memo(function DuelResultPopup({
             </View>
           </Animated.View>
 
-          <View style={styles.vsCircle}>
-            <PopupDuelIcon size={28} />
-          </View>
+          <VsBadge />
 
           <Animated.View entering={SlideInRight.duration(280)} style={styles.playerCardRow}>
             <View style={styles.avatarWrap}>
@@ -186,12 +185,33 @@ export const DuelResultPopup = memo(function DuelResultPopup({
             </View>
           </Animated.View>
 
-          <Animated.View style={[styles.messageBox, contentStyle]}>
-            {currentPlayerReward > 0 ? (
-              <Text style={styles.message}>+{currentPlayerReward} jetons gagnés</Text>
-            ) : (
-              <Text style={styles.message}>Pas de jetons gagnés</Text>
+          <Animated.View style={[styles.feedbackBox, { backgroundColor: feedbackBg, borderColor: feedbackBorder }, contentStyle]}>
+            {/* Gradient SVG en fond pour victoire et défaite */}
+            {!isDraw && (
+              <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" preserveAspectRatio="none">
+                <Defs>
+                  <SvgLinearGradient id="feedback_grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <Stop offset="0%" stopColor={feedbackGradStart} stopOpacity="1" />
+                    <Stop offset="100%" stopColor={feedbackGradEnd} stopOpacity="1" />
+                  </SvgLinearGradient>
+                </Defs>
+                <Rect width="100%" height="100%" fill="url(#feedback_grad)" rx={12} />
+              </Svg>
             )}
+            {/* Ligne feedback */}
+            <View style={styles.feedbackRow}>
+              <Ionicons name={feedbackIcon as any} size={22} color={feedbackIconColor} />
+              <Text style={[styles.feedbackLabel, { color: feedbackLabelColor }]}>{feedbackLabel}</Text>
+            </View>
+            {/* Séparateur */}
+            <View style={[styles.feedbackDivider, { backgroundColor: feedbackDividerColor }]} />
+            {/* Récompense */}
+            <View style={styles.rewardRow}>
+              <Ionicons name="logo-bitcoin" size={16} color={feedbackRewardColor} />
+              <Text style={[styles.rewardText, { color: feedbackRewardColor }]}>
+                {currentPlayerReward > 0 ? `+${currentPlayerReward} jetons gagnés` : 'Aucun jeton gagné'}
+              </Text>
+            </View>
           </Animated.View>
 
           <View style={styles.buttonWrapper}>
@@ -213,23 +233,10 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   content: {
-    paddingTop: SPACING[5],
+    paddingTop: SPACING[4],
     paddingBottom: SPACING[6],
     paddingHorizontal: SPACING[5],
     alignItems: 'center',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    width: '100%',
-    marginBottom: SPACING[4],
-    gap: SPACING[3],
-  },
-  title: {
-    fontFamily: FONTS.title,
-    fontSize: FONT_SIZES['2xl'],
-    letterSpacing: 2,
   },
   playerCardRow: {
     flexDirection: 'row',
@@ -272,15 +279,6 @@ const styles = StyleSheet.create({
   scoreWinner: {
     color: COLORS.success,
   },
-  vsCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(28, 107, 59, 0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginVertical: SPACING[2],
-  },
   messageBox: {
     backgroundColor: '#F8F9FA',
     borderRadius: BORDER_RADIUS.xl,
@@ -296,6 +294,44 @@ const styles = StyleSheet.create({
     color: '#2C3E50',
     textAlign: 'center',
     lineHeight: 24,
+  },
+  feedbackBox: {
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+    width: '100%',
+    marginTop: SPACING[3],
+    marginBottom: SPACING[5],
+    overflow: 'hidden',
+  },
+  feedbackRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING[2],
+    paddingVertical: SPACING[3],
+    paddingHorizontal: SPACING[4],
+  },
+  feedbackLabel: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES.lg,
+    letterSpacing: 1,
+  },
+  feedbackDivider: {
+    height: 1,
+    marginHorizontal: SPACING[4],
+    opacity: 0.5,
+  },
+  rewardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING[2],
+    paddingVertical: SPACING[3],
+    paddingHorizontal: SPACING[4],
+  },
+  rewardText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.sm,
   },
   waitingRow: {
     flexDirection: 'row',

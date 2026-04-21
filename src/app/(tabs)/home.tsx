@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Dimensions, FlatList, Image, Pressable, ScrollView, StyleSheet, Text, View, type ViewToken } from 'react-native';
 import Animated, {
@@ -15,14 +15,19 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
 import { ChallengeHomeCard, EnrollmentFormModal } from '@/components/challenges';
-import { Avatar, DynamicGradientBorder, InfoModal, RadialBackground } from '@/components/ui';
+import { CreateStartupPromptPopup, OnboardingModal, ReturnBonusPopup } from '@/components/game/popups';
+import { Avatar, DynamicGradientBorder, InfoModal, ProgressionPopup, RadialBackground } from '@/components/ui';
 import type { InfoSection } from '@/components/ui';
+import { useOnboarding } from '@/hooks/useOnboarding';
+import { useReturnBonus } from '@/hooks/useReturnBonus';
+import { useStartupCreationPrompt } from '@/hooks/useStartupCreationPrompt';
+import { useChallengeEnroll } from '@/hooks/useChallengeEnroll';
 
-import { formatXP, getLevelFromXP, getRankFromXP, getRankProgress } from '@/config/progression';
+import { formatXP, getRankProgress, getXPForNextRank } from '@/config/progression';
 import { ALL_CHALLENGES, refreshChallengesFromFirestore } from '@/data/challenges';
 import { useAuthStore, useChallengeStore, useUserStore } from '@/stores';
 import { FONTS } from '@/styles/typography';
-import type { Challenge, EnrollmentFormData } from '@/types/challenge';
+import type { Challenge } from '@/types/challenge';
 import { formatFCFARaw } from '@/utils/currency';
 
 const { width } = Dimensions.get('window');
@@ -123,19 +128,36 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const user = useAuthStore((state) => state.user);
   const profile = useUserStore((state) => state.profile);
-  const enrollInChallenge = useChallengeStore((s) => s.enrollInChallenge);
-  const submitEnrollmentForm = useChallengeStore((s) => s.submitEnrollmentForm);
-  const setActiveChallenge = useChallengeStore((s) => s.setActiveChallenge);
-  const getEnrollmentForChallenge = useChallengeStore((s) => s.getEnrollmentForChallenge);
-  const getActiveChallenge = useChallengeStore((s) => s.getActiveChallenge);
-  const getActiveEnrollment = useChallengeStore((s) => s.getActiveEnrollment);
   const userId = user?.id ?? '';
 
-  const [showEnrollmentForm, setShowEnrollmentForm] = useState(false);
-  const [showInfo, setShowInfo] = useState(false);
-  const [challengesLoaded, setChallengesLoaded] = useState(false);
+  const {
+    showEnrollmentForm,
+    activeChallengeName,
+    handleEnroll,
+    handleContinue,
+    handleFormSubmit: handleEnrollmentFormSubmit,
+    handleFormClose,
+  } = useChallengeEnroll();
+  const getEnrollmentForChallenge = useChallengeStore((s) => s.getEnrollmentForChallenge);
 
-  // Récupérer uniquement les challenges inscrits de l'utilisateur
+  const [showInfo, setShowInfo] = useState(false);
+  const { visible: showOnboardingHook, complete: completeOnboarding } = useOnboarding();
+  const [forceOnboarding, setForceOnboarding] = useState(false);
+  const showOnboarding = showOnboardingHook || forceOnboarding;
+  const { visible: showStartupPrompt, dismiss: dismissStartupPrompt } = useStartupCreationPrompt();
+  const { visible: showReturnBonus, claim: claimReturnBonus, dismiss: dismissReturnBonus } = useReturnBonus();
+  const [challengesLoaded, setChallengesLoaded] = useState(false);
+  const [showProgression, setShowProgression] = useState(false);
+
+  const { showProgression: showProgressionParam, xpGained: xpGainedParam, valorisationGain: valorisationGainParam } =
+    useLocalSearchParams<{ showProgression?: string; xpGained?: string; valorisationGain?: string }>();
+  const progressionXpGained = xpGainedParam ? parseInt(xpGainedParam, 10) : undefined;
+  const progressionValorisationGain = valorisationGainParam ? parseInt(valorisationGainParam, 10) : undefined;
+  useEffect(() => {
+    if (showProgressionParam === '1') setShowProgression(true);
+  }, [showProgressionParam]);
+
+  // Challenges inscrits de l'utilisateur (actifs uniquement, filtrés par userId)
   const userEnrollments = useChallengeStore((state) => state.enrollments);
   const enrolledChallenges = useMemo(() => {
     if (!userId) return [];
@@ -181,16 +203,16 @@ export default function HomeScreen() {
     }
   }, [enrolledChallenges.length]);
 
-  // Calculs de progression
+  // Calculs de progression (rang)
   const totalXP = profile?.xp ?? 0;
-  const rankInfo = getRankFromXP(totalXP);
-  const levelInfo = getLevelFromXP(totalXP);
   const rankProgress = getRankProgress(totalXP);
+  const nextRankInfo = getXPForNextRank(totalXP);
 
   // Stats du portfolio
   const startupsCount = profile?.startups?.length ?? 0;
   const portfolioValue = profile?.startups?.reduce((sum, s) => sum + s.tokensInvested, 0) ?? 0;
 
+  const isGuest = user?.isGuest ?? true;
   const displayName = user?.displayName || profile?.displayName || 'Joueur';
 
   // Debug: log enrolled challenges
@@ -198,18 +220,6 @@ export default function HomeScreen() {
   if (enrolledChallenges.length > 0) {
     console.log('[Home] Challenges:', enrolledChallenges.map(c => ({ id: c.id, name: c.name, isActive: c.isActive })));
   }
-
-  const handleEnrollmentFormSubmit = useCallback(
-    (formData: EnrollmentFormData) => {
-      const enrollment = getActiveEnrollment();
-      if (enrollment) {
-        submitEnrollmentForm(enrollment.id, formData);
-        setShowEnrollmentForm(false);
-        router.push('/(challenges)/challenge-hub');
-      }
-    },
-    [submitEnrollmentForm, getActiveEnrollment, router]
-  );
 
   const handlePlay = () => {
     router.push('/(game)/mode-selection');
@@ -292,13 +302,17 @@ export default function HomeScreen() {
           <View style={styles.statDivider} />
 
           <View style={[styles.statItem, styles.statItemXp]}>
-            <Text style={styles.xpTextValue} numberOfLines={1} adjustsFontSizeToFit>
-              {formatXP(totalXP)} / 15,000 XP
+            <Text style={styles.xpRankLabel} numberOfLines={1}>
+              Progression
             </Text>
             <View style={styles.xpBarContainer}>
               <View style={[styles.xpBarFill, { width: `${rankProgress}%` }]} />
             </View>
-            {/* <Text style={styles.statLabel}>Progression</Text> */}
+            <Text style={styles.xpTextValue} numberOfLines={1} adjustsFontSizeToFit>
+              {nextRankInfo.nextRank
+                ? `${formatXP(totalXP)} / ${formatXP(nextRankInfo.nextRank.minXP)} XP`
+                : `${formatXP(totalXP)} XP · Rang max`}
+            </Text>
           </View>
         </View>
           </View>
@@ -360,12 +374,36 @@ export default function HomeScreen() {
         {/* Challenge Section */}
         <View style={styles.challengeHeader}>
           <Text style={styles.challengeHeaderTitle}>CHALLENGE EN COURS</Text>
-          <Pressable onPress={() => router.push('/(challenges)/challenge-explorer')}>
-            <Text style={styles.voirPlusText}>VOIR PLUS</Text>
-          </Pressable>
+          {!isGuest && (
+            <Pressable onPress={() => router.push('/(challenges)/challenge-explorer')}>
+              <Text style={styles.voirPlusText}>VOIR PLUS</Text>
+            </Pressable>
+          )}
         </View>
 
-        {enrolledChallenges.length > 0 ? (
+        {isGuest ? (
+          /* Teaser programmes pour les invités */
+          <View style={styles.challengeCardWrapper}>
+            <Animated.View entering={FadeInDown.delay(600).duration(500)}>
+              <Pressable onPress={() => router.push('/(auth)/register')}>
+                <DynamicGradientBorder borderRadius={16} fill="rgba(0, 0, 0, 0.35)">
+                  <View style={styles.emptyCardContent}>
+                    <View style={styles.emptyCardLeft}>
+                      <View style={styles.emptyLogoContainer}>
+                        <Ionicons name="lock-closed-outline" size={26} color="rgba(255, 188, 64, 0.6)" />
+                      </View>
+                      <View style={styles.emptyCardInfo}>
+                        <Text style={styles.emptyCardTitle}>PROGRAMMES</Text>
+                        <Text style={styles.emptyCardSub}>Crée un compte pour accéder aux programmes</Text>
+                      </View>
+                    </View>
+                    <Ionicons name="arrow-forward" size={16} color="#FFBC40" />
+                  </View>
+                </DynamicGradientBorder>
+              </Pressable>
+            </Animated.View>
+          </View>
+        ) : enrolledChallenges.length > 0 ? (
           <View style={styles.challengeCardWrapper}>
             <FlatList
               ref={challengeListRef}
@@ -384,26 +422,14 @@ export default function HomeScreen() {
                 index,
               })}
               renderItem={({ item: challenge }) => {
-                const enrollment = getEnrollmentForChallenge(challenge.id);
+                const enrollment = getEnrollmentForChallenge(challenge.id, userId);
                 return (
                   <View style={{ width: CARD_WIDTH }}>
                     <ChallengeHomeCard
                       challenge={challenge}
                       enrollment={enrollment ?? null}
-                      onEnroll={() => {
-                        if (!userId) return;
-                        enrollInChallenge(challenge.id, userId);
-                        setActiveChallenge(challenge.id);
-                        setShowEnrollmentForm(true);
-                      }}
-                      onContinue={() => {
-                        setActiveChallenge(challenge.id);
-                        if (enrollment && enrollment.formData == null) {
-                          setShowEnrollmentForm(true);
-                        } else {
-                          router.push('/(challenges)/challenge-hub');
-                        }
-                      }}
+                      onEnroll={() => handleEnroll(challenge.id)}
+                      onContinue={() => handleContinue(challenge.id)}
                     />
                   </View>
                 );
@@ -441,20 +467,60 @@ export default function HomeScreen() {
         )}
       </ScrollView>
 
-      {/* Formulaire d'inscription au challenge (obligatoire avant d'accéder aux niveaux) */}
+      {/* Formulaire d'inscription au challenge */}
       <EnrollmentFormModal
         visible={showEnrollmentForm}
-        challengeName={getActiveChallenge()?.name ?? 'Programme'}
+        challengeName={activeChallengeName}
         onSubmit={handleEnrollmentFormSubmit}
-        onClose={() => setShowEnrollmentForm(false)}
+        onClose={handleFormClose}
+      />
+
+      {/* DEV: bouton test onboarding (comptes enregistrés uniquement) */}
+      {!isGuest && (
+        <Pressable
+          style={{ position: 'absolute', top: 120, right: 16, backgroundColor: 'rgba(255,0,0,0.85)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, zIndex: 9999 }}
+          onPress={() => setForceOnboarding(true)}
+        >
+          <Text style={{ color: '#fff', fontSize: 11, fontWeight: 'bold' }}>TEST ONBOARDING</Text>
+        </Pressable>
+      )}
+
+      {/* Onboarding (première connexion uniquement) */}
+      <OnboardingModal
+        visible={showOnboarding}
+        onComplete={() => { completeOnboarding(); setForceOnboarding(false); }}
+      />
+
+      {/* Popup bonus reconnexion */}
+      <ReturnBonusPopup
+        visible={showReturnBonus}
+        onClaim={claimReturnBonus}
+        onDismiss={dismissReturnBonus}
+      />
+
+      {/* Popup création startup */}
+      <CreateStartupPromptPopup
+        visible={showStartupPrompt}
+        onCreateStartup={() => {
+          dismissStartupPrompt();
+          router.push('/(startup)/ideation');
+        }}
+        onDismiss={dismissStartupPrompt}
+      />
+
+      {/* Popup progression post-partie */}
+      <ProgressionPopup
+        visible={showProgression}
+        onContinue={() => setShowProgression(false)}
+        xpGained={progressionXpGained}
+        valorisationGain={progressionValorisationGain}
       />
 
       {/* Info Modal */}
       <InfoModal
         visible={showInfo}
         onClose={() => setShowInfo(false)}
-        title="ACCUEIL"
-        headerIcon="home"
+        variant="accueil"
         description="Ton tableau de bord personnel. Suis ta progression et accède à tes programmes d'entraînement."
         sections={HOME_INFO_SECTIONS}
       />
@@ -581,11 +647,19 @@ const styles = StyleSheet.create({
     marginTop: 3,
     textAlign: 'center',
   },
-  xpTextValue: {
+  xpRankLabel: {
     fontFamily: FONTS.bodyBold,
     fontSize: 9,
     color: '#FFBC40',
     marginBottom: 3,
+    textAlign: 'center',
+    width: '100%',
+  },
+  xpTextValue: {
+    fontFamily: FONTS.body,
+    fontSize: 8,
+    color: 'rgba(255,255,255,0.85)',
+    marginTop: 3,
     textAlign: 'center',
     width: '100%',
   },

@@ -16,3 +16,7 @@ export { ScreenHeader } from './ScreenHeader';
 export { FAB } from './FAB';
 export { InfoModal } from './InfoModal';
 export type { InfoSection } from './InfoModal';
+export { ProgressionPopup } from './ProgressionPopup';
+export { GamePopup, GamePopupSpinningShape, GamePopupGradientBorder, GAME_POPUP_WIDTH } from './GamePopup';
+export { OutlinedText } from './OutlinedText';
+export { GuestGate } from './GuestGate';

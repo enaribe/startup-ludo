@@ -67,6 +67,8 @@ export interface RemoteEmojiReaction {
 interface UseOnlineGameReturn {
   /** Roll dice and broadcast to other players */
   rollDice: () => number;
+  /** Set a fixed dice value (joker) and broadcast as a roll */
+  setDiceValue: (value: number) => void;
   /** Move pawn and broadcast */
   movePawn: (pawnIndex: number) => MoveResult | null;
   /** Exit home and broadcast */
@@ -140,6 +142,7 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
 
   // Store action refs (avoid stale closures)
   const storeRollDice = useGameStore((s) => s.rollDice);
+  const storeSetDiceValue = useGameStore((s) => s.setDiceValue);
   const storeExecuteMove = useGameStore((s) => s.executeMove);
   const storeExitHome = useGameStore((s) => s.exitHome);
   const storeAddTokens = useGameStore((s) => s.addTokens);
@@ -470,6 +473,21 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
     return value;
   }, [userId, storeRollDice]);
 
+  /** Joker : applique une valeur fixe localement ET la broadcaste comme un roll normal */
+  const setDiceValue = useCallback(
+    (value: number) => {
+      if (!userId) return;
+      storeSetDiceValue(value);
+      console.log('[useOnlineGame.setDiceValue] Joker utilisé:', value, '- envoi action "r"');
+      multiplayerSync.sendAction({
+        t: 'r',
+        p: userId,
+        d: { v: value },
+      });
+    },
+    [userId, storeSetDiceValue],
+  );
+
   const movePawn = useCallback(
     (pawnIndex: number) => {
       if (!userId) {
@@ -690,6 +708,7 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
 
   return {
     rollDice,
+    setDiceValue,
     movePawn,
     exitHome,
     resolveEvent,

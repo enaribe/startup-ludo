@@ -6,7 +6,6 @@ import { Dimensions, Pressable, RefreshControl, ScrollView, StyleSheet, Text, Vi
 import Animated, {
   Easing,
   FadeInDown,
-  SlideInUp,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
@@ -22,10 +21,10 @@ import {
   DynamicGradientBorder,
   GameButton,
   InfoModal,
-  Modal,
   RadialBackground,
   ScreenHeader,
 } from '@/components/ui';
+import { GamePopup, GamePopupGradientBorder } from '@/components/ui/GamePopup';
 import type { InfoSection } from '@/components/ui';
 import { useAuthStore, useSettingsStore, useUserStore } from '@/stores';
 import { useSocialStore } from '@/stores/useSocialStore';
@@ -39,9 +38,6 @@ import { formatFCFARaw } from '@/utils/currency';
 const HEADER_CONTENT_HEIGHT = 82;
 const { width: screenWidth } = Dimensions.get('window');
 
-/** Largeurs swipe détail — alignées sur StartupDetailPopup (portfolio) */
-const PROFILE_POPUP_CARD_INNER_W = screenWidth - 36 - SPACING[5] * 2;
-const PROFILE_POPUP_DETAIL_PAGE_W = PROFILE_POPUP_CARD_INNER_W - 40;
 
 const FILTERS = [
   { id: 'joueurs', label: 'JOUEURS', icon: 'people' as const },
@@ -520,8 +516,7 @@ export default function ClassementScreen() {
       <InfoModal
         visible={showInfo}
         onClose={() => setShowInfo(false)}
-        title="CLASSEMENT GLOBAL"
-        headerIcon="trophy"
+        variant="classement"
         description="Le classement regroupe tous les joueurs et entreprises de la plateforme."
         sections={CLASSEMENT_INFO_SECTIONS}
       />
@@ -548,6 +543,8 @@ interface ProfilePopupProps {
 
 function ProfilePopup({ item, rank, isFollowed, isGuest, onToggleFollow, onClose }: ProfilePopupProps) {
   const [detailPageIndex, setDetailPageIndex] = useState(0);
+  const [cardW, setCardW] = useState(0);
+  const [cardH, setCardH] = useState(0);
   const isUser = item.type === 'user';
   const showFollowCta = isUser && !item.isCurrentUser;
 
@@ -555,216 +552,137 @@ function ProfilePopup({ item, rank, isFollowed, isGuest, onToggleFollow, onClose
     setDetailPageIndex(0);
   }, [item.id]);
 
+  const icon = isUser
+    ? item.avatar
+      ? <Avatar name={item.name} size="lg" source={item.avatar} />
+      : <Ionicons name="person" size={64} color={COLORS.primary} />
+    : <RocketIcon color="#1F91D0" size={72} withShadow={false} />;
+
+  const pages: { title: string; content: React.ReactNode }[] = isUser
+    ? [
+        {
+          title: 'Synthèse',
+          content: (
+            <View style={ppStyles.statsList}>
+              <ProfileLinearStat label="XP" value={item.score.toLocaleString()} />
+              <View style={ppStyles.statSep} />
+              <ProfileLinearStat label="Niveau" value={`NIV. ${item.level || 1}`} />
+              <View style={ppStyles.statSep} />
+              <ProfileLinearStat label="Startups" value={String(item.startupCount ?? 0)} />
+              <View style={ppStyles.statSep} />
+              <ProfileLinearStat label="Rang" value={`#${rank}`} />
+            </View>
+          ),
+        },
+        {
+          title: 'Performance',
+          content: (
+            <View style={ppStyles.infoList}>
+              <ProfilePortfolioDetailRow icon="medal-outline" label="Ligue" value={item.rank?.trim() || '—'} />
+              <ProfilePortfolioDetailRow icon="game-controller" label="Parties jouées" value={String(item.gamesPlayed || 0)} />
+              <ProfilePortfolioDetailRow icon="trophy" label="Victoires" value={String(item.gamesWon || 0)} />
+              <ProfilePortfolioDetailRow
+                icon="star"
+                label="Taux de victoire"
+                value={`${item.gamesPlayed ? Math.round(((item.gamesWon || 0) / item.gamesPlayed) * 100) : 0}%`}
+                highlight
+              />
+            </View>
+          ),
+        },
+      ]
+    : [
+        {
+          title: 'À propos',
+          content: (
+            <View style={ppStyles.infoList}>
+              <ProfileLinearStat label="Valorisation" value={formatScore(item)} />
+              <View style={ppStyles.statSep} />
+              <ProfileLinearStat label="Secteur" value={item.sector || '—'} multiline />
+            </View>
+          ),
+        },
+        {
+          title: 'Créateur',
+          content: (
+            <View style={ppStyles.infoList}>
+              <ProfilePortfolioDetailRow icon="person" label="Nom" value={item.creatorName?.trim() || '—'} />
+            </View>
+          ),
+        },
+      ];
+
   return (
-    <Modal
+    <GamePopup
       visible
-      onClose={onClose}
       onRequestClose={onClose}
-      closeOnBackdrop
-      showCloseButton={false}
-      bareContent
+      icon={icon}
+      spinningShape={!isUser}
+      title={item.name}
+      footer={
+        <View style={ppStyles.actionsColumn}>
+          {showFollowCta && (
+            <GameButton
+              title={isFollowed ? 'NE PLUS SUIVRE' : 'SUIVRE'}
+              variant={isFollowed ? 'blue' : 'yellow'}
+              fullWidth
+              disabled={isGuest}
+              onPress={onToggleFollow}
+            />
+          )}
+          <GameButton title="FERMER" variant="blue" fullWidth onPress={onClose} />
+        </View>
+      }
     >
-      {/* Aligné StartupDetailPopup (portfolio) : SlideInUp 280ms */}
-      <Animated.View entering={SlideInUp.duration(280)} style={portfolioPopupStyles.centered}>
-        <DynamicGradientBorder borderRadius={24} fill="#0A1929" boxWidth={screenWidth - 36}>
-          <View style={portfolioPopupStyles.card}>
-            <Pressable style={portfolioPopupStyles.closeBtn} onPress={onClose} hitSlop={8}>
-              <Ionicons name="close" size={20} color="rgba(255,255,255,0.6)" />
-            </Pressable>
-
-            <View style={portfolioPopupStyles.header}>
-              <View style={portfolioPopupStyles.iconBadge}>
-                {isUser && item.avatar ? (
-                  <Avatar name={item.name} size="lg" source={item.avatar} />
-                ) : isUser ? (
-                  <Ionicons name="person" size={64} color={COLORS.primary} />
-                ) : (
-                  <RocketIcon color="#1F91D0" size={75} withShadow={false} />
-                )}
-              </View>
-              <Text style={portfolioPopupStyles.startupName}>{item.name}</Text>
-              {item.subtitle ? (
-                <Text style={portfolioPopupStyles.rankSubtitle}>{item.subtitle}</Text>
-              ) : null}
+      {/* Carte swipeable */}
+      <View
+        style={ppStyles.detailCard}
+        onLayout={(e) => {
+          setCardW(e.nativeEvent.layout.width);
+          setCardH(e.nativeEvent.layout.height);
+        }}
+      >
+        {cardW > 0 && cardH > 0 && (
+          <GamePopupGradientBorder
+            width={cardW}
+            height={cardH}
+            borderRadius={14}
+            gradientId={`profile_detail_border_${item.id}`}
+          />
+        )}
+        <ScrollView
+          key={`profile-swipe-${item.id}`}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          decelerationRate="fast"
+          style={cardW > 0 ? { width: cardW } : undefined}
+          onMomentumScrollEnd={(e) => {
+            const pageW = e.nativeEvent.layoutMeasurement.width;
+            const x = e.nativeEvent.contentOffset.x;
+            if (pageW > 0) setDetailPageIndex(Math.round(x / pageW));
+          }}
+        >
+          {pages.map((page) => (
+            <View
+              key={page.title}
+              style={[ppStyles.detailPage, cardW > 0 && { width: cardW }]}
+            >
+              <Text style={ppStyles.detailPageTitle}>{page.title}</Text>
+              <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false} style={ppStyles.detailScroll}>
+                {page.content}
+              </ScrollView>
             </View>
+          ))}
+        </ScrollView>
 
-            {isUser ? (
-              <>
-                <View style={portfolioPopupStyles.detailCard}>
-                  <ScrollView
-                    key={`profile-swipe-${item.id}`}
-                    horizontal
-                    pagingEnabled
-                    showsHorizontalScrollIndicator={false}
-                    decelerationRate="fast"
-                    style={{ width: PROFILE_POPUP_DETAIL_PAGE_W, alignSelf: 'center' }}
-                    onMomentumScrollEnd={(e) => {
-                      const pageW = e.nativeEvent.layoutMeasurement.width;
-                      const x = e.nativeEvent.contentOffset.x;
-                      if (pageW > 0) {
-                        setDetailPageIndex(Math.round(x / pageW));
-                      }
-                    }}
-                  >
-                    <View style={[portfolioPopupStyles.detailSwipePage, { width: PROFILE_POPUP_DETAIL_PAGE_W }]}>
-                      <Text style={portfolioPopupStyles.detailSwipeTitle}>Synthèse</Text>
-                      <ScrollView
-                        nestedScrollEnabled
-                        showsVerticalScrollIndicator={false}
-                        style={portfolioPopupStyles.detailVerticalScroll}
-                        contentContainerStyle={portfolioPopupStyles.detailVerticalScrollContent}
-                      >
-                        <View style={portfolioPopupStyles.statsLinear}>
-                          <ProfileLinearStat label="XP" value={item.score.toLocaleString()} />
-                          <View style={portfolioPopupStyles.statLineSep} />
-                          <ProfileLinearStat label="Niveau" value={`NIV. ${item.level || 1}`} />
-                          <View style={portfolioPopupStyles.statLineSep} />
-                          <ProfileLinearStat label="Startups" value={String(item.startupCount ?? 0)} />
-                          <View style={portfolioPopupStyles.statLineSep} />
-                          <ProfileLinearStat label="Rang" value={`#${rank}`} />
-                        </View>
-                      </ScrollView>
-                    </View>
-
-                    <View style={[portfolioPopupStyles.detailSwipePage, { width: PROFILE_POPUP_DETAIL_PAGE_W }]}>
-                      <Text style={portfolioPopupStyles.detailSwipeTitle}>Performance</Text>
-                      <ScrollView
-                        nestedScrollEnabled
-                        showsVerticalScrollIndicator={false}
-                        style={portfolioPopupStyles.detailVerticalScroll}
-                        contentContainerStyle={portfolioPopupStyles.detailVerticalScrollContent}
-                      >
-                        <ProfilePortfolioDetailRow
-                          icon="medal-outline"
-                          label="Ligue"
-                          value={item.rank?.trim() || '—'}
-                        />
-                        <ProfilePortfolioDetailRow
-                          icon="game-controller"
-                          label="Parties jouées"
-                          value={String(item.gamesPlayed || 0)}
-                        />
-                        <ProfilePortfolioDetailRow
-                          icon="trophy"
-                          label="Victoires"
-                          value={String(item.gamesWon || 0)}
-                        />
-                        <ProfilePortfolioDetailRow
-                          icon="star"
-                          label="Taux de victoire"
-                          value={`${item.gamesPlayed ? Math.round(((item.gamesWon || 0) / item.gamesPlayed) * 100) : 0}%`}
-                          highlight
-                        />
-                      </ScrollView>
-                    </View>
-                  </ScrollView>
-
-                  <View style={portfolioPopupStyles.detailPagerDots}>
-                    <View
-                      style={[
-                        portfolioPopupStyles.detailPagerDot,
-                        detailPageIndex === 0 && portfolioPopupStyles.detailPagerDotActive,
-                      ]}
-                    />
-                    <View
-                      style={[
-                        portfolioPopupStyles.detailPagerDot,
-                        detailPageIndex === 1 && portfolioPopupStyles.detailPagerDotActive,
-                      ]}
-                    />
-                  </View>
-                </View>
-              </>
-            ) : (
-              <>
-                <View style={portfolioPopupStyles.detailCard}>
-                  <ScrollView
-                    key={`profile-swipe-startup-${item.id}`}
-                    horizontal
-                    pagingEnabled
-                    showsHorizontalScrollIndicator={false}
-                    decelerationRate="fast"
-                    style={{ width: PROFILE_POPUP_DETAIL_PAGE_W, alignSelf: 'center' }}
-                    onMomentumScrollEnd={(e) => {
-                      const pageW = e.nativeEvent.layoutMeasurement.width;
-                      const x = e.nativeEvent.contentOffset.x;
-                      if (pageW > 0) {
-                        setDetailPageIndex(Math.round(x / pageW));
-                      }
-                    }}
-                  >
-                    <View style={[portfolioPopupStyles.detailSwipePage, { width: PROFILE_POPUP_DETAIL_PAGE_W }]}>
-                      <Text style={portfolioPopupStyles.detailSwipeTitle}>À propos</Text>
-                      <ScrollView
-                        nestedScrollEnabled
-                        showsVerticalScrollIndicator={false}
-                        style={portfolioPopupStyles.detailVerticalScroll}
-                        contentContainerStyle={portfolioPopupStyles.detailVerticalScrollContent}
-                      >
-                        <View style={portfolioPopupStyles.statsLinear}>
-                          <ProfileLinearStat label="Valorisation" value={formatScore(item)} />
-                          <View style={portfolioPopupStyles.statLineSep} />
-                          <ProfileLinearStat label="Secteur" value={item.sector || '—'} multiline />
-                        </View>
-                        <Text style={portfolioPopupStyles.detailDescriptionText}>
-                          {item.subtitle?.trim()
-                            ? item.subtitle
-                            : 'Aucune description pour cette entreprise.'}
-                        </Text>
-                      </ScrollView>
-                    </View>
-
-                    <View style={[portfolioPopupStyles.detailSwipePage, { width: PROFILE_POPUP_DETAIL_PAGE_W }]}>
-                      <Text style={portfolioPopupStyles.detailSwipeTitle}>Créateur</Text>
-                      <ScrollView
-                        nestedScrollEnabled
-                        showsVerticalScrollIndicator={false}
-                        style={portfolioPopupStyles.detailVerticalScroll}
-                        contentContainerStyle={portfolioPopupStyles.detailVerticalScrollContent}
-                      >
-                        <ProfilePortfolioDetailRow
-                          icon="person"
-                          label="Nom"
-                          value={item.creatorName?.trim() || '—'}
-                        />
-                      </ScrollView>
-                    </View>
-                  </ScrollView>
-
-                  <View style={portfolioPopupStyles.detailPagerDots}>
-                    <View
-                      style={[
-                        portfolioPopupStyles.detailPagerDot,
-                        detailPageIndex === 0 && portfolioPopupStyles.detailPagerDotActive,
-                      ]}
-                    />
-                    <View
-                      style={[
-                        portfolioPopupStyles.detailPagerDot,
-                        detailPageIndex === 1 && portfolioPopupStyles.detailPagerDotActive,
-                      ]}
-                    />
-                  </View>
-                </View>
-              </>
-            )}
-
-            <View style={portfolioPopupStyles.actionsColumn}>
-              {showFollowCta ? (
-                <GameButton
-                  title={isFollowed ? 'NE PLUS SUIVRE' : 'SUIVRE'}
-                  variant={isFollowed ? 'blue' : 'yellow'}
-                  fullWidth
-                  disabled={isGuest}
-                  onPress={onToggleFollow}
-                />
-              ) : null}
-              <GameButton title="FERMER" variant="blue" fullWidth onPress={onClose} />
-            </View>
-          </View>
-        </DynamicGradientBorder>
-      </Animated.View>
-    </Modal>
+        <View style={ppStyles.dots}>
+          {pages.map((_, i) => (
+            <View key={i} style={[ppStyles.dot, detailPageIndex === i && ppStyles.dotActive]} />
+          ))}
+        </View>
+      </View>
+    </GamePopup>
   );
 }
 
@@ -778,10 +696,10 @@ function ProfileLinearStat({
   multiline?: boolean;
 }) {
   return (
-    <View style={portfolioPopupStyles.statLine}>
-      <Text style={portfolioPopupStyles.statLineLabel}>{label}</Text>
+    <View style={ppStyles.statLine}>
+      <Text style={ppStyles.statLineLabel}>{label}</Text>
       <Text
-        style={portfolioPopupStyles.statLineValue}
+        style={ppStyles.statLineValue}
         numberOfLines={multiline ? 3 : 1}
         ellipsizeMode="tail"
       >
@@ -803,13 +721,13 @@ function ProfilePortfolioDetailRow({
   highlight?: boolean;
 }) {
   return (
-    <View style={portfolioPopupStyles.detailRow}>
-      <View style={portfolioPopupStyles.detailLeft}>
-        <Ionicons name={icon} size={16} color="#7F8E9E" />
-        <Text style={portfolioPopupStyles.detailLabel}>{label}</Text>
+    <View style={ppStyles.detailRow}>
+      <View style={ppStyles.detailLeft}>
+        <Ionicons name={icon} size={14} color="#7F8E9E" />
+        <Text style={ppStyles.detailLabel}>{label}</Text>
       </View>
       <Text
-        style={highlight ? portfolioPopupStyles.detailValueHighlight : portfolioPopupStyles.detailValue}
+        style={highlight ? ppStyles.detailValueHighlight : ppStyles.detailValue}
         numberOfLines={2}
       >
         {value}
@@ -1064,101 +982,35 @@ const styles = StyleSheet.create({
 
 });
 
-/** Styles alignés sur StartupDetailPopup (portfolio.tsx) */
-const portfolioPopupStyles = StyleSheet.create({
-  centered: {
-    width: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 18,
-  },
-  card: {
-    width: screenWidth - 36,
-    padding: SPACING[5],
+const ppStyles = StyleSheet.create({
+  // Carte swipeable
+  detailCard: {
     position: 'relative',
-  },
-  closeBtn: {
-    position: 'absolute',
-    top: SPACING[3],
-    right: SPACING[3],
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1,
-  },
-  header: {
-    alignItems: 'center',
+    borderRadius: 14,
+    overflow: 'hidden',
     marginBottom: SPACING[4],
-    marginTop: SPACING[2],
+    minHeight: 180,
   },
-  iconBadge: {
-    marginBottom: SPACING[3],
-  },
-  startupName: {
-    fontFamily: FONTS.title,
-    fontSize: 24,
-    color: COLORS.white,
-    textAlign: 'center',
-  },
-  rankSubtitle: {
-    fontFamily: FONTS.body,
-    fontSize: 11,
-    color: '#7F8E9E',
-    textAlign: 'center',
-    marginTop: SPACING[2],
-    lineHeight: 16,
-  },
-  statsLinear: {
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
-    borderRadius: 15,
-    paddingVertical: SPACING[3],
+  detailPage: {
     paddingHorizontal: SPACING[4],
+    paddingTop: SPACING[3],
+    paddingBottom: SPACING[2],
+    minHeight: 180,
   },
-  detailSwipePage: {
-    minHeight: 200,
-    maxHeight: 300,
-  },
-  detailSwipeTitle: {
+  detailPageTitle: {
     fontFamily: FONTS.title,
-    fontSize: 16,
+    fontSize: 14,
     color: COLORS.primary,
     marginBottom: SPACING[2],
     textAlign: 'center',
   },
-  detailVerticalScroll: {
-    maxHeight: 260,
+  detailScroll: {
+    maxHeight: 200,
   },
-  detailVerticalScrollContent: {
-    gap: 24,
-    paddingBottom: SPACING[2],
-  },
-  detailDescriptionText: {
-    fontFamily: FONTS.body,
-    fontSize: FONT_SIZES.base,
-    lineHeight: 22,
-    color: 'rgba(255,255,255,0.85)',
-  },
-  detailPagerDots: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: SPACING[3],
-  },
-  detailPagerDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.25)',
-  },
-  detailPagerDotActive: {
-    backgroundColor: COLORS.primary,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+
+  // Stats liste (Synthèse / À propos)
+  statsList: {
+    gap: 0,
   },
   statLine: {
     flexDirection: 'row',
@@ -1180,27 +1032,26 @@ const portfolioPopupStyles = StyleSheet.create({
     textAlign: 'right',
     flex: 1,
   },
-  statLineSep: {
+  statSep: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
-  detailCard: {
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
-    borderRadius: 15,
-    paddingVertical: 27,
-    paddingHorizontal: 20,
-    marginBottom: SPACING[5],
+
+  // Info liste (Performance / Créateur)
+  infoList: {
+    gap: 12,
+    paddingBottom: SPACING[2],
   },
   detailRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: SPACING[2],
   },
   detailLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
     flexShrink: 0,
   },
   detailLabel: {
@@ -1222,6 +1073,29 @@ const portfolioPopupStyles = StyleSheet.create({
     flex: 1,
     textAlign: 'right',
   },
+
+  // Dots pagination
+  dots: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: SPACING[2],
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+  },
+  dotActive: {
+    backgroundColor: COLORS.primary,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+
+  // Footer
   actionsColumn: {
     gap: SPACING[3],
   },

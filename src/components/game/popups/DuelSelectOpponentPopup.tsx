@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import Animated, { SlideInUp, FadeIn } from 'react-native-reanimated';
 import { Modal } from '@/components/ui/Modal';
 import { Avatar } from '@/components/ui/Avatar';
-import { PopupDuelIcon } from '@/components/game/popups/PopupIcons';
+import { DuelHeader } from '@/components/game/popups/DuelHeader';
 import { COLORS } from '@/styles/colors';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { SPACING, BORDER_RADIUS, SHADOWS } from '@/styles/spacing';
@@ -36,20 +36,13 @@ export const DuelSelectOpponentPopup = memo(function DuelSelectOpponentPopup({
       bareContent
     >
       <Animated.View entering={SlideInUp.duration(280)} style={styles.card}>
+        <DuelHeader />
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
           bounces={false}
         >
-          {/* Icône */}
-          <View style={styles.iconCircle}>
-            <PopupDuelIcon size={48} />
-          </View>
-
-          {/* Titre */}
-          <Text style={styles.title}>DUEL</Text>
-
           {/* Description */}
           <View style={styles.descriptionBox}>
             <Text style={styles.description}>
@@ -132,26 +125,10 @@ const styles = StyleSheet.create({
     flexGrow: 0,
   },
   content: {
-    paddingTop: SPACING[5],
+    paddingTop: SPACING[4],
     paddingBottom: SPACING[6],
     paddingHorizontal: SPACING[5],
     alignItems: 'center',
-  },
-  iconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(76, 175, 80, 0.12)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: SPACING[3],
-  },
-  title: {
-    fontFamily: FONTS.title,
-    fontSize: FONT_SIZES['2xl'],
-    color: COLORS.success,
-    letterSpacing: 2,
-    marginBottom: SPACING[3],
   },
   descriptionBox: {
     backgroundColor: '#F8F9FA',

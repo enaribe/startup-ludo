@@ -13,3 +13,4 @@ export {
 } from './useHaptics';
 export { useMultiplayer } from './useMultiplayer';
 export { useResponsiveLayout } from './useResponsiveLayout';
+export { useChallengeEnroll } from './useChallengeEnroll';

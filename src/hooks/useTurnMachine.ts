@@ -69,6 +69,8 @@ export interface UseTurnMachineParams {
   clearSelection: () => void;
   /** Whether the online game considers it my turn (for dice disable) */
   isMyTurnOnline?: boolean;
+  /** Appelé quand un pion passe devant son entrée finale sans assez de jetons */
+  onMissedFinalEntry?: (tokensNeeded: number) => void;
 }
 
 export interface UseTurnMachineReturn {
@@ -239,7 +241,11 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
     hapticsEnabled,
     setAnimating,
     clearSelection,
+    onMissedFinalEntry,
   } = params;
+
+  const onMissedFinalEntryRef = useRef(onMissedFinalEntry);
+  onMissedFinalEntryRef.current = onMissedFinalEntry;
 
   const { play: playSound } = useSound();
 
@@ -314,7 +320,10 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
   }, [hapticsEnabled]);
 
   const onDiceComplete = useCallback((value: number) => {
-    // Phase guard: if already past rolling, this is a no-op (fixes double-fire)
+    if (turnStateRef.current.phase !== 'rolling') {
+      console.warn('[useTurnMachine] onDiceComplete ignoré — phase:', turnStateRef.current.phase, 'value:', value);
+      return;
+    }
     console.log('[useTurnMachine] onDiceComplete → phase moving', { value });
     dispatch({ type: 'ROLL_COMPLETE', value });
 
@@ -359,6 +368,12 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
     }
 
     const move = moves[0]!;
+
+    // Avertir AVANT le mouvement si le pion va passer devant son entrée finale
+    if (move.type === 'move' && move.result.missedFinalEntry && move.result.tokensNeeded) {
+      onMissedFinalEntryRef.current?.(move.result.tokensNeeded);
+    }
+
     setAnimating(true);
     console.log('[useTurnMachine] Exécution auto du premier coup:', move.type, 'pawnIndex', move.pawnIndex);
 

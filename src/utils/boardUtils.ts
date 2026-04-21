@@ -213,6 +213,7 @@ export function getCellColor(type: EventType): string {
     quiz: '#4A90E2',
     funding: '#50C878',
     duel: '#FF6B6B',
+    event: '#FFBC40',
     opportunity: '#FFB347',
     challenge: '#9B59B6',
     safe: 'rgba(255, 255, 255, 0.1)',

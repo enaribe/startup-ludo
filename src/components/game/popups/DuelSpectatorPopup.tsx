@@ -10,7 +10,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Modal } from '@/components/ui/Modal';
 import { Avatar } from '@/components/ui/Avatar';
-import { PopupDuelIcon } from '@/components/game/popups/PopupIcons';
+import { DuelHeader, VsBadge } from '@/components/game/popups/DuelHeader';
 import { COLORS } from '@/styles/colors';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { SPACING, BORDER_RADIUS, SHADOWS } from '@/styles/spacing';
@@ -57,15 +57,8 @@ export const DuelSpectatorPopup = memo(function DuelSpectatorPopup({
       bareContent
     >
       <Animated.View entering={SlideInUp.duration(280)} style={styles.card}>
+        <DuelHeader />
         <View style={styles.content}>
-          {/* Icône */}
-          <View style={styles.iconCircle}>
-            <PopupDuelIcon size={48} />
-          </View>
-
-          {/* Titre */}
-          <Text style={styles.title}>DUEL EN COURS</Text>
-
           {/* VS Section */}
           <View style={styles.vsSection}>
             {/* Challenger */}
@@ -81,9 +74,9 @@ export const DuelSpectatorPopup = memo(function DuelSpectatorPopup({
               </Text>
             </View>
 
-            {/* VS Badge */}
-            <Animated.View style={[styles.vsBadge, vsStyle]}>
-              <Text style={styles.vsText}>VS</Text>
+            {/* VS Badge animé */}
+            <Animated.View style={vsStyle}>
+              <VsBadge />
             </Animated.View>
 
             {/* Opponent */}
@@ -123,26 +116,10 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   content: {
-    paddingTop: SPACING[5],
+    paddingTop: SPACING[4],
     paddingBottom: SPACING[6],
     paddingHorizontal: SPACING[5],
     alignItems: 'center',
-  },
-  iconCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: 'rgba(76, 175, 80, 0.12)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: SPACING[3],
-  },
-  title: {
-    fontFamily: FONTS.title,
-    fontSize: FONT_SIZES.xl,
-    color: COLORS.success,
-    letterSpacing: 1,
-    marginBottom: SPACING[4],
   },
   vsSection: {
     flexDirection: 'row',
@@ -162,21 +139,6 @@ const styles = StyleSheet.create({
     marginTop: SPACING[2],
     textAlign: 'center',
     maxWidth: 80,
-  },
-  vsBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: COLORS.success,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginHorizontal: SPACING[2],
-    ...SHADOWS.md,
-  },
-  vsText: {
-    fontFamily: FONTS.title,
-    fontSize: FONT_SIZES.base,
-    color: COLORS.white,
   },
   messageBox: {
     flexDirection: 'row',

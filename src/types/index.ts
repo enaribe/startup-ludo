@@ -55,7 +55,7 @@ export interface LegacyPlayer {
 // ===== GAME TYPES =====
 export type GameMode = 'solo' | 'local' | 'online';
 export type GameStatus = 'waiting' | 'playing' | 'paused' | 'finished';
-export type EventType = 'quiz' | 'funding' | 'duel' | 'opportunity' | 'challenge' | 'safe' | 'start' | 'finish';
+export type EventType = 'quiz' | 'funding' | 'duel' | 'opportunity' | 'challenge' | 'event' | 'safe' | 'start' | 'finish';
 
 export interface GameState {
   id: string;

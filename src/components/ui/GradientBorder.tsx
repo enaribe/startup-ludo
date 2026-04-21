@@ -64,7 +64,17 @@ interface DynamicGradientBorderProps {
   boxWidth?: number;
   borderRadius?: number;
   fill?: string;
+  borderWidth?: number;
+  gradientColors?: { offset: string; color: string; opacity: number }[];
 }
+
+const DEFAULT_GRADIENT = [
+  { offset: '0%',   color: '#9A9A9A', opacity: 0.3 },
+  { offset: '25%',  color: '#707070', opacity: 0.2 },
+  { offset: '50%',  color: '#B0B0B0', opacity: 0.35 },
+  { offset: '75%',  color: '#606060', opacity: 0.2 },
+  { offset: '100%', color: '#9A9A9A', opacity: 0.3 },
+];
 
 // Bordure gradient dynamique (hauteur auto via onLayout)
 export const DynamicGradientBorder = memo(function DynamicGradientBorder({
@@ -73,9 +83,10 @@ export const DynamicGradientBorder = memo(function DynamicGradientBorder({
   boxWidth = SCREEN_WIDTH - 36,
   borderRadius = 20,
   fill = 'transparent',
+  borderWidth: borderW = 1,
+  gradientColors = DEFAULT_GRADIENT,
 }: DynamicGradientBorderProps) {
   const [boxHeight, setBoxHeight] = useState(0);
-  const borderW = 1;
   const gradientId = `grad_${Math.random().toString(36).substr(2, 9)}`;
 
   return (
@@ -91,11 +102,9 @@ export const DynamicGradientBorder = memo(function DynamicGradientBorder({
         >
           <Defs>
             <LinearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
-              <Stop offset="0%" stopColor="#9A9A9A" stopOpacity="0.3" />
-              <Stop offset="25%" stopColor="#707070" stopOpacity="0.2" />
-              <Stop offset="50%" stopColor="#B0B0B0" stopOpacity="0.35" />
-              <Stop offset="75%" stopColor="#606060" stopOpacity="0.2" />
-              <Stop offset="100%" stopColor="#9A9A9A" stopOpacity="0.3" />
+              {gradientColors.map((s) => (
+                <Stop key={s.offset} offset={s.offset} stopColor={s.color} stopOpacity={s.opacity} />
+              ))}
             </LinearGradient>
           </Defs>
           <Rect

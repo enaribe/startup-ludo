@@ -210,55 +210,62 @@ export const PLAYER_CONFIG: Record<PlayerColor, PlayerConfig> = {
 export const SAFE_POSITIONS: number[] = [1, 12, 23, 34]; // Les départs
 
 // Types d'événements sur les cases
-export type CellEventType = 'quiz' | 'funding' | 'duel' | 'opportunity' | 'challenge' | 'safe' | 'start' | 'normal';
+export type CellEventType = 'quiz' | 'funding' | 'duel' | 'event' | 'opportunity' | 'challenge' | 'safe' | 'start' | 'normal';
 
 // Distribution des événements sur le circuit (44 cases)
-// Équilibrage : 8 quiz, 4 duels (max), 6 funding, 6 opportunity, 4 challenge, 4 start
-// Les cases non-assignées utilisent le fallback (qui favorise les quiz)
+// Règle : 4 start, 4 duel, 4 funding, le reste = quiz + opportunity en alternance
 export const CIRCUIT_EVENTS: Record<number, CellEventType> = {
-  // Cases de départ (safe) — 4 cases
+  // Cases de départ (safe) — 4 cases, une par couleur
   1: 'start',   // Yellow
   12: 'start',  // Blue
   23: 'start',  // Red
   34: 'start',  // Green
 
-  // Quiz — 8 cases (doublé pour plus de quiz)
-  2: 'quiz',
-  4: 'quiz',
-  10: 'quiz',
-  15: 'quiz',
-  21: 'quiz',
-  26: 'quiz',
-  32: 'quiz',
-  37: 'quiz',
-
-  // Funding — 6 cases
-  7: 'funding',
-  13: 'funding',
-  18: 'funding',
-  24: 'funding',
-  29: 'funding',
-  40: 'funding',
-
-  // Duel — 4 cases (max)
+  // Duel — exactement 4, répartis équitablement
   6: 'duel',
   17: 'duel',
   28: 'duel',
   39: 'duel',
 
-  // Opportunity — 6 cases
-  3: 'opportunity',
-  8: 'opportunity',
-  14: 'opportunity',
-  19: 'opportunity',
-  25: 'opportunity',
-  36: 'opportunity',
+  // Funding — exactement 4, juste après chaque duel
+  7: 'funding',
+  18: 'funding',
+  29: 'funding',
+  40: 'funding',
 
-  // Challenge — 4 cases
-  9: 'challenge',
-  20: 'challenge',
-  31: 'challenge',
-  42: 'challenge',
+  // Quiz et événement — rythme 2 quiz / 1 événement (aléatoire : opportunity ou challenge)
+  2: 'quiz',
+  3: 'quiz',
+  4: 'event',
+  5: 'quiz',
+  8: 'quiz',
+  9: 'event',
+  10: 'quiz',
+  11: 'quiz',
+  13: 'event',
+  14: 'quiz',
+  15: 'quiz',
+  16: 'event',
+  19: 'quiz',
+  20: 'quiz',
+  21: 'event',
+  22: 'quiz',
+  24: 'quiz',
+  25: 'event',
+  26: 'quiz',
+  27: 'quiz',
+  30: 'event',
+  31: 'quiz',
+  32: 'quiz',
+  33: 'event',
+  35: 'quiz',
+  36: 'quiz',
+  37: 'event',
+  38: 'quiz',
+  41: 'quiz',
+  42: 'event',
+  43: 'quiz',
+  0: 'quiz',
 };
 
 // ===== HELPERS =====
@@ -270,15 +277,8 @@ export function isSafePosition(circuitIndex: number): boolean {
   return SAFE_POSITIONS.includes(circuitIndex);
 }
 
-// Types d'événements déclenchables (hors start/normal) — utilisés pour les cases sans événement fixe.
-// Le cycle favorise les quiz et évite les duels (les 4 duels sont déjà placés dans CIRCUIT_EVENTS).
-const FALLBACK_EVENTS: CellEventType[] = [
-  'quiz',
-  'funding',
-  'quiz',
-  'opportunity',
-  'challenge',
-];
+// Fallback minimal — toutes les cases sont normalement couvertes dans CIRCUIT_EVENTS
+const FALLBACK_EVENTS: CellEventType[] = ['quiz', 'event'];
 
 /**
  * Obtient le type d'événement pour une position du circuit.

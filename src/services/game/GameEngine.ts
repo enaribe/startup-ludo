@@ -33,6 +33,10 @@ export interface MoveResult {
   capturedPawn?: { playerId: string; pawnIndex: number };
   triggeredEvent?: EventType;
   isFinished?: boolean;
+  /** Vrai si le pion vient de passer devant son entrée finale sans avoir assez de jetons */
+  missedFinalEntry?: boolean;
+  /** Jetons manquants pour pouvoir entrer (TOKENS_TO_FINISH - tokens actuels) */
+  tokensNeeded?: number;
 }
 
 export interface ValidMove {
@@ -213,12 +217,17 @@ export class GameEngine {
       ? eventType as EventType
       : undefined;
 
+    // Détecte si le pion vient de passer devant son entrée finale faute de jetons
+    const passedExit = diceValue >= stepsToExit && player.tokens < TOKENS_TO_FINISH;
+
     return {
       canMove: true,
       newState,
       path,
       capturedPawn,
       triggeredEvent,
+      missedFinalEntry: passedExit || undefined,
+      tokensNeeded: passedExit ? TOKENS_TO_FINISH - player.tokens : undefined,
     };
   }
 

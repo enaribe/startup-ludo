@@ -1,8 +1,9 @@
 import { memo, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, Dimensions } from 'react-native';
-import Animated, { SlideInUp, FadeIn } from 'react-native-reanimated';
-import { DynamicGradientBorder, Modal } from '@/components/ui';
+import Animated, { FadeIn } from 'react-native-reanimated';
+import { GamePopup, GAME_POPUP_WIDTH } from '@/components/ui/GamePopup';
 import { GameButton } from '@/components/ui/GameButton';
+import { DynamicGradientBorder } from '@/components/ui/GradientBorder';
 import { RocketIcon } from '@/components/icons';
 import { COLORS } from '@/styles/colors';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
@@ -10,9 +11,18 @@ import { SPACING, BORDER_RADIUS } from '@/styles/spacing';
 import type { Startup } from '@/types';
 import type { DefaultProject } from '@/data/defaultProjects';
 
-const { width: screenWidth, height: windowHeight } = Dimensions.get('window');
-/** Hauteur max de la liste : plus d’items visibles sans scroll (écran × ~40 %, plafonné) */
-const SCROLL_LIST_MAX_HEIGHT = Math.min(windowHeight * 0.45, 400);
+const { height: windowHeight } = Dimensions.get('window');
+/** Hauteur max de la liste : plus d'items visibles sans scroll (écran × ~40 %, plafonné) */
+const SCROLL_LIST_MAX_HEIGHT = Math.min(windowHeight * 0.38, 320);
+
+// Largeur disponible à l'intérieur du GamePopup (padding horizontal 20 × 2)
+const CARD_ROW_WIDTH = GAME_POPUP_WIDTH - 40;
+
+const SELECTED_GRADIENT = [
+  { offset: '0%',   color: '#FFBC40', opacity: 0.6 },
+  { offset: '40%',  color: '#FFD97A', opacity: 1   },
+  { offset: '100%', color: '#FFBC40', opacity: 0.6 },
+];
 
 interface StartupSelectionModalProps {
   visible: boolean;
@@ -28,46 +38,6 @@ interface StartupSelectionModalProps {
   onClose: () => void;
 }
 
-// Texte avec contour (stroke) simulé par empilement de Text décalés
-const OutlinedText = memo(function OutlinedText({
-  text,
-  style,
-  outlineColor,
-  outlineWidth = 2,
-}: {
-  text: string;
-  style: object;
-  outlineColor: string;
-  outlineWidth?: number;
-}) {
-  const offsets = [
-    { x: -outlineWidth, y: -outlineWidth },
-    { x: 0, y: -outlineWidth },
-    { x: outlineWidth, y: -outlineWidth },
-    { x: outlineWidth, y: 0 },
-    { x: outlineWidth, y: outlineWidth },
-    { x: 0, y: outlineWidth },
-    { x: -outlineWidth, y: outlineWidth },
-    { x: -outlineWidth, y: 0 },
-  ];
-  return (
-    <View>
-      {offsets.map((offset, i) => (
-        <Text
-          key={i}
-          style={[style, { color: outlineColor, position: 'absolute', left: offset.x, top: offset.y }]}
-          numberOfLines={1}
-        >
-          {text}
-        </Text>
-      ))}
-      <Text style={[style, { color: '#FFFFFF' }]} numberOfLines={1}>
-        {text}
-      </Text>
-    </View>
-  );
-});
-
 export const StartupSelectionModal = memo(function StartupSelectionModal({
   visible,
   userStartups,
@@ -81,7 +51,6 @@ export const StartupSelectionModal = memo(function StartupSelectionModal({
   const handleConfirm = () => {
     if (!selectedId) return;
 
-    // Check user startups first
     const userStartup = userStartups.find((s) => s.id === selectedId);
     if (userStartup) {
       onSelect(userStartup.id, userStartup.name, false, userStartup.sector);
@@ -89,7 +58,6 @@ export const StartupSelectionModal = memo(function StartupSelectionModal({
       return;
     }
 
-    // Then default projects
     const defaultProject = defaultProjects.find((p) => p.id === selectedId);
     if (defaultProject) {
       onSelect(defaultProject.id, defaultProject.name, true, defaultProject.sector);
@@ -103,54 +71,48 @@ export const StartupSelectionModal = memo(function StartupSelectionModal({
   };
 
   return (
-    <>
-      <Modal visible={visible} onClose={handleClose} closeOnBackdrop showCloseButton={false} bareContent>
-        <Animated.View entering={SlideInUp.duration(280)} style={styles.card}>
-          <DynamicGradientBorder
-            borderRadius={24}
-            fill="#0A1929"
-            boxWidth={screenWidth - 36}
-          >
-            <View style={styles.inner}>
-              {/* Header Title */}
-              <View style={styles.header}>
-                <OutlinedText
-                  text="CHOISISSEZ VOTRE STARTUP"
-                  style={styles.title}
-                  outlineColor="#1F91D0"
-                  outlineWidth={1.5}
-                />
-                {playerName && (
-                  <Text style={styles.subtitle} numberOfLines={1}>
-                    {playerName}
-                  </Text>
-                )}
-              </View>
-
-              <ScrollView
-                style={styles.scrollView}
-                contentContainerStyle={styles.content}
-                showsVerticalScrollIndicator={false}
-              >
-          {/* User's own startups */}
-          {userStartups.length > 0 ? (
-            <View style={styles.section}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScrollContent}>
-                {userStartups.map((startup, index) => (
-                  <Animated.View key={startup.id} entering={FadeIn.delay(index * 80)}>
-                    <Pressable
-                      onPress={() => setSelectedId(startup.id)}
-                      style={styles.cardWrapper}
+    <GamePopup
+      visible={visible}
+      onRequestClose={handleClose}
+      header={playerName ?? undefined}
+      title="CHOISISSEZ VOTRE STARTUP"
+      footer={
+        <GameButton
+          title="CONFIRMER"
+          onPress={handleConfirm}
+          variant="yellow"
+          fullWidth
+          disabled={!selectedId}
+        />
+      }
+    >
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Startups de l'utilisateur */}
+        {userStartups.length > 0 && (
+          <View style={styles.section}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalScrollContent}
+            >
+              {userStartups.map((startup, index) => (
+                <Animated.View key={startup.id} entering={FadeIn.delay(index * 80)}>
+                  <Pressable onPress={() => setSelectedId(startup.id)}>
+                    <DynamicGradientBorder
+                      borderRadius={BORDER_RADIUS.xl}
+                      fill="rgba(0,0,0,0.35)"
+                      boxWidth={130}
+                      borderWidth={selectedId === startup.id ? 1.5 : 1}
+                      gradientColors={selectedId === startup.id ? SELECTED_GRADIENT : undefined}
                     >
-                      <View
-                        style={[
-                          styles.projectCardSquare,
-                          selectedId === startup.id && styles.projectCardSquareSelected,
-                        ]}
-                      >
+                      <View style={styles.projectCardSquare}>
                         <View style={styles.projectIconWrapSquare}>
                           <RocketIcon
-                            color={selectedId === startup.id ? COLORS.primary : '#7F8E9E'}
+                            color={selectedId === startup.id ? COLORS.primary : '#1F91D0'}
                             size={42}
                             withShadow={false}
                           />
@@ -168,49 +130,48 @@ export const StartupSelectionModal = memo(function StartupSelectionModal({
                           {startup.sector}
                         </Text>
                       </View>
-                    </Pressable>
-                  </Animated.View>
-                ))}
-              </ScrollView>
-            </View>
-          ) : null}
+                    </DynamicGradientBorder>
+                  </Pressable>
+                </Animated.View>
+              ))}
+            </ScrollView>
+          </View>
+        )}
 
-          {/* Default projects */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionLabel}>
-                Startup par défaut
-              </Text>
-              <View style={styles.sectionLabelLine} />
-            </View>
-            {defaultProjects.map((project, index) => (
-              <Animated.View
-                key={project.id}
-                entering={FadeIn.delay((userStartups.length + index) * 80)}
-              >
-                <Pressable
-                  onPress={() => setSelectedId(project.id)}
-                  style={styles.cardWrapper}
+        {/* Projets par défaut */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionLabel}>Startup par défaut</Text>
+            <View style={styles.sectionLabelLine} />
+          </View>
+          {defaultProjects.map((project, index) => (
+            <Animated.View
+              key={project.id}
+              entering={FadeIn.delay((userStartups.length + index) * 80)}
+              style={styles.cardWrapper}
+            >
+              <Pressable onPress={() => setSelectedId(project.id)}>
+                <DynamicGradientBorder
+                  borderRadius={BORDER_RADIUS.lg}
+                  fill="rgba(0,0,0,0.35)"
+                  boxWidth={CARD_ROW_WIDTH}
+                  borderWidth={selectedId === project.id ? 1.5 : 1}
+                  gradientColors={selectedId === project.id ? SELECTED_GRADIENT : undefined}
                 >
-                  <View
-                    style={[
-                      styles.projectCardRow,
-                      selectedId === project.id && styles.projectCardRowSelected,
-                    ]}
-                  >
+                  <View style={styles.projectCardRow}>
                     <View style={styles.projectIconWrapRow}>
-                      <RocketIcon 
-                        color={selectedId === project.id ? COLORS.primary : "#7F8E9E"} 
-                        size={32} 
-                        withShadow={false} 
+                      <RocketIcon
+                        color={selectedId === project.id ? COLORS.primary : '#1F91D0'}
+                        size={32}
+                        withShadow={false}
                       />
                     </View>
                     <View style={styles.projectInfoRow}>
-                      <Text 
+                      <Text
                         style={[
                           styles.projectNameRow,
-                          selectedId === project.id && styles.projectNameRowSelected
-                        ]} 
+                          selectedId === project.id && styles.projectNameRowSelected,
+                        ]}
                         numberOfLines={1}
                       >
                         {project.name}
@@ -220,78 +181,21 @@ export const StartupSelectionModal = memo(function StartupSelectionModal({
                       </Text>
                     </View>
                   </View>
-                </Pressable>
-              </Animated.View>
-            ))}
-          </View>
-              </ScrollView>
-
-              {/* Confirm button */}
-              <View style={styles.buttonWrapper}>
-                <GameButton
-                  title="CONFIRMER"
-                  onPress={handleConfirm}
-                  variant="yellow"
-                  fullWidth
-                  disabled={!selectedId}
-                />
-              </View>
-            </View>
-          </DynamicGradientBorder>
-        </Animated.View>
-      </Modal>
-    </>
+                </DynamicGradientBorder>
+              </Pressable>
+            </Animated.View>
+          ))}
+        </View>
+      </ScrollView>
+    </GamePopup>
   );
 });
 
 const styles = StyleSheet.create({
-  /** Modal plus compacte pour limiter le scroll */
-  card: {
-    width: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 18,
-  },
-  inner: {
-    width: screenWidth - 36,
-    padding: SPACING[5],
-    position: 'relative',
-  },
-  closeButton: {
-    position: 'absolute',
-    top: SPACING[3],
-    right: SPACING[3],
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    zIndex: 10,
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: SPACING[4],
-    marginTop: SPACING[2],
-  },
-  title: {
-    fontFamily: FONTS.title,
-    fontSize: 22,
-    color: '#FFFFFF',
-    letterSpacing: 1,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontFamily: FONTS.bodyMedium,
-    fontSize: FONT_SIZES.sm,
-    color: 'rgba(255, 255, 255, 0.7)',
-    textAlign: 'center',
-    marginTop: SPACING[1],
-    paddingHorizontal: SPACING[2],
-  },
   scrollView: {
     flexGrow: 0,
     maxHeight: SCROLL_LIST_MAX_HEIGHT,
+    width: '100%',
   },
   content: {
     paddingBottom: SPACING[2],
@@ -319,24 +223,18 @@ const styles = StyleSheet.create({
   horizontalScrollContent: {
     gap: SPACING[3],
     paddingBottom: SPACING[2],
+    justifyContent: 'center',
+    flexGrow: 1,
   },
   cardWrapper: {
     marginBottom: SPACING[2],
   },
   projectCardSquare: {
-    width: 140,
-    height: 140,
+    width: 130,
+    height: 130,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
     padding: SPACING[3],
-  },
-  projectCardSquareSelected: {
-    borderColor: COLORS.primary,
-    backgroundColor: 'rgba(255, 188, 64, 0.05)',
   },
   projectIconWrapSquare: {
     marginBottom: SPACING[2],
@@ -344,7 +242,7 @@ const styles = StyleSheet.create({
   projectNameSquare: {
     fontFamily: FONTS.title,
     fontSize: FONT_SIZES.xs,
-    color: '#7F8E9E',
+    color: '#1F91D0',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     textAlign: 'center',
@@ -362,16 +260,9 @@ const styles = StyleSheet.create({
   projectCardRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-    borderRadius: BORDER_RADIUS.lg,
+    width: CARD_ROW_WIDTH,
     paddingVertical: SPACING[3],
     paddingHorizontal: SPACING[4],
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
-  },
-  projectCardRowSelected: {
-    borderColor: COLORS.primary,
-    backgroundColor: 'rgba(255, 188, 64, 0.05)',
   },
   projectIconWrapRow: {
     marginRight: SPACING[4],
@@ -382,20 +273,17 @@ const styles = StyleSheet.create({
   projectNameRow: {
     fontFamily: FONTS.title,
     fontSize: FONT_SIZES.sm,
-    color: '#7F8E9E',
+    color: '#1F91D0',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 4,
   },
   projectNameRowSelected: {
-    color: '#FFFFFF',
+    color: COLORS.primary,
   },
   projectSectorRow: {
     fontFamily: FONTS.body,
     fontSize: 11,
     color: 'rgba(255, 255, 255, 0.5)',
-  },
-  buttonWrapper: {
-    paddingTop: SPACING[3],
   },
 });

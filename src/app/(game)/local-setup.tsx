@@ -26,6 +26,14 @@ import type { PlayerColor } from '@/types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CONTENT_WIDTH = SCREEN_WIDTH - 36;
+// padding modePanel=12, gap modeRow=12 → chaque pill = (CONTENT_WIDTH - 24 - 12) / 2
+const MODE_PILL_WIDTH = (CONTENT_WIDTH - 24 - 12) / 2;
+
+const YELLOW_GRADIENT = [
+  { offset: '0%',   color: '#FFBC40', opacity: 0.6 },
+  { offset: '40%',  color: '#FFD97A', opacity: 1 },
+  { offset: '100%', color: '#FFBC40', opacity: 0.6 },
+];
 const EDITION_TILE_GAP = 12;
 const EDITION_TILE_WIDTH = (CONTENT_WIDTH - EDITION_TILE_GAP) / 2;
 const IDEATION_GRID_GAP = 12;
@@ -507,36 +515,54 @@ export default function LocalSetupScreen() {
                 style={styles.modePanel}
               >
                 <View style={styles.modeRow}>
-                  <Pressable
-                    style={[styles.modePill, gameMode === 'solo' && styles.modePillSelected]}
-                    onPress={() => handleModeChange('solo')}
+                  <DynamicGradientBorder
+                    borderRadius={14}
+                    fill="transparent"
+                    boxWidth={MODE_PILL_WIDTH}
+                    borderWidth={gameMode === 'solo' ? 1.5 : 0}
+                    gradientColors={gameMode === 'solo' ? YELLOW_GRADIENT : undefined}
+                    style={styles.modePillBorder}
                   >
-                    <View style={[styles.modePillIconBox, gameMode === 'solo' && styles.modePillIconBoxActive]}>
-                      <Ionicons
-                        name="game-controller"
-                        size={20}
-                        color={gameMode === 'solo' ? '#FFBC40' : 'rgba(255,255,255,0.5)'}
-                      />
-                    </View>
-                    <Text style={[styles.modePillText, gameMode === 'solo' && styles.modePillTextSelected]}>
-                      SOLO VS IA
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    style={[styles.modePill, gameMode === 'local' && styles.modePillSelected]}
-                    onPress={() => handleModeChange('local')}
+                    <Pressable
+                      style={[styles.modePill, gameMode === 'solo' && styles.modePillSelected]}
+                      onPress={() => handleModeChange('solo')}
+                    >
+                      <View style={[styles.modePillIconBox, gameMode === 'solo' && styles.modePillIconBoxActive]}>
+                        <Ionicons
+                          name="game-controller"
+                          size={20}
+                          color={gameMode === 'solo' ? '#FFBC40' : 'rgba(255,255,255,0.5)'}
+                        />
+                      </View>
+                      <Text style={[styles.modePillText, gameMode === 'solo' && styles.modePillTextSelected]}>
+                        SOLO VS IA
+                      </Text>
+                    </Pressable>
+                  </DynamicGradientBorder>
+                  <DynamicGradientBorder
+                    borderRadius={14}
+                    fill="transparent"
+                    boxWidth={MODE_PILL_WIDTH}
+                    borderWidth={gameMode === 'local' ? 1.5 : 0}
+                    gradientColors={gameMode === 'local' ? YELLOW_GRADIENT : undefined}
+                    style={styles.modePillBorder}
                   >
-                    <View style={[styles.modePillIconBox, gameMode === 'local' && styles.modePillIconBoxActive]}>
-                      <Ionicons
-                        name="people"
-                        size={20}
-                        color={gameMode === 'local' ? '#FFBC40' : 'rgba(255,255,255,0.5)'}
-                      />
-                    </View>
-                    <Text style={[styles.modePillText, gameMode === 'local' && styles.modePillTextSelected]}>
-                      TOUR PAR TOUR
-                    </Text>
-                  </Pressable>
+                    <Pressable
+                      style={[styles.modePill, gameMode === 'local' && styles.modePillSelected]}
+                      onPress={() => handleModeChange('local')}
+                    >
+                      <View style={[styles.modePillIconBox, gameMode === 'local' && styles.modePillIconBoxActive]}>
+                        <Ionicons
+                          name="people"
+                          size={20}
+                          color={gameMode === 'local' ? '#FFBC40' : 'rgba(255,255,255,0.5)'}
+                        />
+                      </View>
+                      <Text style={[styles.modePillText, gameMode === 'local' && styles.modePillTextSelected]}>
+                        TOUR PAR TOUR
+                      </Text>
+                    </Pressable>
+                  </DynamicGradientBorder>
                 </View>
               </DynamicGradientBorder>
             </Animated.View>
@@ -596,7 +622,7 @@ export default function LocalSetupScreen() {
                     >
                       <DynamicGradientBorder
                         borderRadius={14}
-                        fill="rgba(0, 0, 0, 0.35)"
+                        fill="transparent"
                         boxWidth={CONTENT_WIDTH - 24}
                         style={styles.playerCardWrapper}
                       >
@@ -1095,6 +1121,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
   },
+  modePillBorder: {
+    flex: 1,
+  },
   modePill: {
     flex: 1,
     paddingVertical: 12,
@@ -1102,15 +1131,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 2,
-    borderColor: 'transparent',
     gap: 8,
   },
-  modePillSelected: {
-    borderColor: '#FFBC40',
-    backgroundColor: 'rgba(255, 188, 64, 0.1)',
-  },
+  modePillSelected: {},
   modePillIconBox: {
     width: 36,
     height: 36,
@@ -1153,7 +1176,6 @@ const styles = StyleSheet.create({
   nombreJoueursControl: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.35)',
     borderRadius: 24,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',

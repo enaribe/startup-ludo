@@ -9,7 +9,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { Modal } from '@/components/ui/Modal';
-import { PopupDuelIcon } from '@/components/game/popups/PopupIcons';
+import { DuelHeader } from '@/components/game/popups/DuelHeader';
 import { COLORS } from '@/styles/colors';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { SPACING, BORDER_RADIUS, SHADOWS } from '@/styles/spacing';
@@ -135,13 +135,8 @@ export const DuelQuestionPopup = memo(function DuelQuestionPopup({
       bareContent
     >
       <Animated.View entering={SlideInUp.duration(280)} style={styles.card}>
+        <DuelHeader />
         <View style={styles.content}>
-          {/* Header */}
-          <View style={styles.header}>
-            <PopupDuelIcon size={32} />
-            <Text style={styles.title}>DUEL</Text>
-          </View>
-
           {/* Progress */}
           <View style={styles.progressSection}>
             <Text style={styles.progressText}>{currentIndex + 1}/{questions.length}</Text>
@@ -159,6 +154,12 @@ export const DuelQuestionPopup = memo(function DuelQuestionPopup({
           <View style={styles.options}>
             {shuffledOptions.map((option, index) => {
               const isSelected = selectedAnswer === index;
+              const pts = option.points ?? 0;
+              const selectedColor = pts === 0
+                ? COLORS.error
+                : pts <= 15
+                  ? COLORS.warning
+                  : COLORS.success;
 
               return (
                 <Animated.View
@@ -174,7 +175,7 @@ export const DuelQuestionPopup = memo(function DuelQuestionPopup({
                         style={[
                           styles.optionPill,
                           pressed && !selectedAnswer && styles.optionPillPressed,
-                          isSelected && styles.optionPillSelected,
+                          isSelected && { backgroundColor: selectedColor, borderColor: selectedColor },
                         ]}
                       >
                         <Text
@@ -182,10 +183,17 @@ export const DuelQuestionPopup = memo(function DuelQuestionPopup({
                             styles.optionText,
                             isSelected && styles.optionTextSelected,
                           ]}
-                          numberOfLines={2}
+                          adjustsFontSizeToFit
+                          minimumFontScale={0.6}
+                          numberOfLines={3}
                         >
                           {option.text}
                         </Text>
+                        {isSelected && (
+                          <View style={[styles.pointsBadge, { backgroundColor: 'rgba(255,255,255,0.25)' }]}>
+                            <Text style={[styles.pointsText, { color: COLORS.white }]}>+{pts} pts</Text>
+                          </View>
+                        )}
                       </View>
                     )}
                   </Pressable>
@@ -215,22 +223,10 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   content: {
-    paddingTop: SPACING[5],
+    paddingTop: SPACING[4],
     paddingBottom: SPACING[6],
     paddingHorizontal: SPACING[5],
     alignItems: 'center',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING[2],
-    marginBottom: SPACING[3],
-  },
-  title: {
-    fontFamily: FONTS.title,
-    fontSize: FONT_SIZES['2xl'],
-    color: COLORS.success,
-    letterSpacing: 2,
   },
   progressSection: {
     width: '100%',
@@ -282,7 +278,7 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.xl,
     paddingVertical: SPACING[4],
     paddingHorizontal: SPACING[4],
-    minHeight: 60,
+    minHeight: 52,
     borderWidth: 2,
     borderColor: 'transparent',
     ...SHADOWS.sm,

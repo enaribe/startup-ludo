@@ -7,7 +7,7 @@ import Animated, { FadeInDown, FadeOut, SlideInUp } from 'react-native-reanimate
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LocalModeIcon, OnlineModeIcon } from '@/components/game/ModeSelectionIcons';
-import { DynamicGradientBorder, GameButton, RadialBackground } from '@/components/ui';
+import { DynamicGradientBorder, GameButton, ProgressionPopup, RadialBackground } from '@/components/ui';
 import { useAuthStore, useSettingsStore, useUserStore } from '@/stores';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
@@ -25,7 +25,10 @@ const THEME = {
 export default function GameModeSelectionScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { challenge } = useLocalSearchParams<{ challenge?: string }>();
+  const { challenge, showProgression: showProgressionParam, xpGained: xpGainedParam, valorisationGain: valorisationGainParam } =
+    useLocalSearchParams<{ challenge?: string; showProgression?: string; xpGained?: string; valorisationGain?: string }>();
+  const progressionXpGained = xpGainedParam ? parseInt(xpGainedParam, 10) : undefined;
+  const progressionValorisationGain = valorisationGainParam ? parseInt(valorisationGainParam, 10) : undefined;
   const user = useAuthStore((state) => state.user);
   const profile = useUserStore((state) => state.profile);
 
@@ -35,6 +38,11 @@ export default function GameModeSelectionScreen() {
 
   const [showNoProjectPopup, setShowNoProjectPopup] = useState(false);
   const [showGuestPopup, setShowGuestPopup] = useState(false);
+  const [showProgression, setShowProgression] = useState(false);
+
+  useEffect(() => {
+    if (showProgressionParam === '1') setShowProgression(true);
+  }, [showProgressionParam]);
 
   useEffect(() => {
     if (showGuestPopup && hapticsEnabled) {
@@ -310,6 +318,14 @@ export default function GameModeSelectionScreen() {
           </Animated.View>
         </View>
       </Modal>
+
+      {/* Popup progression post-partie */}
+      <ProgressionPopup
+        visible={showProgression}
+        onContinue={() => setShowProgression(false)}
+        xpGained={progressionXpGained}
+        valorisationGain={progressionValorisationGain}
+      />
 
     </View>
   );
