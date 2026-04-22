@@ -101,7 +101,7 @@ export default function CompleteProfileScreen() {
       <RadialBackground centerColor="#0F3A6B" edgeColor="#081A2A" />
 
       {/* Shape (rayons) en arrière-plan */}
-      <View style={styles.shapeContainer}>
+      <View style={styles.shapeContainer} pointerEvents="none">
         <Image
           source={shapeImage}
           style={styles.shapeImage}
@@ -114,7 +114,7 @@ export default function CompleteProfileScreen() {
 
       <KeyboardAvoidingView
         style={styles.keyboardView}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
           contentContainerStyle={[

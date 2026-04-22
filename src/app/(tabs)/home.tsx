@@ -141,9 +141,7 @@ export default function HomeScreen() {
   const getEnrollmentForChallenge = useChallengeStore((s) => s.getEnrollmentForChallenge);
 
   const [showInfo, setShowInfo] = useState(false);
-  const { visible: showOnboardingHook, complete: completeOnboarding } = useOnboarding();
-  const [forceOnboarding, setForceOnboarding] = useState(false);
-  const showOnboarding = showOnboardingHook || forceOnboarding;
+  const { visible: showOnboarding, complete: completeOnboarding } = useOnboarding();
   const { visible: showStartupPrompt, dismiss: dismissStartupPrompt } = useStartupCreationPrompt();
   const { visible: showReturnBonus, claim: claimReturnBonus, dismiss: dismissReturnBonus } = useReturnBonus();
   const [challengesLoaded, setChallengesLoaded] = useState(false);
@@ -475,20 +473,10 @@ export default function HomeScreen() {
         onClose={handleFormClose}
       />
 
-      {/* DEV: bouton test onboarding (comptes enregistrés uniquement) */}
-      {!isGuest && (
-        <Pressable
-          style={{ position: 'absolute', top: 120, right: 16, backgroundColor: 'rgba(255,0,0,0.85)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, zIndex: 9999 }}
-          onPress={() => setForceOnboarding(true)}
-        >
-          <Text style={{ color: '#fff', fontSize: 11, fontWeight: 'bold' }}>TEST ONBOARDING</Text>
-        </Pressable>
-      )}
-
       {/* Onboarding (première connexion uniquement) */}
       <OnboardingModal
         visible={showOnboarding}
-        onComplete={() => { completeOnboarding(); setForceOnboarding(false); }}
+        onComplete={completeOnboarding}
       />
 
       {/* Popup bonus reconnexion */}

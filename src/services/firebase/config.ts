@@ -36,6 +36,8 @@ export const REALTIME_PATHS = {
   presence: 'presence',
   userPresence: (userId: string) => `presence/${userId}`,
   matchmaking: 'matchmaking',
+  matchmakingQueue: 'matchmaking/queue',
+  matchmakingTicket: (ticketId: string) => `matchmaking/queue/${ticketId}`,
 } as const;
 
 // Firestore collections
@@ -206,6 +208,33 @@ export interface RealtimePresence {
   online: boolean;
   lastSeen: number;
   currentRoom: string | null;
+}
+
+// ===== MATCHMAKING =====
+
+/** Status d'un ticket dans la file d'attente match rapide */
+export type MatchmakingStatus = 'waiting' | 'matching' | 'matched' | 'cancelled';
+
+/**
+ * Ticket de match rapide dans la file d'attente.
+ * Déposé par chaque joueur qui lance une recherche.
+ * Supprimé via onDisconnect() si le joueur ferme l'app.
+ */
+export interface MatchmakingTicket {
+  id: string;
+  userId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  maxPlayers: 2 | 3 | 4;
+  startupId: string;
+  startupName: string;
+  isDefaultProject: boolean;
+  sector: string;
+  edition: string;
+  createdAt: number;
+  status: MatchmakingStatus;
+  /** Rempli quand le ticket est matché : ID de la room à rejoindre */
+  roomId: string | null;
 }
 
 // ===== EMOJI REACTIONS =====

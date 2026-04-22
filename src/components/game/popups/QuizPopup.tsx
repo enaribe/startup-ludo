@@ -5,6 +5,7 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
   SlideInUp,
+  FadeInDown,
   interpolateColor,
 } from 'react-native-reanimated';
 import { Path, LinearGradient, RadialGradient, Stop, G, Rect, Mask } from 'react-native-svg';
@@ -12,12 +13,14 @@ import { PopupHeader } from './PopupHeader';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Modal } from '@/components/ui/Modal';
+import { GameButton } from '@/components/ui/GameButton';
 import { COLORS } from '@/styles/colors';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { SPACING, BORDER_RADIUS, SHADOWS } from '@/styles/spacing';
 import { useSettingsStore } from '@/stores';
 import { useSound, usePlaySoundOnOpen } from '@/hooks/useSound';
 import type { QuizEvent } from '@/types';
+import { crashLog } from '@/utils/gameLog';
 
 // ─── Defs propres à l'icône Quiz ────────────────────────────────────────────
 
@@ -89,6 +92,8 @@ interface QuizPopupProps {
   onClose: () => void;
   isSpectator?: boolean;
   spectatorResult?: { ok: boolean; reward: number; selectedIndex?: number };
+  /** En mode spectateur (IA joue), callback pour fermer manuellement le popup */
+  onSpectatorClose?: () => void;
 }
 
 
@@ -99,6 +104,7 @@ export const QuizPopup = memo(function QuizPopup({
   onClose,
   isSpectator = false,
   spectatorResult,
+  onSpectatorClose,
 }: QuizPopupProps) {
   const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
   const { play: playSound } = useSound();
@@ -111,6 +117,13 @@ export const QuizPopup = memo(function QuizPopup({
   const timerProgress = useSharedValue(1);
   const resultScale = useSharedValue(0);
   const badgeBounce = useSharedValue(0);
+
+  useEffect(() => {
+    crashLog('QuizPopup mount/update', { visible, hasQuiz: !!quiz });
+    return () => {
+      crashLog('QuizPopup unmount');
+    };
+  }, [visible, quiz]);
 
   useEffect(() => {
     if (visible && quiz) {
@@ -362,6 +375,13 @@ export const QuizPopup = memo(function QuizPopup({
               </View>
             </Animated.View>
           ) : null}
+
+          {/* Bouton FERMER en mode spectateur — apparaît après la réponse de l'IA */}
+          {isSpectator && hasAnswered && onSpectatorClose && (
+            <Animated.View entering={FadeInDown.duration(220)} style={styles.spectatorCloseWrap}>
+              <GameButton title="FERMER" onPress={onSpectatorClose} variant="blue" fullWidth />
+            </Animated.View>
+          )}
         </ScrollView>
       </Animated.View>
     </Modal>
@@ -572,6 +592,11 @@ const styles = StyleSheet.create({
   explanationWrap: {
     width: '100%',
     marginTop: SPACING[3],
+  },
+  spectatorCloseWrap: {
+    width: '100%',
+    marginTop: SPACING[4],
+    paddingHorizontal: SPACING[2],
   },
   explanationBox: {
     backgroundColor: '#FFF8E1',

@@ -3,7 +3,7 @@
  * Utilise GradientBorder pour les bordures subtiles du design system
  */
 
-import { memo, useState, useCallback } from 'react';
+import { memo, useState, useCallback, useRef } from 'react';
 import {
   View,
   TextInput,
@@ -33,12 +33,14 @@ export const AuthInput = memo(function AuthInput({
   secureTextEntry,
   ...props
 }: AuthInputProps) {
+  const inputRef = useRef<TextInput>(null);
   const [isFocused, setIsFocused] = useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
 
   const handleFocus = useCallback(() => setIsFocused(true), []);
   const handleBlur = useCallback(() => setIsFocused(false), []);
   const togglePassword = useCallback(() => setIsPasswordVisible(v => !v), []);
+  const focusInput = useCallback(() => inputRef.current?.focus(), []);
 
   const showPassword = secureTextEntry && !isPasswordVisible;
 
@@ -52,7 +54,7 @@ export const AuthInput = memo(function AuthInput({
         borderRadius={26}
         fill={isFocused ? 'rgba(255, 188, 64, 0.08)' : 'rgba(0, 0, 0, 0.2)'}
       >
-        <View style={styles.inputWrapper}>
+        <Pressable style={styles.inputWrapper} onPress={focusInput}>
           {leftIcon && (
             <Ionicons
               name={leftIcon}
@@ -63,6 +65,7 @@ export const AuthInput = memo(function AuthInput({
           )}
 
           <TextInput
+            ref={inputRef}
             style={styles.input}
             placeholderTextColor="rgba(255, 255, 255, 0.4)"
             onFocus={handleFocus}
@@ -80,7 +83,7 @@ export const AuthInput = memo(function AuthInput({
               />
             </Pressable>
           )}
-        </View>
+        </Pressable>
       </GradientBorder>
 
       {error && <Text style={styles.error}>{error}</Text>}

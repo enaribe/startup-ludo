@@ -20,6 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import type { PlayerColor } from '@/types';
 import { COLORS } from '@/styles/colors';
 import { useSound } from '@/hooks/useSound';
+import { gameLog, gameWarn, gameError } from '@/utils/gameLog';
 
 interface PawnProps {
   color: PlayerColor;
@@ -68,7 +69,7 @@ export const Pawn = memo(function Pawn({
 
   // Callback stable pour éviter les re-renders
   const handleAnimationComplete = useCallback(() => {
-    console.log(`[Pawn ${pawnIndex}] Animation complete`);
+    gameLog('pawn', `${pawnIndex} Animation complete`);
     onAnimationComplete?.();
   }, [onAnimationComplete, pawnIndex]);
 
@@ -78,7 +79,7 @@ export const Pawn = memo(function Pawn({
     const newY = targetY - pawnSize / 2;
     const targetKey = `${targetX},${targetY}`;
 
-    console.log(`[Pawn ${pawnIndex}] useEffect triggered`, {
+    gameLog('pawn', `${pawnIndex} useEffect`, {
       targetX,
       targetY,
       newX,
@@ -91,7 +92,7 @@ export const Pawn = memo(function Pawn({
 
     // Premier rendu : positionnement direct sans animation
     if (isFirstRender.current) {
-      console.log(`[Pawn ${pawnIndex}] First render - direct positioning`);
+      gameLog('pawn', `${pawnIndex} First render - direct positioning`);
       translateX.value = newX;
       translateY.value = newY;
       isFirstRender.current = false;
@@ -101,7 +102,7 @@ export const Pawn = memo(function Pawn({
 
     // Si la cible n'a pas changé, ne rien faire
     if (targetKey === lastTargetRef.current) {
-      console.log(`[Pawn ${pawnIndex}] Target unchanged, skipping animation`);
+      gameLog('pawn', `${pawnIndex} Target unchanged, skipping`);
       return;
     }
 
@@ -115,11 +116,11 @@ export const Pawn = memo(function Pawn({
       cancelAnimation(translateY);
       cancelAnimation(bounce);
     } catch (e) {
-      console.warn(`[Pawn ${pawnIndex}] cancelAnimation error:`, e);
+      gameWarn('pawn', `${pawnIndex} cancelAnimation error:`, e);
     }
 
     // Animation simple et robuste : spring direct vers la cible
-    console.log(`[Pawn ${pawnIndex}] Starting spring animation to (${newX}, ${newY})`);
+    gameLog('pawn', `${pawnIndex} Starting spring to`, { newX, newY });
     
     try {
       translateX.value = withSpring(newX, { 
@@ -145,7 +146,7 @@ export const Pawn = memo(function Pawn({
         withTiming(0, { duration: 180, easing: Easing.inOut(Easing.quad) })
       );
     } catch (error) {
-      console.error(`[Pawn ${pawnIndex}] Animation error:`, error);
+      gameError('pawn', `${pawnIndex} Animation error:`, error);
       // Fallback : positionnement direct
       translateX.value = newX;
       translateY.value = newY;

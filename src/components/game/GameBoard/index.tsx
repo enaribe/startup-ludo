@@ -27,6 +27,7 @@ import { CenterZone } from './CenterZone';
 import { HomeZone } from './HomeZone';
 import { PathCell } from './PathCell';
 import { Pawn } from './Pawn';
+import { gameLog, gameWarn, gameError } from '@/utils/gameLog';
 
 interface GameBoardProps {
   players: Player[];
@@ -57,22 +58,21 @@ export const GameBoard = memo(function GameBoard({
   // Convertir le chemin du dernier mouvement en pixels
   const movePathPixels = useMemo(() => {
     if (!lastMoveResult?.path?.length) {
-      console.log('[GameBoard] No move path to convert');
+      gameLog('board', 'No move path');
       return null;
     }
-    
-    console.log('[GameBoard] Converting move path:', {
+
+    gameLog('board', 'Converting move path', {
       pathLength: lastMoveResult.path.length,
-      path: lastMoveResult.path,
     });
-    
+
     // Filtrer les coordonnées invalides
     const validPath = lastMoveResult.path.filter(
       (coord) => coord && typeof coord.col === 'number' && typeof coord.row === 'number'
     );
-    
+
     if (validPath.length !== lastMoveResult.path.length) {
-      console.warn('[GameBoard] Some coords in path were invalid!', {
+      gameWarn('board', 'Invalid coords filtered', {
         original: lastMoveResult.path.length,
         valid: validPath.length,
       });
@@ -128,8 +128,8 @@ export const GameBoard = memo(function GameBoard({
 
   // Positions des pions
   const pawnPositions = useMemo(() => {
-    console.log('[GameBoard] Calculating pawn positions...');
-    
+    gameLog('board', 'Calculating pawn positions');
+
     const positions: {
       playerId: string;
       playerColor: PlayerColor;
@@ -144,19 +144,19 @@ export const GameBoard = memo(function GameBoard({
       player.pawns.forEach((pawn, index) => {
         try {
           const coords = GameEngine.getPawnCoordinates(player.color, pawn);
-          
+
           if (!coords) {
-            console.warn(`[GameBoard] No coords for pawn ${index} of ${player.color}`, pawn);
+            gameWarn('board', `No coords for pawn ${index} of ${player.color}`, pawn);
             return;
           }
-          
+
           // Vérifier que les coordonnées sont valides
           if (typeof coords.row !== 'number' || typeof coords.col !== 'number' ||
               isNaN(coords.row) || isNaN(coords.col)) {
-            console.error(`[GameBoard] Invalid coords for pawn ${index} of ${player.color}:`, coords, pawn);
+            gameError('board', `Invalid coords for pawn ${index} of ${player.color}:`, coords, pawn);
             return;
           }
-          
+
           positions.push({
             playerId: player.id,
             playerColor: player.color,
@@ -167,12 +167,12 @@ export const GameBoard = memo(function GameBoard({
             isAI: player.isAI,
           });
         } catch (error) {
-          console.error(`[GameBoard] Error getting coords for pawn ${index} of ${player.color}:`, error);
+          gameError('board', `Error getting coords for pawn ${index} of ${player.color}:`, error);
         }
       });
     });
 
-    console.log('[GameBoard] Pawn positions calculated:', positions.length);
+    gameLog('board', 'Pawn positions calculated', positions.length);
     return positions;
   }, [players]);
 
@@ -267,11 +267,7 @@ export const GameBoard = memo(function GameBoard({
 
             // Protection contre coordonnées invalides
             if (isNaN(x) || isNaN(y) || x === 0 && y === 0) {
-              console.error('[GameBoard] Skipping pawn with invalid pixel coords:', {
-                pawn,
-                x,
-                y,
-              });
+              gameError('board', 'Skipping pawn invalid pixel coords', { pawn, x, y });
               return null;
             }
 
@@ -280,13 +276,10 @@ export const GameBoard = memo(function GameBoard({
               && selectedPawnIndex === pawn.pawnIndex
               && movePathPixels && movePathPixels.length > 0;
 
-            // Log le mouvement
             if (isMovingPawn) {
-              console.log('[GameBoard] Pawn is moving:', {
+              gameLog('board', 'Pawn is moving', {
                 pawnIndex: pawn.pawnIndex,
                 color: pawn.playerColor,
-                targetX: x,
-                targetY: y,
                 pathLength: movePathPixels?.length,
               });
             }

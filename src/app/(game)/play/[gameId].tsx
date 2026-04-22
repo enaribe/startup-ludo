@@ -274,6 +274,10 @@ export default function PlayScreen() {
   const aiResultTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const aiCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Callback stockée pour la fermeture manuelle des popups quand l'IA joue
+  // (le joueur clique "FERMER" après avoir lu le contenu)
+  const [aiCloseHandler, setAiCloseHandler] = useState<(() => void) | null>(null);
+
   const clearAiTimers = useCallback(() => {
     if (aiResultTimerRef.current) {
       clearTimeout(aiResultTimerRef.current);
@@ -313,6 +317,7 @@ export default function PlayScreen() {
           clearAiTimers();
           setAiSpectatorResult(null);
           setIsEventSpectator(false);
+          setAiCloseHandler(null);
           actions.resolveEvent(result);
           setQuizData(null);
           setFundingData(null);
@@ -322,8 +327,8 @@ export default function PlayScreen() {
           handleEventResolveRef.current();
         };
 
-        // Show the same popups as for human, then auto-resolve after delay
-        // Annuler les timers du tour précédent avant d'en créer de nouveaux
+        // Show the same popups as for human — fermeture manuelle via bouton "FERMER"
+        // (pas de timer auto pour laisser le temps de lire le contenu)
         clearAiTimers();
 
         switch (event.type) {
@@ -341,26 +346,27 @@ export default function PlayScreen() {
             }
             const result = { ok: aiCorrect, reward, selectedIndex };
             setQuizData(quizEv);
+            // Affiche la réponse de l'IA après 1.5s, puis attend que le joueur clique FERMER
             aiResultTimerRef.current = setTimeout(() => setAiSpectatorResult(result), 1500);
-            aiCloseTimerRef.current = setTimeout(() => resolveAndClose(result), 3500);
+            setAiCloseHandler(() => () => resolveAndClose(result));
             break;
           }
           case 'funding': {
             const fundingEv = event.data as FundingEvent;
             setFundingData(fundingEv);
-            aiCloseTimerRef.current = setTimeout(() => resolveAndClose({ ok: true, reward: fundingEv.amount }), 2500);
+            setAiCloseHandler(() => () => resolveAndClose({ ok: true, reward: fundingEv.amount }));
             break;
           }
           case 'opportunity': {
             const oppEv = event.data as OpportunityEvent;
             setOpportunityData(oppEv);
-            aiCloseTimerRef.current = setTimeout(() => resolveAndClose({ ok: oppEv.effect === 'tokens', reward: oppEv.value }), 2500);
+            setAiCloseHandler(() => () => resolveAndClose({ ok: oppEv.effect === 'tokens', reward: oppEv.value }));
             break;
           }
           case 'challenge': {
             const chalEv = event.data as ChallengeEvent;
             setChallengeData(chalEv);
-            aiCloseTimerRef.current = setTimeout(() => resolveAndClose({ ok: false, reward: chalEv.value }), 2500);
+            setAiCloseHandler(() => () => resolveAndClose({ ok: false, reward: chalEv.value }));
             break;
           }
           case 'duel': {
@@ -1230,6 +1236,7 @@ export default function PlayScreen() {
         onClose={() => setQuizData(null)}
         isSpectator={isEventSpectator}
         spectatorResult={aiSpectatorResult ?? (onlineGame.remoteEventResult ? { ok: onlineGame.remoteEventResult.ok, reward: onlineGame.remoteEventResult.reward, selectedIndex: onlineGame.remoteEventResult.selectedIndex } : undefined)}
+        onSpectatorClose={aiCloseHandler ?? undefined}
       />
 
       <FundingPopup
@@ -1238,6 +1245,7 @@ export default function PlayScreen() {
         onAccept={handleFundingAccept}
         onClose={() => setFundingData(null)}
         isSpectator={isEventSpectator}
+        onSpectatorClose={aiCloseHandler ?? undefined}
       />
 
       <EventPopup
@@ -1247,6 +1255,7 @@ export default function PlayScreen() {
         onAccept={handleEventAccept}
         onClose={() => setOpportunityData(null)}
         isSpectator={isEventSpectator}
+        onSpectatorClose={aiCloseHandler ?? undefined}
       />
 
       <EventPopup
@@ -1256,6 +1265,7 @@ export default function PlayScreen() {
         onAccept={handleEventAccept}
         onClose={() => setChallengeData(null)}
         isSpectator={isEventSpectator}
+        onSpectatorClose={aiCloseHandler ?? undefined}
       />
 
       {/* New Duel System Popups */}

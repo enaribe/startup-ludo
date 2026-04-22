@@ -16,7 +16,12 @@ export const RadialBackground = memo(function RadialBackground({
   radius = '80%',
 }: RadialBackgroundProps) {
   return (
-    <Svg style={StyleSheet.absoluteFill} width={width} height={height}>
+    <Svg
+      style={StyleSheet.absoluteFill}
+      width={width}
+      height={height}
+      pointerEvents="none"
+    >
       <Defs>
         <RadialGradient id="radialBg" cx="50%" cy="50%" r={radius}>
           <Stop offset="0%" stopColor={centerColor} stopOpacity="1" />

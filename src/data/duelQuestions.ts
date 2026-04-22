@@ -124,8 +124,23 @@ export const DUEL_QUESTIONS: DuelQuestion[] = [
   },
 ];
 
+// ID des questions de duel déjà utilisées dans la partie courante.
+// Reset via resetDuelQuestionPool() au démarrage d'une nouvelle partie.
+const usedDuelQuestionIds: Set<string> = new Set();
+
 /**
- * Retourne un ensemble aléatoire de questions pour un duel.
+ * Réinitialise les questions de duel utilisées.
+ * À appeler au démarrage d'une nouvelle partie.
+ */
+export function resetDuelQuestionPool(): void {
+  usedDuelQuestionIds.clear();
+}
+
+/**
+ * Retourne un ensemble aléatoire de questions pour un duel,
+ * en évitant les questions déjà utilisées dans la partie courante.
+ * Recycle automatiquement le pool quand il est épuisé.
+ *
  * Utilise les duels de l'édition si disponibles, sinon fallback sur les questions par défaut.
  * @param count Nombre de questions (par défaut 3)
  * @param editionId Edition dont on veut les duels (optionnel)
@@ -149,8 +164,22 @@ export function getRandomDuelQuestions(count: number = 3, editionId?: string): D
     }
   }
 
-  const shuffled = [...pool].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, count);
+  // Filtrer les questions non encore utilisées
+  let available = pool.filter((q) => !usedDuelQuestionIds.has(q.id));
+
+  // Pool épuisé (ou pas assez pour remplir le duel) → recyclage complet
+  if (available.length < count) {
+    usedDuelQuestionIds.clear();
+    available = pool;
+  }
+
+  const shuffled = [...available].sort(() => Math.random() - 0.5);
+  const selected = shuffled.slice(0, count);
+
+  // Marquer les questions sélectionnées comme utilisées
+  selected.forEach((q) => usedDuelQuestionIds.add(q.id));
+
+  return selected;
 }
 
 /**

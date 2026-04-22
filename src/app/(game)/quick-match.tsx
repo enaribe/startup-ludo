@@ -1,166 +1,235 @@
 /**
  * quick-match - Matchmaking rapide
  *
- * Recherche automatique d'adversaires avec animation,
- * affichage des joueurs trouves, puis redirection vers le salon.
+ * Flow :
+ * 1. L'utilisateur choisit maxPlayers (2/3/4, défaut 2) et sa startup
+ * 2. Dépôt d'un ticket dans la file d'attente matchmaking (Realtime DB)
+ * 3. Le hook useQuickMatch détecte N joueurs compatibles, lock les tickets, crée la room
+ * 4. Redirection directe vers game-preparation quand le match est prêt
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, Pressable, Dimensions, StyleSheet, ActivityIndicator } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Dimensions,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import Animated, {
   FadeInDown,
   useAnimatedStyle,
+  useSharedValue,
   withRepeat,
   withTiming,
-  useSharedValue,
 } from 'react-native-reanimated';
-import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { COLORS } from '@/styles/colors';
+import { Avatar } from '@/components/ui/Avatar';
+import { DynamicGradientBorder, GameButton, RadialBackground } from '@/components/ui';
+import { StartupSelectionModal } from '@/components/game/StartupSelectionModal';
+import { getDefaultProjectsForEdition, getMatchingUserStartups, getSectorEdition } from '@/data/defaultProjects';
+import { useQuickMatch } from '@/hooks/useQuickMatch';
+import { useAuthStore, useUserStore } from '@/stores';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
-import { useAuthStore } from '@/stores';
-import { useMultiplayer } from '@/hooks/useMultiplayer';
-import { RadialBackground, DynamicGradientBorder, GameButton } from '@/components/ui';
-import { Avatar } from '@/components/ui/Avatar';
 
 const { width: screenWidth } = Dimensions.get('window');
 const contentWidth = screenWidth - SPACING[4] * 2;
 
-type MatchState = 'idle' | 'searching' | 'found' | 'joining';
+type Phase = 'setup' | 'searching' | 'match-found' | 'joining';
 
-const SEARCH_MESSAGES = [
-  'RECHERCHE D\'ADVERSAIRES...',
-  'Elargissement des criteres...',
-  'Recherche avancee...',
-  'Presque trouve !',
-];
-
-// Simulated players for UI demo
-const MOCK_FOUND_PLAYERS = [
-  { id: '1', name: 'Joueur 1', level: 5, color: 'yellow' as const },
-  { id: '2', name: 'Joueur 2', level: 3, color: 'blue' as const },
-];
+const PLAYER_COUNT_OPTIONS: Array<2 | 3 | 4> = [2, 3, 4];
 
 export default function QuickMatchScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { challenge } = useLocalSearchParams<{ challenge?: string }>();
   const user = useAuthStore((state) => state.user);
-  const { createRoom } = useMultiplayer(user?.id ?? null);
+  const profile = useUserStore((state) => state.profile);
 
-  const [matchState, setMatchState] = useState<MatchState>('idle');
-  const [searchTime, setSearchTime] = useState(0);
-  const [messageIndex, setMessageIndex] = useState(0);
-  const [foundPlayers, setFoundPlayers] = useState<typeof MOCK_FOUND_PLAYERS>([]);
+  const {
+    state: matchState,
+    foundTickets,
+    elapsedSeconds,
+    roomId,
+    error,
+    start,
+    cancel,
+  } = useQuickMatch();
 
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pulseValue = useSharedValue(1);
+  // Note : pour rejoindre la room en tant que non-lead, on utilise le singleton directement
+  // (voir effet `joinAsGuest` plus bas)
 
-  // Pulse animation
+  const [phase, setPhase] = useState<Phase>('setup');
+  const [maxPlayers, setMaxPlayers] = useState<2 | 3 | 4>(2);
+  const [selectedStartupId, setSelectedStartupId] = useState<string | null>(null);
+  const [selectedStartupName, setSelectedStartupName] = useState<string | null>(null);
+  const [selectedIsDefault, setSelectedIsDefault] = useState<boolean>(false);
+  const [selectedSector, setSelectedSector] = useState<string | null>(null);
+  const [showStartupModal, setShowStartupModal] = useState(false);
+  const [matchFoundCountdown, setMatchFoundCountdown] = useState(3);
+
+  const edition = challenge || 'classic';
+  const defaultProjects = useMemo(
+    () => getDefaultProjectsForEdition(edition),
+    [edition]
+  );
+  const userStartups = useMemo(
+    () => getMatchingUserStartups(profile?.startups ?? [], edition),
+    [profile?.startups, edition]
+  );
+
+  // Auto-sélection si une seule startup compatible disponible
   useEffect(() => {
-    if (matchState === 'searching') {
+    if (selectedStartupId) return;
+    const s = userStartups[0];
+    if (userStartups.length === 1 && defaultProjects.length === 0 && s) {
+      setSelectedStartupId(s.id);
+      setSelectedStartupName(s.name);
+      setSelectedIsDefault(false);
+      setSelectedSector(s.sector);
+    }
+  }, [userStartups, defaultProjects, selectedStartupId]);
+
+  // Animation pulse
+  const pulseValue = useSharedValue(1);
+  useEffect(() => {
+    if (phase === 'searching') {
       pulseValue.value = withRepeat(withTiming(1.15, { duration: 1000 }), -1, true);
     } else {
       pulseValue.value = 1;
     }
-  }, [matchState, pulseValue]);
-
+  }, [phase, pulseValue]);
   const pulseStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pulseValue.value }],
   }));
 
-  // Search timer
+  // Sync du matchState vers la phase UI
   useEffect(() => {
-    if (matchState === 'searching') {
-      timerRef.current = setInterval(() => {
-        setSearchTime((prev) => {
-          const newTime = prev + 1;
-          if (newTime % 10 === 0 && newTime > 0) {
-            setMessageIndex((idx) => Math.min(idx + 1, SEARCH_MESSAGES.length - 1));
-          }
-          return newTime;
-        });
-      }, 1000);
-    } else {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
+    if (matchState === 'matched' && roomId) {
+      setPhase('match-found');
+      setMatchFoundCountdown(3);
+    } else if (matchState === 'joining' && roomId) {
+      // On a été matché par un autre lead, on doit rejoindre sa room
+      setPhase('joining');
+    }
+  }, [matchState, roomId]);
+
+  // Countdown "match trouvé" → redirection
+  useEffect(() => {
+    if (phase !== 'match-found' || !roomId) return undefined;
+
+    if (matchFoundCountdown <= 0) {
+      // Le host a déjà la room configurée (setup par tryCreateRoomFromTickets)
+      // On va vers game-preparation en lui passant les infos
+      router.replace({
+        pathname: '/(game)/create-room',
+        params: {
+          roomId,
+          isHost: 'true',
+          quickMatch: 'true',
+          ...(challenge ? { challenge } : {}),
+        },
+      });
+      return undefined;
     }
 
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
+    const t = setTimeout(() => {
+      setMatchFoundCountdown((c) => c - 1);
+    }, 1000);
+    return () => clearTimeout(t);
+  }, [phase, matchFoundCountdown, roomId, router, challenge]);
+
+  // Redirection pour les non-lead quand leur ticket est marqué matched
+  useEffect(() => {
+    if (phase !== 'joining' || !roomId || !user) return;
+
+    const joinAsGuest = async () => {
+      const { multiplayerSync } = await import('@/services/multiplayer');
+      try {
+        await multiplayerSync.joinRoomById(roomId, {
+          playerId: user.id,
+          playerName: user.displayName ?? 'Joueur',
+        });
+        // Propager sa startup côté room
+        if (selectedStartupId && selectedStartupName && selectedSector) {
+          await multiplayerSync.setStartupSelection(
+            selectedStartupId,
+            selectedStartupName,
+            selectedIsDefault,
+            selectedSector
+          );
+        }
+        // Nettoyer le ticket
+        await cancel();
+
+        router.replace({
+          pathname: '/(game)/create-room',
+          params: {
+            roomId,
+            isHost: 'false',
+            quickMatch: 'true',
+            ...(challenge ? { challenge } : {}),
+          },
+        });
+      } catch (e) {
+        console.error('[QuickMatch] Failed to join room by id', e);
       }
     };
-  }, [matchState]);
 
-  // Simulate matchmaking
-  useEffect(() => {
-    if (matchState === 'searching' && searchTime >= 3 && foundPlayers.length === 0) {
-      const firstPlayer = MOCK_FOUND_PLAYERS[0];
-      if (firstPlayer) {
-        setFoundPlayers([firstPlayer]);
-      }
+    joinAsGuest();
+  }, [phase, roomId, user, selectedStartupId, selectedStartupName, selectedIsDefault, selectedSector, cancel, router, challenge]);
+
+  const handleStartupSelected = useCallback(
+    (startupId: string, startupName: string, isDefault: boolean, sector: string) => {
+      setSelectedStartupId(startupId);
+      setSelectedStartupName(startupName);
+      setSelectedIsDefault(isDefault);
+      setSelectedSector(sector);
+      setShowStartupModal(false);
+    },
+    []
+  );
+
+  const handleStartSearch = useCallback(async () => {
+    if (!user) return;
+    if (!selectedStartupId || !selectedStartupName || !selectedSector) {
+      setShowStartupModal(true);
+      return;
     }
-    if (matchState === 'searching' && searchTime >= 5) {
-      handleFoundMatch();
+
+    const derivedEdition = getSectorEdition(selectedSector);
+
+    setPhase('searching');
+    await start({
+      userId: user.id,
+      displayName: user.displayName ?? 'Joueur',
+      avatarUrl: user.photoURL ?? null,
+      maxPlayers,
+      startupId: selectedStartupId,
+      startupName: selectedStartupName,
+      isDefaultProject: selectedIsDefault,
+      sector: selectedSector,
+      edition: derivedEdition,
+    });
+  }, [user, selectedStartupId, selectedStartupName, selectedIsDefault, selectedSector, maxPlayers, start]);
+
+  const handleCancel = useCallback(async () => {
+    await cancel();
+    setPhase('setup');
+    setMatchFoundCountdown(3);
+  }, [cancel]);
+
+  const handleBack = useCallback(async () => {
+    if (phase === 'searching' || phase === 'match-found') {
+      await handleCancel();
     }
-  }, [matchState, searchTime]);
-
-  const handleBack = () => {
-    if (matchState === 'searching') {
-      handleCancelSearch();
-    } else {
-      router.back();
-    }
-  };
-
-  const handleStartSearch = useCallback(() => {
-    setMatchState('searching');
-    setSearchTime(0);
-    setMessageIndex(0);
-    setFoundPlayers([]);
-  }, []);
-
-  const handleCancelSearch = useCallback(() => {
-    setMatchState('idle');
-    setSearchTime(0);
-    setMessageIndex(0);
-    setFoundPlayers([]);
-  }, []);
-
-  const handleFoundMatch = useCallback(async () => {
-    setMatchState('found');
-    setFoundPlayers(MOCK_FOUND_PLAYERS);
-
-    if (user) {
-      const result = await createRoom({
-        edition: challenge || 'classic',
-        maxPlayers: 4,
-        hostName: user.displayName ?? 'Joueur',
-        isQuickMatch: true,
-      });
-
-      if (result) {
-        setTimeout(() => {
-          setMatchState('joining');
-          router.replace({
-            pathname: '/(game)/create-room',
-            params: {
-              roomId: result.roomId,
-              code: result.code,
-              isHost: 'true',
-              quickMatch: 'true',
-            },
-          });
-        }, 2000);
-      }
-    }
-  }, [user, createRoom, challenge, router]);
+    router.back();
+  }, [phase, handleCancel, router]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -168,17 +237,20 @@ export default function QuickMatchScreen() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const playersOnline = matchState === 'searching'
-    ? foundPlayers.length + 1
-    : matchState === 'found'
-      ? MOCK_FOUND_PLAYERS.length + 1
-      : 0;
+  const searchMessage = useMemo(() => {
+    if (elapsedSeconds < 10) return 'RECHERCHE D\'ADVERSAIRES...';
+    if (elapsedSeconds < 30) return 'RECHERCHE EN COURS...';
+    if (elapsedSeconds < 60) return 'QUELQUES JOUEURS EN APPROCHE...';
+    return 'PAS BEAUCOUP DE MONDE POUR LE MOMENT...';
+  }, [elapsedSeconds]);
+
+  const playersInQueue = foundTickets.length;
 
   return (
     <View style={styles.container}>
       <RadialBackground />
 
-      {/* Fixed Header */}
+      {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + SPACING[2] }]}>
         <Pressable onPress={handleBack} hitSlop={8}>
           <Ionicons name="arrow-back" size={24} color="white" />
@@ -188,124 +260,206 @@ export default function QuickMatchScreen() {
       </View>
 
       <View style={styles.content}>
-        <View style={{
-          flex: 1,
-          paddingTop: insets.top + 80,
-          paddingBottom: insets.bottom + (matchState === 'idle' ? 120 : 40),
-          paddingHorizontal: SPACING[4],
-        }}>
-          {/* Search Section */}
-          <Animated.View entering={FadeInDown.delay(100).duration(500)} style={{ marginBottom: SPACING[5] }}>
-            <DynamicGradientBorder
-              borderRadius={20}
-              fill="rgba(10, 25, 41, 0.6)"
-              boxWidth={contentWidth}
-            >
-              <View style={styles.searchSection}>
-                <Animated.View style={[pulseStyle, styles.searchIconContainer]}>
-                  {matchState === 'searching' ? (
-                    <ActivityIndicator size="large" color="#FFBC40" />
-                  ) : matchState === 'found' || matchState === 'joining' ? (
-                    <Ionicons name="checkmark-circle" size={48} color="#4CAF50" />
-                  ) : (
-                    <Ionicons name="globe" size={48} color="#FFBC40" />
-                  )}
-                </Animated.View>
+        <View
+          style={{
+            flex: 1,
+            paddingTop: insets.top + 80,
+            paddingBottom: insets.bottom + (phase === 'setup' ? 120 : 40),
+            paddingHorizontal: SPACING[4],
+          }}
+        >
+          {/* SETUP phase : sélecteur maxPlayers + startup */}
+          {phase === 'setup' && (
+            <Animated.View entering={FadeInDown.delay(100).duration(500)}>
+              <DynamicGradientBorder
+                borderRadius={20}
+                fill="rgba(0, 0, 0, 0.35)"
+                boxWidth={contentWidth}
+              >
+                <View style={styles.setupSection}>
+                  <Ionicons name="flash" size={48} color="#FFBC40" />
+                  <Text style={styles.setupTitle}>PRÊT À JOUER ?</Text>
+                  <Text style={styles.setupSubtitle}>
+                    Choisis le nombre de joueurs et ta startup
+                  </Text>
+                </View>
+              </DynamicGradientBorder>
 
-                <Text style={styles.searchTitle}>
-                  {matchState === 'idle' && 'PRET A JOUER ?'}
-                  {matchState === 'searching' && SEARCH_MESSAGES[messageIndex]}
-                  {matchState === 'found' && 'PARTIE TROUVEE !'}
-                  {matchState === 'joining' && 'CONNEXION EN COURS...'}
-                </Text>
-
-                <Text style={styles.searchSubtitle}>
-                  {matchState === 'idle' && 'Matchmaking automatique active'}
-                  {matchState === 'searching' && `Temps de recherche: ${formatTime(searchTime)}`}
-                  {matchState === 'found' && 'Redirection vers le salon...'}
-                  {matchState === 'joining' && 'Preparation de la partie...'}
-                </Text>
-
-                {matchState === 'searching' && (
-                  <Pressable onPress={handleCancelSearch} style={styles.cancelButton}>
-                    <Text style={styles.cancelButtonText}>Annuler</Text>
-                  </Pressable>
-                )}
-              </View>
-            </DynamicGradientBorder>
-          </Animated.View>
-
-          {/* Players Found Section */}
-          {(matchState === 'searching' || matchState === 'found' || matchState === 'joining') && (
-            <Animated.View entering={FadeInDown.delay(300).duration(500)}>
-              <Text style={styles.playersTitle}>
-                JOUEURS EN LIGNE {playersOnline}/4
-              </Text>
-
-              <View style={{ gap: SPACING[3] }}>
-                {/* Current user */}
-                <DynamicGradientBorder
-                  borderRadius={16}
-                  fill="rgba(255, 188, 64, 0.08)"
-                  boxWidth={contentWidth}
-                >
-                  <View style={styles.playerCard}>
-                    <Avatar
-                      name={user?.displayName ?? 'Joueur'}
-                      playerColor="yellow"
-                      size="md"
-                    />
-                    <View style={{ flex: 1, marginLeft: SPACING[3] }}>
-                      <Text style={styles.playerName}>{user?.displayName ?? 'Joueur'}</Text>
-                      <Text style={styles.playerLevel}>Vous</Text>
-                    </View>
-                    <View style={[styles.colorDot, { backgroundColor: COLORS.players.yellow }]} />
-                  </View>
-                </DynamicGradientBorder>
-
-                {/* Found players */}
-                {foundPlayers.map((player, index) => (
-                  <Animated.View
-                    key={player.id}
-                    entering={FadeInDown.delay(400 + index * 150).duration(400)}
+              {/* maxPlayers */}
+              <Text style={styles.sectionLabel}>NOMBRE DE JOUEURS</Text>
+              <View style={styles.playerCountRow}>
+                {PLAYER_COUNT_OPTIONS.map((n) => (
+                  <Pressable
+                    key={n}
+                    onPress={() => setMaxPlayers(n)}
+                    style={{ flex: 1 }}
                   >
                     <DynamicGradientBorder
                       borderRadius={16}
-                      fill="rgba(10, 25, 41, 0.6)"
-                      boxWidth={contentWidth}
+                      fill={maxPlayers === n ? 'rgba(255, 188, 64, 0.2)' : 'rgba(0, 0, 0, 0.35)'}
+                      boxWidth={(contentWidth - SPACING[3] * 2) / 3}
                     >
-                      <View style={styles.playerCard}>
-                        <Avatar
-                          name={player.name}
-                          playerColor={player.color}
-                          size="md"
-                        />
-                        <View style={{ flex: 1, marginLeft: SPACING[3] }}>
-                          <Text style={styles.playerName}>{player.name}</Text>
-                          <Text style={styles.playerLevel}>Niv. {player.level}</Text>
-                        </View>
-                        <View style={[styles.colorDot, { backgroundColor: COLORS.players[player.color] }]} />
+                      <View style={styles.playerCountCard}>
+                        <Text
+                          style={[
+                            styles.playerCountNumber,
+                            maxPlayers === n && { color: '#FFBC40' },
+                          ]}
+                        >
+                          {n}
+                        </Text>
+                        <Text style={styles.playerCountLabel}>joueurs</Text>
                       </View>
                     </DynamicGradientBorder>
-                  </Animated.View>
+                  </Pressable>
                 ))}
               </View>
+
+              {/* Startup selection */}
+              <Text style={styles.sectionLabel}>TA STARTUP</Text>
+              <Pressable onPress={() => setShowStartupModal(true)}>
+                <DynamicGradientBorder
+                  borderRadius={16}
+                  fill="rgba(0, 0, 0, 0.35)"
+                  boxWidth={contentWidth}
+                >
+                  <View style={styles.startupCard}>
+                    <View style={styles.startupIconWrap}>
+                      <Ionicons
+                        name={selectedStartupName ? 'rocket' : 'rocket-outline'}
+                        size={24}
+                        color={selectedStartupName ? '#FFBC40' : 'rgba(255,255,255,0.6)'}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.startupName}>
+                        {selectedStartupName || 'Choisir une startup'}
+                      </Text>
+                      {selectedSector && (
+                        <Text style={styles.startupSector}>{selectedSector}</Text>
+                      )}
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.5)" />
+                  </View>
+                </DynamicGradientBorder>
+              </Pressable>
+            </Animated.View>
+          )}
+
+          {/* SEARCHING phase */}
+          {phase === 'searching' && (
+            <Animated.View entering={FadeInDown.delay(100).duration(500)}>
+              <DynamicGradientBorder
+                borderRadius={20}
+                fill="rgba(0, 0, 0, 0.35)"
+                boxWidth={contentWidth}
+              >
+                <View style={styles.searchSection}>
+                  <Animated.View style={[pulseStyle, styles.searchIconContainer]}>
+                    <ActivityIndicator size="large" color="#FFBC40" />
+                  </Animated.View>
+                  <Text style={styles.searchTitle}>{searchMessage}</Text>
+                  <Text style={styles.searchSubtitle}>
+                    Temps : {formatTime(elapsedSeconds)}
+                  </Text>
+                  <Text style={[styles.searchSubtitle, { marginTop: 4 }]}>
+                    {playersInQueue}/{maxPlayers} joueur{maxPlayers > 1 ? 's' : ''} trouvé
+                    {playersInQueue > 1 ? 's' : ''}
+                  </Text>
+
+                  <Pressable onPress={handleCancel} style={styles.cancelButton}>
+                    <Text style={styles.cancelButtonText}>Annuler</Text>
+                  </Pressable>
+                </View>
+              </DynamicGradientBorder>
+
+              {/* Liste des joueurs trouvés */}
+              {foundTickets.length > 0 && (
+                <View style={{ marginTop: SPACING[4], gap: SPACING[2] }}>
+                  {foundTickets.slice(0, maxPlayers).map((ticket) => (
+                    <Animated.View
+                      key={ticket.id}
+                      entering={FadeInDown.duration(300)}
+                    >
+                      <DynamicGradientBorder
+                        borderRadius={16}
+                        fill="rgba(0, 0, 0, 0.35)"
+                        boxWidth={contentWidth}
+                      >
+                        <View style={styles.ticketRow}>
+                          <Avatar
+                            name={ticket.displayName}
+                            playerColor="yellow"
+                            size="sm"
+                          />
+                          <View style={{ flex: 1, marginLeft: SPACING[3] }}>
+                            <Text style={styles.ticketName}>
+                              {ticket.userId === user?.id ? 'Vous' : ticket.displayName}
+                            </Text>
+                            <Text style={styles.ticketStartup}>{ticket.startupName}</Text>
+                          </View>
+                        </View>
+                      </DynamicGradientBorder>
+                    </Animated.View>
+                  ))}
+                </View>
+              )}
+            </Animated.View>
+          )}
+
+          {/* MATCH FOUND */}
+          {(phase === 'match-found' || phase === 'joining') && (
+            <Animated.View entering={FadeInDown.duration(400)}>
+              <DynamicGradientBorder
+                borderRadius={20}
+                fill="rgba(76, 175, 80, 0.15)"
+                boxWidth={contentWidth}
+              >
+                <View style={styles.searchSection}>
+                  <Ionicons name="checkmark-circle" size={64} color="#4CAF50" />
+                  <Text style={styles.searchTitle}>PARTIE TROUVÉE !</Text>
+                  <Text style={styles.searchSubtitle}>
+                    {phase === 'match-found'
+                      ? `Lancement dans ${matchFoundCountdown}...`
+                      : 'Connexion au salon...'}
+                  </Text>
+                </View>
+              </DynamicGradientBorder>
+            </Animated.View>
+          )}
+
+          {/* ERROR */}
+          {error && phase !== 'setup' && (
+            <Animated.View entering={FadeInDown} style={{ marginTop: SPACING[4] }}>
+              <Text style={styles.errorText}>{error}</Text>
             </Animated.View>
           )}
         </View>
       </View>
 
-      {/* Bottom Button (idle state only) */}
-      {matchState === 'idle' && (
+      {/* Bouton de lancement (phase setup uniquement) */}
+      {phase === 'setup' && (
         <View style={[styles.bottomBar, { paddingBottom: insets.bottom + SPACING[4] }]}>
           <GameButton
             variant="yellow"
             fullWidth
             title="LANCER LA RECHERCHE"
             onPress={handleStartSearch}
+            disabled={!selectedStartupId}
           />
         </View>
       )}
+
+      {/* Modal de sélection startup */}
+      <StartupSelectionModal
+        visible={showStartupModal}
+        edition={edition}
+        userStartups={userStartups}
+        defaultProjects={defaultProjects}
+        playerName={user?.displayName ?? undefined}
+        onSelect={handleStartupSelected}
+        onClose={() => setShowStartupModal(false)}
+      />
     </View>
   );
 }
@@ -338,6 +492,75 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  setupSection: {
+    alignItems: 'center',
+    padding: SPACING[5],
+  },
+  setupTitle: {
+    fontFamily: FONTS.title,
+    fontSize: 20,
+    color: 'white',
+    marginTop: SPACING[3],
+    marginBottom: SPACING[2],
+  },
+  setupSubtitle: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.sm,
+    color: 'rgba(255,255,255,0.6)',
+    textAlign: 'center',
+  },
+  sectionLabel: {
+    fontFamily: FONTS.title,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.7)',
+    marginTop: SPACING[5],
+    marginBottom: SPACING[3],
+    letterSpacing: 0.5,
+  },
+  playerCountRow: {
+    flexDirection: 'row',
+    gap: SPACING[3],
+  },
+  playerCountCard: {
+    alignItems: 'center',
+    paddingVertical: SPACING[4],
+  },
+  playerCountNumber: {
+    fontFamily: FONTS.title,
+    fontSize: 28,
+    color: 'white',
+  },
+  playerCountLabel: {
+    fontFamily: FONTS.body,
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.5)',
+    marginTop: 2,
+  },
+  startupCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SPACING[3],
+    gap: SPACING[3],
+  },
+  startupIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 188, 64, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  startupName: {
+    fontFamily: FONTS.title,
+    fontSize: 15,
+    color: 'white',
+  },
+  startupSector: {
+    fontFamily: FONTS.body,
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.5)',
+    marginTop: 2,
   },
   searchSection: {
     alignItems: 'center',
@@ -379,32 +602,27 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.sm,
     color: '#FF6B6B',
   },
-  playersTitle: {
-    fontFamily: FONTS.title,
-    fontSize: 16,
-    color: 'white',
-    marginBottom: SPACING[3],
-  },
-  playerCard: {
+  ticketRow: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: SPACING[3],
   },
-  playerName: {
+  ticketName: {
     fontFamily: FONTS.title,
-    fontSize: 15,
+    fontSize: 14,
     color: 'white',
   },
-  playerLevel: {
+  ticketStartup: {
     fontFamily: FONTS.body,
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.5)',
+    color: 'rgba(255,255,255,0.5)',
     marginTop: 2,
   },
-  colorDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+  errorText: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.sm,
+    color: '#FF6B6B',
+    textAlign: 'center',
   },
   bottomBar: {
     position: 'absolute',

@@ -117,16 +117,28 @@ export default function CreateRoomScreen() {
     }
   }, [room?.status, room?.gameId, currentRoomId, router]);
 
-  // Auto-start for quick match
+  // Auto-start pour le match rapide :
+  // En quick match, tous les joueurs ont déjà sélectionné leur startup avant la queue
+  // (transmise via ticket). On attend juste que la room soit pleine (= maxPlayers atteint)
+  // ET que tous aient leur startup, puis on lance automatiquement côté host.
   useEffect(() => {
-    if (isQuickMatch && playersList.length >= 2 && allReady) {
+    if (!isQuickMatch) return undefined;
+    if (params.isHost !== 'true') return undefined; // seul le host lance
+    if (!room) return undefined;
+
+    const expectedPlayers = room.maxPlayers ?? room.gameSettings?.maxPlayers ?? 2;
+    const allPresent = playersList.length >= expectedPlayers;
+    const allHaveStartup = playersList.every((p) => !!p.startupId);
+
+    if (allPresent && allHaveStartup) {
       const timer = setTimeout(() => {
         handleStartGame();
-      }, 10000);
+      }, 1500);
       return () => clearTimeout(timer);
     }
     return undefined;
-  }, [isQuickMatch, playersList.length, allReady]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isQuickMatch, params.isHost, room?.maxPlayers, playersList.length, playersList.map((p) => p.startupId).join('|')]);
 
   const handleBack = useCallback(() => {
     if (showLobby) {

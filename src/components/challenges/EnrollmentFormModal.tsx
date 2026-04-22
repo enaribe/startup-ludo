@@ -116,8 +116,8 @@ function GradientPressable({
               <Stop offset="100%" stopColor="#9A9A9A" stopOpacity="0.3"  />
             </SvgLinearGradient>
           </Defs>
-          <Rect x="0.75" y="0.75" width={w - 1.5} height={h - 1.5} rx={13.25} ry={13.25}
-            fill="transparent" stroke={`url(#${id})`} strokeWidth={1.5} />
+          <Rect x="0.75" y="0.75" width={String(w - 1.5)} height={String(h - 1.5)} rx="13.25" ry="13.25"
+            fill="transparent" stroke={`url(#${id})`} strokeWidth="1.5" />
         </Svg>
       )}
       {children}
@@ -145,8 +145,8 @@ function GradientInput(props: React.ComponentProps<typeof TextInput>) {
               <Stop offset="100%" stopColor="#9A9A9A" stopOpacity="0.3"  />
             </SvgLinearGradient>
           </Defs>
-          <Rect x="0.75" y="0.75" width="99.5%" height={h - 1.5} rx={13.25} ry={13.25}
-            fill="transparent" stroke={`url(#${id})`} strokeWidth={1.5} />
+          <Rect x="0.75" y="0.75" width="99.5%" height={String(h - 1.5)} rx="13.25" ry="13.25"
+            fill="transparent" stroke={`url(#${id})`} strokeWidth="1.5" />
         </Svg>
       )}
       <TextInput {...props} style={[styles.input, props.style]} />

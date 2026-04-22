@@ -114,16 +114,6 @@ export const DuelQuestionPopup = memo(function DuelQuestionPopup({
     }, 600);
   }, [selectedAnswer, currentIndex, questions, shuffledOptions, hapticsEnabled, onComplete, answers, totalScore]);
 
-  if (__DEV__) {
-    console.log('[DuelQuestionPopup] render', {
-      visible,
-      questionsLength: questions.length,
-      currentIndex,
-      hasCurrentQuestion: !!currentQuestion,
-      willReturnNull: !visible || questions.length === 0 || !currentQuestion,
-    });
-  }
-
   if (!visible || questions.length === 0 || !currentQuestion) return null;
 
   return (

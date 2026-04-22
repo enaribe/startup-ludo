@@ -20,6 +20,7 @@ import { SPACING, BORDER_RADIUS, SHADOWS } from '@/styles/spacing';
 import { useSettingsStore } from '@/stores';
 import { usePlaySoundOnOpen } from '@/hooks/useSound';
 import type { FundingEvent } from '@/types';
+import { crashLog } from '@/utils/gameLog';
 
 // ─── Header Financement ───────────────────────────────────────────────────────
 
@@ -33,7 +34,7 @@ const FUND_ICON_DEFS = (
 );
 
 const FUND_ICON = (
-  <G translateX={10} translateY={17} scale={1.45}>
+  <G translateX="10" translateY="17" scale="1.45">
     <Path d="M20.0039 0.667969C20.3499 0.496949 20.7969 0.424745 21.5039 0.603516C22.1734 0.772801 22.3503 1.03791 22.8711 1.42578C23.4153 1.8311 24.1196 2.15766 25.6064 2.22852C26.2572 2.25955 26.4668 2.42705 26.5371 2.5332C26.6154 2.65147 26.6583 2.89397 26.5215 3.37891C26.3898 3.84533 26.1261 4.41596 25.7793 5.08105C25.4275 5.75579 25.0342 6.44826 24.6191 7.22754L24.4395 7.56445L24.7168 7.82617L24.7275 7.83691C24.792 7.89801 24.8945 7.99609 25.376 8.46191C25.7783 8.85446 26.3232 9.39402 26.8955 9.98242C27.4686 10.5716 28.066 11.2071 28.5732 11.791C29.088 12.3836 29.4852 12.8956 29.6807 13.2451L30.5479 14.7959C30.7996 15.3072 31.0812 15.9328 31.3486 16.6533C32.1268 18.75 32.7911 21.6192 32.3701 24.7539C31.9532 27.8581 30.6287 29.4902 28.8965 30.3662C27.1163 31.2665 24.833 31.4077 22.4287 31.3408C21.8112 31.3237 21.1679 31.3378 20.5244 31.3535C19.8769 31.3694 19.2291 31.3871 18.584 31.3818C17.2907 31.3712 16.0548 31.2649 14.9619 30.876C13.8835 30.4921 12.936 29.8305 12.2109 28.6826C11.4787 27.5233 10.9522 25.8349 10.7881 23.3682C10.4641 18.498 12.4787 14.6415 14.5996 11.9844C15.6593 10.6568 16.7403 9.63563 17.5557 8.94727C17.963 8.60339 18.3033 8.34302 18.54 8.16992C18.6584 8.08339 18.8135 7.97656 18.8994 7.91602H18.9033L19.4199 7.58105L18.9854 7.14355L18.9609 7.11914C18.8198 6.97069 18.6104 6.74121C18.3813 6.48609 18.0765 6.13104 17.7734 5.72852C17.4691 5.32423 17.1736 4.88214 16.9561 4.45312C16.7338 4.01486 16.6172 3.6364 16.6172 3.34766C16.6172 3.03016 16.6936 2.88482 16.7617 2.80469C16.8406 2.71194 16.9688 2.6345 17.1953 2.55078C17.3078 2.50921 17.4257 2.47263 17.5654 2.42773C17.6999 2.38454 17.8504 2.33453 18.001 2.27344C18.3045 2.15028 18.6365 1.96978 18.9092 1.65137C19.3133 1.17942 19.6311 0.852281 20.0039 0.667969Z" fill="url(#fund_bg_grad)" stroke="#1C6B3B" />
     <Path d="M7.39551 17.5957C11.3976 17.5957 14.6414 20.8266 14.6416 24.8115C14.6416 28.7966 11.3977 32.0283 7.39551 32.0283C3.39336 32.0283 0.150391 28.7966 0.150391 24.8115C0.150623 20.8267 3.3935 17.5958 7.39551 17.5957Z" fill="#FFBC40" stroke="#AC700C" strokeWidth="0.3" />
     <Path d="M10.9442 20.4453C13.4733 22.311 13.872 26.0212 11.8826 28.4281C10.4602 30.2083 7.93789 30.9713 5.76502 30.2569C5.05298 30.0289 4.38985 29.6586 3.83398 29.1727C4.72074 29.8317 5.77986 30.2361 6.87945 30.3136C9.48339 30.5172 11.9359 28.8608 12.683 26.369C13.3448 24.2732 12.622 21.872 10.9446 20.4453H10.9442Z" fill="#E5A32A" />
@@ -82,6 +83,8 @@ interface FundingPopupProps {
   onAccept: (amount: number) => void;
   onClose: () => void;
   isSpectator?: boolean;
+  /** En mode spectateur (IA joue), callback pour fermer manuellement le popup */
+  onSpectatorClose?: () => void;
 }
 
 // ─── Composant ───────────────────────────────────────────────────────────────
@@ -92,11 +95,19 @@ export const FundingPopup = memo(function FundingPopup({
   onAccept,
   onClose,
   isSpectator = false,
+  onSpectatorClose,
 }: FundingPopupProps) {
   const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
   usePlaySoundOnOpen(visible && !!funding, 'popup-open');
 
   const badgeBounce = useSharedValue(0);
+
+  useEffect(() => {
+    crashLog('FundingPopup mount/update', { visible, hasFunding: !!funding, amount: funding?.amount });
+    return () => {
+      crashLog('FundingPopup unmount');
+    };
+  }, [visible, funding]);
 
   useEffect(() => {
     if (visible && funding) {
@@ -172,6 +183,13 @@ export const FundingPopup = memo(function FundingPopup({
           {!isSpectator && (
             <Animated.View entering={FadeInDown.delay(500).duration(220)} style={styles.buttonWrap}>
               <GameButton title="Collecter" onPress={handleAccept} variant="green" fullWidth />
+            </Animated.View>
+          )}
+
+          {/* Bouton FERMER en mode spectateur (IA joue) */}
+          {isSpectator && onSpectatorClose && (
+            <Animated.View entering={FadeInDown.delay(300).duration(220)} style={styles.buttonWrap}>
+              <GameButton title="FERMER" onPress={onSpectatorClose} variant="blue" fullWidth />
             </Animated.View>
           )}
         </ScrollView>

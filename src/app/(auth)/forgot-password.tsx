@@ -60,7 +60,7 @@ export default function ForgotPasswordScreen() {
       <View style={styles.container}>
         <RadialBackground centerColor="#0F3A6B" edgeColor="#081A2A" />
 
-        <View style={styles.shapeContainer}>
+        <View style={styles.shapeContainer} pointerEvents="none">
           <Image
             source={shapeImage}
             style={styles.shapeImage}
@@ -115,7 +115,7 @@ export default function ForgotPasswordScreen() {
       <RadialBackground centerColor="#0F3A6B" edgeColor="#081A2A" />
 
       {/* Shape (rayons) en arrière-plan */}
-      <View style={styles.shapeContainer}>
+      <View style={styles.shapeContainer} pointerEvents="none">
         <Image
           source={shapeImage}
           style={styles.shapeImage}
@@ -128,7 +128,7 @@ export default function ForgotPasswordScreen() {
 
       <KeyboardAvoidingView
         style={styles.keyboardView}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
           contentContainerStyle={styles.scrollContent}

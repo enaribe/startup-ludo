@@ -4,6 +4,12 @@ import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
+// Conversion sûre en string SVG (évite bug locale FR/Motorola où "1.45" devient "1,45")
+const svgNum = (n: number): string => {
+  if (!Number.isFinite(n)) return '0';
+  return n.toFixed(4).replace(/\.?0+$/, '') || '0';
+};
+
 interface GradientBorderProps {
   children: React.ReactNode;
   style?: object;
@@ -31,6 +37,7 @@ export const GradientBorder = memo(function GradientBorder({
         width={boxWidth}
         height={boxHeight}
         style={{ position: 'absolute', top: 0, left: 0 }}
+        pointerEvents="none"
       >
         <Defs>
           <LinearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
@@ -42,15 +49,15 @@ export const GradientBorder = memo(function GradientBorder({
           </LinearGradient>
         </Defs>
         <Rect
-          x={borderW / 2}
-          y={borderW / 2}
-          width={boxWidth - borderW}
-          height={boxHeight - borderW}
-          rx={borderRadius}
-          ry={borderRadius}
+          x={svgNum(borderW / 2)}
+          y={svgNum(borderW / 2)}
+          width={svgNum(boxWidth - borderW)}
+          height={svgNum(boxHeight - borderW)}
+          rx={svgNum(borderRadius)}
+          ry={svgNum(borderRadius)}
           fill={fill}
           stroke={`url(#${gradientId})`}
-          strokeWidth={borderW}
+          strokeWidth={svgNum(borderW)}
         />
       </Svg>
       {children}
@@ -99,24 +106,25 @@ export const DynamicGradientBorder = memo(function DynamicGradientBorder({
           width={boxWidth}
           height={boxHeight}
           style={{ position: 'absolute', top: 0, left: 0 }}
+          pointerEvents="none"
         >
           <Defs>
             <LinearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
               {gradientColors.map((s) => (
-                <Stop key={s.offset} offset={s.offset} stopColor={s.color} stopOpacity={s.opacity} />
+                <Stop key={s.offset} offset={s.offset} stopColor={s.color} stopOpacity={svgNum(s.opacity)} />
               ))}
             </LinearGradient>
           </Defs>
           <Rect
-            x={borderW / 2}
-            y={borderW / 2}
-            width={boxWidth - borderW}
-            height={boxHeight - borderW}
-            rx={borderRadius}
-            ry={borderRadius}
+            x={svgNum(borderW / 2)}
+            y={svgNum(borderW / 2)}
+            width={svgNum(boxWidth - borderW)}
+            height={svgNum(boxHeight - borderW)}
+            rx={svgNum(borderRadius)}
+            ry={svgNum(borderRadius)}
             fill={fill}
             stroke={`url(#${gradientId})`}
-            strokeWidth={borderW}
+            strokeWidth={svgNum(borderW)}
           />
         </Svg>
       )}

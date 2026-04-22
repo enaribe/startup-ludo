@@ -5,7 +5,7 @@
  * GameButton, GradientBorder et les assets existants.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -36,11 +36,18 @@ const shapeImage = require('@/../assets/images/shape.png');
 
 export default function RegisterScreen() {
   const router = useRouter();
-  const { register, loginWithGoogle, loginWithApple, isLoading, error, clearError } = useAuthStore();
+  const { register, loginWithGoogle, loginWithApple, isLoading, error, clearError, isAuthenticated } = useAuthStore();
 
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+
+  // Redirection auto vers home dès que l'utilisateur est authentifié
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.replace('/(tabs)/home');
+    }
+  }, [isAuthenticated, router]);
 
   const isFormValid =
     displayName.trim().length >= 2 &&
@@ -77,7 +84,7 @@ export default function RegisterScreen() {
       <RadialBackground centerColor="#0F3A6B" edgeColor="#081A2A" />
 
       {/* Shape (rayons) en arrière-plan */}
-      <View style={styles.shapeContainer}>
+      <View style={styles.shapeContainer} pointerEvents="none">
         <Image
           source={shapeImage}
           style={styles.shapeImage}
@@ -90,7 +97,7 @@ export default function RegisterScreen() {
 
       <KeyboardAvoidingView
         style={styles.keyboardView}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
           contentContainerStyle={styles.scrollContent}

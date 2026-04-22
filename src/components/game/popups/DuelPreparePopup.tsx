@@ -7,9 +7,10 @@ import { BORDER_RADIUS, SHADOWS, SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { usePlaySoundOnOpen } from '@/hooks/useSound';
 import type { Player } from '@/types';
-import { memo } from 'react';
+import { memo, useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { SlideInLeft, SlideInRight, SlideInUp } from 'react-native-reanimated';
+import { crashLog } from '@/utils/gameLog';
 
 interface DuelPreparePopupProps {
   visible: boolean;
@@ -31,6 +32,13 @@ export const DuelPreparePopup = memo(function DuelPreparePopup({
   onStart,
 }: DuelPreparePopupProps) {
   usePlaySoundOnOpen(visible && !!challenger && !!opponent, 'popup-open');
+
+  useEffect(() => {
+    crashLog('DuelPreparePopup mount/update', { visible, phase, hasChallenger: !!challenger, hasOpponent: !!opponent });
+    return () => {
+      crashLog('DuelPreparePopup unmount');
+    };
+  }, [visible, phase, challenger, opponent]);
 
   if (!challenger || !opponent) return null;
 

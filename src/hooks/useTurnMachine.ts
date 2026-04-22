@@ -13,6 +13,7 @@ import type { GameState, Player } from '@/types';
 import { useSound } from '@/hooks/useSound';
 import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { gameLog, gameWarn } from '@/utils/gameLog';
 
 // ===== CONSTANTS =====
 
@@ -321,10 +322,10 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
 
   const onDiceComplete = useCallback((value: number) => {
     if (turnStateRef.current.phase !== 'rolling') {
-      console.warn('[useTurnMachine] onDiceComplete ignoré — phase:', turnStateRef.current.phase, 'value:', value);
+      gameWarn('turn', 'onDiceComplete ignoré — phase:', turnStateRef.current.phase, 'value:', value);
       return;
     }
-    console.log('[useTurnMachine] onDiceComplete → phase moving', { value });
+    gameLog('turn', 'onDiceComplete → phase moving', { value });
     dispatch({ type: 'ROLL_COMPLETE', value });
 
     if (value === 6 && hapticsEnabled) {
@@ -350,7 +351,7 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
     if (!game || !currentPlayer) return;
 
     const moves = actions.getValidMoves();
-    console.log('[useTurnMachine] Phase moving: coups valides', {
+    gameLog('turn', 'Phase moving: coups valides', {
       count: moves.length,
       moves: moves.map((m) => ({ type: m.type, pawnIndex: m.pawnIndex })),
       currentPlayerId: currentPlayer.id,
@@ -359,7 +360,7 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
     });
 
     if (moves.length === 0) {
-      console.log('[useTurnMachine] Aucun coup valide → fin de tour (noMove)');
+      gameLog('turn', 'Aucun coup valide → fin de tour');
       // No valid moves — skip turn after short delay
       timers.set('noMove', () => {
         dispatch({ type: 'NO_VALID_MOVE' });
@@ -375,7 +376,7 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
     }
 
     setAnimating(true);
-    console.log('[useTurnMachine] Exécution auto du premier coup:', move.type, 'pawnIndex', move.pawnIndex);
+    gameLog('turn', 'Exécution auto du coup', { type: move.type, pawnIndex: move.pawnIndex });
 
     timers.set('autoMove', () => {
       const rolledSix = turnState.rolledSix;
@@ -383,13 +384,13 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
 
       if (move.type === 'exit') {
         result = actions.exitHome(move.pawnIndex);
-        console.log('[useTurnMachine] exitHome résultat:', {
+        gameLog('turn', 'exitHome résultat', {
           canMove: result?.canMove,
           pathLength: result?.path?.length,
         });
       } else {
         result = actions.executeMove(move.pawnIndex);
-        console.log('[useTurnMachine] executeMove résultat:', {
+        gameLog('turn', 'executeMove résultat', {
           canMove: result?.canMove,
           newStatus: result?.newState?.status,
           pathLength: result?.path?.length,
@@ -446,7 +447,7 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
         }, animDelay);
       } else {
         // Move returned null (shouldn't happen but be safe)
-        console.warn('[useTurnMachine] executeMove/exitHome a retourné null');
+        gameWarn('turn', 'executeMove/exitHome a retourné null');
         setAnimating(false);
         dispatch({ type: 'NO_VALID_MOVE' });
       }

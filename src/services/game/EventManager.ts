@@ -7,12 +7,7 @@
 
 import type { EventType } from '@/types';
 import {
-  getRandomQuiz,
-  getRandomDuel,
-  getRandomFunding,
-  getRandomEvent,
-  getRandomOpportunity,
-  getRandomChallenge,
+  getEdition,
   type EditionId,
   type Quiz,
   type Duel,
@@ -204,25 +199,35 @@ export class EventManager {
   }
 
   /**
-   * Sélectionne un élément aléatoire d'un tableau
+   * Sélectionne un élément aléatoire en évitant les IDs déjà utilisés.
+   * Quand tous les items ont été utilisés, reset le Set et recycle.
+   * Garantit qu'un même item ne reviendra pas avant d'avoir parcouru tout le pool.
    */
-  private pickRandom<T>(items: T[]): T | null {
+  private pickRandomUnused<T extends { id: string }>(items: T[], usedIds: Set<string>): T | null {
     if (items.length === 0) return null;
-    return items[Math.floor(Math.random() * items.length)] ?? null;
+
+    const available = items.filter((item) => !usedIds.has(item.id));
+
+    // Pool épuisé : on recycle en resettant le Set
+    if (available.length === 0) {
+      usedIds.clear();
+      return items[Math.floor(Math.random() * items.length)] ?? null;
+    }
+
+    return available[Math.floor(Math.random() * available.length)] ?? null;
   }
 
   /**
-   * Génère un quiz aléatoire
+   * Génère un quiz aléatoire (évite les doublons tant qu'il reste des quiz non joués)
    */
   generateQuizEvent(difficulty?: DifficultyLevel): GeneratedQuizEvent | null {
-    // Priorité : contenu du sous-niveau, puis édition
-    const quiz = this.subLevelContent?.quizzes.length
-      ? this.pickRandom(
-          difficulty
-            ? this.subLevelContent.quizzes.filter(q => q.difficulty === difficulty)
-            : this.subLevelContent.quizzes
-        )
-      : getRandomQuiz(this.editionId, difficulty);
+    // Source : sous-niveau challenge si défini, sinon édition
+    const pool = this.subLevelContent?.quizzes.length
+      ? this.subLevelContent.quizzes
+      : getEdition(this.editionId).quizzes;
+
+    const filtered = difficulty ? pool.filter((q) => q.difficulty === difficulty) : pool;
+    const quiz = this.pickRandomUnused(filtered, this.usedQuizIds);
 
     if (!quiz) {
       return this.getFallbackQuiz();
@@ -252,12 +257,14 @@ export class EventManager {
   }
 
   /**
-   * Génère un financement aléatoire
+   * Génère un financement aléatoire (évite les doublons)
    */
   generateFundingEvent(): GeneratedFundingEvent | null {
-    const funding = this.subLevelContent?.fundings.length
-      ? this.pickRandom(this.subLevelContent.fundings)
-      : getRandomFunding(this.editionId);
+    const pool = this.subLevelContent?.fundings.length
+      ? this.subLevelContent.fundings
+      : getEdition(this.editionId).fundings;
+
+    const funding = this.pickRandomUnused(pool, this.usedFundingIds);
 
     if (!funding) {
       return this.getFallbackFunding();
@@ -279,12 +286,14 @@ export class EventManager {
   }
 
   /**
-   * Génère un duel aléatoire (format DuelQuestion : question + 3 options avec points)
+   * Génère un duel aléatoire (évite les doublons)
    */
   generateDuelEvent(): GeneratedDuelEvent | null {
-    const duel = this.subLevelContent?.duels.length
-      ? this.pickRandom(this.subLevelContent.duels)
-      : getRandomDuel(this.editionId);
+    const pool = this.subLevelContent?.duels.length
+      ? this.subLevelContent.duels
+      : getEdition(this.editionId).duels;
+
+    const duel = this.pickRandomUnused(pool, this.usedDuelIds);
 
     if (!duel) {
       return this.getFallbackDuel();
@@ -304,12 +313,14 @@ export class EventManager {
   }
 
   /**
-   * Génère une opportunité aléatoire
+   * Génère une opportunité aléatoire (évite les doublons)
    */
   generateOpportunityEvent(): GeneratedOpportunityEvent | null {
-    const opportunity = this.subLevelContent?.opportunities.length
-      ? this.pickRandom(this.subLevelContent.opportunities)
-      : getRandomOpportunity(this.editionId);
+    const pool = this.subLevelContent?.opportunities.length
+      ? this.subLevelContent.opportunities
+      : getEdition(this.editionId).opportunities;
+
+    const opportunity = this.pickRandomUnused(pool, this.usedOpportunityIds);
 
     if (!opportunity) {
       return this.getFallbackOpportunity();
@@ -331,12 +342,14 @@ export class EventManager {
   }
 
   /**
-   * Génère un challenge aléatoire
+   * Génère un challenge aléatoire (évite les doublons)
    */
   generateChallengeEvent(): GeneratedChallengeEvent | null {
-    const challenge = this.subLevelContent?.challengeEvents.length
-      ? this.pickRandom(this.subLevelContent.challengeEvents)
-      : getRandomChallenge(this.editionId);
+    const pool = this.subLevelContent?.challengeEvents.length
+      ? this.subLevelContent.challengeEvents
+      : getEdition(this.editionId).challenges;
+
+    const challenge = this.pickRandomUnused(pool, this.usedChallengeIds);
 
     if (!challenge) {
       return this.getFallbackChallenge();
@@ -358,72 +371,63 @@ export class EventManager {
   }
 
   /**
-   * Génère un événement aléatoire (50% opportunité, 50% challenge)
+   * Génère un événement aléatoire (50% opportunité, 50% challenge) — évite les doublons
    */
   generateRandomEvent(): GeneratedOpportunityEvent | GeneratedChallengeEvent | null {
-    // Si contenu sous-niveau, tirer de là
-    if (this.subLevelContent) {
-      const hasOpp = this.subLevelContent.opportunities.length > 0;
-      const hasChal = this.subLevelContent.challengeEvents.length > 0;
-      if (!hasOpp && !hasChal) {
-        return Math.random() < 0.5 ? this.getFallbackOpportunity() : this.getFallbackChallenge();
-      }
-      const pickOpp = hasOpp && (!hasChal || Math.random() < 0.5);
-      if (pickOpp) {
-        const opp = this.pickRandom(this.subLevelContent.opportunities);
-        if (opp) {
-          this.usedOpportunityIds.add(opp.id);
-          return {
-            type: 'opportunity',
-            data: { id: opp.id, title: opp.title, description: opp.description, effect: 'tokens', value: FIXED_POINTS.opportunity, rarity: this.inferRarity(FIXED_POINTS.opportunity) },
-          };
-        }
-      }
-      const chal = this.pickRandom(this.subLevelContent.challengeEvents);
-      if (chal) {
-        this.usedChallengeIds.add(chal.id);
+    // Source : sous-niveau si défini, sinon édition
+    const opportunities = this.subLevelContent?.opportunities.length
+      ? this.subLevelContent.opportunities
+      : getEdition(this.editionId).opportunities;
+    const challenges = this.subLevelContent?.challengeEvents.length
+      ? this.subLevelContent.challengeEvents
+      : getEdition(this.editionId).challenges;
+
+    const hasOpp = opportunities.length > 0;
+    const hasChal = challenges.length > 0;
+
+    if (!hasOpp && !hasChal) {
+      return Math.random() < 0.5 ? this.getFallbackOpportunity() : this.getFallbackChallenge();
+    }
+
+    // Choix du type : 50/50 si les deux sont dispo, sinon celui qui a des items
+    const pickOpp = hasOpp && (!hasChal || Math.random() < 0.5);
+
+    if (pickOpp) {
+      const opp = this.pickRandomUnused(opportunities, this.usedOpportunityIds);
+      if (opp) {
+        this.usedOpportunityIds.add(opp.id);
         return {
-          type: 'challenge',
-          data: { id: chal.id, title: chal.title, description: chal.description, effect: 'loseTokens', value: FIXED_POINTS.challenge, rarity: this.inferRarity(FIXED_POINTS.challenge) },
+          type: 'opportunity',
+          data: {
+            id: opp.id,
+            title: opp.title,
+            description: opp.description,
+            effect: 'tokens',
+            value: FIXED_POINTS.opportunity,
+            rarity: this.inferRarity(FIXED_POINTS.opportunity),
+          },
         };
       }
     }
 
-    const event = getRandomEvent(this.editionId);
-
-    if (!event) {
-      return Math.random() < 0.5
-        ? this.getFallbackOpportunity()
-        : this.getFallbackChallenge();
-    }
-
-    if (event.type === 'opportunity') {
-      this.usedOpportunityIds.add(event.data.id);
-      return {
-        type: 'opportunity',
-        data: {
-          id: event.data.id,
-          title: event.data.title,
-          description: event.data.description,
-          effect: 'tokens',
-          value: FIXED_POINTS.opportunity,
-          rarity: this.inferRarity(FIXED_POINTS.opportunity),
-        },
-      };
-    } else {
-      this.usedChallengeIds.add(event.data.id);
+    const chal = this.pickRandomUnused(challenges, this.usedChallengeIds);
+    if (chal) {
+      this.usedChallengeIds.add(chal.id);
       return {
         type: 'challenge',
         data: {
-          id: event.data.id,
-          title: event.data.title,
-          description: event.data.description,
+          id: chal.id,
+          title: chal.title,
+          description: chal.description,
           effect: 'loseTokens',
           value: FIXED_POINTS.challenge,
           rarity: this.inferRarity(FIXED_POINTS.challenge),
         },
       };
     }
+
+    // Fallback si tout est vide
+    return Math.random() < 0.5 ? this.getFallbackOpportunity() : this.getFallbackChallenge();
   }
 
   // ===== HELPERS PRIVÉS =====

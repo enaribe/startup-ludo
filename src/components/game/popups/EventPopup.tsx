@@ -20,6 +20,7 @@ import { SPACING, BORDER_RADIUS, SHADOWS } from '@/styles/spacing';
 import { useSettingsStore } from '@/stores';
 import { usePlaySoundOnOpen } from '@/hooks/useSound';
 import type { OpportunityEvent, ChallengeEvent } from '@/types';
+import { crashLog } from '@/utils/gameLog';
 
 type EventData = OpportunityEvent | ChallengeEvent;
 
@@ -142,6 +143,8 @@ interface EventPopupProps {
   onAccept: (value: number, effect: string) => void;
   onClose: () => void;
   isSpectator?: boolean;
+  /** En mode spectateur (IA joue), callback pour fermer manuellement le popup */
+  onSpectatorClose?: () => void;
 }
 
 // ─── Composant ───────────────────────────────────────────────────────────────
@@ -153,6 +156,7 @@ export const EventPopup = memo(function EventPopup({
   onAccept,
   onClose,
   isSpectator = false,
+  onSpectatorClose,
 }: EventPopupProps) {
   const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
   usePlaySoundOnOpen(visible && !!event, 'popup-open');
@@ -160,6 +164,13 @@ export const EventPopup = memo(function EventPopup({
   const isOpportunity = eventType === 'opportunity';
 
   const badgeBounce = useSharedValue(0);
+
+  useEffect(() => {
+    crashLog('EventPopup mount/update', { visible, eventType, hasEvent: !!event });
+    return () => {
+      crashLog('EventPopup unmount', { eventType });
+    };
+  }, [visible, event, eventType]);
 
   useEffect(() => {
     if (visible && event) {
@@ -292,6 +303,13 @@ export const EventPopup = memo(function EventPopup({
                 </Animated.View>
               )}
             </>
+          )}
+
+          {/* Bouton FERMER en mode spectateur (IA joue) */}
+          {isSpectator && onSpectatorClose && (
+            <Animated.View entering={FadeInDown.delay(300).duration(220)} style={styles.buttonWrap}>
+              <GameButton title="FERMER" onPress={onSpectatorClose} variant="blue" fullWidth />
+            </Animated.View>
           )}
         </ScrollView>
       </Animated.View>

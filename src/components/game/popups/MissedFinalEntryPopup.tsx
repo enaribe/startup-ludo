@@ -46,7 +46,7 @@ function PawnIcon({ color }: { color: string }) {
   return (
     <Svg width={14} height={20} viewBox="0 0 14 20" fill="none">
       {/* Tête */}
-      <Circle cx={7} cy={4} r={3.5} fill={color} />
+      <Circle cx="7" cy="4" r="3.5" fill={color} />
       {/* Corps */}
       <Path d="M3 19 C3 13 11 13 11 19 Z" fill={color} />
       {/* Base */}
@@ -61,7 +61,7 @@ function FlagIcon() {
   return (
     <Svg width={20} height={22} viewBox="0 0 20 22" fill="none">
       {/* Mât vertical */}
-      <Rect x={2} y={0} width={2.5} height={22} rx={1.25} fill="#CCCCCC" />
+      <Rect x="2" y="0" width="2.5" height="22" rx="1.25" fill="#CCCCCC" />
       {/* Fanion triangulaire */}
       <Polygon points="4.5,1 18,6 4.5,11" fill="#F35145" />
     </Svg>

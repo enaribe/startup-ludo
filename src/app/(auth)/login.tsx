@@ -5,7 +5,7 @@
  * GameButton, GradientBorder et les assets existants.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -34,10 +34,17 @@ const shapeImage = require('@/../assets/images/shape.png');
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { login, loginWithGoogle, loginWithApple, isLoading, error, clearError } = useAuthStore();
+  const { login, loginWithGoogle, loginWithApple, isLoading, error, clearError, isAuthenticated } = useAuthStore();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+
+  // Redirection automatique vers home une fois authentifié (login email, Google, Apple, téléphone)
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.replace('/(tabs)/home');
+    }
+  }, [isAuthenticated, router]);
 
   const isFormValid = email.trim().includes('@') && password.trim().length >= 6;
 
@@ -75,7 +82,7 @@ export default function LoginScreen() {
       <RadialBackground centerColor="#0F3A6B" edgeColor="#081A2A" />
 
       {/* Shape (rayons) en arrière-plan */}
-      <View style={styles.shapeContainer}>
+      <View style={styles.shapeContainer} pointerEvents="none">
         <Image
           source={shapeImage}
           style={styles.shapeImage}
@@ -88,7 +95,7 @@ export default function LoginScreen() {
 
       <KeyboardAvoidingView
         style={styles.keyboardView}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
           contentContainerStyle={styles.scrollContent}

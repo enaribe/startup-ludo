@@ -26,6 +26,7 @@ import type {
   RealtimePlayer,
   RealtimeGameState,
   RealtimeAction,
+  MatchmakingTicket,
 } from '@/services/firebase/config';
 
 // ===== TYPES =====
@@ -268,6 +269,94 @@ export class MultiplayerSync {
       return { roomId: foundRoomId, color: availableColor };
     } catch (error) {
       firebaseLog('Failed to join room', error);
+      throw new Error(error instanceof Error ? error.message : getFirebaseErrorMessage(error));
+    }
+  }
+
+  /**
+   * Rejoint une room existante directement par son ID (sans code).
+   * Utilisé par le match rapide : les joueurs reçoivent le roomId via leur ticket.
+   */
+  async joinRoomById(roomId: string, data: JoinRoomData): Promise<{ roomId: string; color: PlayerColor }> {
+    try {
+      firebaseLog('Joining room by id', { roomId, playerId: data.playerId });
+
+      const roomSnap = await database().ref(REALTIME_PATHS.room(roomId)).once('value');
+      if (!roomSnap.exists()) {
+        throw new Error('Salon introuvable');
+      }
+
+      const room = roomSnap.val() as RealtimeRoom;
+      if (room.status !== 'waiting') {
+        throw new Error('Ce salon n\'est plus disponible');
+      }
+
+      const playersRef = database().ref(REALTIME_PATHS.roomPlayers(roomId));
+      const playersSnap = await playersRef.once('value');
+
+      const usedColors = new Set<string>();
+      let playerCount = 0;
+      if (playersSnap.exists()) {
+        playersSnap.forEach((child) => {
+          const player = child.val() as RealtimePlayer;
+          // Si déjà présent (reconnexion), on réutilise sa couleur
+          if (child.key === data.playerId) {
+            this.roomId = roomId;
+            this.playerId = data.playerId;
+            this.isConnected = true;
+            this.setupPresence();
+            this.startPresenceHeartbeat();
+          }
+          usedColors.add(player.color);
+          playerCount++;
+          return undefined;
+        });
+      }
+
+      // Si le joueur est déjà dans la room, pas besoin de le re-ajouter
+      if (this.roomId === roomId && this.playerId === data.playerId) {
+        const existing = playersSnap.child(data.playerId).val() as RealtimePlayer | null;
+        return { roomId, color: existing?.color ?? 'yellow' };
+      }
+
+      const maxPlayers = room.maxPlayers ?? room.gameSettings?.maxPlayers ?? 4;
+      if (playerCount >= maxPlayers) {
+        throw new Error('Ce salon est plein');
+      }
+
+      const availableColor = PLAYER_COLORS.find((c) => !usedColors.has(c)) ?? 'yellow';
+
+      const playerData: RealtimePlayer = {
+        id: data.playerId,
+        displayName: data.playerName,
+        name: data.playerName,
+        color: availableColor,
+        isHost: false,
+        isReady: false,
+        isConnected: true,
+        joinedAt: Date.now(),
+        lastSeen: Date.now(),
+      };
+
+      await database().ref(REALTIME_PATHS.roomPlayer(roomId, data.playerId)).set(playerData);
+
+      this.roomId = roomId;
+      this.playerId = data.playerId;
+      this.isConnected = true;
+
+      this.setupPresence();
+      this.startPresenceHeartbeat();
+
+      this.emit({
+        type: 'player_joined',
+        data: playerData,
+        timestamp: Date.now(),
+      });
+
+      firebaseLog('Joined room by id successfully', { roomId, color: availableColor });
+      return { roomId, color: availableColor };
+    } catch (error) {
+      firebaseLog('Failed to join room by id', error);
       throw new Error(error instanceof Error ? error.message : getFirebaseErrorMessage(error));
     }
   }
@@ -924,6 +1013,241 @@ export class MultiplayerSync {
         console.error('[MultiplayerSync] Event callback error:', error);
       }
     });
+  }
+
+  // ===== MATCHMAKING (MATCH RAPIDE) =====
+
+  /**
+   * Dépose un ticket dans la file d'attente match rapide.
+   * Le ticket est auto-supprimé si le joueur se déconnecte (onDisconnect).
+   */
+  async enqueueMatchmakingTicket(
+    payload: Omit<MatchmakingTicket, 'id' | 'createdAt' | 'status' | 'roomId'>
+  ): Promise<string> {
+    try {
+      const queueRef = database().ref(REALTIME_PATHS.matchmakingQueue);
+      const newTicketRef = queueRef.push();
+      const ticketId = newTicketRef.key!;
+
+      const ticket: MatchmakingTicket = {
+        ...payload,
+        id: ticketId,
+        createdAt: Date.now(),
+        status: 'waiting',
+        roomId: null,
+      };
+
+      await newTicketRef.set(ticket);
+      // Auto-cleanup si le joueur ferme l'app
+      await newTicketRef.onDisconnect().remove();
+
+      firebaseLog('Matchmaking ticket enqueued', { ticketId, maxPlayers: payload.maxPlayers });
+      return ticketId;
+    } catch (error) {
+      firebaseLog('Failed to enqueue matchmaking ticket', error);
+      throw new Error(getFirebaseErrorMessage(error));
+    }
+  }
+
+  /**
+   * Supprime un ticket de la file (annulation volontaire ou fin de match).
+   */
+  async removeMatchmakingTicket(ticketId: string): Promise<void> {
+    try {
+      const ref = database().ref(REALTIME_PATHS.matchmakingTicket(ticketId));
+      await ref.onDisconnect().cancel();
+      await ref.remove();
+      firebaseLog('Matchmaking ticket removed', { ticketId });
+    } catch (error) {
+      firebaseLog('Failed to remove matchmaking ticket', error);
+    }
+  }
+
+  /**
+   * S'abonne à la file d'attente globale (triée par createdAt).
+   * Retourne la liste complète des tickets à chaque changement.
+   */
+  subscribeToMatchmakingQueue(
+    callback: (tickets: MatchmakingTicket[]) => void
+  ): () => void {
+    const queueRef = database()
+      .ref(REALTIME_PATHS.matchmakingQueue)
+      .orderByChild('createdAt');
+
+    const onValueCallback = (snapshot: FirebaseDatabaseTypes.DataSnapshot) => {
+      const tickets: MatchmakingTicket[] = [];
+      if (snapshot.exists()) {
+        snapshot.forEach((child) => {
+          const ticket = child.val() as MatchmakingTicket;
+          tickets.push({ ...ticket, id: child.key ?? ticket.id });
+          return undefined;
+        });
+      }
+      callback(tickets);
+    };
+
+    queueRef.on('value', onValueCallback);
+
+    const key = `mm_queue_${Date.now()}`;
+    this.listeners.set(key, () => queueRef.off('value', onValueCallback));
+
+    return () => {
+      queueRef.off('value', onValueCallback);
+      this.listeners.delete(key);
+    };
+  }
+
+  /**
+   * S'abonne à un ticket spécifique pour savoir quand il est matché.
+   */
+  subscribeToMatchmakingTicket(
+    ticketId: string,
+    callback: (ticket: MatchmakingTicket | null) => void
+  ): () => void {
+    const ticketRef = database().ref(REALTIME_PATHS.matchmakingTicket(ticketId));
+
+    const onValueCallback = (snapshot: FirebaseDatabaseTypes.DataSnapshot) => {
+      if (snapshot.exists()) {
+        callback(snapshot.val() as MatchmakingTicket);
+      } else {
+        callback(null);
+      }
+    };
+
+    ticketRef.on('value', onValueCallback);
+
+    const key = `mm_ticket_${ticketId}`;
+    this.listeners.set(key, () => ticketRef.off('value', onValueCallback));
+
+    return () => {
+      ticketRef.off('value', onValueCallback);
+      this.listeners.delete(key);
+    };
+  }
+
+  /**
+   * Tente de verrouiller N tickets (transition waiting → matching) de manière atomique.
+   * Retourne true si le lock réussit pour TOUS les tickets, false sinon.
+   * Si ça échoue, le caller doit réessayer au prochain tick de la queue.
+   */
+  private async lockTickets(ticketIds: string[]): Promise<boolean> {
+    let allLocked = true;
+
+    for (const ticketId of ticketIds) {
+      const ref = database().ref(REALTIME_PATHS.matchmakingTicket(ticketId));
+      const txResult = await ref.transaction((current: MatchmakingTicket | null) => {
+        if (!current) return; // abort
+        if (current.status !== 'waiting') return; // abort
+        return { ...current, status: 'matching' };
+      });
+
+      if (!txResult.committed || !txResult.snapshot.exists()) {
+        allLocked = false;
+        break;
+      }
+    }
+
+    // Si un lock a échoué, on relâche les tickets déjà lockés
+    if (!allLocked) {
+      await Promise.all(
+        ticketIds.map((id) =>
+          database()
+            .ref(REALTIME_PATHS.matchmakingTicket(id))
+            .transaction((current: MatchmakingTicket | null) => {
+              if (!current) return;
+              if (current.status !== 'matching') return;
+              return { ...current, status: 'waiting' };
+            })
+            .catch(() => {})
+        )
+      );
+    }
+
+    return allLocked;
+  }
+
+  /**
+   * Marque N tickets comme matchés, avec le roomId.
+   * Appelée par le "lead" une fois la room créée.
+   */
+  async markTicketsMatched(ticketIds: string[], roomId: string): Promise<void> {
+    await Promise.all(
+      ticketIds.map((id) =>
+        database()
+          .ref(REALTIME_PATHS.matchmakingTicket(id))
+          .update({ status: 'matched' as const, roomId })
+          .catch((err) => firebaseLog('Failed to mark ticket matched', { id, err }))
+      )
+    );
+  }
+
+  /**
+   * Logique "lead" : appelée quand on détecte que notre ticket est le plus ancien
+   * parmi un groupe de N compatibles. Lock les tickets, crée la room, les marque matched.
+   *
+   * @returns roomId si le match a été créé, null si un autre lead a pris la main
+   */
+  async tryCreateRoomFromTickets(
+    tickets: MatchmakingTicket[],
+    hostUserId: string,
+    hostDisplayName: string
+  ): Promise<string | null> {
+    if (tickets.length === 0) return null;
+
+    const ticketIds = tickets.map((t) => t.id);
+    const host = tickets.find((t) => t.userId === hostUserId);
+    if (!host) {
+      firebaseLog('Lead ticket not found in group, aborting');
+      return null;
+    }
+
+    // Phase 1 : lock atomique
+    const locked = await this.lockTickets(ticketIds);
+    if (!locked) {
+      firebaseLog('Failed to lock tickets, another lead got them');
+      return null;
+    }
+
+    try {
+      // Phase 2 : créer la room en tant que host
+      const { roomId } = await this.createRoom({
+        edition: host.edition,
+        maxPlayers: host.maxPlayers,
+        hostId: hostUserId,
+        hostName: hostDisplayName,
+        isQuickMatch: true,
+      });
+
+      // Le host a déjà été ajouté par createRoom avec isHost=true, on propage sa startup
+      await this.setStartupSelection(
+        host.startupId,
+        host.startupName,
+        host.isDefaultProject,
+        host.sector
+      );
+
+      // Phase 3 : notifier les autres tickets
+      await this.markTicketsMatched(ticketIds, roomId);
+
+      firebaseLog('Match created from tickets', { roomId, ticketIds });
+      return roomId;
+    } catch (error) {
+      firebaseLog('Failed to create room from tickets, releasing locks', error);
+      // Relâcher les tickets en cas d'échec
+      await Promise.all(
+        ticketIds.map((id) =>
+          database()
+            .ref(REALTIME_PATHS.matchmakingTicket(id))
+            .transaction((current: MatchmakingTicket | null) => {
+              if (!current) return;
+              if (current.status !== 'matching') return;
+              return { ...current, status: 'waiting' };
+            })
+            .catch(() => {})
+        )
+      );
+      return null;
+    }
   }
 
   // ===== CLEANUP =====

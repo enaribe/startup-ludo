@@ -20,6 +20,8 @@ import type { EditionId } from '@/data';
 import type { CheckpointData } from '@/utils/onlineCodec';
 import { useChallengeStore } from '@/stores/useChallengeStore';
 import { MAX_TOKENS } from '@/config/boardConfig';
+import { gameLog } from '@/utils/gameLog';
+import { resetDuelQuestionPool } from '@/data/duelQuestions';
 
 /** Action compacte recue d'un joueur distant via RTDB */
 export interface RemoteAction {
@@ -151,16 +153,19 @@ export const useGameStore = create<GameStore>()(
         // Configurer l'EventManager avec l'édition
         eventManager.setEdition(edition as EditionId);
 
+        // Reset du pool de questions de duel (évite les doublons entre parties)
+        resetDuelQuestionPool();
+
         // Si mode challenge, charger le contenu du sous-niveau
         eventManager.clearSubLevelContent();
         if (challengeContext) {
           const { challenges } = useChallengeStore.getState();
-          console.log('[GameStore] Challenge mode, challenges in store:', challenges.length);
+          gameLog('store', '[GameStore] Challenge mode, challenges in store:', challenges.length);
           const challenge = challenges.find((c) => c.id === challengeContext.challengeId);
           if (challenge) {
             const level = challenge.levels.find((l) => l.number === challengeContext.levelNumber);
             const subLevel = level?.subLevels.find((s) => s.number === challengeContext.subLevelNumber);
-            console.log('[GameStore] SubLevel found:', subLevel?.name, 'quizzes:', subLevel?.quizzes?.length ?? 0, 'duels:', subLevel?.duels?.length ?? 0);
+            gameLog('store', '[GameStore] SubLevel found:', subLevel?.name, 'quizzes:', subLevel?.quizzes?.length ?? 0, 'duels:', subLevel?.duels?.length ?? 0);
             if (subLevel) {
               // Filter content by sector: keep items without sectorId (generic) + items matching player's sector
               const sectorId = challengeContext.sectorId;
@@ -183,13 +188,13 @@ export const useGameStore = create<GameStore>()(
 
               if (hasContent) {
                 eventManager.setSubLevelContent(filteredContent);
-                console.log('[GameStore] SubLevel content loaded into EventManager (filtered by sector:', sectorId || 'none', ')');
+                gameLog('store', '[GameStore] SubLevel content loaded into EventManager (filtered by sector:', sectorId || 'none', ')');
               } else {
-                console.log('[GameStore] SubLevel has no content after sector filtering, using edition fallback');
+                gameLog('store', '[GameStore] SubLevel has no content after sector filtering, using edition fallback');
               }
             }
           } else {
-            console.log('[GameStore] Challenge not found in store:', challengeContext.challengeId);
+            gameLog('store', '[GameStore] Challenge not found in store:', challengeContext.challengeId);
           }
         }
 
@@ -361,36 +366,36 @@ export const useGameStore = create<GameStore>()(
       // ===== ACTIONS DE JEU =====
 
       executeMove: (pawnIndex) => {
-        console.log('[useGameStore.executeMove] Starting move for pawn:', pawnIndex);
+        gameLog('store', '[useGameStore.executeMove] Starting move for pawn:', pawnIndex);
         
         const { game } = get();
         if (!game || game.diceValue === null) {
-          console.log('[useGameStore.executeMove] No game or dice value');
+          gameLog('store', '[useGameStore.executeMove] No game or dice value');
           return null;
         }
 
         const currentPlayer = game.players[game.currentPlayerIndex];
         if (!currentPlayer) {
-          console.log('[useGameStore.executeMove] No current player');
+          gameLog('store', '[useGameStore.executeMove] No current player');
           return null;
         }
 
         const pawn = currentPlayer.pawns[pawnIndex];
         if (!pawn) {
-          console.log('[useGameStore.executeMove] No pawn at index:', pawnIndex);
+          gameLog('store', '[useGameStore.executeMove] No pawn at index:', pawnIndex);
           return null;
         }
 
-        console.log('[useGameStore.executeMove] Pawn state:', pawn);
+        gameLog('store', '[useGameStore.executeMove] Pawn state:', pawn);
 
         // Sortie de maison
         if (pawn.status === 'home') {
-          console.log('[useGameStore.executeMove] Pawn is at home, calling exitHome');
+          gameLog('store', '[useGameStore.executeMove] Pawn is at home, calling exitHome');
           return get().exitHome(pawnIndex);
         }
 
         // Mouvement normal
-        console.log('[useGameStore.executeMove] Moving pawn on circuit/final');
+        gameLog('store', '[useGameStore.executeMove] Moving pawn on circuit/final');
         const result = GameEngine.movePawn(
           currentPlayer,
           pawnIndex,
@@ -398,7 +403,7 @@ export const useGameStore = create<GameStore>()(
           game.players
         );
 
-        console.log('[useGameStore.executeMove] Move result:', {
+        gameLog('store', '[useGameStore.executeMove] Move result:', {
           canMove: result.canMove,
           newStatus: result.newState?.status,
           newPosition: result.newState && 'position' in result.newState ? result.newState.position : undefined,
@@ -407,7 +412,7 @@ export const useGameStore = create<GameStore>()(
         });
 
         if (!result.canMove) {
-          console.log('[useGameStore.executeMove] Cannot move');
+          gameLog('store', '[useGameStore.executeMove] Cannot move');
           return null;
         }
 
@@ -418,7 +423,7 @@ export const useGameStore = create<GameStore>()(
               player.pawns[pawnIndex] = result.newState;
               state.game.updatedAt = Date.now();
               state.lastMoveResult = result;
-              console.log('[useGameStore.executeMove] State updated, lastMoveResult set');
+              gameLog('store', '[useGameStore.executeMove] State updated, lastMoveResult set');
             }
           }
         });
@@ -427,17 +432,17 @@ export const useGameStore = create<GameStore>()(
       },
 
       exitHome: (pawnIndex) => {
-        console.log('[useGameStore.exitHome] Exiting home for pawn:', pawnIndex);
+        gameLog('store', '[useGameStore.exitHome] Exiting home for pawn:', pawnIndex);
         
         const { game } = get();
         if (!game || game.diceValue !== 6) {
-          console.log('[useGameStore.exitHome] Cannot exit - no 6');
+          gameLog('store', '[useGameStore.exitHome] Cannot exit - no 6');
           return null;
         }
 
         const currentPlayer = game.players[game.currentPlayerIndex];
         if (!currentPlayer) {
-          console.log('[useGameStore.exitHome] No current player');
+          gameLog('store', '[useGameStore.exitHome] No current player');
           return null;
         }
 
@@ -447,7 +452,7 @@ export const useGameStore = create<GameStore>()(
           game.players
         );
 
-        console.log('[useGameStore.exitHome] Exit result:', {
+        gameLog('store', '[useGameStore.exitHome] Exit result:', {
           canMove: result.canMove,
           newStatus: result.newState?.status,
           newPosition: result.newState && 'position' in result.newState ? result.newState.position : undefined,
@@ -455,7 +460,7 @@ export const useGameStore = create<GameStore>()(
         });
 
         if (!result.canMove) {
-          console.log('[useGameStore.exitHome] Cannot exit');
+          gameLog('store', '[useGameStore.exitHome] Cannot exit');
           return null;
         }
 
@@ -466,7 +471,7 @@ export const useGameStore = create<GameStore>()(
               player.pawns[pawnIndex] = result.newState;
               state.game.updatedAt = Date.now();
               state.lastMoveResult = result;
-              console.log('[useGameStore.exitHome] State updated');
+              gameLog('store', '[useGameStore.exitHome] State updated');
             }
           }
         });
@@ -702,11 +707,11 @@ export const useGameStore = create<GameStore>()(
       applyRemoteAction: (action) => {
         const { game } = get();
         if (!game) {
-          console.log('[useGameStore.applyRemoteAction] Pas de partie, action ignorée:', action.t);
+          gameLog('store', '[useGameStore.applyRemoteAction] Pas de partie, action ignorée:', action.t);
           return;
         }
 
-        console.log('[useGameStore.applyRemoteAction]', action.t, {
+        gameLog('store', '[useGameStore.applyRemoteAction]', action.t, {
           from: action.p,
           currentPlayerIndex: game.currentPlayerIndex,
           currentPlayerId: game.players[game.currentPlayerIndex]?.id,
@@ -718,7 +723,7 @@ export const useGameStore = create<GameStore>()(
           case 'r': {
             // Roll: apply remote dice value
             const value = (action.d as { v: number }).v;
-            console.log('[useGameStore.applyRemoteAction] r (roll): valeur', value);
+            gameLog('store', '[useGameStore.applyRemoteAction] r (roll): valeur', value);
             set((state) => {
               if (state.game) {
                 state.game.diceValue = value;
@@ -732,9 +737,9 @@ export const useGameStore = create<GameStore>()(
           case 'm': {
             // Move: execute the same move locally
             const pawnIndex = (action.d as { i: number }).i;
-            console.log('[useGameStore.applyRemoteAction] m (move): pawnIndex', pawnIndex);
+            gameLog('store', '[useGameStore.applyRemoteAction] m (move): pawnIndex', pawnIndex);
             const moveResult = get().executeMove(pawnIndex);
-            console.log('[useGameStore.applyRemoteAction] m résultat:', {
+            gameLog('store', '[useGameStore.applyRemoteAction] m résultat:', {
               canMove: moveResult?.canMove,
               newStatus: moveResult?.newState?.status,
             });
@@ -744,9 +749,9 @@ export const useGameStore = create<GameStore>()(
           case 'x': {
             // Exit home: execute locally
             const pawnIndex = (action.d as { i: number }).i;
-            console.log('[useGameStore.applyRemoteAction] x (exit): pawnIndex', pawnIndex);
+            gameLog('store', '[useGameStore.applyRemoteAction] x (exit): pawnIndex', pawnIndex);
             const exitResult = get().exitHome(pawnIndex);
-            console.log('[useGameStore.applyRemoteAction] x résultat:', {
+            gameLog('store', '[useGameStore.applyRemoteAction] x résultat:', {
               canMove: exitResult?.canMove,
             });
             break;
@@ -773,7 +778,7 @@ export const useGameStore = create<GameStore>()(
           case 'n': {
             // Next turn (after move completed)
             const data = action.d as { extra?: boolean };
-            console.log('[useGameStore.applyRemoteAction] n (nextTurn): extra=', data.extra);
+            gameLog('store', '[useGameStore.applyRemoteAction] n (nextTurn): extra=', data.extra);
             if (data.extra) {
               get().grantExtraTurn();
             } else {
