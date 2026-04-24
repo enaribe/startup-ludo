@@ -16,6 +16,9 @@ import {
 } from '@/components/game';
 import { DiceChoiceButton } from '@/components/game/DiceChoiceButton';
 import {
+  CaptureChoicePopup,
+  CaptureFailurePopup,
+  TokensStolenPopup,
   EventPopup,
   FundingPopup,
   MissedFinalEntryPopup,
@@ -141,6 +144,9 @@ export default function PlayScreen() {
   const [showQuitConfirm, setShowQuitConfirm] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [missedFinalEntry, setMissedFinalEntry] = useState<{ tokensNeeded: number } | null>(null);
+  const [captureChoice, setCaptureChoice] = useState<{ capturedPlayerId: string; capturedPawnIndex: number } | null>(null);
+  const [captureFailure, setCaptureFailure] = useState<{ seed: number } | null>(null);
+  const [tokensStolen, setTokensStolen] = useState<{ amount: number } | null>(null);
   const [boardWrapSize, setBoardWrapSize] = useState({ w: 0, h: 0 });
   const handleBoardWrapLayout = useCallback((e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
@@ -458,7 +464,7 @@ export default function PlayScreen() {
 
   // ===== TURN MACHINE =====
 
-  const { turnState, diceProps, handleEventResolve, chosenDiceValue, hasUsedDiceChoice, setChosenDiceValue } = useTurnMachine({
+  const { turnState, diceProps, handleEventResolve, chosenDiceValue, hasUsedDiceChoice, setChosenDiceValue, resolveCaptureChoice } = useTurnMachine({
     game,
     currentPlayer,
     isOnline,
@@ -470,6 +476,17 @@ export default function PlayScreen() {
     setAnimating,
     clearSelection,
     onMissedFinalEntry: (tokensNeeded) => setMissedFinalEntry({ tokensNeeded }),
+    onCapturePending: (capturedPlayerId, capturedPawnIndex) => {
+      setCaptureChoice({ capturedPlayerId, capturedPawnIndex });
+    },
+    onAICapture: (capturedPlayerId) => {
+      // IA a capturé → pion déjà renvoyé, affiche popup échec narratif
+      // seulement si le capturé est le joueur local (ou en local partage du device)
+      const seed = Math.floor(Math.random() * 10000);
+      if (!isOnline || capturedPlayerId === userId) {
+        setCaptureFailure({ seed });
+      }
+    },
   });
 
   // Keep ref in sync so handleTriggeredEvent (AI path) can call it without circular dependency
@@ -477,6 +494,28 @@ export default function PlayScreen() {
 
   // ===== SHAKE TO ROLL (temporairement désactivé) =====
   // Désactivé pour l’instant: la détection de secousse n’est pas active dans cette version.
+
+  // ===== ONLINE: React to remote capture failure (popup échec chez le capturé) =====
+
+  useEffect(() => {
+    if (!isOnline || !onlineGame.remoteCaptureFailure) return;
+    const { capturedPlayerId, seed } = onlineGame.remoteCaptureFailure;
+    if (capturedPlayerId === userId) {
+      setCaptureFailure({ seed });
+    }
+    onlineGame.clearRemoteCaptureFailure();
+  }, [isOnline, onlineGame.remoteCaptureFailure, onlineGame.clearRemoteCaptureFailure, userId, onlineGame]);
+
+  // ===== ONLINE: React to remote tokens stolen (popup "jetons cédés" chez le capturé) =====
+
+  useEffect(() => {
+    if (!isOnline || !onlineGame.remoteTokensStolen) return;
+    const { capturedPlayerId, amount } = onlineGame.remoteTokensStolen;
+    if (capturedPlayerId === userId) {
+      setTokensStolen({ amount });
+    }
+    onlineGame.clearRemoteTokensStolen();
+  }, [isOnline, onlineGame.remoteTokensStolen, onlineGame.clearRemoteTokensStolen, userId, onlineGame]);
 
   // ===== ONLINE: React to remote dice rolls =====
 
@@ -735,6 +774,44 @@ export default function PlayScreen() {
       handleEventResolve();
     },
     [actions, handleEventResolve]
+  );
+
+  // Résolution du choix de capture (captureur)
+  const handleCaptureChoiceResolve = useCallback(
+    (choice: 'steal_tokens' | 'send_home') => {
+      if (!captureChoice || !game) return;
+      const { capturedPlayerId, capturedPawnIndex } = captureChoice;
+      const capturedPlayer = game.players.find((p) => p.id === capturedPlayerId);
+
+      if (choice === 'steal_tokens') {
+        const amount = capturedPlayer?.tokens ?? 0;
+        if (amount > 0) {
+          if (isOnline) {
+            onlineGame.broadcastCaptureSteal(capturedPlayerId, amount);
+          } else if (currentPlayer) {
+            removeTokens(capturedPlayerId, amount);
+            addTokens(currentPlayer.id, amount);
+            // En local, affiche le popup "jetons cédés" (partage du device)
+            setTokensStolen({ amount });
+          }
+        }
+      } else {
+        // send_home : renvoyer à la base + afficher popup échec
+        const seed = Math.floor(Math.random() * 10000);
+        if (isOnline) {
+          onlineGame.broadcastCapture(capturedPlayerId, capturedPawnIndex);
+          onlineGame.broadcastCaptureFailure(capturedPlayerId, seed);
+          // Le captureur local ne voit pas le popup échec (il l'affiche chez le capturé)
+        } else {
+          storeHandleCapture(capturedPlayerId, capturedPawnIndex);
+          // En local, tout le monde voit le popup échec
+          setCaptureFailure({ seed });
+        }
+      }
+      setCaptureChoice(null);
+      resolveCaptureChoice();
+    },
+    [captureChoice, game, isOnline, onlineGame, currentPlayer, addTokens, removeTokens, storeHandleCapture, resolveCaptureChoice],
   );
 
   // Duel handlers
@@ -1131,6 +1208,49 @@ export default function PlayScreen() {
         onAnimationComplete={handleEmojiAnimationComplete}
       />
 
+      {/* DEV: boutons test popups capture */}
+      <View style={{ position: 'absolute', top: 60, right: 12, zIndex: 9999, gap: 6 }}>
+        <Pressable
+          style={{ backgroundColor: 'rgba(255,188,64,0.9)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}
+          onPress={() => {
+            const firstOther = game?.players.find((p) => p.id !== currentPlayer?.id);
+            if (firstOther) {
+              // Donner 5 jetons à la victime si elle en a moins, pour tester l'option "récupérer"
+              const current = firstOther.tokens ?? 0;
+              if (current < 5) addTokens(firstOther.id, 5 - current);
+              setCaptureChoice({ capturedPlayerId: firstOther.id, capturedPawnIndex: 0 });
+            }
+          }}
+        >
+          <Text style={{ color: '#000', fontSize: 11, fontWeight: 'bold' }}>TEST CHOIX (5 jtn)</Text>
+        </Pressable>
+        <Pressable
+          style={{ backgroundColor: 'rgba(200,200,200,0.9)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}
+          onPress={() => {
+            const firstOther = game?.players.find((p) => p.id !== currentPlayer?.id);
+            if (firstOther) {
+              // Remettre à 0 pour tester l'option désactivée
+              if (firstOther.tokens > 0) removeTokens(firstOther.id, firstOther.tokens);
+              setCaptureChoice({ capturedPlayerId: firstOther.id, capturedPawnIndex: 0 });
+            }
+          }}
+        >
+          <Text style={{ color: '#000', fontSize: 11, fontWeight: 'bold' }}>TEST CHOIX (0 jtn)</Text>
+        </Pressable>
+        <Pressable
+          style={{ backgroundColor: 'rgba(243,81,69,0.9)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}
+          onPress={() => setCaptureFailure({ seed: Math.floor(Math.random() * 10000) })}
+        >
+          <Text style={{ color: '#fff', fontSize: 11, fontWeight: 'bold' }}>TEST ÉCHEC</Text>
+        </Pressable>
+        <Pressable
+          style={{ backgroundColor: 'rgba(76,175,80,0.9)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}
+          onPress={() => setTokensStolen({ amount: 5 })}
+        >
+          <Text style={{ color: '#fff', fontSize: 11, fontWeight: 'bold' }}>TEST CÉDÉS</Text>
+        </Pressable>
+      </View>
+
       {/* Quit Confirmation Modal */}
       <QuitConfirmPopup
         visible={showQuitConfirm}
@@ -1199,6 +1319,28 @@ export default function PlayScreen() {
         tokensNeeded={missedFinalEntry?.tokensNeeded ?? 1}
         currentPlayer={currentPlayer}
         allPlayers={game?.players ?? []}
+      />
+
+      {/* Capture Choice Popup (captureur) */}
+      <CaptureChoicePopup
+        visible={captureChoice !== null}
+        capturer={currentPlayer}
+        captured={captureChoice ? (game?.players.find((p) => p.id === captureChoice.capturedPlayerId) ?? null) : null}
+        onChoice={handleCaptureChoiceResolve}
+      />
+
+      {/* Capture Failure Popup (capturé — renvoi à la base) */}
+      <CaptureFailurePopup
+        visible={captureFailure !== null}
+        seed={captureFailure?.seed}
+        onContinue={() => setCaptureFailure(null)}
+      />
+
+      {/* Tokens Stolen Popup (capturé — jetons cédés) */}
+      <TokensStolenPopup
+        visible={tokensStolen !== null}
+        amount={tokensStolen?.amount}
+        onContinue={() => setTokensStolen(null)}
       />
 
       {/* Opponent Disconnected Modal (online) */}

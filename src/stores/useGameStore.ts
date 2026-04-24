@@ -795,9 +795,19 @@ export const useGameStore = create<GameStore>()(
           }
 
           case 'k': {
-            // Capture
+            // Capture: renvoi du pion à la base
             const data = action.d as { pid: string; pi: number };
             get().handleCapture(data.pid, data.pi);
+            break;
+          }
+
+          case 'ks': {
+            // Capture steal: voler les jetons du pion capturé
+            const data = action.d as { pid: string; amount: number };
+            if (data.amount > 0) {
+              get().removeTokens(data.pid, data.amount);
+              get().addTokens(action.p, data.amount);
+            }
             break;
           }
 

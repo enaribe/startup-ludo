@@ -72,6 +72,10 @@ export interface UseTurnMachineParams {
   isMyTurnOnline?: boolean;
   /** Appelé quand un pion passe devant son entrée finale sans assez de jetons */
   onMissedFinalEntry?: (tokensNeeded: number) => void;
+  /** Appelé quand une capture doit être résolue via popup de choix (captureur humain) */
+  onCapturePending?: (capturedPlayerId: string, capturedPawnIndex: number) => void;
+  /** Appelé quand une IA capture → choix automatique = renvoi à la base (permet d'afficher popup échec) */
+  onAICapture?: (capturedPlayerId: string, capturedPawnIndex: number) => void;
 }
 
 export interface UseTurnMachineReturn {
@@ -85,6 +89,8 @@ export interface UseTurnMachineReturn {
   chosenDiceValue: number | null;
   hasUsedDiceChoice: boolean;
   setChosenDiceValue: (value: number) => void;
+  /** À appeler par PlayScreen une fois le popup de choix capture résolu (débloquera le passage de tour) */
+  resolveCaptureChoice: () => void;
 }
 
 // ===== INITIAL STATE =====
@@ -243,10 +249,27 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
     setAnimating,
     clearSelection,
     onMissedFinalEntry,
+    onCapturePending,
+    onAICapture,
   } = params;
 
   const onMissedFinalEntryRef = useRef(onMissedFinalEntry);
   onMissedFinalEntryRef.current = onMissedFinalEntry;
+  const onCapturePendingRef = useRef(onCapturePending);
+  onCapturePendingRef.current = onCapturePending;
+  const onAICaptureRef = useRef(onAICapture);
+  onAICaptureRef.current = onAICapture;
+
+  // Flag bloquant le passage de tour tant que le popup de choix capture n'est pas résolu
+  const waitingForCaptureChoiceRef = useRef(false);
+  const pendingTurnEndRef = useRef<(() => void) | null>(null);
+
+  const resolveCaptureChoice = useCallback(() => {
+    waitingForCaptureChoiceRef.current = false;
+    const pending = pendingTurnEndRef.current;
+    pendingTurnEndRef.current = null;
+    pending?.();
+  }, []);
 
   const { play: playSound } = useSound();
 
@@ -407,12 +430,30 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
         // Handle capture after animation
         if (result.capturedPawn) {
           timers.set('capture', () => {
-            actionsRef.current.handleCapture(
-              result!.capturedPawn!.playerId,
-              result!.capturedPawn!.pawnIndex
-            );
             if (hapticsEnabled) {
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            }
+            // Si le captureur est un humain ET qu'un callback pending est fourni,
+            // déléguer au PlayScreen pour afficher le popup de choix.
+            // Sinon (IA), appliquer directement le renvoi à la base + déclencher
+            // onAICapture pour que PlayScreen affiche le popup d'échec.
+            const capturer = currentPlayerRef.current;
+            if (onCapturePendingRef.current && capturer && !capturer.isAI) {
+              // Bloquer le passage de tour tant que le choix n'est pas fait
+              waitingForCaptureChoiceRef.current = true;
+              onCapturePendingRef.current(
+                result!.capturedPawn!.playerId,
+                result!.capturedPawn!.pawnIndex,
+              );
+            } else {
+              actionsRef.current.handleCapture(
+                result!.capturedPawn!.playerId,
+                result!.capturedPawn!.pawnIndex,
+              );
+              onAICaptureRef.current?.(
+                result!.capturedPawn!.playerId,
+                result!.capturedPawn!.pawnIndex,
+              );
             }
           }, animDelay);
         }
@@ -467,7 +508,7 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
   useEffect(() => {
     if (turnState.phase !== 'ending') return;
 
-    timers.set('endTurn', () => {
+    const runEndTurn = () => {
       const state = turnStateRef.current;
 
       // Extra turn on 6: only if a move was actually made (moveResult !== null)
@@ -485,6 +526,15 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
       clearSelection();
       setAnimating(false);
       dispatch({ type: 'TURN_ENDED' });
+    };
+
+    timers.set('endTurn', () => {
+      // Si un popup de choix capture est ouvert, reporter la fin de tour
+      if (waitingForCaptureChoiceRef.current) {
+        pendingTurnEndRef.current = runEndTurn;
+        return;
+      }
+      runEndTurn();
     }, 300);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -589,5 +639,6 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
     chosenDiceValue,
     hasUsedDiceChoice,
     setChosenDiceValue,
+    resolveCaptureChoice,
   };
 }

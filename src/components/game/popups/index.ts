@@ -12,3 +12,6 @@ export { MissedFinalEntryPopup } from './MissedFinalEntryPopup';
 export { CreateStartupPromptPopup } from './CreateStartupPromptPopup';
 export { ReturnBonusPopup } from './ReturnBonusPopup';
 export { OnboardingModal } from './OnboardingModal';
+export { CaptureChoicePopup } from './CaptureChoicePopup';
+export { CaptureFailurePopup } from './CaptureFailurePopup';
+export { TokensStolenPopup } from './TokensStolenPopup';

@@ -81,6 +81,18 @@ interface UseOnlineGameReturn {
   endTurn: (extra: boolean) => void;
   /** Broadcast capture */
   broadcastCapture: (capturedPlayerId: string, capturedPawnIndex: number) => void;
+  /** Broadcast capture steal : voler les jetons du pion capturé */
+  broadcastCaptureSteal: (capturedPlayerId: string, amount: number) => void;
+  /** Broadcast popup échec narratif au pion capturé (type 'kf') */
+  broadcastCaptureFailure: (capturedPlayerId: string, seed: number) => void;
+  /** Remote capture failure reçu (pour afficher popup échec chez le capturé) */
+  remoteCaptureFailure: { capturedPlayerId: string; seed: number } | null;
+  /** Clear remote capture failure après affichage */
+  clearRemoteCaptureFailure: () => void;
+  /** Remote tokens stolen reçu (popup "jetons cédés" chez le capturé) */
+  remoteTokensStolen: { capturedPlayerId: string; amount: number } | null;
+  /** Clear remote tokens stolen après affichage */
+  clearRemoteTokensStolen: () => void;
   /** Broadcast win */
   broadcastWin: (winnerId: string) => void;
   /** Broadcast an event trigger (so opponent sees the popup) */
@@ -164,12 +176,16 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
   const [remoteDuelScore, setRemoteDuelScore] = useState<RemoteDuelScore | null>(null);
   const [remoteDuelResult, setRemoteDuelResult] = useState<RemoteDuelResult | null>(null);
   const [remoteEmojiReaction, setRemoteEmojiReaction] = useState<RemoteEmojiReaction | null>(null);
+  const [remoteCaptureFailure, setRemoteCaptureFailure] = useState<{ capturedPlayerId: string; seed: number } | null>(null);
+  const [remoteTokensStolen, setRemoteTokensStolen] = useState<{ capturedPlayerId: string; amount: number } | null>(null);
 
   const clearRemoteEvent = useCallback(() => setRemoteEvent(null), []);
   const clearRemoteEventResult = useCallback(() => setRemoteEventResult(null), []);
   const clearRemoteDuelScore = useCallback(() => setRemoteDuelScore(null), []);
   const clearRemoteDuelResult = useCallback(() => setRemoteDuelResult(null), []);
   const clearRemoteEmojiReaction = useCallback(() => setRemoteEmojiReaction(null), []);
+  const clearRemoteCaptureFailure = useCallback(() => setRemoteCaptureFailure(null), []);
+  const clearRemoteTokensStolen = useCallback(() => setRemoteTokensStolen(null), []);
 
   // Track processed actions to avoid duplicates
   const processedActionsRef = useRef<Set<string>>(new Set());
@@ -277,6 +293,19 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
           console.log('[useOnlineGame] Résultat duel reçu (spectateur):', data);
           setRemoteDuelResult(data);
           return;
+        }
+        case 'kf': {
+          // Capture failure : déclencher le popup échec chez le capturé
+          const data = action.d as { pid: string; seed: number };
+          setRemoteCaptureFailure({ capturedPlayerId: data.pid, seed: data.seed });
+          return;
+        }
+        case 'ks': {
+          // Capture steal : déclencher le popup "jetons cédés" chez le capturé
+          // Le store applique aussi les jetons via applyRemoteAction plus bas.
+          const data = action.d as { pid: string; amount: number };
+          setRemoteTokensStolen({ capturedPlayerId: data.pid, amount: data.amount });
+          break; // pas de return → applyRemoteAction applique le transfert
         }
         case 'em': {
           // Emoji reaction received from another player
@@ -605,6 +634,35 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
     [userId, storeHandleCapture]
   );
 
+  /** Capture: voler les jetons du pion capturé (pas de renvoi à la base) */
+  const broadcastCaptureSteal = useCallback(
+    (capturedPlayerId: string, amount: number) => {
+      if (!userId || amount <= 0) return;
+
+      storeRemoveTokens(capturedPlayerId, amount);
+      storeAddTokens(userId, amount);
+      multiplayerSync.sendAction({
+        t: 'ks',
+        p: userId,
+        d: { pid: capturedPlayerId, amount },
+      });
+    },
+    [userId, storeAddTokens, storeRemoveTokens],
+  );
+
+  /** Broadcaster l'affichage du popup échec narratif chez le joueur capturé */
+  const broadcastCaptureFailure = useCallback(
+    (capturedPlayerId: string, seed: number) => {
+      if (!userId) return;
+      multiplayerSync.sendAction({
+        t: 'kf',
+        p: userId,
+        d: { pid: capturedPlayerId, seed },
+      });
+    },
+    [userId],
+  );
+
   const broadcastWin = useCallback(
     (winnerId: string) => {
       if (!userId) return;
@@ -715,6 +773,12 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
     skipTurn,
     endTurn,
     broadcastCapture,
+    broadcastCaptureSteal,
+    broadcastCaptureFailure,
+    remoteCaptureFailure,
+    clearRemoteCaptureFailure,
+    remoteTokensStolen,
+    clearRemoteTokensStolen,
     broadcastWin,
     broadcastEvent,
     forfeit,
