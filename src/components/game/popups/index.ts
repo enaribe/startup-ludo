@@ -15,3 +15,5 @@ export { OnboardingModal } from './OnboardingModal';
 export { CaptureChoicePopup } from './CaptureChoicePopup';
 export { CaptureFailurePopup } from './CaptureFailurePopup';
 export { TokensStolenPopup } from './TokensStolenPopup';
+export { JokerAcquiredPopup } from './JokerAcquiredPopup';
+export { JokerInventoryPopup } from './JokerInventoryPopup';

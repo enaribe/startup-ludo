@@ -13,7 +13,8 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
-import type { GameState, GameMode, Player, GameEvent, PlayerColor, PawnState, EventType, ChallengeContext } from '@/types';
+import type { GameState, GameMode, Player, GameEvent, PlayerColor, PawnState, EventType, ChallengeContext, JokerType } from '@/types';
+import { newJokerId } from '@/data/jokers';
 import { GameEngine, type MoveResult, type ValidMove } from '@/services/game/GameEngine';
 import { eventManager, type GeneratedGameEvent } from '@/services/game/EventManager';
 import type { EditionId } from '@/data';
@@ -93,6 +94,10 @@ interface GameStoreActions {
 
   // Captures
   handleCapture: (capturedPlayerId: string, capturedPawnIndex: number) => void;
+
+  // Jokers (inventaire)
+  grantJoker: (playerId: string, jokerType: JokerType, id?: string) => string;
+  consumeJoker: (playerId: string, jokerId: string) => void;
 
   // Sélection et surbrillance
   selectPawn: (pawnIndex: number | null) => void;
@@ -208,6 +213,7 @@ export const useGameStore = create<GameStore>()(
               ...p,
               tokens: 0,
               pawns: GameEngine.createInitialPawns(),
+              jokers: [],
               isHost: index === 0,
               // Conserver l'édition du joueur (online) ou fallback sur édition globale
               edition: p.edition || edition,
@@ -647,6 +653,35 @@ export const useGameStore = create<GameStore>()(
         });
       },
 
+      // ===== JOKERS =====
+
+      grantJoker: (playerId, jokerType, id) => {
+        const jokerId = id ?? newJokerId();
+        set((state) => {
+          if (!state.game) return;
+          const player = state.game.players.find((p) => p.id === playerId);
+          if (!player) return;
+          if (!player.jokers) player.jokers = [];
+          player.jokers.push({
+            id: jokerId,
+            type: jokerType,
+            acquiredAt: Date.now(),
+          });
+          state.game.updatedAt = Date.now();
+        });
+        return jokerId;
+      },
+
+      consumeJoker: (playerId, jokerId) => {
+        set((state) => {
+          if (!state.game) return;
+          const player = state.game.players.find((p) => p.id === playerId);
+          if (!player?.jokers) return;
+          player.jokers = player.jokers.filter((j) => j.id !== jokerId);
+          state.game.updatedAt = Date.now();
+        });
+      },
+
       // ===== SÉLECTION ET SURBRILLANCE =====
 
       selectPawn: (pawnIndex) => {
@@ -808,6 +843,36 @@ export const useGameStore = create<GameStore>()(
               get().removeTokens(data.pid, data.amount);
               get().addTokens(action.p, data.amount);
             }
+            break;
+          }
+
+          case 'jg': {
+            // Joker granted: ajouter un joker à l'inventaire du joueur
+            const data = action.d as { pid: string; type: JokerType; id: string };
+            get().grantJoker(data.pid, data.type, data.id);
+            break;
+          }
+
+          case 'ju': {
+            // Joker used: retirer le joker + appliquer l'effet spécifique
+            const data = action.d as {
+              pid: string;
+              id: string;
+              type: JokerType;
+              shieldTarget?: string;
+              stealTarget?: string;
+              stealAmount?: number;
+            };
+            get().consumeJoker(data.pid, data.id);
+
+            // Appliquer l'effet côté store selon le type
+            if (data.type === 'shield' && data.shieldTarget) {
+              get().applyEffect(data.shieldTarget, 'shield');
+            } else if (data.type === 'steal' && data.stealTarget && data.stealAmount && data.stealAmount > 0) {
+              get().removeTokens(data.stealTarget, data.stealAmount);
+              get().addTokens(data.pid, data.stealAmount);
+            }
+            // 'dice_choice' et 'reroll' : la valeur sera broadcastée via 'r' au lancer
             break;
           }
 

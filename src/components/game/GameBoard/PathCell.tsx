@@ -13,7 +13,7 @@ import { memo } from 'react';
 import { View, StyleSheet } from 'react-native';
 import type { PlayerColor } from '@/types';
 import { COLORS } from '@/styles/colors';
-import { QuizIcon, EventIcon, DuelIcon, FundingIcon } from './BoardIcons';
+import { QuizIcon, EventIcon, DuelIcon, FundingIcon, JokerIcon } from './BoardIcons';
 
 // Cases de départ → couleur du joueur
 const START_COLOR: Record<number, PlayerColor> = {
@@ -104,6 +104,8 @@ export const PathCell = memo(function PathCell({
       case 'challenge':
       case 'event':
         return <View style={iconStyle}><EventIcon /></View>;
+      case 'joker':
+        return <View style={iconStyle}><JokerIcon /></View>;
       default:
         return null;
     }

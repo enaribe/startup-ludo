@@ -90,3 +90,26 @@ export const FundingIcon = (props: any) => {
     </Svg>
   );
 };
+
+export const JokerIcon = (props: any) => {
+  const { size, ...rest } = props;
+  const s = size ?? '100%';
+  return (
+    <Svg width={s} height={s} viewBox="0 0 18 18" fill="none" {...rest}>
+      <Defs>
+        <LinearGradient id="joker_grad" x1="0" y1="0" x2="18" y2="18" gradientUnits="userSpaceOnUse">
+          <Stop stopColor="#FFBC40" />
+          <Stop offset="1" stopColor="#E91E63" />
+        </LinearGradient>
+      </Defs>
+      <Circle cx="9" cy="9" r="8.5" fill="url(#joker_grad)" stroke="#AF2121" strokeWidth="0.4" />
+      <Path
+        d="M9 3.5L10.3 7.1L14 7.5L11.1 10L12 13.5L9 11.6L6 13.5L6.9 10L4 7.5L7.7 7.1L9 3.5Z"
+        fill="#FFFFFF"
+        stroke="#AF2121"
+        strokeWidth="0.35"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+};

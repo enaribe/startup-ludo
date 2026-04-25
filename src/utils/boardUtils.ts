@@ -219,6 +219,7 @@ export function getCellColor(type: EventType): string {
     safe: 'rgba(255, 255, 255, 0.1)',
     start: '#2ECC71',
     finish: '#FFD700',
+    joker: '#E91E63',
   };
   return colors[type];
 }

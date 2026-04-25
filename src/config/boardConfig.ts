@@ -210,7 +210,7 @@ export const PLAYER_CONFIG: Record<PlayerColor, PlayerConfig> = {
 export const SAFE_POSITIONS: number[] = [1, 12, 23, 34]; // Les départs
 
 // Types d'événements sur les cases
-export type CellEventType = 'quiz' | 'funding' | 'duel' | 'event' | 'opportunity' | 'challenge' | 'safe' | 'start' | 'normal';
+export type CellEventType = 'quiz' | 'funding' | 'duel' | 'event' | 'opportunity' | 'challenge' | 'safe' | 'start' | 'normal' | 'joker';
 
 // Distribution des événements sur le circuit (44 cases)
 // Règle : 4 start, 4 duel, 4 funding, le reste = quiz + opportunity en alternance
@@ -233,10 +233,15 @@ export const CIRCUIT_EVENTS: Record<number, CellEventType> = {
   29: 'funding',
   40: 'funding',
 
+  // Joker — 4 cases réparties sur le circuit (une par bras)
+  4: 'joker',
+  16: 'joker',
+  30: 'joker',
+  42: 'joker',
+
   // Quiz et événement — rythme 2 quiz / 1 événement (aléatoire : opportunity ou challenge)
   2: 'quiz',
   3: 'quiz',
-  4: 'event',
   5: 'quiz',
   8: 'quiz',
   9: 'event',
@@ -245,7 +250,6 @@ export const CIRCUIT_EVENTS: Record<number, CellEventType> = {
   13: 'event',
   14: 'quiz',
   15: 'quiz',
-  16: 'event',
   19: 'quiz',
   20: 'quiz',
   21: 'event',
@@ -254,7 +258,6 @@ export const CIRCUIT_EVENTS: Record<number, CellEventType> = {
   25: 'event',
   26: 'quiz',
   27: 'quiz',
-  30: 'event',
   31: 'quiz',
   32: 'quiz',
   33: 'event',
@@ -263,7 +266,6 @@ export const CIRCUIT_EVENTS: Record<number, CellEventType> = {
   37: 'event',
   38: 'quiz',
   41: 'quiz',
-  42: 'event',
   43: 'quiz',
   0: 'quiz',
 };

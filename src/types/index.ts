@@ -17,6 +17,17 @@ export interface ChallengeContext {
   sectorId: string | null;
 }
 
+// ===== JOKER TYPES =====
+export type JokerType = 'dice_choice' | 'reroll' | 'shield' | 'steal';
+
+export interface Joker {
+  /** Identifiant unique par instance (ex: 'jk_abc123') */
+  id: string;
+  type: JokerType;
+  /** Timestamp d'acquisition, pour ordre d'affichage */
+  acquiredAt: number;
+}
+
 export interface Player {
   id: string;
   name: string;
@@ -28,6 +39,7 @@ export interface Player {
   isReady?: boolean;
   tokens: number;
   pawns: PawnState[]; // 1 à 4 pions par joueur (par défaut 1)
+  jokers?: Joker[];   // Inventaire de jokers (acquis via cases joker)
   startupId?: string;
   startupName?: string;
   isDefaultProject?: boolean;
@@ -55,7 +67,7 @@ export interface LegacyPlayer {
 // ===== GAME TYPES =====
 export type GameMode = 'solo' | 'local' | 'online';
 export type GameStatus = 'waiting' | 'playing' | 'paused' | 'finished';
-export type EventType = 'quiz' | 'funding' | 'duel' | 'opportunity' | 'challenge' | 'event' | 'safe' | 'start' | 'finish';
+export type EventType = 'quiz' | 'funding' | 'duel' | 'opportunity' | 'challenge' | 'event' | 'safe' | 'start' | 'finish' | 'joker';
 
 export interface GameState {
   id: string;

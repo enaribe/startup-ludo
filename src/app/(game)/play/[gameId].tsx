@@ -14,11 +14,13 @@ import {
   type GameEmoji,
   type EmojiReaction,
 } from '@/components/game';
-import { DiceChoiceButton } from '@/components/game/DiceChoiceButton';
+import { DiceChoiceButton, DiceValuePickerPopup } from '@/components/game/DiceChoiceButton';
 import {
   CaptureChoicePopup,
   CaptureFailurePopup,
   TokensStolenPopup,
+  JokerAcquiredPopup,
+  JokerInventoryPopup,
   EventPopup,
   FundingPopup,
   MissedFinalEntryPopup,
@@ -43,7 +45,8 @@ import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { getRandomDuelQuestions } from '@/data/duelQuestions';
-import type { ChallengeEvent, FundingEvent, OpportunityEvent, Player, QuizEvent, DuelResult, DuelQuestion } from '@/types';
+import { rollRandomJoker } from '@/data/jokers';
+import type { ChallengeEvent, FundingEvent, OpportunityEvent, Player, QuizEvent, DuelResult, DuelQuestion, Joker, JokerType } from '@/types';
 
 // Données de test pour afficher les popups rapidement
 const MOCK_QUIZ: QuizEvent = {
@@ -119,6 +122,9 @@ export default function PlayScreen() {
   const storeNextTurn = useGameStore((s) => s.nextTurn);
   const storeGrantExtraTurn = useGameStore((s) => s.grantExtraTurn);
   const storeEndGame = useGameStore((s) => s.endGame);
+  const grantJoker = useGameStore((s) => s.grantJoker);
+  const consumeJoker = useGameStore((s) => s.consumeJoker);
+  const applyEffect = useGameStore((s) => s.applyEffect);
   const clearSelection = useGameStore((s) => s.clearSelection);
   const setAnimating = useGameStore((s) => s.setAnimating);
   const getCurrentPlayer = useGameStore((s) => s.getCurrentPlayer);
@@ -147,6 +153,9 @@ export default function PlayScreen() {
   const [captureChoice, setCaptureChoice] = useState<{ capturedPlayerId: string; capturedPawnIndex: number } | null>(null);
   const [captureFailure, setCaptureFailure] = useState<{ seed: number } | null>(null);
   const [tokensStolen, setTokensStolen] = useState<{ amount: number } | null>(null);
+  const [jokerAcquired, setJokerAcquired] = useState<{ type: JokerType } | null>(null);
+  const [showJokerInventory, setShowJokerInventory] = useState(false);
+  const [pendingDiceJoker, setPendingDiceJoker] = useState<{ jokerId: string } | null>(null);
   const [boardWrapSize, setBoardWrapSize] = useState({ w: 0, h: 0 });
   const handleBoardWrapLayout = useCallback((e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
@@ -299,6 +308,22 @@ export default function PlayScreen() {
 
   const handleTriggeredEvent = useCallback(
     (eventType: string) => {
+      // ===== CASE JOKER : tirer un joker aléatoire et l'ajouter à l'inventaire =====
+      if (eventType === 'joker' && currentPlayer) {
+        const jokerType = rollRandomJoker();
+        const jokerId = grantJoker(currentPlayer.id, jokerType);
+        if (isOnline) {
+          onlineGame.broadcastJokerGranted(currentPlayer.id, jokerType, jokerId);
+        }
+        // Afficher le popup de découverte (sauf si IA — on laisse tomber silencieusement)
+        if (!currentPlayer.isAI) {
+          setJokerAcquired({ type: jokerType });
+        }
+        // Résoudre l'événement immédiatement (pas d'interaction)
+        handleEventResolveRef.current();
+        return;
+      }
+
       // Utilise l'édition du joueur courant (mode online) ou l'édition globale (mode solo/local)
       const playerEdition = (currentPlayer?.edition || game?.edition || 'classic') as import('@/data').EditionId;
 
@@ -464,7 +489,7 @@ export default function PlayScreen() {
 
   // ===== TURN MACHINE =====
 
-  const { turnState, diceProps, handleEventResolve, chosenDiceValue, hasUsedDiceChoice, setChosenDiceValue, resolveCaptureChoice } = useTurnMachine({
+  const { turnState, diceProps, handleEventResolve, resolveCaptureChoice, setChosenDiceValue } = useTurnMachine({
     game,
     currentPlayer,
     isOnline,
@@ -813,6 +838,94 @@ export default function PlayScreen() {
     },
     [captureChoice, game, isOnline, onlineGame, currentPlayer, addTokens, removeTokens, storeHandleCapture, resolveCaptureChoice],
   );
+
+  // ===== JOKERS =====
+
+  /** Utilise un joker depuis l'inventaire */
+  const handleUseJoker = useCallback(
+    (joker: Joker) => {
+      if (!currentPlayer || !game) return;
+      setShowJokerInventory(false);
+
+      switch (joker.type) {
+        case 'dice_choice': {
+          // Ouvre le picker — la consommation se fait après le choix
+          setPendingDiceJoker({ jokerId: joker.id });
+          break;
+        }
+        case 'reroll': {
+          // "Relancer" = armer une valeur aléatoire au prochain lancer.
+          // Utilisable uniquement à phase idle (bouton joker déjà désactivé sinon).
+          // Consomme le joker maintenant ; la valeur sera appliquée via onRoll.
+          const randomValue = Math.floor(Math.random() * 6) + 1;
+          setChosenDiceValue(randomValue);
+          consumeJoker(currentPlayer.id, joker.id);
+          if (isOnline) {
+            onlineGame.broadcastJokerUsed(joker.id, 'reroll', { diceValue: randomValue });
+          }
+          break;
+        }
+        case 'shield': {
+          applyEffect(currentPlayer.id, 'shield');
+          consumeJoker(currentPlayer.id, joker.id);
+          if (isOnline) {
+            onlineGame.broadcastJokerUsed(joker.id, 'shield', { shieldTarget: currentPlayer.id });
+          }
+          break;
+        }
+        case 'steal': {
+          // Cible : le joueur avec le plus de jetons (autre que soi)
+          const others = game.players.filter((p) => p.id !== currentPlayer.id);
+          const leader = others.reduce(
+            (best, p) => (p.tokens > (best?.tokens ?? 0) ? p : best),
+            null as Player | null,
+          );
+          const amount = Math.min(3, leader?.tokens ?? 0);
+
+          // Consomme toujours le joker (pas de cible valide → joker gaspillé)
+          consumeJoker(currentPlayer.id, joker.id);
+
+          if (leader && amount > 0) {
+            removeTokens(leader.id, amount);
+            addTokens(currentPlayer.id, amount);
+            if (isOnline) {
+              onlineGame.broadcastJokerUsed(joker.id, 'steal', { stealTarget: leader.id, stealAmount: amount });
+            }
+          } else if (isOnline) {
+            // Broadcast quand même la consommation pour synchroniser les inventaires
+            onlineGame.broadcastJokerUsed(joker.id, 'steal', { stealAmount: 0 });
+          }
+          break;
+        }
+      }
+    },
+    [currentPlayer, game, isOnline, onlineGame, setChosenDiceValue, consumeJoker, applyEffect, addTokens, removeTokens],
+  );
+
+  /** Callback du picker de valeur de dé (joker dice_choice) */
+  const handleDiceJokerPick = useCallback(
+    (value: number) => {
+      if (!pendingDiceJoker || !currentPlayer) return;
+      const { jokerId } = pendingDiceJoker;
+      setPendingDiceJoker(null);
+
+      // Arme la valeur qui sera utilisée au prochain lancer (avec animation).
+      // Le joker est consommé ici, mais la valeur sera appliquée via onRoll.
+      setChosenDiceValue(value);
+      consumeJoker(currentPlayer.id, jokerId);
+
+      if (isOnline) {
+        // Broadcast la consommation du joker (sans appliquer la valeur — elle le sera via 'r' au lancer)
+        onlineGame.broadcastJokerUsed(jokerId, 'dice_choice', { diceValue: value });
+      }
+    },
+    [pendingDiceJoker, currentPlayer, isOnline, onlineGame, setChosenDiceValue, consumeJoker],
+  );
+
+  const handleDiceJokerCancel = useCallback(() => {
+    setPendingDiceJoker(null);
+    setShowJokerInventory(true);
+  }, []);
 
   // Duel handlers
   const handleDuelSelectOpponent = useCallback(
@@ -1193,10 +1306,9 @@ export default function PlayScreen() {
               </Svg>
             </View>
             <DiceChoiceButton
-              available={!hasUsedDiceChoice}
-              chosenValue={chosenDiceValue}
+              count={currentPlayer?.jokers?.length ?? 0}
               canUse={turnState.phase === 'idle'}
-              onChoose={setChosenDiceValue}
+              onOpen={() => setShowJokerInventory(true)}
             />
           </>
         )}
@@ -1248,6 +1360,18 @@ export default function PlayScreen() {
           onPress={() => setTokensStolen({ amount: 5 })}
         >
           <Text style={{ color: '#fff', fontSize: 11, fontWeight: 'bold' }}>TEST CÉDÉS</Text>
+        </Pressable>
+        <Pressable
+          style={{ backgroundColor: 'rgba(233,30,99,0.9)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}
+          onPress={() => {
+            // Offrir un joker aléatoire au joueur courant (test)
+            if (!currentPlayer) return;
+            const type = rollRandomJoker();
+            grantJoker(currentPlayer.id, type);
+            setJokerAcquired({ type });
+          }}
+        >
+          <Text style={{ color: '#fff', fontSize: 11, fontWeight: 'bold' }}>TEST JOKER+</Text>
         </Pressable>
       </View>
 
@@ -1341,6 +1465,28 @@ export default function PlayScreen() {
         visible={tokensStolen !== null}
         amount={tokensStolen?.amount}
         onContinue={() => setTokensStolen(null)}
+      />
+
+      {/* Joker Acquired Popup (case joker) */}
+      <JokerAcquiredPopup
+        visible={jokerAcquired !== null}
+        jokerType={jokerAcquired?.type ?? null}
+        onContinue={() => setJokerAcquired(null)}
+      />
+
+      {/* Joker Inventory Popup */}
+      <JokerInventoryPopup
+        visible={showJokerInventory}
+        jokers={currentPlayer?.jokers ?? []}
+        onUse={handleUseJoker}
+        onClose={() => setShowJokerInventory(false)}
+      />
+
+      {/* Dice Value Picker (joker dice_choice) */}
+      <DiceValuePickerPopup
+        visible={pendingDiceJoker !== null}
+        onPick={handleDiceJokerPick}
+        onCancel={handleDiceJokerCancel}
       />
 
       {/* Opponent Disconnected Modal (online) */}

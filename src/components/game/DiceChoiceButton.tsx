@@ -1,8 +1,12 @@
 /**
- * DiceChoiceButton — Bouton Joker pour choisir la valeur du dé (usage unique)
+ * DiceChoiceButton / JokerButton — bouton d'accès à l'inventaire de jokers.
+ * Affiche un badge avec le nombre de jokers disponibles. Au clic → ouverture
+ * de l'inventaire via le callback onOpen.
+ *
+ * Exporte aussi DiceValuePickerPopup utilisé par le joker dice_choice.
  */
 
-import { memo, useState } from 'react';
+import { memo, useState, useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   FadeIn,
@@ -122,86 +126,99 @@ const DiceFace = memo(function DiceFace({ value, size, selected, onPress }: Dice
   );
 });
 
-// ── Composant principal ───────────────────────────────────────────────────────
+// ─── Popup de sélection de valeur de dé (joker dice_choice) ──────────────────
 
-interface DiceChoiceButtonProps {
-  available: boolean;
-  chosenValue: number | null;
-  canUse: boolean;
-  onChoose: (value: number) => void;
+interface DiceValuePickerPopupProps {
+  visible: boolean;
+  onPick: (value: number) => void;
+  onCancel: () => void;
 }
 
-export const DiceChoiceButton = memo(function DiceChoiceButton({
-  available,
-  chosenValue,
-  canUse,
-  onChoose,
-}: DiceChoiceButtonProps) {
-  const [pickerVisible, setPickerVisible] = useState(false);
-  const [pendingValue, setPendingValue] = useState<number | null>(chosenValue);
+export const DiceValuePickerPopup = memo(function DiceValuePickerPopup({
+  visible,
+  onPick,
+  onCancel,
+}: DiceValuePickerPopupProps) {
+  const [pendingValue, setPendingValue] = useState<number | null>(null);
 
-  if (!available) return null;
+  useEffect(() => {
+    if (visible) setPendingValue(null);
+  }, [visible]);
 
-  // Toggle : clic sur un dé actif le désactive, sinon l'active
   const handleSelect = (value: number) => {
     setPendingValue((prev) => (prev === value ? null : value));
   };
 
   const handleConfirm = () => {
     if (pendingValue != null) {
-      onChoose(pendingValue);
+      onPick(pendingValue);
+    } else {
+      onCancel();
     }
-    setPickerVisible(false);
   };
 
   return (
-    <>
-      {/* Bouton déclencheur */}
-      <Animated.View entering={FadeIn.duration(300)} exiting={FadeOut.duration(200)}>
-        <Pressable
-          onPress={() => canUse && setPickerVisible(true)}
-          style={[styles.triggerBtn, !canUse && styles.triggerBtnDisabled]}
-        >
-          <JokerIconWhite size={26} />
-          {chosenValue != null && (
-            <View style={styles.chosenBadge}>
-              <Text style={styles.chosenBadgeText}>{chosenValue}</Text>
-            </View>
-          )}
-        </Pressable>
-      </Animated.View>
-
-      {/* Popup Joker via GamePopup */}
-      <GamePopup
-        visible={pickerVisible}
-        onRequestClose={() => setPickerVisible(false)}
-        icon={<JokerIconGold size={80} />}
-        spinningShape
-        title="Joker"
-        header={chosenValue != null ? '0 BOOST RESTANT' : '1 BOOST RESTANT'}
-        footer={
-          <GameButton
-            title={pendingValue != null ? 'UTILISER LE JOKER' : 'FERMER'}
-            variant={pendingValue != null ? 'yellow' : 'blue'}
-            fullWidth
-            onPress={handleConfirm}
+    <GamePopup
+      visible={visible}
+      onRequestClose={onCancel}
+      icon={<JokerIconGold size={80} />}
+      spinningShape
+      title="Choisis ton dé"
+      header="Fixe la valeur de ton prochain lancer"
+      footer={
+        <GameButton
+          title={pendingValue != null ? 'UTILISER LE JOKER' : 'ANNULER'}
+          variant={pendingValue != null ? 'yellow' : 'blue'}
+          fullWidth
+          onPress={handleConfirm}
+        />
+      }
+    >
+      <View style={styles.diceGrid}>
+        {[1, 2, 3, 4, 5, 6].map((v) => (
+          <DiceFace
+            key={v}
+            value={v}
+            size={56}
+            selected={pendingValue === v}
+            onPress={() => handleSelect(v)}
           />
-        }
+        ))}
+      </View>
+    </GamePopup>
+  );
+});
+
+// ─── Bouton Joker (ouvre l'inventaire) ───────────────────────────────────────
+
+interface JokerButtonProps {
+  /** Nombre de jokers disponibles */
+  count: number;
+  /** Désactivé si hors phase idle */
+  canUse: boolean;
+  /** Callback d'ouverture du popup inventaire */
+  onOpen: () => void;
+}
+
+export const DiceChoiceButton = memo(function DiceChoiceButton({
+  count,
+  canUse,
+  onOpen,
+}: JokerButtonProps) {
+  if (count <= 0) return null;
+
+  return (
+    <Animated.View entering={FadeIn.duration(300)} exiting={FadeOut.duration(200)}>
+      <Pressable
+        onPress={() => canUse && onOpen()}
+        style={[styles.triggerBtn, !canUse && styles.triggerBtnDisabled]}
       >
-        {/* Grille 2×3 */}
-        <View style={styles.diceGrid}>
-          {[1, 2, 3, 4, 5, 6].map((v) => (
-            <DiceFace
-              key={v}
-              value={v}
-              size={56}
-              selected={pendingValue === v}
-              onPress={() => handleSelect(v)}
-            />
-          ))}
+        <JokerIconWhite size={26} />
+        <View style={styles.countBadge}>
+          <Text style={styles.countBadgeText}>{count}</Text>
         </View>
-      </GamePopup>
-    </>
+      </Pressable>
+    </Animated.View>
   );
 });
 
@@ -223,20 +240,21 @@ const styles = StyleSheet.create({
   triggerBtnDisabled: {
     opacity: 0.4,
   },
-  chosenBadge: {
+  countBadge: {
     position: 'absolute',
     top: -4,
     right: -4,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    paddingHorizontal: 5,
     backgroundColor: '#0A1929',
     borderWidth: 1.5,
     borderColor: '#FFBC40',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  chosenBadgeText: {
+  countBadgeText: {
     fontFamily: FONTS.title,
     fontSize: 10,
     color: '#FFBC40',

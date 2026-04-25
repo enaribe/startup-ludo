@@ -14,6 +14,7 @@ import { multiplayerSync } from '@/services/multiplayer';
 import { useGameStore, type RemoteAction } from '@/stores/useGameStore';
 import { encodeCheckpoint } from '@/utils/onlineCodec';
 import type { MoveResult } from '@/services/game/GameEngine';
+import type { JokerType } from '@/types';
 
 // ===== TYPES =====
 
@@ -85,6 +86,14 @@ interface UseOnlineGameReturn {
   broadcastCaptureSteal: (capturedPlayerId: string, amount: number) => void;
   /** Broadcast popup échec narratif au pion capturé (type 'kf') */
   broadcastCaptureFailure: (capturedPlayerId: string, seed: number) => void;
+  /** Broadcast l'acquisition d'un joker (type 'jg') */
+  broadcastJokerGranted: (playerId: string, jokerType: JokerType, jokerId: string) => void;
+  /** Broadcast l'utilisation d'un joker (type 'ju') */
+  broadcastJokerUsed: (
+    jokerId: string,
+    jokerType: JokerType,
+    payload?: { diceValue?: number; shieldTarget?: string; stealTarget?: string; stealAmount?: number },
+  ) => void;
   /** Remote capture failure reçu (pour afficher popup échec chez le capturé) */
   remoteCaptureFailure: { capturedPlayerId: string; seed: number } | null;
   /** Clear remote capture failure après affichage */
@@ -164,6 +173,8 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
   const storeGrantExtraTurn = useGameStore((s) => s.grantExtraTurn);
   const storeHandleCapture = useGameStore((s) => s.handleCapture);
   const storeEndGame = useGameStore((s) => s.endGame);
+  const storeGrantJoker = useGameStore((s) => s.grantJoker);
+  const storeConsumeJoker = useGameStore((s) => s.consumeJoker);
 
   const [isConnected, setIsConnected] = useState(true);
   const [opponentDisconnected, setOpponentDisconnected] = useState(false);
@@ -663,6 +674,45 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
     [userId],
   );
 
+  /** Joker acquis par un joueur (case joker) — applique local + broadcast 'jg' */
+  const broadcastJokerGranted = useCallback(
+    (playerId: string, jokerType: JokerType, jokerId: string) => {
+      if (!userId) return;
+      // L'effet local a déjà été appliqué par l'appelant (grantJoker) — on re-assure juste
+      // si on est le premier broadcast, et on synchronise avec l'id.
+      multiplayerSync.sendAction({
+        t: 'jg',
+        p: userId,
+        d: { pid: playerId, type: jokerType, id: jokerId },
+      });
+    },
+    [userId],
+  );
+
+  /** Joker utilisé — applique local + broadcast 'ju' avec payload spécifique */
+  const broadcastJokerUsed = useCallback(
+    (
+      jokerId: string,
+      jokerType: JokerType,
+      payload?: { diceValue?: number; shieldTarget?: string; stealTarget?: string; stealAmount?: number },
+    ) => {
+      if (!userId) return;
+      storeConsumeJoker(userId, jokerId);
+      multiplayerSync.sendAction({
+        t: 'ju',
+        p: userId,
+        d: {
+          pid: userId,
+          id: jokerId,
+          type: jokerType,
+          ...(payload ?? {}),
+        },
+      });
+    },
+    [userId, storeConsumeJoker],
+  );
+  void storeGrantJoker; // usage indirect via le caller
+
   const broadcastWin = useCallback(
     (winnerId: string) => {
       if (!userId) return;
@@ -775,6 +825,8 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
     broadcastCapture,
     broadcastCaptureSteal,
     broadcastCaptureFailure,
+    broadcastJokerGranted,
+    broadcastJokerUsed,
     remoteCaptureFailure,
     clearRemoteCaptureFailure,
     remoteTokensStolen,

@@ -1,0 +1,58 @@
+/**
+ * Catalogue des jokers — métadonnées UI et logique de tirage aléatoire.
+ * Chaque joker est identifié par son `JokerType`.
+ */
+
+import type { JokerType } from '@/types';
+
+export interface JokerMetadata {
+  title: string;
+  shortTitle: string; // pour les badges/boutons
+  description: string;
+  iconName: string; // Ionicons name
+  color: string; // couleur accent du joker
+}
+
+export const JOKER_CATALOG: Record<JokerType, JokerMetadata> = {
+  dice_choice: {
+    title: 'CHOISIR SON DÉ',
+    shortTitle: 'Dé choisi',
+    description: 'Fixe la valeur de ton prochain lancer (1-6).',
+    iconName: 'dice',
+    color: '#FFBC40',
+  },
+  reroll: {
+    title: 'RELANCER',
+    shortTitle: 'Relance',
+    description: 'Tire une nouvelle valeur aléatoire pour ton prochain lancer.',
+    iconName: 'refresh',
+    color: '#1F91D0',
+  },
+  shield: {
+    title: 'BOUCLIER',
+    shortTitle: 'Bouclier',
+    description: 'Immunise ton pion contre la prochaine capture.',
+    iconName: 'shield-checkmark',
+    color: '#4CAF50',
+  },
+  steal: {
+    title: 'VOL ÉCLAIR',
+    shortTitle: 'Vol éclair',
+    description: 'Vole 3 jetons au joueur le mieux classé.',
+    iconName: 'flash',
+    color: '#F35145',
+  },
+};
+
+export const ALL_JOKER_TYPES: JokerType[] = ['dice_choice', 'reroll', 'shield', 'steal'];
+
+/** Tire un joker aléatoire uniformément parmi tous les types disponibles */
+export function rollRandomJoker(): JokerType {
+  const index = Math.floor(Math.random() * ALL_JOKER_TYPES.length);
+  return ALL_JOKER_TYPES[index] ?? 'dice_choice';
+}
+
+/** Génère un ID unique pour une instance de joker */
+export function newJokerId(): string {
+  return `jk_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+}
