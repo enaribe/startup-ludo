@@ -152,7 +152,7 @@ export const DuelResultPopup = memo(function DuelResultPopup({
   const feedbackBorder = isDraw ? 'rgba(255,152,0,0.25)' : isWinner ? '#2ECC71' : '#F35145';
   const feedbackDividerColor = isDraw ? 'rgba(255,152,0,0.3)' : 'rgba(255,255,255,0.2)';
   const feedbackIcon = isDraw ? 'remove-circle' : isWinner ? 'trophy' : 'close-circle';
-  const feedbackLabel = isDraw ? 'ÉGALITÉ' : isWinner ? 'VICTOIRE !' : 'DÉFAITE';
+  const feedbackLabel = isDraw ? 'ÉGALITÉ' : isWinner ? 'VOUS AVEZ GAGNÉ !' : 'VOUS AVEZ PERDU';
   const feedbackGradStart = isWinner ? '#2ECC71' : '#F35145';
   const feedbackGradEnd = isWinner ? '#1A9E50' : '#C0392B';
 

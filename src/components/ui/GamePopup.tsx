@@ -82,6 +82,14 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 export const GAME_POPUP_WIDTH = Math.min(screenWidth - SPACING[8], 340);
 const BORDER_W = 1.5;
 
+// Conversion sûre en string SVG — évite le bug locale FR/Motorola où
+// react-native-svg natif Android peut interpréter "1.5" comme "1,5" et
+// crasher sur PathParser.parse_number ("Invalid number formating chara").
+const svgNum = (n: number): string => {
+  if (!Number.isFinite(n)) return '0';
+  return n.toFixed(4).replace(/\.?0+$/, '') || '0';
+};
+
 // ─── Shape tournante ────────────────────────────────────────────────────────
 
 export function GamePopupSpinningShape({ size = 240 }: { size?: number }) {
@@ -121,9 +129,9 @@ export function GamePopupGradientBorder({
   borderRadius?: number;
   gradientId: string;
 }) {
-  if (height === 0) return null;
+  if (height === 0 || !Number.isFinite(width) || !Number.isFinite(height)) return null;
   return (
-    <Svg width={width} height={height} style={StyleSheet.absoluteFill} pointerEvents="none">
+    <Svg width={svgNum(width)} height={svgNum(height)} style={StyleSheet.absoluteFill} pointerEvents="none">
       <Defs>
         <LinearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
           <Stop offset="0%"   stopColor="#9A9A9A" stopOpacity="0.3"  />
@@ -134,15 +142,15 @@ export function GamePopupGradientBorder({
         </LinearGradient>
       </Defs>
       <Rect
-        x={BORDER_W / 2}
-        y={BORDER_W / 2}
-        width={width - BORDER_W}
-        height={height - BORDER_W}
-        rx={borderRadius}
-        ry={borderRadius}
+        x={svgNum(BORDER_W / 2)}
+        y={svgNum(BORDER_W / 2)}
+        width={svgNum(width - BORDER_W)}
+        height={svgNum(height - BORDER_W)}
+        rx={svgNum(borderRadius)}
+        ry={svgNum(borderRadius)}
         fill="transparent"
         stroke={`url(#${gradientId})`}
-        strokeWidth={BORDER_W}
+        strokeWidth={svgNum(BORDER_W)}
       />
     </Svg>
   );
@@ -228,7 +236,7 @@ export function GamePopup({
               onLayout={(e) => setPopupHeight(e.nativeEvent.layout.height)}
             >
               {/* Background radial gradient */}
-              <Svg style={StyleSheet.absoluteFill} width={GAME_POPUP_WIDTH} height={popupHeight || 1}>
+              <Svg style={StyleSheet.absoluteFill} width={svgNum(GAME_POPUP_WIDTH)} height={svgNum(popupHeight || 1)}>
                 <Defs>
                   <RadialGradient id="gamePopupBg" cx="50%" cy="35%" r="75%">
                     <Stop offset="0%"   stopColor="#0F3A6B" stopOpacity="1" />

@@ -150,11 +150,29 @@ export default function HomeScreen() {
 
   const { showProgression: showProgressionParam, xpGained: xpGainedParam, valorisationGain: valorisationGainParam } =
     useLocalSearchParams<{ showProgression?: string; xpGained?: string; valorisationGain?: string }>();
-  const progressionXpGained = xpGainedParam ? parseInt(xpGainedParam, 10) : undefined;
-  const progressionValorisationGain = valorisationGainParam ? parseInt(valorisationGainParam, 10) : undefined;
+  // Capturer les valeurs au premier déclenchement uniquement, puis nettoyer le
+  // param URL : sans ça, "showProgression=1" persiste et l'effect peut ré-ouvrir
+  // le popup en arrière-plan à chaque re-render — ce qui bloque les taps sur
+  // "Nouvelle partie" / challenges après que l'utilisateur l'ait fermé.
+  const [progressionXpGained, setProgressionXpGained] = useState<number | undefined>(undefined);
+  const [progressionValorisationGain, setProgressionValorisationGain] = useState<number | undefined>(undefined);
+  const progressionHandledRef = useRef(false);
   useEffect(() => {
-    if (showProgressionParam === '1') setShowProgression(true);
-  }, [showProgressionParam]);
+    if (showProgressionParam !== '1') {
+      progressionHandledRef.current = false;
+      return;
+    }
+    if (progressionHandledRef.current) return;
+    progressionHandledRef.current = true;
+    setProgressionXpGained(xpGainedParam ? parseInt(xpGainedParam, 10) : undefined);
+    setProgressionValorisationGain(valorisationGainParam ? parseInt(valorisationGainParam, 10) : undefined);
+    setShowProgression(true);
+    router.setParams({
+      showProgression: undefined,
+      xpGained: undefined,
+      valorisationGain: undefined,
+    });
+  }, [showProgressionParam, xpGainedParam, valorisationGainParam, router]);
 
   // Tous les challenges actifs : on affiche les challenges actifs globalement,
   // en mettant en tête ceux où l'utilisateur est inscrit (le ChallengeHomeCard
@@ -525,7 +543,13 @@ export default function HomeScreen() {
       {/* Popup progression post-partie */}
       <ProgressionPopup
         visible={showProgression}
-        onContinue={() => setShowProgression(false)}
+        onContinue={() => {
+          setShowProgression(false);
+          // Sécurité : si le ref était resté collé (Android, transitions), on
+          // le débloque dès la fermeture du popup pour que les taps sur
+          // "Nouvelle partie" / challenges fonctionnent immédiatement.
+          navigatingRef.current = false;
+        }}
         xpGained={progressionXpGained}
         valorisationGain={progressionValorisationGain}
       />

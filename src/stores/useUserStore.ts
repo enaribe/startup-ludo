@@ -1,8 +1,9 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
-import { subscribeWithSelector } from 'zustand/middleware';
+import { createJSONStorage, persist, subscribeWithSelector } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import type { UserProfile, Startup } from '@/types';
-import { getUserProfile } from '@/services/firebase/firestore';
+import { addStartup as firestoreAddStartup, getUserProfile } from '@/services/firebase/firestore';
 import {
   getRankFromXP,
   getLevelFromXP,
@@ -69,10 +70,33 @@ const initialState: UserStoreState = {
 
 export const useUserStore = create<UserStore>()(
   subscribeWithSelector(
+    persist(
     immer((set, get) => ({
       ...initialState,
 
       setProfile: (profile) => {
+        // Réconciliation : si on avait des startups locales (persistées via AsyncStorage)
+        // qui ne sont pas dans le profil distant — par exemple parce qu'une écriture
+        // Firestore a échoué silencieusement — on les conserve et on tente de les
+        // renvoyer vers Firestore. Sinon `setProfile(profileFirestore)` écraserait
+        // les startups locales en attente de sync.
+        const previousProfile = get().profile;
+        if (profile && previousProfile && previousProfile.userId === profile.userId) {
+          const remoteIds = new Set(profile.startups.map((s) => s.id));
+          const orphanLocal = previousProfile.startups.filter((s) => !remoteIds.has(s.id));
+          if (orphanLocal.length > 0) {
+            console.warn(
+              `[UserStore] ${orphanLocal.length} local startup(s) absent from Firestore — re-uploading`,
+            );
+            profile = { ...profile, startups: [...profile.startups, ...orphanLocal] };
+            // Re-tente l'upload Firestore en fire-and-forget
+            for (const s of orphanLocal) {
+              firestoreAddStartup(profile.userId, s).catch((err) => {
+                console.error('[UserStore] Re-upload failed for startup', s.id, err);
+              });
+            }
+          }
+        }
         set((state) => {
           state.profile = profile;
           state.isLoading = false;
@@ -283,6 +307,18 @@ export const useUserStore = create<UserStore>()(
       reset: () => {
         set(() => initialState);
       },
-    }))
+    })),
+    {
+      name: 'user-storage',
+      storage: createJSONStorage(() => AsyncStorage),
+      // Persiste uniquement le profil. Les valeurs dérivées (rankInfo, levelProgress, etc.)
+      // sont recalculées via refreshProgressionInfo après hydratation.
+      partialize: (state) => ({ profile: state.profile }),
+      onRehydrateStorage: () => (state) => {
+        // Recalculer les infos de progression après hydratation depuis AsyncStorage.
+        if (state) state.refreshProgressionInfo();
+      },
+    }
+    )
   )
 );

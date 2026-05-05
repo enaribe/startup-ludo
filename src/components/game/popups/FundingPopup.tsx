@@ -1,10 +1,11 @@
 import { memo, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import Animated, {
+  cancelAnimation,
   useSharedValue,
   useAnimatedStyle,
   withTiming,
-  SlideInUp,
+  FadeIn,
   FadeInDown,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
@@ -106,8 +107,16 @@ export const FundingPopup = memo(function FundingPopup({
     crashLog('FundingPopup mount/update', { visible, hasFunding: !!funding, amount: funding?.amount });
     return () => {
       crashLog('FundingPopup unmount');
+      // Couper toute animation en cours pour libérer le worklet Reanimated
+      // — sinon une animation qui s'achève après l'unmount peut tenter d'accéder
+      // à une SharedValue libérée et crasher l'app sur Android.
+      try {
+        cancelAnimation(badgeBounce);
+      } catch {
+        // ignore
+      }
     };
-  }, [visible, funding]);
+  }, [visible, funding, badgeBounce]);
 
   useEffect(() => {
     if (visible && funding) {
@@ -117,6 +126,8 @@ export const FundingPopup = memo(function FundingPopup({
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
     } else {
+      // Annule proprement plutôt que de muter brutalement la SharedValue
+      cancelAnimation(badgeBounce);
       badgeBounce.value = 0;
     }
   }, [visible, funding, badgeBounce, hapticsEnabled]);
@@ -139,7 +150,7 @@ export const FundingPopup = memo(function FundingPopup({
 
   return (
     <Modal visible={visible} onClose={onClose} closeOnBackdrop={false} showCloseButton={false} bareContent>
-      <Animated.View entering={SlideInUp.duration(280)} style={styles.card}>
+      <Animated.View entering={FadeIn.duration(220)} style={styles.card}>
         <FundingHeader />
 
         <ScrollView

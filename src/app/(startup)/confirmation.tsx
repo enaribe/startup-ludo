@@ -160,10 +160,10 @@ export default function StartupConfirmationScreen() {
     // Save to Firestore + sync XP (fire-and-forget, only if authenticated)
     if (userId) {
       firestoreAddStartup(userId, newStartup).catch((err) => {
-        console.warn('[Firestore] Failed to save startup:', err);
+        console.error('[Firestore] Failed to save startup:', err);
       });
       updateUserStats(userId, { xpGained: xpReward }).catch((err) => {
-        console.warn('[Firestore] Failed to sync XP:', err);
+        console.error('[Firestore] Failed to sync XP:', err);
       });
     }
 

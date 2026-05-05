@@ -13,7 +13,7 @@ import type { GameState, Player } from '@/types';
 import { useSound } from '@/hooks/useSound';
 import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { gameLog, gameWarn } from '@/utils/gameLog';
+import { crashLog, gameLog, gameWarn } from '@/utils/gameLog';
 
 // ===== CONSTANTS =====
 
@@ -91,6 +91,8 @@ export interface UseTurnMachineReturn {
   setChosenDiceValue: (value: number) => void;
   /** À appeler par PlayScreen une fois le popup de choix capture résolu (débloquera le passage de tour) */
   resolveCaptureChoice: () => void;
+  /** À appeler par PlayScreen une fois le popup "tour de pénalité" fermé (débloquera l'event de case + fin de tour) */
+  resolveMissedFinalEntry: () => void;
 }
 
 // ===== INITIAL STATE =====
@@ -160,10 +162,9 @@ export function turnReducer(state: TurnState, action: TurnAction): TurnState {
 
     case 'EVENT_RESOLVED': {
       if (state.phase !== 'event') {
-        console.log('[JOKER-CASE] EVENT_RESOLVED IGNORÉ — phase actuelle:', state.phase);
+        crashLog('EVENT_RESOLVED ignored', { currentPhase: state.phase });
         return state;
       }
-      console.log('[JOKER-CASE] EVENT_RESOLVED → phase ending');
       return {
         ...state,
         phase: 'ending',
@@ -272,6 +273,11 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
   // l'issue de la capture, sinon les deux popups se superposent et l'event
   // s'exécute en arrière-plan (timer du quiz qui s'écoule pendant que la modale capture est ouverte).
   const pendingEventTriggerRef = useRef<(() => void) | null>(null);
+  // Flag bloquant le déclenchement de l'event de case + fin de tour
+  // tant que le popup "tour de pénalité" (manque de jetons, passe devant l'entrée finale)
+  // n'a pas été fermé. Sinon le popup d'event s'ouvre derrière le popup d'avertissement
+  // et l'utilisateur ne le voit pas.
+  const waitingForMissedFinalEntryRef = useRef(false);
 
   const resolveCaptureChoice = useCallback(() => {
     waitingForCaptureChoiceRef.current = false;
@@ -281,6 +287,18 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
     const pendingEvent = pendingEventTriggerRef.current;
     pendingEventTriggerRef.current = null;
     pendingEvent?.();
+    pending?.();
+  }, []);
+
+  const resolveMissedFinalEntry = useCallback(() => {
+    waitingForMissedFinalEntryRef.current = false;
+    // Déclencher l'event de case reporté maintenant que l'avertissement est fermé.
+    const pendingEvent = pendingEventTriggerRef.current;
+    pendingEventTriggerRef.current = null;
+    pendingEvent?.();
+    // Et la fin de tour si elle a été reportée
+    const pending = pendingTurnEndRef.current;
+    pendingTurnEndRef.current = null;
     pending?.();
   }, []);
 
@@ -408,13 +426,16 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
 
     // Avertir AVANT le mouvement si le pion va passer devant son entrée finale
     if (move.type === 'move' && move.result.missedFinalEntry && move.result.tokensNeeded) {
+      waitingForMissedFinalEntryRef.current = true;
       onMissedFinalEntryRef.current?.(move.result.tokensNeeded);
     }
 
     setAnimating(true);
     gameLog('turn', 'Exécution auto du coup', { type: move.type, pawnIndex: move.pawnIndex });
+    crashLog('autoMove timer scheduled', { type: move.type, pawnIndex: move.pawnIndex });
 
     timers.set('autoMove', () => {
+      crashLog('autoMove timer fired');
       const rolledSix = turnState.rolledSix;
       let result: MoveResult | null = null;
 
@@ -434,11 +455,43 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
         });
       }
 
+      // Watchdog crash Android — chemins anormalement longs (tour complet)
+      if (result?.path) {
+        const pathLen = result.path.length;
+        if (pathLen > 30) {
+          crashLog('LONG_PATH detected — possible loop', {
+            pathLen,
+            moveType: move.type,
+            pawnIndex: move.pawnIndex,
+            newStatus: result.newState?.status,
+          });
+        }
+        // Coordonnées invalides : col/row NaN/undefined
+        const corruptIdx = result.path.findIndex(
+          (p) => !p || !Number.isFinite((p as { col?: number }).col) || !Number.isFinite((p as { row?: number }).row),
+        );
+        if (corruptIdx >= 0) {
+          crashLog('CORRUPT_PATH coord', {
+            index: corruptIdx,
+            coord: result.path[corruptIdx],
+            pathLen,
+          });
+        }
+      }
+
       if (result) {
         // Calculate animation delay
         const animDelay = result.path?.length
           ? result.path.length * PAWN_STEP_MS + 150
           : 400;
+        crashLog('move scheduled', {
+          moveType: move.type,
+          pathLen: result.path?.length ?? 0,
+          animDelay,
+          hasCapture: !!result.capturedPawn,
+          isFinished: result.isFinished ?? false,
+          triggeredEvent: result.triggeredEvent ?? null,
+        });
 
         // Handle capture after animation
         if (result.capturedPawn) {
@@ -501,14 +554,15 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
           // est déjà appelé ici.
           if (result!.triggeredEvent && !rolledSix) {
             const triggeredEvent = result!.triggeredEvent;
-            if (triggeredEvent === 'joker') {
-              console.log('[JOKER-CASE] moveComplete → triggerEvent (case joker)', {
-                waitingForCapture: waitingForCaptureChoiceRef.current,
-              });
-            }
+            crashLog('moveComplete → triggerEvent', {
+              eventType: triggeredEvent,
+              waitingForCapture: waitingForCaptureChoiceRef.current,
+              waitingForMissed: waitingForMissedFinalEntryRef.current,
+            });
             // Si une capture est en attente (popup choix ouvert), reporter le
             // déclenchement de l'event pour qu'il n'apparaisse pas en parallèle.
-            if (waitingForCaptureChoiceRef.current) {
+            // Idem si le popup "tour de pénalité" (missed final entry) est ouvert.
+            if (waitingForCaptureChoiceRef.current || waitingForMissedFinalEntryRef.current) {
               pendingEventTriggerRef.current = () => onEventRef.current(triggeredEvent);
             } else {
               // Dispatch MOVE_COMPLETE AVANT onEvent pour que la phase soit en 'event'
@@ -543,11 +597,15 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
 
   useEffect(() => {
     if (turnState.phase !== 'ending') return;
-    console.log('[JOKER-CASE] EFFECT phase=ending → schedule endTurn timer');
+    crashLog('phase=ending — schedule endTurn timer');
 
     const runEndTurn = () => {
       const state = turnStateRef.current;
-      console.log('[JOKER-CASE] runEndTurn exec', { rolledSix: state.rolledSix });
+      crashLog('runEndTurn exec', {
+        rolledSix: state.rolledSix,
+        hasMoveResult: !!state.moveResult,
+        isFinished: state.moveResult?.isFinished ?? null,
+      });
 
       // Extra turn on 6: only if a move was actually made (moveResult !== null)
       // and the pawn didn't finish. No valid move on 6 → no extra turn.
@@ -567,13 +625,16 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
     };
 
     timers.set('endTurn', () => {
-      // Si un popup de choix capture est ouvert, reporter la fin de tour
       if (waitingForCaptureChoiceRef.current) {
-        console.log('[JOKER-CASE] endTurn timer → REPORTÉ (waitingForCaptureChoice)');
+        crashLog('endTurn deferred — waitingForCaptureChoice');
         pendingTurnEndRef.current = runEndTurn;
         return;
       }
-      console.log('[JOKER-CASE] endTurn timer → runEndTurn direct');
+      if (waitingForMissedFinalEntryRef.current) {
+        crashLog('endTurn deferred — waitingForMissedFinalEntry');
+        pendingTurnEndRef.current = runEndTurn;
+        return;
+      }
       runEndTurn();
     }, 300);
 
@@ -684,5 +745,6 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
     hasUsedDiceChoice,
     setChosenDiceValue,
     resolveCaptureChoice,
+    resolveMissedFinalEntry,
   };
 }

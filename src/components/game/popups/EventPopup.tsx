@@ -1,10 +1,11 @@
 import { memo, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import Animated, {
+  cancelAnimation,
   useSharedValue,
   useAnimatedStyle,
   withTiming,
-  SlideInUp,
+  FadeIn,
   FadeInDown,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
@@ -169,8 +170,16 @@ export const EventPopup = memo(function EventPopup({
     crashLog('EventPopup mount/update', { visible, eventType, hasEvent: !!event });
     return () => {
       crashLog('EventPopup unmount', { eventType });
+      // Couper l'animation de badge avant unmount — sinon une animation en
+      // cours peut tenter d'écrire sur une SharedValue libérée et crasher
+      // l'app sur Android (SIGSEGV worklet Reanimated).
+      try {
+        cancelAnimation(badgeBounce);
+      } catch {
+        // ignore
+      }
     };
-  }, [visible, event, eventType]);
+  }, [visible, event, eventType, badgeBounce]);
 
   useEffect(() => {
     if (visible && event) {
@@ -184,6 +193,7 @@ export const EventPopup = memo(function EventPopup({
         }
       }
     } else {
+      cancelAnimation(badgeBounce);
       badgeBounce.value = 0;
     }
   }, [visible, event, isOpportunity, badgeBounce, hapticsEnabled]);
@@ -206,7 +216,7 @@ export const EventPopup = memo(function EventPopup({
 
   return (
     <Modal visible={visible} onClose={onClose} closeOnBackdrop={false} showCloseButton={false} bareContent>
-      <Animated.View entering={SlideInUp.duration(280)} style={styles.card}>
+      <Animated.View entering={FadeIn.duration(220)} style={styles.card}>
         {isOpportunity ? <OpportunityHeader /> : <ChallengeHeader />}
 
         <ScrollView

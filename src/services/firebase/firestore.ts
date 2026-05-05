@@ -16,7 +16,12 @@ import {
   collectionGroup,
   serverTimestamp,
   Timestamp,
+  type FirebaseFirestoreTypes,
 } from '@react-native-firebase/firestore';
+
+// Alias court — `@react-native-firebase/firestore` ne réexporte pas
+// QueryDocumentSnapshot ; on passe par le namespace pour typer les `.map`.
+type QDocSnap = FirebaseFirestoreTypes.QueryDocumentSnapshot;
 import { DEFAULT_RANK, getRankFromXP, getLevelFromXP } from '@/config/progression';
 import type { ChallengeEnrollment } from '@/types/challenge';
 import type { Startup, UserProfile } from '@/types';
@@ -109,17 +114,17 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
       getDoc(doc(getFirestore(), FIRESTORE_COLLECTIONS.userStats, userId)),
     ]);
 
-    if (!userSnap.exists) {
+    if (!userSnap.exists()) {
       firebaseLog('User profile not found');
       return null;
     }
 
     const userData = userSnap.data() as FirestoreUser;
-    const statsData = statsSnap.exists ? statsSnap.data() as FirestoreUserStats : null;
+    const statsData = statsSnap.exists() ? statsSnap.data() as FirestoreUserStats : null;
 
     // Fetch user startups
     const startupsSnap = await getDocs(collection(getFirestore(), FIRESTORE_COLLECTIONS.userStartups(userId)));
-    const startups = startupsSnap.docs.map((d) => d.data() as Startup);
+    const startups = startupsSnap.docs.map((d: QDocSnap) => d.data() as Startup);
 
     firebaseLog('User profile fetched successfully');
 
@@ -213,7 +218,7 @@ export const updateUserStats = async (
 
     const now = Timestamp.now();
 
-    if (!statsSnap.exists) {
+    if (!statsSnap.exists()) {
       // Créer le document stats s'il n'existe pas encore
       firebaseLog('User stats not found, creating document', { userId });
       const firstXP = stats.xpGained ?? 0;
@@ -242,22 +247,31 @@ export const updateUserStats = async (
     }
 
     const currentStats = statsSnap.data() as FirestoreUserStats;
-    const newXP = currentStats.xp + (stats.xpGained ?? 0);
+    // Sécurité : tout champ absent dans le doc (ancien schéma, doc partiellement créé)
+    // est traité comme 0 — sinon on crash sur "Cannot read property 'xp' of undefined".
+    const currXP = currentStats.xp ?? 0;
+    const currWeeklyXP = currentStats.weeklyXP ?? 0;
+    const currMonthlyXP = currentStats.monthlyXP ?? 0;
+    const currTotalGames = currentStats.totalGames ?? 0;
+    const currTotalTokens = currentStats.totalTokensEarned ?? 0;
+    const currGamesWon = currentStats.gamesWon ?? 0;
+
+    const newXP = currXP + (stats.xpGained ?? 0);
     const newLevel = getLevelFromXP(newXP).level;
 
     const updates: Partial<FirestoreUserStats> = {
-      totalGames: currentStats.totalGames + 1,
+      totalGames: currTotalGames + 1,
       xp: newXP,
       level: newLevel,
-      weeklyXP: currentStats.weeklyXP + (stats.xpGained ?? 0),
-      monthlyXP: currentStats.monthlyXP + (stats.xpGained ?? 0),
-      totalTokensEarned: currentStats.totalTokensEarned + (stats.tokensEarned ?? 0),
+      weeklyXP: currWeeklyXP + (stats.xpGained ?? 0),
+      monthlyXP: currMonthlyXP + (stats.xpGained ?? 0),
+      totalTokensEarned: currTotalTokens + (stats.tokensEarned ?? 0),
       lastGameAt: now,
       updatedAt: now,
     };
 
     if (stats.won) {
-      updates.gamesWon = currentStats.gamesWon + 1;
+      updates.gamesWon = currGamesWon + 1;
     }
 
     await updateDoc(statsRef, updates);
@@ -278,15 +292,37 @@ export const updateUserStats = async (
 
 // ===== STARTUPS =====
 
+// Supprime récursivement les champs `undefined` — Firestore rejette les undefined
+// avec "Unsupported field value: undefined" et l'écriture échoue silencieusement
+// si elle est en fire-and-forget.
+function stripUndefined<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map((v) => stripUndefined(v)) as unknown as T;
+  }
+  if (value !== null && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      if (v !== undefined) out[k] = stripUndefined(v);
+    }
+    return out as T;
+  }
+  return value;
+}
+
 // Add a startup to user's collection
 export const addStartup = async (userId: string, startup: Startup): Promise<void> => {
   try {
     firebaseLog('Adding startup', { userId, startupId: startup.id });
 
-    await setDoc(doc(getFirestore(), FIRESTORE_COLLECTIONS.userStartups(userId), startup.id), {
+    const payload = stripUndefined({
       ...startup,
       createdAt: serverTimestamp(),
     });
+
+    await setDoc(
+      doc(getFirestore(), FIRESTORE_COLLECTIONS.userStartups(userId), startup.id),
+      payload,
+    );
 
     firebaseLog('Startup added successfully');
   } catch (error) {
@@ -331,18 +367,40 @@ export const deleteStartup = async (userId: string, startupId: string): Promise<
 };
 
 // Get all startups across all users (for leaderboard)
+// Idéal : `orderBy('valorisation', 'desc')` côté serveur — mais ça nécessite
+// un index composite sur le collectionGroup `startups`. Si l'index n'est pas
+// encore créé (FAILED_PRECONDITION), on fallback sur un fetch sans tri puis
+// tri côté client. À petite échelle (<1000 startups) c'est OK ; au-delà, créer
+// l'index via le lien fourni dans le log d'erreur Firebase.
 export const getAllStartups = async (limitCount: number = 100): Promise<Startup[]> => {
   try {
-    console.log('[Firestore] getAllStartups: Starting fetch...');
     firebaseLog('Fetching all startups', { limit: limitCount });
 
-    const snapshot = await getDocs(
-      query(collectionGroup(getFirestore(), 'startups'), limit(limitCount))
-    );
+    let snapshot;
+    try {
+      snapshot = await getDocs(
+        query(
+          collectionGroup(getFirestore(), 'startups'),
+          orderBy('valorisation', 'desc'),
+          limit(limitCount),
+        ),
+      );
+    } catch (err) {
+      const code = (err as { code?: string } | null)?.code ?? '';
+      if (code.includes('failed-precondition')) {
+        firebaseLog('Index missing, falling back to unordered fetch + client-side sort', { code });
+        snapshot = await getDocs(
+          query(collectionGroup(getFirestore(), 'startups'), limit(limitCount)),
+        );
+      } else {
+        throw err;
+      }
+    }
 
-    const startups = snapshot.docs.map((d) => d.data() as Startup);
+    const startups: Startup[] = snapshot.docs.map((d: QDocSnap) => d.data() as Startup);
+    // Tri client (no-op si déjà trié par Firestore)
+    startups.sort((a, b) => (b.valorisation ?? 0) - (a.valorisation ?? 0));
 
-    console.log('[Firestore] getAllStartups: Success, count:', startups.length);
     firebaseLog('All startups fetched successfully', { count: startups.length });
     return startups;
   } catch (error) {
@@ -361,6 +419,7 @@ export interface LeaderboardEntry {
   xp: number;
   level: number;
   gamesWon: number;
+  totalGames: number;
   rank: number;
 }
 
@@ -385,20 +444,32 @@ export const getLeaderboard = async (
     );
 
     const statsDocs = snapshot.docs;
-    const allStats = statsDocs.map((d) => d.data() as FirestoreUserStats);
+    const allStats = statsDocs.map((d: QDocSnap) => d.data() as FirestoreUserStats);
 
     // Identifier les docs qui n'ont pas encore displayName dénormalisé
     const missingIndices: number[] = [];
-    allStats.forEach((s, i) => { if (!s.displayName) missingIndices.push(i); });
+    allStats.forEach((s: FirestoreUserStats, i: number) => { if (!s.displayName) missingIndices.push(i); });
 
-    // Charger les profils manquants en parallèle (au lieu de séquentiellement)
+    // Cap les lectures supplémentaires à 30 — évite une rafale de getDoc()
+    // si aucun stats n'a encore de `displayName` dénormalisé (1er déploiement).
+    const MAX_MISSING_FETCH = 30;
+    const cappedMissing = missingIndices.slice(0, MAX_MISSING_FETCH);
+    if (missingIndices.length > MAX_MISSING_FETCH) {
+      firebaseLog('Capped missing displayName fetches', {
+        total: missingIndices.length,
+        fetched: MAX_MISSING_FETCH,
+      });
+    }
+
+    // Charger les profils manquants en parallèle
     let missingUserSnaps: Awaited<ReturnType<typeof getDoc>>[] = [];
-    if (missingIndices.length > 0) {
+    if (cappedMissing.length > 0) {
       const db = getFirestore();
       missingUserSnaps = await Promise.all(
-        missingIndices.map((i) => getDoc(doc(db, FIRESTORE_COLLECTIONS.users, allStats[i].id)))
+        cappedMissing.map((i) => getDoc(doc(db, FIRESTORE_COLLECTIONS.users, allStats[i].id)))
       );
     }
+    const cappedMissingSet = new Set(cappedMissing);
 
     const entries: LeaderboardEntry[] = [];
     let rank = 1;
@@ -412,21 +483,29 @@ export const getLeaderboard = async (
       if (stats.displayName) {
         displayName = stats.displayName;
         avatarUrl = stats.avatarUrl ?? null;
-      } else {
+      } else if (cappedMissingSet.has(i)) {
         const userSnap = missingUserSnaps[missingCursor++];
-        if (!userSnap?.exists) continue;
+        if (!userSnap?.exists()) continue;
         const userData = userSnap.data() as FirestoreUser;
-        displayName = userData.displayName;
-        avatarUrl = userData.avatarUrl;
+        displayName = userData.displayName ?? 'Joueur';
+        avatarUrl = userData.avatarUrl ?? null;
+      } else {
+        // Au-delà du cap → fallback générique sans lecture supplémentaire
+        displayName = 'Joueur';
+        avatarUrl = null;
       }
+
+      const xpValue =
+        type === 'weekly' ? stats.weeklyXP : type === 'monthly' ? stats.monthlyXP : stats.xp;
 
       entries.push({
         id: stats.id,
         displayName,
         avatarUrl,
-        xp: type === 'weekly' ? stats.weeklyXP : type === 'monthly' ? stats.monthlyXP : stats.xp,
-        level: stats.level,
-        gamesWon: stats.gamesWon,
+        xp: xpValue ?? 0,
+        level: stats.level ?? 1,
+        gamesWon: stats.gamesWon ?? 0,
+        totalGames: stats.totalGames ?? 0,
         rank: rank++,
       });
     }
@@ -485,7 +564,7 @@ export const getGameHistory = async (
       )
     );
 
-    const sessions = snapshot.docs.map((d) => {
+    const sessions = snapshot.docs.map((d: QDocSnap) => {
       const data = d.data();
       // Convert Firestore Timestamp to milliseconds if needed
       let createdAt = data.createdAt;
@@ -582,7 +661,7 @@ export const getChallengeEnrollmentsForUser = async (
       )
     );
 
-    const enrollments = snapshot.docs.map((d) => {
+    const enrollments = snapshot.docs.map((d: QDocSnap) => {
       const data = d.data();
       return { ...data, id: (data as { id?: string }).id ?? d.id } as ChallengeEnrollment;
     });
@@ -608,7 +687,7 @@ export const subscribeToChallengeEnrollments = (
       where('userId', '==', userId)
     ),
     (snapshot) => {
-      const enrollments = snapshot.docs.map((d) => {
+      const enrollments = snapshot.docs.map((d: QDocSnap) => {
         const data = d.data();
         return { ...data, id: (data as { id?: string }).id ?? d.id } as ChallengeEnrollment;
       });
@@ -634,7 +713,7 @@ export const subscribeToUserProfile = (
   const unsubscribe = onSnapshot(
     doc(getFirestore(), FIRESTORE_COLLECTIONS.users, userId),
     async (snapshot) => {
-      if (snapshot.exists) {
+      if (snapshot.exists()) {
         // Fetch full profile including stats
         const profile = await getUserProfile(userId);
         callback(profile);
@@ -668,9 +747,9 @@ export const subscribeToLeaderboard = (
       limit(limitCount)
     ),
     async (snapshot) => {
-      const allStats = snapshot.docs.map((d) => d.data() as FirestoreUserStats);
+      const allStats = snapshot.docs.map((d: QDocSnap) => d.data() as FirestoreUserStats);
       const missingIndices: number[] = [];
-      allStats.forEach((s, i) => { if (!s.displayName) missingIndices.push(i); });
+      allStats.forEach((s: FirestoreUserStats, i: number) => { if (!s.displayName) missingIndices.push(i); });
 
       let missingUserSnaps: Awaited<ReturnType<typeof getDoc>>[] = [];
       if (missingIndices.length > 0) {
@@ -694,19 +773,23 @@ export const subscribeToLeaderboard = (
           avatarUrl = stats.avatarUrl ?? null;
         } else {
           const userSnap = missingUserSnaps[missingCursor++];
-          if (!userSnap?.exists) continue;
+          if (!userSnap?.exists()) continue;
           const userData = userSnap.data() as FirestoreUser;
-          displayName = userData.displayName;
-          avatarUrl = userData.avatarUrl;
+          displayName = userData.displayName ?? 'Joueur';
+          avatarUrl = userData.avatarUrl ?? null;
         }
+
+        const xpValue =
+          type === 'weekly' ? stats.weeklyXP : type === 'monthly' ? stats.monthlyXP : stats.xp;
 
         entries.push({
           id: stats.id,
           displayName,
           avatarUrl,
-          xp: type === 'weekly' ? stats.weeklyXP : type === 'monthly' ? stats.monthlyXP : stats.xp,
-          level: stats.level,
-          gamesWon: stats.gamesWon,
+          xp: xpValue ?? 0,
+          level: stats.level ?? 1,
+          gamesWon: stats.gamesWon ?? 0,
+          totalGames: stats.totalGames ?? 0,
           rank: rank++,
         });
       }

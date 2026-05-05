@@ -1,10 +1,11 @@
 import { memo, useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import Animated, {
+  cancelAnimation,
   useSharedValue,
   useAnimatedStyle,
   withTiming,
-  SlideInUp,
+  FadeIn,
   FadeInDown,
   interpolateColor,
 } from 'react-native-reanimated';
@@ -122,8 +123,18 @@ export const QuizPopup = memo(function QuizPopup({
     crashLog('QuizPopup mount/update', { visible, hasQuiz: !!quiz });
     return () => {
       crashLog('QuizPopup unmount');
+      // Couper toutes les animations Reanimated avant unmount — sinon le timer
+      // 30s en cours peut tenter d'écrire sur une SharedValue libérée et crasher
+      // l'app sur Android.
+      try {
+        cancelAnimation(timerProgress);
+        cancelAnimation(resultScale);
+        cancelAnimation(badgeBounce);
+      } catch {
+        // ignore
+      }
     };
-  }, [visible, quiz]);
+  }, [visible, quiz, timerProgress, resultScale, badgeBounce]);
 
   useEffect(() => {
     if (visible && quiz) {
@@ -239,7 +250,7 @@ export const QuizPopup = memo(function QuizPopup({
 
   return (
     <Modal visible={visible} onClose={onClose} closeOnBackdrop={false} showCloseButton={false} bareContent>
-      <Animated.View entering={SlideInUp.duration(280)} style={styles.card}>
+      <Animated.View entering={FadeIn.duration(220)} style={styles.card}>
         {/* En-tête SVG */}
         <QuizHeader />
 

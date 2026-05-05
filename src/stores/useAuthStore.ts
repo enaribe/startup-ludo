@@ -26,6 +26,7 @@ import {
 } from '@/services/firebase';
 import { useUserStore } from './useUserStore';
 import { useSocialStore } from './useSocialStore';
+import { clearLeaderboardCache } from '@/hooks/useLeaderboardCache';
 
 interface AuthState {
   user: User | null;
@@ -198,6 +199,7 @@ export const useAuthStore = create<AuthStore>()(
             });
             useUserStore.getState().reset();
             useSocialStore.getState().reset();
+            clearLeaderboardCache();
           }
         });
 

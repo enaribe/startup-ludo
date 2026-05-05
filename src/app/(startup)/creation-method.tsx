@@ -13,10 +13,8 @@ import {
 } from 'react-native';
 import Animated, {
     cancelAnimation,
-    Easing,
     FadeIn,
     FadeInDown,
-    FadeOut,
     interpolate,
     SlideInUp,
     useAnimatedStyle,
@@ -31,6 +29,9 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DynamicGradientBorder, GameButton, RadialBackground, Modal } from '@/components/ui';
+import { GamePopup } from '@/components/ui/GamePopup';
+import { OutlinedText } from '@/components/ui/OutlinedText';
+import { RocketIcon } from '@/components/icons';
 import { generateStartupIdeas } from '@/services/ai';
 import { useSettingsStore } from '@/stores';
 import { FONTS } from '@/styles/typography';
@@ -54,99 +55,6 @@ function getMockIdeas(
     { id: '3', title: `${m} durable en ${s}`, description: 'Modèle hybride associant ' + t + ' et ' + s + '.' },
   ];
 }
-
-/* ───────────────────────── Animated Spinner ───────────────────────── */
-
-const AISpinner = memo(function AISpinner() {
-  const rotation = useSharedValue(0);
-  const pulse = useSharedValue(1);
-  const glow = useSharedValue(0);
-
-  useEffect(() => {
-    rotation.value = withRepeat(
-      withTiming(360, { duration: 2400, easing: Easing.linear }),
-      -1,
-      false
-    );
-    pulse.value = withRepeat(
-      withSequence(
-        withTiming(1.12, { duration: 900, easing: Easing.inOut(Easing.ease) }),
-        withTiming(1, { duration: 900, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      true
-    );
-    glow.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: 1200, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0, { duration: 1200, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      true
-    );
-    return () => {
-      cancelAnimation(rotation);
-      cancelAnimation(pulse);
-      cancelAnimation(glow);
-    };
-  }, [rotation, pulse, glow]);
-
-  const ringStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${rotation.value}deg` }, { scale: pulse.value }],
-  }));
-
-  const glowStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(glow.value, [0, 1], [0.3, 0.8]),
-    transform: [{ scale: interpolate(glow.value, [0, 1], [0.9, 1.15]) }],
-  }));
-
-  return (
-    <View style={spinnerStyles.wrapper}>
-      <Animated.View style={[spinnerStyles.glow, glowStyle]} />
-      <Animated.View style={[spinnerStyles.ring, ringStyle]}>
-        <View style={spinnerStyles.ringInner}>
-          <Ionicons name="diamond" size={28} color="#FFBC40" />
-        </View>
-      </Animated.View>
-    </View>
-  );
-});
-
-const spinnerStyles = StyleSheet.create({
-  wrapper: {
-    width: 80,
-    height: 80,
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'center',
-    marginBottom: 24,
-  },
-  glow: {
-    position: 'absolute',
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(255, 188, 64, 0.15)',
-  },
-  ring: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    borderWidth: 3,
-    borderColor: '#FFBC40',
-    borderTopColor: 'transparent',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ringInner: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255, 188, 64, 0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
 
 /* ───────────────────────── Loading Dots ───────────────────────── */
 
@@ -234,23 +142,30 @@ interface IdeaCardProps {
   onSelect: (index: number) => void;
 }
 
+const YELLOW_GRADIENT = [
+  { offset: '0%',   color: '#FFBC40', opacity: 0.6 },
+  { offset: '40%',  color: '#FFD97A', opacity: 1 },
+  { offset: '100%', color: '#FFBC40', opacity: 0.6 },
+];
+
 const IdeaCard = memo(function IdeaCard({ idea, index, isSelected, onSelect }: IdeaCardProps) {
   const [expanded, setExpanded] = useState(false);
   const scale = useSharedValue(1);
 
   const handlePressIn = useCallback(() => {
-    scale.value = withSpring(0.96, { damping: 12, stiffness: 400 });
+    scale.value = withSpring(0.97, { damping: 14, stiffness: 380 });
   }, [scale]);
 
   const handlePressOut = useCallback(() => {
-    scale.value = withSpring(1, { damping: 12, stiffness: 400 });
+    scale.value = withSpring(1, { damping: 14, stiffness: 380 });
   }, [scale]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
 
-  const toggleExpand = useCallback(() => {
+  const toggleExpand = useCallback((e: { stopPropagation?: () => void }) => {
+    e.stopPropagation?.();
     setExpanded((v) => !v);
   }, []);
 
@@ -258,68 +173,77 @@ const IdeaCard = memo(function IdeaCard({ idea, index, isSelected, onSelect }: I
 
   return (
     <Animated.View
-      entering={FadeIn.delay(index * 50).duration(160)}
+      entering={FadeIn.delay(index * 60).duration(180)}
       style={[animatedStyle, ideaStyles.cardOuter]}
     >
-      <DynamicGradientBorder
-        borderRadius={16}
-        fill={isSelected ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.35)'}
-        style={ideaStyles.cardBorder}
+      <Pressable
+        onPress={() => onSelect(index)}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
       >
-        <View style={ideaStyles.cardInner}>
-          <Pressable
-            onPress={() => onSelect(index)}
-            onPressIn={handlePressIn}
-            onPressOut={handlePressOut}
-            style={ideaStyles.cardSelectArea}
-          >
-            <View style={ideaStyles.cardHeader}>
+        <DynamicGradientBorder
+          borderRadius={16}
+          fill={isSelected ? 'rgba(255, 188, 64, 0.10)' : 'rgba(0, 0, 0, 0.35)'}
+          borderWidth={isSelected ? 1.5 : 1}
+          gradientColors={isSelected ? YELLOW_GRADIENT : undefined}
+        >
+          <View style={ideaStyles.cardInner}>
+            {/* Ruban numéro + nom du projet */}
+            <View style={ideaStyles.headerRow}>
               <View style={[ideaStyles.numberBadge, isSelected && ideaStyles.numberBadgeSelected]}>
                 <Text style={[ideaStyles.numberText, isSelected && ideaStyles.numberTextSelected]}>
-                  {index + 1}
+                  {String(index + 1).padStart(2, '0')}
                 </Text>
               </View>
-              <View style={ideaStyles.cardTextWrapper}>
-                <Text style={[ideaStyles.cardTitle, isSelected && ideaStyles.cardTitleSelected]} numberOfLines={2}>
-                  {idea.title}
-                </Text>
-                <Text
-                  style={ideaStyles.cardDesc}
-                  numberOfLines={expanded || !showExpandToggle ? undefined : 3}
-                >
-                  {idea.description}
-                </Text>
-              </View>
+              <Text
+                style={[ideaStyles.cardTitle, isSelected && ideaStyles.cardTitleSelected]}
+                numberOfLines={2}
+              >
+                {idea.title}
+              </Text>
               {isSelected && (
-                <Animated.View entering={ZoomIn.duration(250)} style={ideaStyles.checkIcon}>
-                  <Ionicons name="checkmark-circle" size={24} color="#FFBC40" />
+                <Animated.View entering={ZoomIn.duration(220)}>
+                  <Ionicons name="checkmark-circle" size={20} color="#FFBC40" />
                 </Animated.View>
               )}
             </View>
-          </Pressable>
 
-          {showExpandToggle ? (
-            <Pressable
-              onPress={toggleExpand}
-              style={({ pressed }) => [
-                ideaStyles.expandRow,
-                pressed && ideaStyles.expandRowPressed,
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel={expanded ? 'Réduire la description' : 'Afficher la description complète'}
-            >
-              <Text style={ideaStyles.expandRowText}>
-                {expanded ? 'Voir moins' : 'Voir la description complète'}
+            {/* Description avec section visuellement séparée */}
+            <View style={ideaStyles.descBlock}>
+              <View style={ideaStyles.descHeader}>
+                <View style={ideaStyles.descLabelRow}>
+                  <Ionicons name="document-text" size={12} color="rgba(255,255,255,0.45)" />
+                  <Text style={ideaStyles.descLabel}>Description</Text>
+                </View>
+                {showExpandToggle ? (
+                  <Pressable
+                    onPress={toggleExpand}
+                    style={({ pressed }) => [
+                      ideaStyles.expandPill,
+                      pressed && ideaStyles.expandPillPressed,
+                    ]}
+                    hitSlop={10}
+                    accessibilityRole="button"
+                    accessibilityLabel={expanded ? 'Réduire la description' : 'Afficher la description complète'}
+                  >
+                    <Ionicons
+                      name={expanded ? 'chevron-up' : 'chevron-down'}
+                      size={14}
+                      color="#FFBC40"
+                    />
+                  </Pressable>
+                ) : null}
+              </View>
+              <Text
+                style={ideaStyles.cardDesc}
+                numberOfLines={expanded || !showExpandToggle ? undefined : 3}
+              >
+                {idea.description}
               </Text>
-              <Ionicons
-                name={expanded ? 'chevron-up' : 'chevron-down'}
-                size={18}
-                color="#FFBC40"
-              />
-            </Pressable>
-          ) : null}
-        </View>
-      </DynamicGradientBorder>
+            </View>
+          </View>
+        </DynamicGradientBorder>
+      </Pressable>
     </Animated.View>
   );
 });
@@ -327,113 +251,96 @@ const IdeaCard = memo(function IdeaCard({ idea, index, isSelected, onSelect }: I
 const ideaStyles = StyleSheet.create({
   cardOuter: {
     width: '100%',
-    marginBottom: 10,
-  },
-  cardBorder: {
-    width: '100%',
+    marginBottom: 12,
   },
   cardInner: {
-    overflow: 'hidden',
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 12,
+    gap: 10,
   },
-  cardSelectArea: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
-  },
-  cardHeader: {
+  headerRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
+    alignItems: 'center',
+    gap: 10,
   },
   numberBadge: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    minWidth: 36,
+    height: 26,
+    paddingHorizontal: 8,
+    borderRadius: 13,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.10)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 2,
   },
   numberBadgeSelected: {
-    backgroundColor: 'rgba(255, 188, 64, 0.25)',
+    backgroundColor: 'rgba(255, 188, 64, 0.22)',
+    borderColor: 'rgba(255, 188, 64, 0.55)',
   },
   numberText: {
     fontFamily: FONTS.title,
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.5)',
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.55)',
+    letterSpacing: 1,
   },
   numberTextSelected: {
     color: '#FFBC40',
   },
-  cardTextWrapper: {
-    flex: 1,
-    gap: 4,
-  },
   cardTitle: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: 14,
+    flex: 1,
+    fontFamily: FONTS.title,
+    fontSize: 15,
     color: '#FFFFFF',
+    lineHeight: 20,
+    letterSpacing: 0.3,
   },
   cardTitleSelected: {
     color: '#FFDC64',
   },
+  descBlock: {
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    gap: 6,
+  },
+  descHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  descLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  descLabel: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 10,
+    color: 'rgba(255, 255, 255, 0.45)',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+  },
   cardDesc: {
     fontFamily: FONTS.body,
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.55)',
+    color: 'rgba(255, 255, 255, 0.78)',
     lineHeight: 17,
   },
-  checkIcon: {
-    marginTop: 2,
-  },
-  expandRow: {
-    flexDirection: 'row',
+  expandPill: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingTop: 4,
-    paddingBottom: 14,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: 'rgba(255, 188, 64, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 188, 64, 0.30)',
   },
-  expandRowPressed: {
-    opacity: 0.85,
-  },
-  expandRowText: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: 12,
-    color: '#FFBC40',
-  },
-});
-
-/* ───────────────────────── Step Indicator ───────────────────────── */
-
-const StepIndicator = memo(function StepIndicator({ current, total }: { current: number; total: number }) {
-  return (
-    <View style={stepStyles.row}>
-      {Array.from({ length: total }, (_, i) => (
-        <View key={i} style={[stepStyles.dot, i < current && stepStyles.dotActive]} />
-      ))}
-    </View>
-  );
-});
-
-const stepStyles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    gap: 6,
-    alignSelf: 'center',
-    marginBottom: 20,
-  },
-  dot: {
-    width: 24,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-  },
-  dotActive: {
-    backgroundColor: '#FFBC40',
+  expandPillPressed: {
+    opacity: 0.7,
   },
 });
 
@@ -721,87 +628,64 @@ export default function CreationMethodScreen() {
       </ScrollView>
 
       {/* ═══════════ POPUP IA ═══════════ */}
-      <Modal
+      <GamePopup
         visible={showAIPopup}
-        onClose={isGenerating ? () => {} : handleCloseAIPopup}
-        closeOnBackdrop={!isGenerating}
-        showCloseButton={false}
-        bareContent
+        onRequestClose={isGenerating ? () => {} : handleCloseAIPopup}
+        header="Tambali"
+        spinningShape={isGenerating}
+        spinningShapeSize={180}
+        icon={<RocketIcon color="#1F91D0" size={72} withShadow={false} />}
+        title={
+          <OutlinedText
+            text={isGenerating ? 'GÉNÉRATION EN COURS' : 'CHOISISSEZ UNE IDÉE'}
+            outlineColor="#1F91D0"
+            outlineWidth={2}
+            style={styles.popupTitleOutlined}
+          />
+        }
+        footer={
+          !isGenerating && generatedIdeas.length > 0 ? (
+            <GameButton
+              variant="yellow"
+              fullWidth
+              title="VALIDER CETTE IDÉE"
+              onPress={handleConfirmIdea}
+              disabled={selectedIdeaIndex == null}
+            />
+          ) : null
+        }
       >
-        <Animated.View entering={SlideInUp.duration(280)} style={styles.popupCentered}>
-          <DynamicGradientBorder
-            borderRadius={24}
-            fill="#0A1929"
-            boxWidth={screenWidth - 36}
-          >
-            <View style={styles.popupCard}>
-              {!isGenerating && (
-                <Pressable onPress={handleCloseAIPopup} hitSlop={8} style={styles.popupCloseBtn}>
-                  <Ionicons name="close" size={20} color="rgba(255,255,255,0.6)" />
-                </Pressable>
-              )}
-
-              {/* Header */}
-              <View style={styles.popupHeaderCentered}>
-                <View style={styles.popupIconBadge}>
-                  <Ionicons name="diamond" size={32} color="#FFBC40" />
-                </View>
-                <Text style={styles.popupTitleCentered}>
-                  {isGenerating ? 'TAMBALI' : 'CHOISISSEZ UNE IDÉE'}
-                </Text>
-              </View>
-
-              {/* Body */}
-              <View style={styles.popupBody}>
-                {isGenerating ? (
-                  <Animated.View entering={FadeIn.duration(200)} style={styles.popupLoadingCenter}>
-                    <AISpinner />
-                    <Text style={styles.popupLoadingTitle}>Génération en cours</Text>
-                    <Text style={styles.popupLoadingSubtitle}>
-                      L'IA analyse vos cartes d'inspiration et génère 3 idées de startup...
-                    </Text>
-                    <LoadingDots />
-                  </Animated.View>
-                ) : generatedIdeas.length > 0 ? (
-                  <>
-                    <StepIndicator current={selectedIdeaIndex != null ? 2 : 1} total={2} />
-
-                    <Text style={styles.popupSelectSubtitle}>
-                      Sélectionnez celle qui vous inspire le plus
-                    </Text>
-
-                    <ScrollView
-                      style={styles.popupIdeasScroll}
-                      showsVerticalScrollIndicator={false}
-                      keyboardShouldPersistTaps="handled"
-                    >
-                      {generatedIdeas.map((idea, index) => (
-                        <IdeaCard
-                          key={idea.id}
-                          idea={idea}
-                          index={index}
-                          isSelected={selectedIdeaIndex === index}
-                          onSelect={handleSelectIdea}
-                        />
-                      ))}
-                    </ScrollView>
-
-                    <Animated.View entering={FadeIn.delay(200).duration(150)}>
-                      <GameButton
-                        variant="yellow"
-                        fullWidth
-                        title="VALIDER CETTE IDÉE"
-                        onPress={handleConfirmIdea}
-                        disabled={selectedIdeaIndex == null}
-                      />
-                    </Animated.View>
-                  </>
-                ) : null}
-                </View>
-            </View>
-          </DynamicGradientBorder>
-        </Animated.View>
-      </Modal>
+        {isGenerating ? (
+          <Animated.View entering={FadeIn.duration(200)} style={styles.popupLoadingCenter}>
+            <Text style={styles.popupLoadingSubtitle}>
+              L'IA analyse vos cartes d'inspiration et génère 3 idées de startup...
+            </Text>
+            <LoadingDots />
+          </Animated.View>
+        ) : generatedIdeas.length > 0 ? (
+          <View style={styles.popupBody}>
+            <Text style={styles.popupSelectSubtitle}>
+              Sélectionnez celle qui vous inspire le plus
+            </Text>
+            <ScrollView
+              style={styles.popupIdeasScroll}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              nestedScrollEnabled
+            >
+              {generatedIdeas.map((idea, index) => (
+                <IdeaCard
+                  key={idea.id}
+                  idea={idea}
+                  index={index}
+                  isSelected={selectedIdeaIndex === index}
+                  onSelect={handleSelectIdea}
+                />
+              ))}
+            </ScrollView>
+          </View>
+        ) : null}
+      </GamePopup>
 
       {/* ═══════════ POPUP MANUEL ═══════════ */}
       <Modal
@@ -1081,6 +965,14 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     textAlign: 'center',
     letterSpacing: 1,
+  },
+  popupTitleOutlined: {
+    fontFamily: FONTS.title,
+    fontSize: 20,
+    color: COLORS.white,
+    textAlign: 'center',
+    letterSpacing: 1,
+    marginBottom: 8,
   },
   popupBody: {
     paddingTop: 8,

@@ -46,6 +46,7 @@ import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { getRandomDuelQuestions } from '@/data/duelQuestions';
 import { rollRandomJoker } from '@/data/jokers';
+import { crashLog } from '@/utils/gameLog';
 import type { ChallengeEvent, FundingEvent, OpportunityEvent, Player, QuizEvent, DuelResult, DuelQuestion, Joker, JokerType } from '@/types';
 
 // Données de test pour afficher les popups rapidement
@@ -310,25 +311,19 @@ export default function PlayScreen() {
     (eventType: string) => {
       // ===== CASE JOKER : tirer un joker aléatoire et l'ajouter à l'inventaire =====
       if (eventType === 'joker' && currentPlayer) {
-        console.log('[JOKER-CASE] handleTriggeredEvent ENTER', {
+        crashLog('triggeredEvent: joker', {
           playerId: currentPlayer.id,
           isAI: currentPlayer.isAI,
           isOnline,
         });
         const jokerType = rollRandomJoker();
         const jokerId = grantJoker(currentPlayer.id, jokerType);
-        console.log('[JOKER-CASE] joker tiré', { jokerType, jokerId });
         if (isOnline) {
           onlineGame.broadcastJokerGranted(currentPlayer.id, jokerType, jokerId);
-          console.log('[JOKER-CASE] broadcast joker granted (online)');
         }
-        // Afficher le popup de découverte pour humain (résolution au clic COLLECTER).
-        // Pour l'IA, résolution immédiate (la phase est déjà passée à 'event').
         if (!currentPlayer.isAI) {
           setJokerAcquired({ type: jokerType });
-          console.log('[JOKER-CASE] popup acquired ouvert, attente clic COLLECTER');
         } else {
-          console.log('[JOKER-CASE] IA → handleEventResolve immédiat');
           handleEventResolveRef.current();
         }
         return;
@@ -499,7 +494,7 @@ export default function PlayScreen() {
 
   // ===== TURN MACHINE =====
 
-  const { turnState, diceProps, handleEventResolve, resolveCaptureChoice, setChosenDiceValue } = useTurnMachine({
+  const { turnState, diceProps, handleEventResolve, resolveCaptureChoice, resolveMissedFinalEntry, setChosenDiceValue } = useTurnMachine({
     game,
     currentPlayer,
     isOnline,
@@ -576,10 +571,9 @@ export default function PlayScreen() {
     if (!isOnline || !onlineGame.remoteEvent) return;
 
     const { eventType, eventData } = onlineGame.remoteEvent;
-    console.log('[PlayScreen] Affichage popup événement distant (spectateur):', {
+    crashLog('remoteEvent received (spectator)', {
       eventType,
       hasEventData: !!eventData && Object.keys(eventData).length > 0,
-      eventData,
     });
 
     // Ne montrer le popup "Duel en cours" que pour un vrai duel ; pour quiz/funding/opportunity/challenge, s'assurer que duelTriggered est false
@@ -588,16 +582,13 @@ export default function PlayScreen() {
       const duelData = eventData as { challengerId?: string; opponentId?: string; questions?: DuelQuestion[] };
       const { challengerId, opponentId, questions } = duelData;
 
-      console.log('[PlayScreen] Duel distant reçu:', { challengerId, opponentId, questionsCount: questions?.length, myId: userId });
+      crashLog('duel remote received', { challengerId, opponentId, questionsCount: questions?.length, myId: userId });
 
       if (challengerId && opponentId && questions && questions.length > 0) {
         if (userId === challengerId) {
-          // Je suis le challenger — j'ai déjà configuré le duel localement, ignorer
-          console.log('[PlayScreen] Je suis le challenger (ignoré, duel déjà en cours)');
+          // Je suis le challenger — duel déjà configuré localement
         } else if (userId === opponentId) {
-          // Je suis l'adversaire — rejoindre le duel
-          // On rejoint même si un duel précédent est encore "actif" côté state (race condition reset)
-          // car ce nouveau broadcast correspond à un duel différent (nouveau challengerId/opponentId/questions)
+          // Je suis l'adversaire — rejoindre le duel si différent
           const currentDuel = duelRef.current;
           const isDifferentDuel =
             !currentDuel.isActive ||
@@ -605,16 +596,12 @@ export default function PlayScreen() {
             currentDuel.duelState?.opponentId !== opponentId;
 
           if (isDifferentDuel) {
-            console.log('[PlayScreen] Je suis l\'adversaire, je rejoins le duel');
             setIsEventSpectator(false);
             setDuelTriggered(true);
             duelRef.current.joinDuel(challengerId, opponentId, questions);
-          } else {
-            console.log('[PlayScreen] Je suis l\'adversaire — même duel déjà en cours, ignoré');
           }
         } else {
           // Je suis spectateur (3-4 joueurs)
-          console.log('[PlayScreen] Je suis spectateur du duel');
           setIsEventSpectator(true);
           setDuelTriggered(true);
           setSpectatorDuelChallengerId(challengerId);
@@ -694,7 +681,7 @@ export default function PlayScreen() {
     if (!isOnline || !onlineGame.remoteDuelResult) return;
 
     const result = onlineGame.remoteDuelResult;
-    console.log('[PlayScreen] Résultat duel reçu (spectateur):', result);
+    crashLog('duel result received (spectator)');
 
     // Appliquer les tokens/pénalités pour les spectateurs
     // Les 2 joueurs du duel ont déjà appliqué via onDuelComplete
@@ -737,13 +724,9 @@ export default function PlayScreen() {
     if (!isOnline) return;
 
     if (onlineGame.opponentDisconnected) {
-      if (__DEV__) {
-        console.log('[PlayScreen] Popup "Adversaire déconnecté" déclenché:', {
-          opponentDisconnected: onlineGame.opponentDisconnected,
-          disconnectedPlayerName: onlineGame.disconnectedPlayerName,
-          timestamp: Date.now(),
-        });
-      }
+      crashLog('opponent disconnected popup', {
+        disconnectedPlayerName: onlineGame.disconnectedPlayerName,
+      });
       setShowDisconnectPopup(true);
       disconnectTimerRef.current = setTimeout(() => {
         if (userId) {
@@ -1458,7 +1441,10 @@ export default function PlayScreen() {
       {/* Missed Final Entry Popup */}
       <MissedFinalEntryPopup
         visible={missedFinalEntry !== null}
-        onContinue={() => setMissedFinalEntry(null)}
+        onContinue={() => {
+          setMissedFinalEntry(null);
+          resolveMissedFinalEntry();
+        }}
         tokensNeeded={missedFinalEntry?.tokensNeeded ?? 1}
         currentPlayer={currentPlayer}
         allPlayers={game?.players ?? []}
@@ -1499,7 +1485,6 @@ export default function PlayScreen() {
         visible={jokerAcquired !== null}
         jokerType={jokerAcquired?.type ?? null}
         onContinue={() => {
-          console.log('[JOKER-CASE] popup acquired CLOSE → handleEventResolve');
           setJokerAcquired(null);
           handleEventResolveRef.current?.();
         }}

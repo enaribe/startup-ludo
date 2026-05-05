@@ -20,7 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import type { PlayerColor } from '@/types';
 import { COLORS } from '@/styles/colors';
 import { useSound } from '@/hooks/useSound';
-import { gameLog, gameWarn, gameError } from '@/utils/gameLog';
+import { crashLog, gameLog, gameWarn, gameError } from '@/utils/gameLog';
 
 interface PawnProps {
   color: PlayerColor;
@@ -78,6 +78,20 @@ export const Pawn = memo(function Pawn({
     const newX = targetX - pawnSize / 2;
     const newY = targetY - pawnSize / 2;
     const targetKey = `${targetX},${targetY}`;
+
+    // Watchdog crash Android : path > 30 cases (tour complet ou boucle)
+    if (movePath && movePath.length > 30) {
+      crashLog('PAWN_LONG_PATH', {
+        pawnIndex,
+        pathLen: movePath.length,
+        targetKey,
+      });
+    }
+    // Watchdog crash : coordonnées invalides
+    if (!Number.isFinite(targetX) || !Number.isFinite(targetY)) {
+      crashLog('PAWN_INVALID_TARGET', { pawnIndex, targetX, targetY });
+      return;
+    }
 
     gameLog('pawn', `${pawnIndex} useEffect`, {
       targetX,
@@ -147,6 +161,12 @@ export const Pawn = memo(function Pawn({
       );
     } catch (error) {
       gameError('pawn', `${pawnIndex} Animation error:`, error);
+      crashLog('PAWN_ANIMATION_ERROR', {
+        pawnIndex,
+        newX,
+        newY,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
       // Fallback : positionnement direct
       translateX.value = newX;
       translateY.value = newY;
@@ -154,6 +174,20 @@ export const Pawn = memo(function Pawn({
       handleAnimationComplete();
     }
   }, [targetX, targetY, pawnSize, pawnIndex, handleAnimationComplete, playSound, translateX, translateY, bounce]);
+
+  // Cleanup au unmount : trace + cancelAnimation pour libérer les workers Reanimated
+  useEffect(() => {
+    return () => {
+      crashLog('PAWN_UNMOUNT', { pawnIndex });
+      try {
+        cancelAnimation(translateX);
+        cancelAnimation(translateY);
+        cancelAnimation(bounce);
+      } catch {
+        // ignore
+      }
+    };
+  }, [pawnIndex, translateX, translateY, bounce]);
 
   // Animation de pulsation pour pion actif
   useEffect(() => {

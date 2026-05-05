@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { memo, useCallback, useEffect, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { Dimensions, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
@@ -89,6 +89,11 @@ const CLASSEMENT_INFO_SECTIONS: InfoSection[] = [
     title: 'MISE À JOUR',
     body: "Le classement est mis en cache pendant 5 minutes. Tire vers le bas pour forcer une actualisation.",
   },
+  {
+    icon: 'eye',
+    title: 'TOP 20',
+    body: "Seul le top 20 est affiché. Si tu es plus loin, on te montre ta position et les rangs voisins.",
+  },
 ];
 
 export default function ClassementScreen() {
@@ -126,31 +131,36 @@ export default function ClassementScreen() {
     }
   }, [selectedProfile?.item.id, currentUserId, loadFollowing]);
 
-  // Utiliser le hook de cache
-  const { players: remotePlayers, startups: remoteStartups, isRefreshing, refresh } = useLeaderboardCache();
-
   const isJoueurs = activeFilter === 'joueurs';
 
-  // Mapper les joueurs du cache
-  const remoteUsers: RankedItem[] = remotePlayers.map((e) => ({
-    id: e.id,
-    name: e.displayName.toUpperCase(),
-    score: e.xp,
-    subtitle: `${e.xp.toLocaleString()} xp`,
-    type: 'user' as const,
-    avatar: e.avatarUrl,
-    isCurrentUser: e.id === currentUserId,
-    level: e.level,
-    gamesPlayed: 0,
-    gamesWon: e.gamesWon,
-    startupCount: 0,
-  }));
+  // Fetch lazy : on ne charge que le dataset de l'onglet actif. Au switch d'onglet,
+  // le hook hydrate l'autre dataset depuis le cache mémoire/AsyncStorage si dispo.
+  const { players: remotePlayers, startups: remoteStartups, isRefreshing, refresh } =
+    useLeaderboardCache(isJoueurs ? 'players' : 'startups');
+
+  // Mapper les joueurs du cache (memoizé : dépendances stables)
+  const remoteUsers: RankedItem[] = useMemo(
+    () =>
+      remotePlayers.map((e) => ({
+        id: e.id,
+        name: (e.displayName ?? 'Joueur').toUpperCase(),
+        score: e.xp,
+        subtitle: `${e.xp.toLocaleString()} xp`,
+        type: 'user' as const,
+        avatar: e.avatarUrl,
+        isCurrentUser: e.id === currentUserId,
+        level: e.level,
+        gamesPlayed: e.totalGames,
+        gamesWon: e.gamesWon,
+        startupCount: 0,
+      })),
+    [remotePlayers, currentUserId],
+  );
 
   // === JOUEURS DATA: merge remote users with local profile ===
-  const joueurData: RankedItem[] = (() => {
+  const joueurData: RankedItem[] = useMemo(() => {
     const list = [...remoteUsers];
 
-    // Always inject local user if authenticated (even with 0 XP)
     if (localProfile && currentUserId) {
       const alreadyPresent = list.some((u) => u.id === currentUserId);
       if (!alreadyPresent) {
@@ -168,7 +178,6 @@ export default function ClassementScreen() {
           startupCount: localProfile.startups?.length ?? 0,
         });
       } else {
-        // Update existing entry with local data if more recent
         const idx = list.findIndex((u) => u.id === currentUserId);
         const existing = list[idx];
         if (idx >= 0 && existing) {
@@ -188,26 +197,19 @@ export default function ClassementScreen() {
 
     list.sort((a, b) => b.score - a.score);
     return list;
-  })();
+  }, [remoteUsers, localProfile, currentUserId, currentUserName]);
 
   // === ENTREPRISES DATA: merge remote startups with local startups ===
-  const entrepriseData: RankedItem[] = (() => {
-    // Start with remote startups
+  const entrepriseData: RankedItem[] = useMemo(() => {
     const startupMap = new Map<string, Startup>();
-    for (const s of remoteStartups) {
-      startupMap.set(s.id, s);
-    }
+    for (const s of remoteStartups) startupMap.set(s.id, s);
 
-    // Merge local startups (may have newer data)
     const localStartups = localProfile?.startups ?? [];
     for (const s of localStartups) {
-      if (!startupMap.has(s.id)) {
-        startupMap.set(s.id, s);
-      }
+      if (!startupMap.has(s.id)) startupMap.set(s.id, s);
     }
 
     const allStartups = Array.from(startupMap.values());
-    // Sort by valorisation descending
     allStartups.sort((a, b) => (b.valorisation ?? 0) - (a.valorisation ?? 0));
 
     return allStartups.map((s) => ({
@@ -219,8 +221,10 @@ export default function ClassementScreen() {
       sector: s.sector,
       creatorName: s.creatorName,
       valorisation: s.valorisation,
+      // Marquer mes propres startups pour highlight + position "Votre position"
+      isCurrentUser: s.creatorId === currentUserId || (!!currentUserName && s.creatorName === currentUserName),
     }));
-  })();
+  }, [remoteStartups, localProfile?.startups, currentUserId, currentUserName]);
 
   const data = isJoueurs ? joueurData : entrepriseData;
 
@@ -228,37 +232,36 @@ export default function ClassementScreen() {
   const hasPodium = data.length >= 3;
   const podiumData = hasPodium ? [data[1], data[0], data[2]].filter(Boolean) : [];
 
-  // Calculer les joueurs à afficher autour de l'utilisateur
-  const getDisplayList = useCallback(() => {
-    if (!hasPodium) return data;
+  // Stratégie d'affichage :
+  // - Top 3 dans le podium
+  // - Liste : rangs 4 à 12 toujours visibles
+  // - Si l'utilisateur (joueur OU entreprise dont il est créateur) est au-delà du rang 12,
+  //   on insère un séparateur puis sa propre ligne (et celles juste autour si dispo)
+  const TOP_LIST_END = 12;
+  // Position de l'utilisateur (joueur OU sa première startup) dans la liste courante
+  const userOwnIndex = useMemo(
+    () => data.findIndex((item) => item.isCurrentUser === true),
+    [data],
+  );
 
-    // Trouver le rang de l'utilisateur
-    const userIndex = data.findIndex((item) =>
-      item.type === 'user' && item.isCurrentUser
-    );
+  const { topRows, ownerRow, ownerRank, hasGap } = useMemo(() => {
+    // Liste juste après le podium : rangs 4 à 12
+    const top = hasPodium ? data.slice(3, TOP_LIST_END) : data;
 
-    // Si l'utilisateur n'est pas trouvé ou dans le top 3, afficher les 10 premiers après le podium
-    if (userIndex === -1 || userIndex < 3) {
-      return data.slice(3, 13); // Rangs 4 à 13
+    // Si je suis hors podium ET hors top 12, je suis "loin" → on m'ajoute en bas
+    if (hasPodium && userOwnIndex >= TOP_LIST_END) {
+      const owner = data[userOwnIndex];
+      return {
+        topRows: top,
+        ownerRow: owner ?? null,
+        ownerRank: userOwnIndex + 1,
+        hasGap: true,
+      };
     }
+    return { topRows: top, ownerRow: null, ownerRank: 0, hasGap: false };
+  }, [data, hasPodium, userOwnIndex]);
 
-    // Calculer la fenêtre autour de l'utilisateur (5 avant, 5 après)
-    const WINDOW_SIZE = 10;
-    const HALF_WINDOW = 5;
-
-    let start = Math.max(3, userIndex - HALF_WINDOW); // Ne pas inclure le podium
-    let end = start + WINDOW_SIZE;
-
-    // Ajuster si on dépasse la fin
-    if (end > data.length) {
-      end = data.length;
-      start = Math.max(3, end - WINDOW_SIZE);
-    }
-
-    return data.slice(start, end);
-  }, [data, hasPodium]);
-
-  const restOfList = getDisplayList();
+  const userTotalCount = data.length;
 
   const onRefresh = useCallback(() => {
     refresh();
@@ -463,7 +466,7 @@ export default function ClassementScreen() {
               </DynamicGradientBorder>
             </Animated.View>
 
-            {/* List Section */}
+            {/* List Section : rangs 4 à 12 + ligne owner si hors top 12 */}
             <Animated.View entering={FadeInDown.delay(300).duration(500)}>
               <DynamicGradientBorder
                 borderRadius={24}
@@ -471,7 +474,7 @@ export default function ClassementScreen() {
                 boxWidth={screenWidth - SPACING[4] * 2}
                 style={{ paddingVertical: SPACING[2] }}
               >
-                {restOfList.length === 0 ? (
+                {topRows.length === 0 && !ownerRow ? (
                   <View style={{ padding: SPACING[4] }}>
                     <EmptyState
                       icon="trophy-outline"
@@ -480,19 +483,41 @@ export default function ClassementScreen() {
                     />
                   </View>
                 ) : (
-                  restOfList.map((item, index) => {
-                    // Calculer le vrai rang dans le classement complet
-                    const actualRank = data.findIndex((d) => d.id === item.id) + 1;
-                    return (
-                      <RankingItem
-                        key={item.id}
-                        rank={actualRank}
-                        item={item}
-                        isLast={index === restOfList.length - 1}
-                        onPress={() => handleProfilePress(item, actualRank)}
-                      />
-                    );
-                  })
+                  <>
+                    {topRows.map((item, index) => {
+                      const actualRank = 3 + index + 1; // 4, 5, ..., 12
+                      const isLast = index === topRows.length - 1 && !hasGap;
+                      return (
+                        <RankingItem
+                          key={item.id}
+                          rank={actualRank}
+                          item={item}
+                          isLast={isLast}
+                          onPress={() => handleProfilePress(item, actualRank)}
+                        />
+                      );
+                    })}
+
+                    {/* Saut visuel + ma position si je suis hors top 12 */}
+                    {hasGap && ownerRow && (
+                      <>
+                        <View style={styles.gapInline}>
+                          <View style={styles.gapDot} />
+                          <View style={styles.gapDot} />
+                          <View style={styles.gapDot} />
+                          <Text style={styles.gapInlineText}>
+                            {`Votre position #${ownerRank} sur ${userTotalCount}`}
+                          </Text>
+                        </View>
+                        <RankingItem
+                          rank={ownerRank}
+                          item={ownerRow}
+                          isLast
+                          onPress={() => handleProfilePress(ownerRow, ownerRank)}
+                        />
+                      </>
+                    )}
+                  </>
                 )}
               </DynamicGradientBorder>
             </Animated.View>
@@ -866,7 +891,10 @@ interface RankingItemProps {
 }
 
 const RankingItem = memo(function RankingItem({ rank, item, isLast, onPress }: RankingItemProps) {
-  const isHighlighted = item.type === 'user' && item.isCurrentUser;
+  // Highlight si c'est moi (joueur) OU une de mes startups
+  const isHighlighted =
+    (item.type === 'user' && item.isCurrentUser) ||
+    (item.type === 'startup' && item.isCurrentUser === true);
 
   return (
     <Pressable
@@ -978,6 +1006,28 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  gapInline: {
+    alignItems: 'center',
+    paddingTop: SPACING[3],
+    paddingBottom: SPACING[2],
+    gap: 4,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.05)',
+    marginTop: SPACING[1],
+  },
+  gapDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+  },
+  gapInlineText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.xs,
+    color: 'rgba(255, 188, 64, 0.7)',
+    letterSpacing: 0.5,
+    marginTop: SPACING[1],
   },
 
 });

@@ -213,7 +213,7 @@ export const useGameStore = create<GameStore>()(
               ...p,
               tokens: 0,
               pawns: GameEngine.createInitialPawns(),
-              jokers: [],
+              jokers: [{ id: newJokerId(), type: 'dice_choice', acquiredAt: Date.now() }],
               isHost: index === 0,
               // Conserver l'édition du joueur (online) ou fallback sur édition globale
               edition: p.edition || edition,
