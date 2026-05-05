@@ -45,13 +45,13 @@ export const CreateStartupPromptPopup = memo(function CreateStartupPromptPopup({
     <GamePopup
       visible={visible}
       onRequestClose={onDismiss}
-      header="Nouvelle Startup"
+      header="Nouvelle Entreprise"
       icon={<RocketIcon color="#1F91D0" size={64} withShadow={false} />}
     >
       {/* Titre avec stroke bleu */}
       <View style={styles.titleWrapper}>
         <OutlinedText
-          text={"CRÉEZ VOTRE STARTUP\nAVANT DE JOUER !"}
+          text={"CRÉEZ VOTRE ENTREPRISE\nAVANT DE JOUER !"}
           style={styles.title}
           outlineColor="#1F91D0"
           outlineWidth={1.5}
@@ -74,7 +74,7 @@ export const CreateStartupPromptPopup = memo(function CreateStartupPromptPopup({
         <GameButton
           variant="yellow"
           fullWidth
-          title="CRÉER MA STARTUP"
+          title="CRÉER MON ENTREPRISE"
           onPress={onCreateStartup}
         />
       </View>

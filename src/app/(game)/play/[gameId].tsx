@@ -310,17 +310,27 @@ export default function PlayScreen() {
     (eventType: string) => {
       // ===== CASE JOKER : tirer un joker aléatoire et l'ajouter à l'inventaire =====
       if (eventType === 'joker' && currentPlayer) {
+        console.log('[JOKER-CASE] handleTriggeredEvent ENTER', {
+          playerId: currentPlayer.id,
+          isAI: currentPlayer.isAI,
+          isOnline,
+        });
         const jokerType = rollRandomJoker();
         const jokerId = grantJoker(currentPlayer.id, jokerType);
+        console.log('[JOKER-CASE] joker tiré', { jokerType, jokerId });
         if (isOnline) {
           onlineGame.broadcastJokerGranted(currentPlayer.id, jokerType, jokerId);
+          console.log('[JOKER-CASE] broadcast joker granted (online)');
         }
-        // Afficher le popup de découverte (sauf si IA — on laisse tomber silencieusement)
+        // Afficher le popup de découverte pour humain (résolution au clic COLLECTER).
+        // Pour l'IA, résolution immédiate (la phase est déjà passée à 'event').
         if (!currentPlayer.isAI) {
           setJokerAcquired({ type: jokerType });
+          console.log('[JOKER-CASE] popup acquired ouvert, attente clic COLLECTER');
+        } else {
+          console.log('[JOKER-CASE] IA → handleEventResolve immédiat');
+          handleEventResolveRef.current();
         }
-        // Résoudre l'événement immédiatement (pas d'interaction)
-        handleEventResolveRef.current();
         return;
       }
 
@@ -854,15 +864,20 @@ export default function PlayScreen() {
           break;
         }
         case 'reroll': {
-          // "Relancer" = armer une valeur aléatoire au prochain lancer.
-          // Utilisable uniquement à phase idle (bouton joker déjà désactivé sinon).
-          // Consomme le joker maintenant ; la valeur sera appliquée via onRoll.
+          // "Relancer" = lance immédiatement le dé avec une valeur aléatoire.
+          // On arme la valeur puis on déclenche onRoll() pour que la machine
+          // d'état joue l'animation et enchaîne sur le mouvement.
           const randomValue = Math.floor(Math.random() * 6) + 1;
-          setChosenDiceValue(randomValue);
           consumeJoker(currentPlayer.id, joker.id);
           if (isOnline) {
             onlineGame.broadcastJokerUsed(joker.id, 'reroll', { diceValue: randomValue });
           }
+          setChosenDiceValue(randomValue);
+          // Déclenche le lancer après le prochain tick (laisse React appliquer
+          // les setState ci-dessus + fermer la modale d'inventaire).
+          setTimeout(() => {
+            diceProps.onRoll();
+          }, 0);
           break;
         }
         case 'shield': {
@@ -899,7 +914,7 @@ export default function PlayScreen() {
         }
       }
     },
-    [currentPlayer, game, isOnline, onlineGame, setChosenDiceValue, consumeJoker, applyEffect, addTokens, removeTokens],
+    [currentPlayer, game, isOnline, onlineGame, setChosenDiceValue, consumeJoker, applyEffect, addTokens, removeTokens, diceProps],
   );
 
   /** Callback du picker de valeur de dé (joker dice_choice) */
@@ -1307,7 +1322,11 @@ export default function PlayScreen() {
             </View>
             <DiceChoiceButton
               count={currentPlayer?.jokers?.length ?? 0}
-              canUse={turnState.phase === 'idle'}
+              canUse={
+                turnState.phase === 'idle' &&
+                !currentPlayer?.isAI &&
+                (!isOnline || onlineGame.isMyTurn)
+              }
               onOpen={() => setShowJokerInventory(true)}
             />
           </>
@@ -1320,60 +1339,60 @@ export default function PlayScreen() {
         onAnimationComplete={handleEmojiAnimationComplete}
       />
 
-      {/* DEV: boutons test popups capture */}
-      <View style={{ position: 'absolute', top: 60, right: 12, zIndex: 9999, gap: 6 }}>
-        <Pressable
-          style={{ backgroundColor: 'rgba(255,188,64,0.9)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}
-          onPress={() => {
-            const firstOther = game?.players.find((p) => p.id !== currentPlayer?.id);
-            if (firstOther) {
-              // Donner 5 jetons à la victime si elle en a moins, pour tester l'option "récupérer"
-              const current = firstOther.tokens ?? 0;
-              if (current < 5) addTokens(firstOther.id, 5 - current);
-              setCaptureChoice({ capturedPlayerId: firstOther.id, capturedPawnIndex: 0 });
-            }
-          }}
-        >
-          <Text style={{ color: '#000', fontSize: 11, fontWeight: 'bold' }}>TEST CHOIX (5 jtn)</Text>
-        </Pressable>
-        <Pressable
-          style={{ backgroundColor: 'rgba(200,200,200,0.9)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}
-          onPress={() => {
-            const firstOther = game?.players.find((p) => p.id !== currentPlayer?.id);
-            if (firstOther) {
-              // Remettre à 0 pour tester l'option désactivée
-              if (firstOther.tokens > 0) removeTokens(firstOther.id, firstOther.tokens);
-              setCaptureChoice({ capturedPlayerId: firstOther.id, capturedPawnIndex: 0 });
-            }
-          }}
-        >
-          <Text style={{ color: '#000', fontSize: 11, fontWeight: 'bold' }}>TEST CHOIX (0 jtn)</Text>
-        </Pressable>
-        <Pressable
-          style={{ backgroundColor: 'rgba(243,81,69,0.9)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}
-          onPress={() => setCaptureFailure({ seed: Math.floor(Math.random() * 10000) })}
-        >
-          <Text style={{ color: '#fff', fontSize: 11, fontWeight: 'bold' }}>TEST ÉCHEC</Text>
-        </Pressable>
-        <Pressable
-          style={{ backgroundColor: 'rgba(76,175,80,0.9)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}
-          onPress={() => setTokensStolen({ amount: 5 })}
-        >
-          <Text style={{ color: '#fff', fontSize: 11, fontWeight: 'bold' }}>TEST CÉDÉS</Text>
-        </Pressable>
-        <Pressable
-          style={{ backgroundColor: 'rgba(233,30,99,0.9)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}
-          onPress={() => {
-            // Offrir un joker aléatoire au joueur courant (test)
-            if (!currentPlayer) return;
-            const type = rollRandomJoker();
-            grantJoker(currentPlayer.id, type);
-            setJokerAcquired({ type });
-          }}
-        >
-          <Text style={{ color: '#fff', fontSize: 11, fontWeight: 'bold' }}>TEST JOKER+</Text>
-        </Pressable>
-      </View>
+      {/* DEV: boutons test popups capture & jokers — masqués en production.
+          Pour réactiver, set DEV_TEST_BUTTONS = true ci-dessous. */}
+      {false && (
+        <View style={{ position: 'absolute', top: 60, right: 12, zIndex: 9999, gap: 6 }}>
+          <Pressable
+            style={{ backgroundColor: 'rgba(255,188,64,0.9)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}
+            onPress={() => {
+              const firstOther = game?.players.find((p) => p.id !== currentPlayer?.id);
+              if (firstOther) {
+                const current = firstOther.tokens ?? 0;
+                if (current < 5) addTokens(firstOther.id, 5 - current);
+                setCaptureChoice({ capturedPlayerId: firstOther.id, capturedPawnIndex: 0 });
+              }
+            }}
+          >
+            <Text style={{ color: '#000', fontSize: 11, fontWeight: 'bold' }}>TEST CHOIX (5 jtn)</Text>
+          </Pressable>
+          <Pressable
+            style={{ backgroundColor: 'rgba(200,200,200,0.9)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}
+            onPress={() => {
+              const firstOther = game?.players.find((p) => p.id !== currentPlayer?.id);
+              if (firstOther) {
+                if (firstOther.tokens > 0) removeTokens(firstOther.id, firstOther.tokens);
+                setCaptureChoice({ capturedPlayerId: firstOther.id, capturedPawnIndex: 0 });
+              }
+            }}
+          >
+            <Text style={{ color: '#000', fontSize: 11, fontWeight: 'bold' }}>TEST CHOIX (0 jtn)</Text>
+          </Pressable>
+          <Pressable
+            style={{ backgroundColor: 'rgba(243,81,69,0.9)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}
+            onPress={() => setCaptureFailure({ seed: Math.floor(Math.random() * 10000) })}
+          >
+            <Text style={{ color: '#fff', fontSize: 11, fontWeight: 'bold' }}>TEST ÉCHEC</Text>
+          </Pressable>
+          <Pressable
+            style={{ backgroundColor: 'rgba(76,175,80,0.9)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}
+            onPress={() => setTokensStolen({ amount: 5 })}
+          >
+            <Text style={{ color: '#fff', fontSize: 11, fontWeight: 'bold' }}>TEST CÉDÉS</Text>
+          </Pressable>
+          <Pressable
+            style={{ backgroundColor: 'rgba(233,30,99,0.9)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}
+            onPress={() => {
+              if (!currentPlayer) return;
+              const type = rollRandomJoker();
+              grantJoker(currentPlayer.id, type);
+              setJokerAcquired({ type });
+            }}
+          >
+            <Text style={{ color: '#fff', fontSize: 11, fontWeight: 'bold' }}>TEST JOKER+</Text>
+          </Pressable>
+        </View>
+      )}
 
       {/* Quit Confirmation Modal */}
       <QuitConfirmPopup
@@ -1457,21 +1476,33 @@ export default function PlayScreen() {
       <CaptureFailurePopup
         visible={captureFailure !== null}
         seed={captureFailure?.seed}
-        onContinue={() => setCaptureFailure(null)}
+        onContinue={() => {
+          setCaptureFailure(null);
+          // Libère le blocage capture côté machine de tour : ça déclenche
+          // l'event de case reporté (quiz, duel, etc.) si le pion en avait un.
+          resolveCaptureChoice();
+        }}
       />
 
       {/* Tokens Stolen Popup (capturé — jetons cédés) */}
       <TokensStolenPopup
         visible={tokensStolen !== null}
         amount={tokensStolen?.amount}
-        onContinue={() => setTokensStolen(null)}
+        onContinue={() => {
+          setTokensStolen(null);
+          resolveCaptureChoice();
+        }}
       />
 
       {/* Joker Acquired Popup (case joker) */}
       <JokerAcquiredPopup
         visible={jokerAcquired !== null}
         jokerType={jokerAcquired?.type ?? null}
-        onContinue={() => setJokerAcquired(null)}
+        onContinue={() => {
+          console.log('[JOKER-CASE] popup acquired CLOSE → handleEventResolve');
+          setJokerAcquired(null);
+          handleEventResolveRef.current?.();
+        }}
       />
 
       {/* Joker Inventory Popup */}

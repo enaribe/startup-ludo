@@ -408,7 +408,7 @@ export const CustomIdeaModal = memo(function CustomIdeaModal({
               </Animated.View>
               <Text style={styles.generatingTitle}>Génération en cours...</Text>
               <Text style={styles.generatingText}>
-                Création de votre startup innovante
+                Création de votre entreprise innovante
               </Text>
             </View>
           )}

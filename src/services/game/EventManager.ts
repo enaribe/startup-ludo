@@ -464,7 +464,7 @@ export class EventManager {
       data: {
         id: `fallback_quiz_${Date.now()}`,
         category: 'Entrepreneuriat',
-        question: 'Quel est le premier pas pour créer une startup ?',
+        question: 'Quel est le premier pas pour créer une entreprise ?',
         options: [
           'Chercher des investisseurs',
           'Identifier un problème à résoudre',

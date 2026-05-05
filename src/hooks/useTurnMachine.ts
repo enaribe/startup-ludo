@@ -159,7 +159,11 @@ export function turnReducer(state: TurnState, action: TurnAction): TurnState {
     }
 
     case 'EVENT_RESOLVED': {
-      if (state.phase !== 'event') return state;
+      if (state.phase !== 'event') {
+        console.log('[JOKER-CASE] EVENT_RESOLVED IGNORÉ — phase actuelle:', state.phase);
+        return state;
+      }
+      console.log('[JOKER-CASE] EVENT_RESOLVED → phase ending');
       return {
         ...state,
         phase: 'ending',
@@ -263,11 +267,20 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
   // Flag bloquant le passage de tour tant que le popup de choix capture n'est pas résolu
   const waitingForCaptureChoiceRef = useRef(false);
   const pendingTurnEndRef = useRef<(() => void) | null>(null);
+  // Event de case (quiz, duel, etc.) reporté quand une capture est en cours :
+  // on ne déclenche pas le popup d'event tant que le joueur n'a pas choisi
+  // l'issue de la capture, sinon les deux popups se superposent et l'event
+  // s'exécute en arrière-plan (timer du quiz qui s'écoule pendant que la modale capture est ouverte).
+  const pendingEventTriggerRef = useRef<(() => void) | null>(null);
 
   const resolveCaptureChoice = useCallback(() => {
     waitingForCaptureChoiceRef.current = false;
     const pending = pendingTurnEndRef.current;
     pendingTurnEndRef.current = null;
+    // Déclencher l'event de case reporté maintenant que la capture est résolue.
+    const pendingEvent = pendingEventTriggerRef.current;
+    pendingEventTriggerRef.current = null;
+    pendingEvent?.();
     pending?.();
   }, []);
 
@@ -446,6 +459,11 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
                 result!.capturedPawn!.pawnIndex,
               );
             } else {
+              // IA capture : on bloque aussi pour empêcher l'event de la case
+              // (quiz, duel, ...) de s'ouvrir en parallèle du CaptureFailurePopup.
+              // PlayScreen appellera resolveCaptureChoice() quand le popup d'échec
+              // sera fermé (ou immédiatement si aucun popup d'échec n'est affiché).
+              waitingForCaptureChoiceRef.current = true;
               actionsRef.current.handleCapture(
                 result!.capturedPawn!.playerId,
                 result!.capturedPawn!.pawnIndex,
@@ -482,7 +500,25 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
           // en ligne (remoteEvent), mais ne fera rien en solo car onEventRef
           // est déjà appelé ici.
           if (result!.triggeredEvent && !rolledSix) {
-            onEventRef.current(result!.triggeredEvent);
+            const triggeredEvent = result!.triggeredEvent;
+            if (triggeredEvent === 'joker') {
+              console.log('[JOKER-CASE] moveComplete → triggerEvent (case joker)', {
+                waitingForCapture: waitingForCaptureChoiceRef.current,
+              });
+            }
+            // Si une capture est en attente (popup choix ouvert), reporter le
+            // déclenchement de l'event pour qu'il n'apparaisse pas en parallèle.
+            if (waitingForCaptureChoiceRef.current) {
+              pendingEventTriggerRef.current = () => onEventRef.current(triggeredEvent);
+            } else {
+              // Dispatch MOVE_COMPLETE AVANT onEvent pour que la phase soit en 'event'
+              // au moment où le callback est appelé. Sinon handleEventResolve appelé
+              // depuis le callback (cas case joker auto-resolve) ne fera rien
+              // (reducer EVENT_RESOLVED ignore si phase !== 'event').
+              dispatch({ type: 'MOVE_COMPLETE', result: result!, rolledSix });
+              onEventRef.current(triggeredEvent);
+              return;
+            }
           }
           dispatch({ type: 'MOVE_COMPLETE', result: result!, rolledSix });
         }, animDelay);
@@ -507,9 +543,11 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
 
   useEffect(() => {
     if (turnState.phase !== 'ending') return;
+    console.log('[JOKER-CASE] EFFECT phase=ending → schedule endTurn timer');
 
     const runEndTurn = () => {
       const state = turnStateRef.current;
+      console.log('[JOKER-CASE] runEndTurn exec', { rolledSix: state.rolledSix });
 
       // Extra turn on 6: only if a move was actually made (moveResult !== null)
       // and the pawn didn't finish. No valid move on 6 → no extra turn.
@@ -531,9 +569,11 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
     timers.set('endTurn', () => {
       // Si un popup de choix capture est ouvert, reporter la fin de tour
       if (waitingForCaptureChoiceRef.current) {
+        console.log('[JOKER-CASE] endTurn timer → REPORTÉ (waitingForCaptureChoice)');
         pendingTurnEndRef.current = runEndTurn;
         return;
       }
+      console.log('[JOKER-CASE] endTurn timer → runEndTurn direct');
       runEndTurn();
     }, 300);
 
@@ -589,6 +629,10 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
 
     // Player changed — reset machine for the new player
     activePlayerIdRef.current = playerId;
+    // Reset valeur de dé armée par joker (dice_choice/reroll) : elle ne doit
+    // jamais déborder sur le tour d'un autre joueur.
+    chosenDiceValueRef.current = null;
+    setChosenDiceValueState(null);
     // Ne pas clearAll() ici : les timers du nouveau tour (moveComplete, etc.)
     // peuvent déjà être en attente sur Android où les re-renders sont décalés.
     // On dispatche RESET seulement si la machine n'est pas déjà à idle

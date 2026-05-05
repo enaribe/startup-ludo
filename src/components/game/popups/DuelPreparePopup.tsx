@@ -84,7 +84,7 @@ export const DuelPreparePopup = memo(function DuelPreparePopup({
                   <Avatar name={challenger.name} playerColor={challenger.color} size="md" showBorder />
                 </View>
                 <View style={styles.playerCardText}>
-                  <Text style={styles.playerCardName} numberOfLines={1}>{challenger.startupName || 'Startup'}</Text>
+                  <Text style={styles.playerCardName} numberOfLines={1}>{challenger.startupName || 'Entreprise'}</Text>
                   <Text style={styles.playerCardSubtitle}>{challenger.name}</Text>
                 </View>
               </Animated.View>
@@ -96,7 +96,7 @@ export const DuelPreparePopup = memo(function DuelPreparePopup({
                   <Avatar name={opponent.name} playerColor={opponent.color} size="md" showBorder />
                 </View>
                 <View style={styles.playerCardText}>
-                  <Text style={styles.playerCardName} numberOfLines={1}>{opponent.startupName || 'Startup'}</Text>
+                  <Text style={styles.playerCardName} numberOfLines={1}>{opponent.startupName || 'Entreprise'}</Text>
                   <Text style={styles.playerCardSubtitle}>{opponent.name}</Text>
                 </View>
               </Animated.View>
@@ -110,7 +110,7 @@ export const DuelPreparePopup = memo(function DuelPreparePopup({
                 <Avatar name={activePlayer.name} playerColor={activePlayer.color} size="md" showBorder />
               </View>
               <View style={styles.playerCardText}>
-                <Text style={styles.playerCardName} numberOfLines={1}>{activePlayer.startupName || 'Startup'}</Text>
+                <Text style={styles.playerCardName} numberOfLines={1}>{activePlayer.startupName || 'Entreprise'}</Text>
                 <Text style={styles.playerCardSubtitle}>{activePlayer.name}</Text>
               </View>
             </View>

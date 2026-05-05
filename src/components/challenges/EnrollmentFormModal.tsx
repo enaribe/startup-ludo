@@ -171,7 +171,6 @@ export const EnrollmentFormModal = memo(function EnrollmentFormModal({
   const [situationHandicap, setSituationHandicap] = useState<boolean | null>(null);
   const [isCurrentEntrepreneur, setIsCurrentEntrepreneur] = useState<boolean | null>(null);
   const [planToStart, setPlanToStart] = useState<boolean | null>(null);
-  const [wantsContact, setWantsContact] = useState<boolean | null>(null);
   const [phone, setPhone] = useState('');
 
   const isValid = lastName.trim().length >= 2
@@ -181,7 +180,8 @@ export const EnrollmentFormModal = memo(function EnrollmentFormModal({
     && region.trim().length >= 2
     && genre !== null
     && situationHandicap !== null
-    && isCurrentEntrepreneur !== null;
+    && isCurrentEntrepreneur !== null
+    && phone.trim().length >= 6;
 
   const handleSubmit = useCallback(() => {
     if (!isValid) return;
@@ -195,10 +195,10 @@ export const EnrollmentFormModal = memo(function EnrollmentFormModal({
       situationHandicap,
       isCurrentEntrepreneur,
       planToStart,
-      wantsContact,
+      wantsContact: true,
       phone: phone.trim(),
     });
-  }, [isValid, lastName, firstName, age, pays, region, genre, situationHandicap, isCurrentEntrepreneur, planToStart, wantsContact, phone, onSubmit]);
+  }, [isValid, lastName, firstName, age, pays, region, genre, situationHandicap, isCurrentEntrepreneur, planToStart, phone, onSubmit]);
 
   return (
     <GamePopup
@@ -331,28 +331,21 @@ export const EnrollmentFormModal = memo(function EnrollmentFormModal({
           </Animated.View>
         )}
 
-        {/* Question 3: Contact */}
+        {/* Phone — obligatoire pour être contacté */}
         <Animated.View entering={FadeInDown.delay(500).duration(300)}>
-          <Text style={styles.questionLabel}>
-            SOUHAITEZ-VOUS ÊTRE CONTACTÉ POUR BÉNÉFICIER DES OPPORTUNITÉS D'ACCOMPAGNEMENT DU PROGRAMME {challengeName.toUpperCase()} ?
+          <Text style={styles.label}>NUMÉRO DE TÉLÉPHONE</Text>
+          <Text style={styles.helper}>
+            Pour bénéficier des opportunités d'accompagnement du programme {challengeName}.
           </Text>
-          <YesNoButtons value={wantsContact} onChange={setWantsContact} />
+          <GradientInput
+            style={styles.input}
+            value={phone}
+            onChangeText={setPhone}
+            placeholder="Numéro de téléphone"
+            placeholderTextColor="rgba(255,255,255,0.25)"
+            keyboardType="phone-pad"
+          />
         </Animated.View>
-
-        {/* Phone input (visible si veut être contacté) */}
-        {wantsContact === true && (
-          <Animated.View entering={FadeInDown.duration(300)}>
-            <Text style={styles.label}>NUMÉRO DE TÉLÉPHONE</Text>
-            <GradientInput
-              style={styles.input}
-              value={phone}
-              onChangeText={setPhone}
-              placeholder="Numéro de téléphone"
-              placeholderTextColor="rgba(255,255,255,0.25)"
-              keyboardType="phone-pad"
-            />
-          </Animated.View>
-        )}
 
         <View style={{ height: SPACING[4] }} />
       </ScrollView>
@@ -412,6 +405,14 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginBottom: SPACING[2],
     marginTop: SPACING[3],
+  },
+  helper: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.textSecondary,
+    lineHeight: FONT_SIZES.xs * 1.5,
+    marginTop: -SPACING[1],
+    marginBottom: SPACING[2],
   },
   inputWrap: {
     borderRadius: 14,

@@ -103,7 +103,7 @@ export const DuelResultPopup = memo(function DuelResultPopup({
                 <Avatar name={challenger.name} playerColor={challenger.color} size="md" showBorder />
               </View>
               <View style={styles.playerCardText}>
-                <Text style={styles.playerCardName} numberOfLines={1}>{challenger.startupName || 'Startup'}</Text>
+                <Text style={styles.playerCardName} numberOfLines={1}>{challenger.startupName || 'Entreprise'}</Text>
                 <Text style={styles.playerCardSubtitle}>{challenger.name}</Text>
               </View>
             </Animated.View>
@@ -115,7 +115,7 @@ export const DuelResultPopup = memo(function DuelResultPopup({
                 <Avatar name={opponent.name} playerColor={opponent.color} size="md" showBorder />
               </View>
               <View style={styles.playerCardText}>
-                <Text style={styles.playerCardName} numberOfLines={1}>{opponent.startupName || 'Startup'}</Text>
+                <Text style={styles.playerCardName} numberOfLines={1}>{opponent.startupName || 'Entreprise'}</Text>
                 <Text style={styles.playerCardSubtitle}>{opponent.name}</Text>
               </View>
             </Animated.View>
@@ -166,7 +166,7 @@ export const DuelResultPopup = memo(function DuelResultPopup({
               <Avatar name={challenger.name} playerColor={challenger.color} size="md" showBorder />
             </View>
             <View style={styles.playerCardText}>
-              <Text style={styles.playerCardName} numberOfLines={1}>{challenger.startupName || 'Startup'}</Text>
+              <Text style={styles.playerCardName} numberOfLines={1}>{challenger.startupName || 'Entreprise'}</Text>
               <Text style={styles.playerCardSubtitle}>{challenger.name}</Text>
               <Text style={[styles.scoreLine, challengerWon && styles.scoreWinner]}>{result.challengerScore} pts</Text>
             </View>
@@ -179,7 +179,7 @@ export const DuelResultPopup = memo(function DuelResultPopup({
               <Avatar name={opponent.name} playerColor={opponent.color} size="md" showBorder />
             </View>
             <View style={styles.playerCardText}>
-              <Text style={styles.playerCardName} numberOfLines={1}>{opponent.startupName || 'Startup'}</Text>
+              <Text style={styles.playerCardName} numberOfLines={1}>{opponent.startupName || 'Entreprise'}</Text>
               <Text style={styles.playerCardSubtitle}>{opponent.name}</Text>
               <Text style={[styles.scoreLine, opponentWon && styles.scoreWinner]}>{result.opponentScore} pts</Text>
             </View>

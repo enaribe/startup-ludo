@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Dimensions, FlatList, Image, Pressable, ScrollView, StyleSheet, Text, View, type ViewToken } from 'react-native';
 import Animated, {
@@ -16,7 +16,8 @@ import Svg, { Path } from 'react-native-svg';
 
 import { ChallengeHomeCard, EnrollmentFormModal } from '@/components/challenges';
 import { CreateStartupPromptPopup, OnboardingModal, ReturnBonusPopup } from '@/components/game/popups';
-import { Avatar, DynamicGradientBorder, InfoModal, ProgressionPopup, RadialBackground } from '@/components/ui';
+import { ProgramIcon } from '@/components/icons';
+import { Avatar, DynamicGradientBorder, GameButton, InfoModal, ProgressionPopup, RadialBackground } from '@/components/ui';
 import type { InfoSection } from '@/components/ui';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { useReturnBonus } from '@/hooks/useReturnBonus';
@@ -114,7 +115,7 @@ const HOME_INFO_SECTIONS: InfoSection[] = [
   {
     icon: 'briefcase',
     title: 'PORTFOLIO',
-    body: 'La valorisation totale de tes startups créées lors des parties. Chaque levée de fonds augmente la valeur de ton entreprise.',
+    body: 'La valorisation totale de tes entreprises créées lors des parties. Chaque levée de fonds augmente la valeur de ton entreprise.',
   },
   {
     icon: 'school',
@@ -155,14 +156,22 @@ export default function HomeScreen() {
     if (showProgressionParam === '1') setShowProgression(true);
   }, [showProgressionParam]);
 
-  // Challenges inscrits de l'utilisateur (actifs uniquement, filtrés par userId)
+  // Tous les challenges actifs : on affiche les challenges actifs globalement,
+  // en mettant en tête ceux où l'utilisateur est inscrit (le ChallengeHomeCard
+  // affichera "CONTINUER" pour les inscrits et "REJOINDRE" pour les autres).
   const userEnrollments = useChallengeStore((state) => state.enrollments);
   const enrolledChallenges = useMemo(() => {
-    if (!userId) return [];
-    const userChallengeIds = userEnrollments
-      .filter((e) => e.userId === userId)
-      .map((e) => e.challengeId);
-    return ALL_CHALLENGES.filter((c) => userChallengeIds.includes(c.id) && c.isActive);
+    const activeChallenges = ALL_CHALLENGES.filter((c) => c.isActive);
+    if (!userId) return activeChallenges;
+    const userChallengeIds = new Set(
+      userEnrollments.filter((e) => e.userId === userId).map((e) => e.challengeId),
+    );
+    // Trie : inscrits d'abord, puis les autres dans leur ordre d'origine
+    return [...activeChallenges].sort((a, b) => {
+      const aEnrolled = userChallengeIds.has(a.id) ? 0 : 1;
+      const bEnrolled = userChallengeIds.has(b.id) ? 0 : 1;
+      return aEnrolled - bEnrolled;
+    });
   }, [userEnrollments, userId, challengesLoaded]);
 
   // Refresh challenges when screen mounts or focuses
@@ -171,7 +180,6 @@ export default function HomeScreen() {
       try {
         await refreshChallengesFromFirestore();
         setChallengesLoaded(true);
-        console.log('[Home] Challenges loaded, ALL_CHALLENGES:', ALL_CHALLENGES.length);
       } catch (error) {
         console.error('[Home] Failed to load challenges:', error);
         setChallengesLoaded(true); // Still set true to show fallback
@@ -213,15 +221,28 @@ export default function HomeScreen() {
   const isGuest = user?.isGuest ?? true;
   const displayName = user?.displayName || profile?.displayName || 'Joueur';
 
-  // Debug: log enrolled challenges
-  console.log('[Home] Enrolled challenges count:', enrolledChallenges.length);
-  if (enrolledChallenges.length > 0) {
-    console.log('[Home] Challenges:', enrolledChallenges.map(c => ({ id: c.id, name: c.name, isActive: c.isActive })));
-  }
-
-  const handlePlay = () => {
+  // Guard anti double-tap : un second clic rapide pendant la navigation
+  // peut être avalé par expo-router (la première navigation gèle l'écran
+  // pendant la transition, le second tap ne fait rien et donne l'impression
+  // que le bouton ne réagit pas).
+  const navigatingRef = useRef(false);
+  // Reset au focus de l'écran : si une navigation a été annulée (back, swipe),
+  // le ref pouvait rester collé à `true` et bloquer tous les taps suivants
+  // jusqu'au prochain reload — symptôme du bug "ça ne passe pas".
+  useFocusEffect(
+    useCallback(() => {
+      navigatingRef.current = false;
+    }, [])
+  );
+  const handlePlay = useCallback(() => {
+    if (navigatingRef.current) return;
+    navigatingRef.current = true;
     router.push('/(game)/mode-selection');
-  };
+    // Réautorise un nouveau push après la transition d'écran
+    setTimeout(() => {
+      navigatingRef.current = false;
+    }, 300);
+  }, [router]);
 
   // Hauteur réservée sous le header fixe (alignée sur le layout compact ci-dessous)
   const headerHeight = insets.top + 188;
@@ -232,7 +253,9 @@ export default function HomeScreen() {
       <RadialBackground />
 
       {/* Header Fixe — bordure gradient (design system) */}
-      <View style={styles.fixedHeaderOuter}>
+      {/* pointerEvents="box-none" : laisse passer les taps sur les zones
+          transparentes (coins arrondis) vers le contenu scrollable en dessous */}
+      <View style={styles.fixedHeaderOuter} pointerEvents="box-none">
         <DynamicGradientBorder
           borderRadius={32}
           fill="#0A1929"
@@ -327,7 +350,7 @@ export default function HomeScreen() {
       >
         {/* Play Button */}
         <Animated.View entering={FadeInDown.delay(500).duration(500)}>
-          <Pressable onPress={handlePlay}>
+          <Pressable onPress={handlePlay} hitSlop={12} android_disableSound={false}>
             <View style={styles.playButtonContainer}>
               <LinearGradient
                 colors={['#FFDC64', '#F0B432']}
@@ -444,22 +467,25 @@ export default function HomeScreen() {
         ) : (
           <View style={styles.challengeCardWrapper}>
             <Animated.View entering={FadeInDown.delay(600).duration(500)}>
-              <Pressable onPress={() => router.push('/(challenges)/challenge-explorer')}>
-                <DynamicGradientBorder borderRadius={16} fill="rgba(0, 0, 0, 0.35)">
-                  <View style={styles.emptyCardContent}>
-                    <View style={styles.emptyCardLeft}>
-                      <View style={styles.emptyLogoContainer}>
-                        <Ionicons name="school-outline" size={26} color="rgba(255, 188, 64, 0.6)" />
-                      </View>
-                      <View style={styles.emptyCardInfo}>
-                        <Text style={styles.emptyCardTitle}>AUCUN PROGRAMME</Text>
-                        <Text style={styles.emptyCardSub}>Explorez et rejoignez un programme</Text>
-                      </View>
-                    </View>
-                    <Ionicons name="arrow-forward" size={16} color="#FFBC40" />
+              <DynamicGradientBorder borderRadius={20} fill="rgba(0, 0, 0, 0.35)">
+                <View style={styles.emptyProgramContent}>
+                  <ProgramIcon size={48} color="#71808E" />
+                  <View style={styles.emptyProgramTextWrap}>
+                    <Text style={styles.emptyProgramTitle}>AUCUN PROGRAMME</Text>
+                    <Text style={styles.emptyProgramSub}>
+                      Aucun programme actif pour le moment.{'\n'}Reviens bientôt pour découvrir{'\n'}les prochains défis !
+                    </Text>
                   </View>
-                </DynamicGradientBorder>
-              </Pressable>
+                  <View style={styles.emptyProgramButtonWrap}>
+                    <GameButton
+                      variant="yellow"
+                      fullWidth
+                      title="EXPLORER LES PROGRAMMES"
+                      onPress={() => router.push('/(challenges)/challenge-explorer')}
+                    />
+                  </View>
+                </View>
+              </DynamicGradientBorder>
             </Animated.View>
           </View>
         )}
@@ -936,5 +962,35 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: 'rgba(255, 255, 255, 0.5)',
     marginTop: 2,
+  },
+
+  // Empty state — design refait
+  emptyProgramContent: {
+    paddingVertical: 22,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    gap: 12,
+  },
+  emptyProgramTextWrap: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  emptyProgramTitle: {
+    fontFamily: FONTS.title,
+    fontSize: 18,
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+    textAlign: 'center',
+  },
+  emptyProgramSub: {
+    fontFamily: FONTS.body,
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.6)',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  emptyProgramButtonWrap: {
+    width: '100%',
+    marginTop: 4,
   },
 });

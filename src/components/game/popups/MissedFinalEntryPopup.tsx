@@ -219,8 +219,8 @@ export const MissedFinalEntryPopup = memo(function MissedFinalEntryPopup({
 
   const titleText =
     tokensNeeded === 1
-      ? 'IL VOUS MANQUE 1 JETON\nPOUR TERMINER'
-      : `IL VOUS MANQUE ${tokensNeeded} JETONS\nPOUR TERMINER`;
+      ? 'ENCORE 1 JETON\nPOUR TERMINER'
+      : `ENCORE ${tokensNeeded} JETONS\nPOUR TERMINER`;
 
   return (
     <GamePopup

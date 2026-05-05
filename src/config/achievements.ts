@@ -203,7 +203,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   {
     id: 'first_startup',
     title: 'Fondateur',
-    description: 'Crée ta première startup',
+    description: 'Crée ta première entreprise',
     icon: 'business-outline',
     category: 'entrepreneur',
     rarity: 'common',
@@ -213,7 +213,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   {
     id: 'serial_entrepreneur',
     title: 'Serial Entrepreneur',
-    description: 'Crée 5 startups',
+    description: 'Crée 5 entreprises',
     icon: 'business',
     category: 'entrepreneur',
     rarity: 'rare',
@@ -223,7 +223,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   {
     id: 'empire_builder',
     title: 'Bâtisseur d\'Empire',
-    description: 'Crée 10 startups',
+    description: 'Crée 10 entreprises',
     icon: 'globe-outline',
     category: 'entrepreneur',
     rarity: 'epic',

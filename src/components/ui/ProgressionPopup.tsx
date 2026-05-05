@@ -223,7 +223,7 @@ export function ProgressionPopup({ visible, onContinue, xpGained, valorisationGa
               <Animated.View entering={FadeInDown.delay(160).duration(320)}>
                 <Text style={styles.titleText}>
                   {valorisationGain != null
-                    ? 'VOTRE STARTUP A GAGNÉ'
+                    ? 'VOTRE ENTREPRISE A GAGNÉ'
                     : 'VOS ENTREPRISES VALENT\nDÉSORMAIS'}
                 </Text>
               </Animated.View>

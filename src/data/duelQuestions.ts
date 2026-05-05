@@ -24,7 +24,7 @@ export const DUEL_QUESTIONS: DuelQuestion[] = [
   },
   {
     id: 'duel-q3',
-    question: "Comment valider une idée de startup efficacement?",
+    question: "Comment valider une idée d'entreprise efficacement?",
     options: [
       { text: "Parler à des clients potentiels et tester avec un MVP", points: 30 },
       { text: "Faire une étude de marché complète", points: 20 },
@@ -34,7 +34,7 @@ export const DUEL_QUESTIONS: DuelQuestion[] = [
   },
   {
     id: 'duel-q4',
-    question: "Quel indicateur est le plus important pour une startup early-stage?",
+    question: "Quel indicateur est le plus important pour une entreprise early-stage?",
     options: [
       { text: "Le taux de rétention des utilisateurs", points: 30 },
       { text: "Le nombre de téléchargements", points: 10 },

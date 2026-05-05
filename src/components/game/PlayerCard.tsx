@@ -133,7 +133,7 @@ export const PlayerCard = memo(function PlayerCard({
                 showBorder={false}
               />
               <View style={styles.textContainer}>
-                <Text style={styles.companyName}>concree</Text>
+                <Text style={styles.companyName} numberOfLines={1}>{player.startupName || 'Entreprise'}</Text>
                 <Text style={styles.userName} numberOfLines={1}>{player.name}</Text>
               </View>
             </View>
@@ -204,7 +204,6 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.title,
     fontSize: 12,
     color: '#FFFFFF',
-    textTransform: 'lowercase',
   },
   userName: {
     fontFamily: FONTS.body,

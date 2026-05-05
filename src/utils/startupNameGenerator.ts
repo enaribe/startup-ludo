@@ -63,7 +63,7 @@ export function generateStartupIdea(
   const name = generateStartupName(sectorId);
 
   // Générer une description détaillée
-  const description = `${name} est une startup ${sectorTitle.toLowerCase()} innovante qui cible ${targetTitle.toLowerCase()} (${targetCategory}). Notre mission est de ${missionTitle.toLowerCase()} dans le domaine ${missionCategory}.`;
+  const description = `${name} est une entreprise ${sectorTitle.toLowerCase()} innovante qui cible ${targetTitle.toLowerCase()} (${targetCategory}). Notre mission est de ${missionTitle.toLowerCase()} dans le domaine ${missionCategory}.`;
 
   // Générer un pitch court et percutant
   const pitchTemplates = [

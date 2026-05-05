@@ -75,7 +75,7 @@ export const StartupSelectionModal = memo(function StartupSelectionModal({
       visible={visible}
       onRequestClose={handleClose}
       header={playerName ?? undefined}
-      title="CHOISISSEZ VOTRE STARTUP"
+      title="CHOISISSEZ VOTRE ENTREPRISE"
       footer={
         <GameButton
           title="CONFIRMER"
@@ -141,7 +141,7 @@ export const StartupSelectionModal = memo(function StartupSelectionModal({
         {/* Projets par défaut */}
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionLabel}>Startup par défaut</Text>
+            <Text style={styles.sectionLabel}>Entreprise par défaut</Text>
             <View style={styles.sectionLabelLine} />
           </View>
           {defaultProjects.map((project, index) => (

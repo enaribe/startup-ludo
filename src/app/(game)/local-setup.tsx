@@ -18,7 +18,7 @@ import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { useGameStore, useAuthStore, useUserStore } from '@/stores';
 import { EditionTileIcon } from '@/components/icons';
-import { RadialBackground, DynamicGradientBorder, GameButton, GradientBorder } from '@/components/ui';
+import { RadialBackground, DynamicGradientBorder, GameButton } from '@/components/ui';
 import { StartupSelectionModal } from '@/components/game/StartupSelectionModal';
 import { getDefaultProjectsForEdition, getMatchingUserStartups } from '@/data/defaultProjects';
 import { getEditionList } from '@/data';
@@ -38,7 +38,7 @@ const EDITION_TILE_GAP = 12;
 const EDITION_TILE_WIDTH = (CONTENT_WIDTH - EDITION_TILE_GAP) / 2;
 const IDEATION_GRID_GAP = 12;
 const IDEATION_CARD_WIDTH = (CONTENT_WIDTH - IDEATION_GRID_GAP) / 2;
-const IDEATION_PLAYER_PILL_W = 84;
+const IDEATION_PLAYER_PILL_W = IDEATION_CARD_WIDTH - 24;
 const IDEATION_PLAYER_PILL_H = 30;
 
 // Couleurs des joueurs (toutes)
@@ -91,15 +91,14 @@ const ideationStartupTitleStyles = StyleSheet.create({
   outer: {
     width: '100%',
     alignSelf: 'stretch',
-    alignItems: 'flex-start',
-    justifyContent: 'flex-start',
-    paddingRight: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingBottom: 2,
   },
   base: {
     fontFamily: FONTS.title,
     fontSize: 18,
-    textAlign: 'left',
+    textAlign: 'center',
     letterSpacing: 0.6,
     lineHeight: 22,
   },
@@ -331,18 +330,21 @@ export default function LocalSetupScreen() {
   );
 
   // Auto-select pour les IA quand on entre dans le step 3
+  // On tire sans remise pour éviter que deux IA prennent la même entreprise.
   const autoSelectAI = useCallback(() => {
     const newSelections: Record<number, StartupSelection> = {};
+    const takenIds = new Set<string>();
     players.forEach((player, index) => {
       if (player.isAI) {
-        const randomProject = defaultProjects[Math.floor(Math.random() * defaultProjects.length)];
-        if (randomProject) {
-          newSelections[index] = {
-            startupId: randomProject.id,
-            startupName: randomProject.name,
-            isDefaultProject: true,
-          };
-        }
+        const pool = defaultProjects.filter((p) => !takenIds.has(p.id));
+        if (pool.length === 0) return;
+        const randomProject = pool[Math.floor(Math.random() * pool.length)]!;
+        newSelections[index] = {
+          startupId: randomProject.id,
+          startupName: randomProject.name,
+          isDefaultProject: true,
+        };
+        takenIds.add(randomProject.id);
       }
     });
     setStartupSelections(newSelections);
@@ -353,15 +355,26 @@ export default function LocalSetupScreen() {
   }, [players, defaultProjects]);
 
   const handleStartupSelected = (startupId: string, startupName: string, isDefault: boolean, sector: string) => {
-    setStartupSelections((prev) => ({
-      ...prev,
-      [currentSelectingPlayer]: { startupId, startupName, isDefaultProject: isDefault, sector },
-    }));
+    const updatedSelections = {
+      ...startupSelections,
+      [currentSelectingPlayer]: {
+        startupId,
+        startupName,
+        isDefaultProject: isDefault,
+        sector,
+      } as StartupSelection,
+    };
+    setStartupSelections(updatedSelections);
     setShowStartupModal(false);
 
     // Trouver le prochain joueur humain qui n'a pas encore choisi
+    // (on saute les IA ET les humains qui ont déjà une sélection — sinon
+    // on rouvre le modal de sélection sur des joueurs déjà servis).
     let next = currentSelectingPlayer + 1;
-    while (next < players.length && players[next]?.isAI) {
+    while (
+      next < players.length &&
+      (players[next]?.isAI || updatedSelections[next])
+    ) {
       next++;
     }
     if (next < players.length) {
@@ -753,7 +766,7 @@ export default function LocalSetupScreen() {
           </Animated.View>
         )}
 
-        {/* STEP 3: Phase d'Ideation — grille 2×2 (maquette) */}
+        {/* STEP 3: Phase d'Ideation — grille avec badge VS central */}
         {step === 3 && (
           <Animated.View entering={FadeInDown.delay(100).duration(500)}>
             <Text style={styles.sectionTitle}>PHASE D'IDÉATION</Text>
@@ -761,42 +774,66 @@ export default function LocalSetupScreen() {
               Chaque joueur choisit un projet avec lequel jouer
             </Text>
 
-            <View style={styles.ideationGrid}>
-              {players.map((player, index) => {
-                const selection = startupSelections[index];
-                const isCurrent = currentSelectingPlayer === index && !selection;
-                const themeHex =
-                  ALL_PLAYER_COLORS.find((c) => c.color === player.color)?.hex ?? '#FFBC40';
+            <View style={styles.ideationGridWrap}>
+              <View
+                style={[
+                  styles.ideationGrid,
+                  players.length === 2 && styles.ideationGridTwo,
+                ]}
+              >
+                {players.map((player, index) => {
+                  const selection = startupSelections[index];
+                  const isCurrent = currentSelectingPlayer === index && !selection;
+                  const themeHex =
+                    ALL_PLAYER_COLORS.find((c) => c.color === player.color)?.hex ?? '#FFBC40';
 
-                const openChooser = () => {
-                  if (!player.isAI) {
+                  // La carte est cliquable si :
+                  // - le joueur n'est pas une IA
+                  // - le joueur n'a pas encore choisi, OU il existe au moins un autre
+                  //   projet libre (non pris par un autre joueur) qu'il pourrait prendre.
+                  let canChange = !player.isAI;
+                  if (canChange && selection) {
+                    const takenByOthers = new Set(
+                      Object.entries(startupSelections)
+                        .filter(([k]) => Number(k) !== index)
+                        .map(([, sel]) => sel.startupId),
+                    );
+                    const userPool = index === 0 ? userStartups : [];
+                    const totalAvailable =
+                      defaultProjects.filter((p) => !takenByOthers.has(p.id)).length +
+                      userPool.filter((s) => !takenByOthers.has(s.id)).length;
+                    // Le joueur a au moins son choix actuel + il faut au moins une alternative
+                    canChange = totalAvailable > 1;
+                  }
+
+                  const openChooser = () => {
+                    if (!canChange) return;
                     setCurrentSelectingPlayer(index);
                     setShowStartupModal(true);
-                  }
-                };
+                  };
 
-                return (
-                  <Animated.View
-                    key={`ideation-${index}`}
-                    entering={FadeInDown.delay(150 + index * 80).duration(400)}
-                    style={styles.ideationGridItem}
-                  >
-                    <Pressable
-                      onPress={openChooser}
-                      disabled={player.isAI}
-                      style={({ pressed }) => [
-                        styles.ideationCardPressable,
-                        !player.isAI && pressed && styles.ideationCardPressablePressed,
-                      ]}
+                  return (
+                    <Animated.View
+                      key={`ideation-${index}`}
+                      entering={FadeInDown.delay(150 + index * 80).duration(400)}
+                      style={styles.ideationGridItem}
                     >
-                      <DynamicGradientBorder
-                        borderRadius={24}
-                        fill="rgba(22, 37, 59, 0.92)"
-                        boxWidth={IDEATION_CARD_WIDTH}
+                      <Pressable
+                        onPress={openChooser}
+                        disabled={!canChange}
+                        style={({ pressed }) => [
+                          styles.ideationCardPressable,
+                          canChange && pressed && styles.ideationCardPressablePressed,
+                        ]}
                       >
-                        <View style={styles.ideationCardInner}>
-                          <View style={styles.ideationCardTopRow}>
-                            <View>
+                        <DynamicGradientBorder
+                          borderRadius={24}
+                          fill="rgba(22, 37, 59, 0.92)"
+                          boxWidth={IDEATION_CARD_WIDTH}
+                        >
+                          <View style={styles.ideationCardInner}>
+                            {/* Avatar centré en haut */}
+                            <View style={styles.ideationAvatarCenter}>
                               {player.isAI ? (
                                 <View style={[styles.ideationAvatarCircle, { backgroundColor: themeHex }]}>
                                   <Ionicons name="sparkles" size={22} color="#FFFFFF" />
@@ -808,61 +845,95 @@ export default function LocalSetupScreen() {
                                 />
                               )}
                             </View>
-                            <GradientBorder
-                              boxWidth={IDEATION_PLAYER_PILL_W}
-                              boxHeight={IDEATION_PLAYER_PILL_H}
-                              borderRadius={IDEATION_PLAYER_PILL_H / 2}
-                              fill="rgba(0, 0, 0, 0.35)"
-                              style={styles.ideationPlayerPillWrap}
-                            >
-                              <View style={styles.ideationPlayerPillInner}>
-                                <Text style={[styles.ideationPlayerPillText, { color: themeHex }]}>
-                                  Joueur {index + 1}
-                                </Text>
-                              </View>
-                            </GradientBorder>
-                          </View>
 
-                          <View style={styles.ideationTitleBlock}>
-                            {selection ? (
-                              <IdeationStartupTitle text={selection.startupName} themeColor={themeHex} />
-                            ) : isCurrent ? (
-                              <Text style={styles.ideationPlaceholder}>En attente...</Text>
-                            ) : (
-                              <Text style={styles.ideationPlaceholder}>—</Text>
-                            )}
-                          </View>
-
-                          <Text style={styles.ideationSubtitle} numberOfLines={1}>
-                            {player.isAI ? 'IA' : player.name}
-                          </Text>
-
-                          {!player.isAI && isCurrent && !selection ? (
-                            <View style={styles.ideationTapHint}>
-                              <Text style={styles.ideationTapHintText}>Appuyer pour choisir</Text>
+                            {/* Badge nom du joueur (ou "IA - Bot") */}
+                            <View style={styles.ideationPlayerPillCenter}>
+                              <DynamicGradientBorder
+                                boxWidth={IDEATION_PLAYER_PILL_W}
+                                borderRadius={IDEATION_PLAYER_PILL_H / 2}
+                                fill="rgba(0, 0, 0, 0.35)"
+                                style={styles.ideationPlayerPillBorder}
+                              >
+                                <View style={styles.ideationPlayerPillInner}>
+                                  <Text
+                                    style={[styles.ideationPlayerPillText, { color: themeHex }]}
+                                    numberOfLines={1}
+                                  >
+                                    {player.isAI ? 'IA - Bot' : player.name || `Joueur ${index + 1}`}
+                                  </Text>
+                                </View>
+                              </DynamicGradientBorder>
                             </View>
-                          ) : null}
-                        </View>
-                      </DynamicGradientBorder>
-                    </Pressable>
-                  </Animated.View>
-                );
-              })}
+
+                            {/* Titre entreprise */}
+                            <View style={styles.ideationTitleBlock}>
+                              {selection ? (
+                                <IdeationStartupTitle text={selection.startupName} themeColor={themeHex} />
+                              ) : isCurrent ? (
+                                <Text style={styles.ideationPlaceholder}>En attente...</Text>
+                              ) : (
+                                <Text style={styles.ideationPlaceholder}>—</Text>
+                              )}
+                            </View>
+
+                            {!player.isAI && isCurrent && !selection ? (
+                              <View style={styles.ideationTapHint}>
+                                <Text style={styles.ideationTapHintText}>Appuyer pour choisir</Text>
+                              </View>
+                            ) : null}
+                          </View>
+                        </DynamicGradientBorder>
+                      </Pressable>
+                    </Animated.View>
+                  );
+                })}
+
+                {/* Cellule fantôme pour 3 joueurs (équilibre la grille 2×2) */}
+                {players.length === 3 && (
+                  <View style={[styles.ideationGridItem, { opacity: 0 }]}>
+                    <View style={{ width: IDEATION_CARD_WIDTH, height: 1 }} />
+                  </View>
+                )}
+              </View>
+
+              {/* Badge VS central — positionné absolument au centre de la grille */}
+              {players.length >= 2 && (
+                <View pointerEvents="none" style={styles.vsBadgeWrap}>
+                  <View style={styles.vsBadge}>
+                    <Text style={styles.vsBadgeText}>VS</Text>
+                  </View>
+                </View>
+              )}
             </View>
           </Animated.View>
         )}
       </ScrollView>
 
-      {/* Startup Selection Modal */}
-      <StartupSelectionModal
-        visible={showStartupModal}
-        edition={selectedEdition}
-        userStartups={currentSelectingPlayer === 0 ? userStartups : []}
-        defaultProjects={defaultProjects}
-        playerName={players[currentSelectingPlayer]?.name}
-        onSelect={handleStartupSelected}
-        onClose={() => setShowStartupModal(false)}
-      />
+      {/* Startup Selection Modal — on retire les entreprises déjà choisies par les autres
+          joueurs (sauf celle du joueur courant si on vient de fermer le modal puis rouvrir). */}
+      {(() => {
+        const takenIds = new Set(
+          Object.entries(startupSelections)
+            .filter(([idx]) => Number(idx) !== currentSelectingPlayer)
+            .map(([, sel]) => sel.startupId),
+        );
+        const availableDefaults = defaultProjects.filter((p) => !takenIds.has(p.id));
+        const availableUserStartups =
+          currentSelectingPlayer === 0
+            ? userStartups.filter((s) => !takenIds.has(s.id))
+            : [];
+        return (
+          <StartupSelectionModal
+            visible={showStartupModal}
+            edition={selectedEdition}
+            userStartups={availableUserStartups}
+            defaultProjects={availableDefaults}
+            playerName={players[currentSelectingPlayer]?.name}
+            onSelect={handleStartupSelected}
+            onClose={() => setShowStartupModal(false)}
+          />
+        );
+      })()}
 
       {/* Bouton fixe en bas (sans fond) */}
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
@@ -1260,12 +1331,19 @@ const styles = StyleSheet.create({
     opacity: 0.35,
   },
 
-  // ── Ideation (Step 3) — grille 2×2 maquette ──
+  // ── Ideation (Step 3) — grille 2×2 avec badge VS central ──
+  ideationGridWrap: {
+    position: 'relative',
+    marginTop: SPACING[2],
+  },
   ideationGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginTop: SPACING[2],
+  },
+  /** 2 joueurs : layout sur 1 ligne (côte à côte) */
+  ideationGridTwo: {
+    flexWrap: 'nowrap',
   },
   ideationGridItem: {
     width: IDEATION_CARD_WIDTH,
@@ -1280,16 +1358,16 @@ const styles = StyleSheet.create({
   },
   ideationCardInner: {
     paddingHorizontal: SPACING[3],
-    paddingTop: SPACING[2],
-    paddingBottom: SPACING[2],
-    minHeight: 138,
+    paddingTop: SPACING[3],
+    paddingBottom: SPACING[3],
+    minHeight: 168,
+    alignItems: 'center',
     position: 'relative',
   },
-  ideationCardTopRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: SPACING[3],
+  ideationAvatarCenter: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING[2],
   },
   ideationAvatarCircle: {
     width: 48,
@@ -1298,15 +1376,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  /** Haut droite, même ligne de base que le cercle d’initiales (pas flex-end qui alignait en bas) */
-  ideationPlayerPillWrap: {
-    alignSelf: 'flex-start',
+  ideationPlayerPillCenter: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    marginBottom: SPACING[2],
+  },
+  ideationPlayerPillBorder: {
+    alignSelf: 'stretch',
   },
   ideationPlayerPillInner: {
-    ...StyleSheet.absoluteFillObject,
+    height: IDEATION_PLAYER_PILL_H,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
   },
   ideationPlayerPillText: {
     fontFamily: FONTS.bodySemiBold,
@@ -1314,27 +1396,53 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   ideationTitleBlock: {
-    justifyContent: 'flex-start',
-    marginBottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: SPACING[1],
     alignSelf: 'stretch',
   },
   ideationPlaceholder: {
     fontFamily: FONTS.body,
     fontSize: 13,
     color: 'rgba(255, 255, 255, 0.35)',
-    textAlign: 'left',
-    alignSelf: 'stretch',
-  },
-  ideationSubtitle: {
-    fontFamily: FONTS.body,
-    fontSize: 14,
-    color: '#FFFFFF',
-    textAlign: 'left',
+    textAlign: 'center',
     alignSelf: 'stretch',
   },
   ideationTapHint: {
     marginTop: SPACING[1],
-    alignItems: 'flex-start',
+    alignItems: 'center',
+  },
+
+  // Badge VS central
+  vsBadgeWrap: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  vsBadge: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FFBC40',
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  vsBadgeText: {
+    fontFamily: FONTS.title,
+    fontSize: 20,
+    color: '#0C243E',
+    letterSpacing: 0.5,
   },
   ideationTapHintText: {
     fontFamily: FONTS.body,

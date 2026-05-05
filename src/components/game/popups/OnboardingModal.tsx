@@ -214,7 +214,7 @@ function SlideRocket({ w }: { w: number }) {
         outlineWidth={1.5}
       />
       <Text style={styles.description}>
-        3 cartes d'inspiration — une Cible, une Mission, un Secteur — guident votre idéation pour créer une startup unique.
+        3 cartes d'inspiration — une Cible, une Mission, un Secteur — guident votre idéation pour créer une entreprise unique.
       </Text>
     </>
   );
@@ -231,7 +231,7 @@ function SlideMedal({ w }: { w: number }) {
         outlineWidth={1.5}
       />
       <Text style={styles.description}>
-        Chaque partie ajoute une startup à votre portfolio. Regardez leur valorisation évoluer et grimpez au classement mondial !
+        Chaque partie ajoute une entreprise à votre portfolio. Regardez leur valorisation évoluer et grimpez au classement mondial !
       </Text>
     </>
   );
@@ -248,7 +248,7 @@ function SlideXP({ w }: { w: number }) {
         outlineWidth={1.5}
       />
       <Text style={styles.description}>
-        Chaque partie ajoute une startup à votre portfolio. Regardez leur valorisation évoluer et grimpez au classement mondial !
+        Chaque partie ajoute une entreprise à votre portfolio. Regardez leur valorisation évoluer et grimpez au classement mondial !
       </Text>
     </>
   );

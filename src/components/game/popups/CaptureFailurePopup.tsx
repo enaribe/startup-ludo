@@ -81,7 +81,7 @@ const FAILURE_SCENARIOS: FailureScenario[] = [
   },
   {
     title: "RUPTURE D'ASSOCIÉS",
-    description: "Ton co-fondateur est parti avec la moitié de l'équipe. La startup n'a pas survécu à la rupture.",
+    description: "Ton co-fondateur est parti avec la moitié de l'équipe. L'entreprise n'a pas survécu à la rupture.",
   },
   {
     title: 'MARCHÉ INEXISTANT',
@@ -89,7 +89,7 @@ const FAILURE_SCENARIOS: FailureScenario[] = [
   },
   {
     title: 'BURN-OUT DU FONDATEUR',
-    description: "Épuisé, tu dois mettre la startup en pause. Le temps que tu récupères, il faut tout reconstruire.",
+    description: "Épuisé, tu dois mettre l'entreprise en pause. Le temps que tu récupères, il faut tout reconstruire.",
   },
   {
     title: 'ATTAQUE CONCURRENTIELLE',

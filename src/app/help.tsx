@@ -56,21 +56,21 @@ const FAQ_ITEMS: FAQItem[] = [
     category: 'startup',
     question: "À quoi servent les cartes d'inspiration ?",
     answer:
-      "Les cartes d'inspiration t'aident à imaginer ton idée de startup. La carte Cible définit ton marché (étudiants, agriculteurs...) et la carte Mission définit le problème que tu résous (éduquer, connecter...). Combine les deux pour créer ton concept !",
+      "Les cartes d'inspiration t'aident à imaginer ton idée d'entreprise. La carte Cible définit ton marché (étudiants, agriculteurs...) et la carte Mission définit le problème que tu résous (éduquer, connecter...). Combine les deux pour créer ton concept !",
   },
   {
     id: 'faq6',
     category: 'startup',
-    question: 'Comment développer ma startup ?',
+    question: 'Comment développer mon entreprise ?',
     answer:
-      "Gagne des jetons en jouant et investis-les dans ta startup pour la faire évoluer. Plus tu investis, plus ton niveau augmente. Chaque niveau débloque de nouveaux avantages et te rapproche du succès !",
+      "Gagne des jetons en jouant et investis-les dans ton entreprise pour la faire évoluer. Plus tu investis, plus ton niveau augmente. Chaque niveau débloque de nouveaux avantages et te rapproche du succès !",
   },
   {
     id: 'faq7',
     category: 'startup',
-    question: 'Puis-je avoir plusieurs startups ?',
+    question: 'Puis-je avoir plusieurs entreprises ?',
     answer:
-      "Oui ! Tu peux créer autant de startups que tu le souhaites. Chacune peut être dans un secteur différent et avoir ses propres objectifs. Gère ton portfolio comme un vrai entrepreneur !",
+      "Oui ! Tu peux créer autant d'entreprises que tu le souhaites. Chacune peut être dans un secteur différent et avoir ses propres objectifs. Gère ton portfolio comme un vrai entrepreneur !",
   },
   // Account
   {
@@ -85,7 +85,7 @@ const FAQ_ITEMS: FAQItem[] = [
     category: 'account',
     question: 'Puis-je jouer sans compte ?',
     answer:
-      "Oui, tu peux jouer en tant qu'invité. Cependant, ta progression ne sera pas sauvegardée si tu quittes l'application. Crée un compte pour garder tes startups et ton historique !",
+      "Oui, tu peux jouer en tant qu'invité. Cependant, ta progression ne sera pas sauvegardée si tu quittes l'application. Crée un compte pour garder tes entreprises et ton historique !",
   },
   // Technical
   {
@@ -100,7 +100,7 @@ const FAQ_ITEMS: FAQItem[] = [
 const CATEGORIES = [
   { id: 'all', label: 'Tout', icon: 'apps' },
   { id: 'gameplay', label: 'Gameplay', icon: 'game-controller' },
-  { id: 'startup', label: 'Startups', icon: 'rocket' },
+  { id: 'startup', label: 'Entreprises', icon: 'rocket' },
   { id: 'account', label: 'Compte', icon: 'person' },
   { id: 'technical', label: 'Technique', icon: 'settings' },
 ];

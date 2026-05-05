@@ -412,7 +412,7 @@ export default function SettingsScreen() {
               </View>
               <View style={styles.modalListItem}>
                 <Ionicons name="close-circle" size={16} color="#E74C3C" />
-                <Text style={styles.modalListText}>Votre portfolio de startups</Text>
+                <Text style={styles.modalListText}>Votre portfolio d'entreprises</Text>
               </View>
               <View style={styles.modalListItem}>
                 <Ionicons name="close-circle" size={16} color="#E74C3C" />

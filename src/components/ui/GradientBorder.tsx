@@ -1,4 +1,4 @@
-import { memo, useState } from 'react';
+import { memo, useId, useMemo, useState } from 'react';
 import { View, Dimensions } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
@@ -29,7 +29,8 @@ export const GradientBorder = memo(function GradientBorder({
   fill = 'transparent',
 }: GradientBorderProps) {
   const borderW = 1;
-  const gradientId = `grad_${Math.random().toString(36).substr(2, 9)}`;
+  const reactId = useId();
+  const gradientId = useMemo(() => `grad_${reactId.replace(/:/g, '')}`, [reactId]);
 
   return (
     <View style={[{ position: 'relative', width: boxWidth, height: boxHeight, borderRadius, overflow: 'hidden' }, style]}>
@@ -94,7 +95,8 @@ export const DynamicGradientBorder = memo(function DynamicGradientBorder({
   gradientColors = DEFAULT_GRADIENT,
 }: DynamicGradientBorderProps) {
   const [boxHeight, setBoxHeight] = useState(0);
-  const gradientId = `grad_${Math.random().toString(36).substr(2, 9)}`;
+  const reactId = useId();
+  const gradientId = useMemo(() => `grad_${reactId.replace(/:/g, '')}`, [reactId]);
 
   return (
     <View

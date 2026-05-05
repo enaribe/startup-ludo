@@ -681,7 +681,7 @@ export default function CreationMethodScreen() {
                 </View>
                 <View style={styles.optionTextCol}>
                   <Text style={styles.optionTitle}>Assistant Tambali</Text>
-                  <Text style={styles.optionDesc}>Générer 3 idées de startup avec l'IA</Text>
+                  <Text style={styles.optionDesc}>Générer 3 idées d'entreprise avec l'IA</Text>
                 </View>
               </View>
 

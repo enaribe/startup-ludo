@@ -280,7 +280,7 @@ export default function QuickMatchScreen() {
                   <Ionicons name="flash" size={48} color="#FFBC40" />
                   <Text style={styles.setupTitle}>PRÊT À JOUER ?</Text>
                   <Text style={styles.setupSubtitle}>
-                    Choisis le nombre de joueurs et ta startup
+                    Choisis le nombre de joueurs et ton entreprise
                   </Text>
                 </View>
               </DynamicGradientBorder>
@@ -333,7 +333,7 @@ export default function QuickMatchScreen() {
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.startupName}>
-                        {selectedStartupName || 'Choisir une startup'}
+                        {selectedStartupName || 'Choisir une entreprise'}
                       </Text>
                       {selectedSector && (
                         <Text style={styles.startupSector}>{selectedSector}</Text>

@@ -42,13 +42,18 @@ const LABEL = (
   </SvgText>
 );
 
-// ─── Card d'un joker ─────────────────────────────────────────────────────────
-function JokerCard({ joker, onUse }: { joker: Joker; onUse: () => void }) {
+// ─── Card d'un joker (avec compteur si plusieurs du même type) ───────────────
+function JokerCard({ joker, count, onUse }: { joker: Joker; count: number; onUse: () => void }) {
   const meta = JOKER_CATALOG[joker.type];
   return (
     <View style={styles.jokerCard}>
       <View style={[styles.jokerIconWrap, { backgroundColor: meta.color }]}>
         <Ionicons name={meta.iconName as never} size={22} color="#FFFFFF" />
+        {count > 1 && (
+          <View style={styles.countBadge}>
+            <Text style={styles.countBadgeText}>x{count}</Text>
+          </View>
+        )}
       </View>
       <View style={styles.jokerTextWrap}>
         <Text style={styles.jokerTitle} numberOfLines={1}>{meta.title}</Text>
@@ -75,6 +80,18 @@ export const JokerInventoryPopup = memo(function JokerInventoryPopup({
   onUse,
   onClose,
 }: JokerInventoryPopupProps) {
+  // Regrouper les jokers par type — on affiche une seule carte par type
+  // avec un badge "xN", et on consomme le premier exemplaire au clic UTILISER.
+  const groupedJokers = jokers.reduce<{ joker: Joker; count: number }[]>((acc, joker) => {
+    const existing = acc.find((g) => g.joker.type === joker.type);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      acc.push({ joker, count: 1 });
+    }
+    return acc;
+  }, []);
+
   return (
     <Modal visible={visible} onClose={onClose} closeOnBackdrop showCloseButton={false} bareContent>
       <Animated.View entering={SlideInUp.duration(280)} style={styles.card}>
@@ -96,8 +113,13 @@ export const JokerInventoryPopup = memo(function JokerInventoryPopup({
               showsVerticalScrollIndicator={false}
               bounces={false}
             >
-              {jokers.map((joker) => (
-                <JokerCard key={joker.id} joker={joker} onUse={() => onUse(joker)} />
+              {groupedJokers.map(({ joker, count }) => (
+                <JokerCard
+                  key={joker.type}
+                  joker={joker}
+                  count={count}
+                  onUse={() => onUse(joker)}
+                />
               ))}
             </ScrollView>
           )}
@@ -174,6 +196,27 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  countBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -8,
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#0C243E',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    paddingHorizontal: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  countBadgeText: {
+    fontFamily: FONTS.title,
+    fontSize: 10,
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
+    lineHeight: 12,
   },
   jokerTextWrap: {
     flex: 1,

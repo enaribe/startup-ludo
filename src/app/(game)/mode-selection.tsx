@@ -7,8 +7,10 @@ import Animated, { FadeInDown, FadeOut, SlideInUp } from 'react-native-reanimate
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LocalModeIcon, OnlineModeIcon } from '@/components/game/ModeSelectionIcons';
-import { DynamicGradientBorder, GameButton, ProgressionPopup, RadialBackground } from '@/components/ui';
+import { RocketIcon } from '@/components/icons';
+import { DynamicGradientBorder, GameButton, GamePopup, OutlinedText, ProgressionPopup, RadialBackground } from '@/components/ui';
 import { useAuthStore, useSettingsStore, useUserStore } from '@/stores';
+import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 
@@ -124,7 +126,7 @@ export default function GameModeSelectionScreen() {
       >
         <View style={styles.headerRow}>
           <Pressable onPress={handleBack} style={styles.backButton} hitSlop={8}>
-            <Ionicons name="chevron-back" size={26} color={THEME.accent} />
+            <Ionicons name="chevron-back" size={26} color={THEME.text} />
           </Pressable>
           <View style={styles.headerTitleWrap} pointerEvents="none">
             <Text style={styles.headerTitle}>NOUVELLE PARTIE</Text>
@@ -135,7 +137,12 @@ export default function GameModeSelectionScreen() {
 
       <View style={[styles.contentContainer, { paddingTop: headerBlockHeight + SPACING[5] }]}>
         <Animated.View entering={FadeInDown.delay(100).duration(500)} style={styles.subtitleWrap}>
-          <Text style={styles.subtitle}>Sélectionner le mode de jeu</Text>
+          <OutlinedText
+            text="SÉLECTIONNER LE MODE DE JEU"
+            style={styles.subtitle}
+            outlineColor="#0A1929"
+            outlineWidth={2}
+          />
         </Animated.View>
 
         {/* Partie locale — icône téléphone jaune */}
@@ -209,60 +216,35 @@ export default function GameModeSelectionScreen() {
         </Animated.View>
       </View>
 
-      {/* Popup - Aucun projet (design system) */}
-      <Modal
+      {/* Popup - Aucun projet (GamePopup design system) */}
+      <GamePopup
         visible={showNoProjectPopup}
-        transparent
-        animationType="fade"
         onRequestClose={handleCloseNoProjectPopup}
+        header="Nouveau projet requis"
+        icon={<RocketIcon color="#1F91D0" size={72} withShadow={false} />}
+        title="AUCUN PROJET"
+        footer={
+          <>
+            <GameButton
+              variant="yellow"
+              fullWidth
+              title="Créer mon entreprise"
+              onPress={handleCreateStartup}
+              style={styles.popupPrimaryBtn}
+            />
+            <GameButton
+              variant="blue"
+              fullWidth
+              title="Annuler"
+              onPress={handleCloseNoProjectPopup}
+            />
+          </>
+        }
       >
-        <View style={styles.popupOverlay}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={handleCloseNoProjectPopup} />
-          <Animated.View
-            entering={SlideInUp.duration(100).springify().damping(32)}
-            exiting={FadeOut.duration(100)}
-            style={styles.popupWrapper}
-          >
-            <DynamicGradientBorder
-              borderRadius={24}
-              fill="#0D2744"
-              style={styles.popupCardBorder}
-            >
-              <View style={styles.popupInner}>
-                <View style={styles.popupHeaderRow}>
-                  <View style={styles.popupHeaderLeft}>
-                    <View style={[styles.popupIconBox, styles.popupIconBoxYellow]}>
-                      <Ionicons name="business-outline" size={18} color="#FFBC40" />
-                    </View>
-                    <Text style={styles.popupTitle}>Aucun projet</Text>
-                  </View>
-                  <Pressable onPress={handleCloseNoProjectPopup} hitSlop={12} style={styles.popupCloseBtn}>
-                    <Ionicons name="close" size={22} color="rgba(255,255,255,0.6)" />
-                  </Pressable>
-                </View>
-                <View style={styles.popupDivider} />
-                <Text style={styles.popupSubtitle}>
-                  Tu dois créer une startup avant de jouer en ligne. Les jetons gagnés seront investis dans ton projet !
-                </Text>
-                <GameButton
-                  variant="yellow"
-                  fullWidth
-                  title="Créer ma startup"
-                  onPress={handleCreateStartup}
-                  style={styles.popupPrimaryBtn}
-                />
-                <GameButton
-                  variant="blue"
-                  fullWidth
-                  title="Annuler"
-                  onPress={handleCloseNoProjectPopup}
-                  style={styles.popupSecondaryBtn}
-                />
-              </View>
-            </DynamicGradientBorder>
-          </Animated.View>
-        </View>
-      </Modal>
+        <Text style={styles.popupBodyText}>
+          Tu dois créer une entreprise avant de jouer en ligne. Les jetons gagnés seront investis dans ton projet !
+        </Text>
+      </GamePopup>
 
       {/* Popup - Compte requis (design system) */}
       <Modal
@@ -387,10 +369,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   subtitle: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: FONT_SIZES.base,
-    color: THEME.accent,
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES.lg,
     textAlign: 'center',
+    letterSpacing: 0.5,
   },
   cardContent: {
     flexDirection: 'row',
@@ -492,8 +474,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  popupIconBoxYellow: {
-    backgroundColor: 'rgba(255, 188, 64, 0.2)',
+  popupBodyText: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: SPACING[3],
+    paddingHorizontal: SPACING[2],
   },
   popupTitle: {
     fontFamily: FONTS.title,

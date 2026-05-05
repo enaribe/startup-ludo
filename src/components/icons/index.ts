@@ -3,3 +3,4 @@ export { AccueilIcon, PortfolioIcon, ClassementIcon, ProfilIcon, RocketIcon } fr
 export { SectorActivityIcon } from './SectorActivityIcon';
 export { EditionTileIcon, resolveEditionTileIconVariant } from './EditionTileIcon';
 export type { EditionTileIconVariant } from './EditionTileIcon';
+export { ProgramIcon } from './ProgramIcon';

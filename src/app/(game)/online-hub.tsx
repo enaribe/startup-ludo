@@ -180,13 +180,13 @@ export default function OnlineHubScreen() {
 
             <Text style={styles.modalTitle}>Aucun projet</Text>
             <Text style={styles.modalDescription}>
-              Tu dois creer une startup avant de jouer en ligne. Les jetons gagnes seront investis dans ton projet !
+              Tu dois creer une entreprise avant de jouer en ligne. Les jetons gagnes seront investis dans ton projet !
             </Text>
 
             <GameButton
               variant="yellow"
               fullWidth
-              title="CREER MA STARTUP"
+              title="CREER MON ENTREPRISE"
               onPress={handleCreateStartup}
               style={{ marginBottom: SPACING[3] }}
             />

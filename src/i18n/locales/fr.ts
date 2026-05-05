@@ -43,8 +43,8 @@ const fr = {
   'home.localModeDesc': 'Joue avec tes amis',
   'home.onlineMode': 'Multijoueur Online',
   'home.onlineModeDesc': 'Bientôt disponible',
-  'home.yourStartups': 'Tes Startups',
-  'home.createStartup': 'Créer une startup',
+  'home.yourStartups': 'Tes Entreprises',
+  'home.createStartup': 'Créer une entreprise',
   'home.viewAll': 'Voir tout',
 
   // Game
@@ -92,24 +92,24 @@ const fr = {
   'victory.leaderboard': 'Classement final',
 
   // Startup Creation
-  'startup.create': 'Créer ta startup',
+  'startup.create': 'Créer ton entreprise',
   'startup.inspiration': 'Cartes d\'inspiration',
-  'startup.inspirationDesc': 'Tire des cartes pour trouver l\'idée de ta startup',
+  'startup.inspirationDesc': 'Tire des cartes pour trouver l\'idée de ton entreprise',
   'startup.targetCard': 'Carte Cible',
   'startup.targetCardDesc': 'Qui sera ton client ?',
   'startup.missionCard': 'Carte Mission',
   'startup.missionCardDesc': 'Quel problème résoudre ?',
   'startup.drawCard': 'Appuie pour tirer une carte',
   'startup.drawing': 'Tirage...',
-  'startup.name': 'Nom de ta startup',
+  'startup.name': 'Nom de ton entreprise',
   'startup.namePlaceholder': 'Ex: EcoFarm, HealthTech...',
   'startup.description': 'Description',
-  'startup.descriptionPlaceholder': 'Décris ce que fait ta startup en une phrase...',
+  'startup.descriptionPlaceholder': 'Décris ce que fait ton entreprise en une phrase...',
   'startup.sector': 'Secteur d\'activité',
-  'startup.createButton': 'Créer ma startup',
+  'startup.createButton': 'Créer mon entreprise',
   'startup.creating': 'Création...',
   'startup.success': 'Félicitations !',
-  'startup.successDesc': 'Ta startup a été créée avec succès',
+  'startup.successDesc': 'Ton entreprise a été créée avec succès',
   'startup.viewPortfolio': 'Voir mon portfolio',
 
   // Sectors
@@ -123,9 +123,9 @@ const fr = {
   // Portfolio
   'portfolio.title': 'Mon Portfolio',
   'portfolio.totalValue': 'Valeur totale',
-  'portfolio.startups': 'Startups',
-  'portfolio.empty': 'Aucune startup',
-  'portfolio.emptyDesc': 'Crée ta première startup pour commencer !',
+  'portfolio.startups': 'Entreprises',
+  'portfolio.empty': 'Aucune entreprise',
+  'portfolio.emptyDesc': 'Crée ta première entreprise pour commencer !',
   'portfolio.level': 'Niveau {{level}}',
   'portfolio.invested': '{{amount}} jetons investis',
 
@@ -184,7 +184,7 @@ const fr = {
   'help.subtitle': 'Trouve des réponses à tes questions',
   'help.all': 'Tout',
   'help.gameplay': 'Gameplay',
-  'help.startups': 'Startups',
+  'help.startups': 'Entreprises',
   'help.account': 'Compte',
   'help.technical': 'Technique',
   'help.contact': 'Besoin d\'aide supplémentaire ?',

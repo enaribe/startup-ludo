@@ -175,8 +175,8 @@ export const XP_REWARDS: Record<string, XPReward> = {
   TOKEN_MILESTONE_50: { type: 'token', amount: 50, description: '50 jetons accumulés' },
 
   // Startups
-  STARTUP_CREATED: { type: 'startup', amount: 25, description: 'Startup créée' },
-  STARTUP_UPGRADED: { type: 'startup', amount: 10, description: 'Startup améliorée' },
+  STARTUP_CREATED: { type: 'startup', amount: 25, description: 'Entreprise créée' },
+  STARTUP_UPGRADED: { type: 'startup', amount: 10, description: 'Entreprise améliorée' },
 
   // Social
   FIRST_GAME: { type: 'social', amount: 50, description: 'Première partie' },

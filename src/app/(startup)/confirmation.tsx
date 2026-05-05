@@ -81,7 +81,7 @@ export default function StartupConfirmationScreen() {
     missionCardDesc?: string;
   }>();
 
-  const startupName = params.startupName || 'Nouvelle Startup';
+  const startupName = params.startupName || 'Nouvelle Entreprise';
   const startupDescription = params.startupDescription || '';
   const sectorId = params.startupSector || 'fintech';
   const sectorInfo = SECTOR_INFO[sectorId] ?? { name: 'Fintech', icon: 'cash' };

@@ -82,7 +82,7 @@ const CLASSEMENT_INFO_SECTIONS: InfoSection[] = [
   {
     icon: 'rocket',
     title: 'ENTREPRISES',
-    body: "Les entreprises sont classées par valorisation. Elle augmente chaque fois que ta startup lève des fonds lors d'une partie.",
+    body: "Les entreprises sont classées par valorisation. Elle augmente chaque fois que ton entreprise lève des fonds lors d'une partie.",
   },
   {
     icon: 'refresh-circle',
@@ -373,7 +373,7 @@ export default function ClassementScreen() {
               description={
                 isJoueurs
                   ? 'Le classement sera disponible quand des joueurs auront joue !'
-                  : 'Creez votre premiere startup pour apparaitre ici !'
+                  : 'Creez votre premiere entreprise pour apparaitre ici !'
               }
             />
           </View>
@@ -568,7 +568,7 @@ function ProfilePopup({ item, rank, isFollowed, isGuest, onToggleFollow, onClose
               <View style={ppStyles.statSep} />
               <ProfileLinearStat label="Niveau" value={`NIV. ${item.level || 1}`} />
               <View style={ppStyles.statSep} />
-              <ProfileLinearStat label="Startups" value={String(item.startupCount ?? 0)} />
+              <ProfileLinearStat label="Entreprises" value={String(item.startupCount ?? 0)} />
               <View style={ppStyles.statSep} />
               <ProfileLinearStat label="Rang" value={`#${rank}`} />
             </View>

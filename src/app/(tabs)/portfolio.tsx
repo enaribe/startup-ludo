@@ -385,18 +385,18 @@ const MAX_STARTUPS = 3;
 const PORTFOLIO_INFO_SECTIONS: InfoSection[] = [
   {
     icon: 'rocket',
-    title: 'STARTUPS',
-    body: `Tu peux créer jusqu'à ${MAX_STARTUPS} startups. Chaque startup est définie par un secteur, une cible et une mission.`,
+    title: 'ENTREPRISES',
+    body: `Tu peux créer jusqu'à ${MAX_STARTUPS} entreprises. Chaque entreprise est définie par un secteur, une cible et une mission.`,
   },
   {
     icon: 'trending-up',
     title: 'VALORISATION',
-    body: "La valorisation augmente chaque fois que ta startup lève des fonds lors d'une partie. Elle représente la valeur totale de ton entreprise.",
+    body: "La valorisation augmente chaque fois que ton entreprise lève des fonds lors d'une partie. Elle représente la valeur totale de ton entreprise.",
   },
   {
     icon: 'bar-chart',
     title: 'NIVEAU',
-    body: "Le niveau de ta startup progresse avec les levées de fonds. Un niveau élevé reflète une startup mature et bien financée.",
+    body: "Le niveau de ton entreprise progresse avec les levées de fonds. Un niveau élevé reflète une entreprise mature et bien financée.",
   },
 ];
 
@@ -489,9 +489,9 @@ export default function PortfolioScreen() {
         {startups.length === 0 ? (
           <Animated.View entering={FadeInDown.delay(300).duration(500)} style={styles.emptyContainer}>
             <PortfolioIcon color="rgba(255,255,255,0.2)" size={64} />
-            <Text style={styles.emptyTitle}>Aucune startup</Text>
+            <Text style={styles.emptyTitle}>Aucune entreprise</Text>
             <Text style={styles.emptyDesc}>
-              Crée ta première startup en jouant et en gagnant des jetons !
+              Crée ta première entreprise en jouant et en gagnant des jetons !
             </Text>
           </Animated.View>
         ) : (
@@ -514,7 +514,7 @@ export default function PortfolioScreen() {
                         <View style={styles.startupInfo}>
                           <Text style={styles.startupName}>{startup.name}</Text>
                           <Text style={styles.startupDesc} numberOfLines={2}>
-                            {startup.description || `Startup innovante dans le secteur ${startup.sector}`}
+                            {startup.description || `Entreprise innovante dans le secteur ${startup.sector}`}
                           </Text>
                         </View>
                       </View>
@@ -601,7 +601,7 @@ export default function PortfolioScreen() {
         visible={showInfo}
         onClose={() => setShowInfo(false)}
         variant="portfolio"
-        description="Ton portfolio regroupe toutes les startups que tu as créées et développées en jouant."
+        description="Ton portfolio regroupe toutes les entreprises que tu as créées et développées en jouant."
         sections={PORTFOLIO_INFO_SECTIONS}
       />
     </View>
