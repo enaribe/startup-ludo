@@ -2,7 +2,7 @@
   "expo": {
     "name": "Startup Ludo",
     "slug": "startup-ludo",
-    "version": "2.0.7",
+    "version": "2.0.8",
     "orientation": "portrait",
     "icon": "./assets/images/iconludo.png",
     "scheme": "startupludo",
@@ -11,7 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.startupludo.app",
-      "buildNumber": "36",
+      "buildNumber": "37",
       "googleServicesFile": "./GoogleService-Info.plist",
       "usesAppleSignIn": true,
       "infoPlist": {
@@ -21,7 +21,7 @@
     },
     "android": {
       "package": "com.startupludo.app",
-      "versionCode": 36,
+      "versionCode": 37,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#0C243E",
@@ -65,7 +65,14 @@
       "@react-native-firebase/app",
       "./plugins/withRNFirebasePodfile.js",
       "@react-native-firebase/auth",
-      "@react-native-google-signin/google-signin"
+      "@react-native-google-signin/google-signin",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Startup Ludo accède à tes photos pour définir ta photo de profil.",
+          "cameraPermission": "Startup Ludo accède à ta caméra pour prendre ta photo de profil."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

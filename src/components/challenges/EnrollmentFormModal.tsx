@@ -173,6 +173,19 @@ export const EnrollmentFormModal = memo(function EnrollmentFormModal({
   const [planToStart, setPlanToStart] = useState<boolean | null>(null);
   const [phone, setPhone] = useState('');
 
+  const scrollRef = useRef<ScrollView>(null);
+  // Position Y du bloc téléphone dans la ScrollView (mesurée via onLayout).
+  const phoneFieldYRef = useRef(0);
+
+  // Quand un champ reçoit le focus, on s'assure qu'il reste visible au-dessus
+  // du clavier en faisant défiler la ScrollView jusqu'à sa position.
+  const handleFieldFocus = useCallback((y: number) => {
+    // Petit délai pour laisser le clavier s'ouvrir avant de défiler.
+    setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: Math.max(0, y - 20), animated: true });
+    }, 250);
+  }, []);
+
   const isValid = lastName.trim().length >= 2
     && firstName.trim().length >= 2
     && age.trim().length > 0
@@ -226,9 +239,13 @@ export const EnrollmentFormModal = memo(function EnrollmentFormModal({
       </View>
 
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        automaticallyAdjustKeyboardInsets
       >
         <Text style={styles.subtitle}>
           Remplissez ce formulaire pour rejoindre le programme
@@ -332,7 +349,10 @@ export const EnrollmentFormModal = memo(function EnrollmentFormModal({
         )}
 
         {/* Phone — obligatoire pour être contacté */}
-        <Animated.View entering={FadeInDown.delay(500).duration(300)}>
+        <Animated.View
+          entering={FadeInDown.delay(500).duration(300)}
+          onLayout={(e) => { phoneFieldYRef.current = e.nativeEvent.layout.y; }}
+        >
           <Text style={styles.label}>NUMÉRO DE TÉLÉPHONE</Text>
           <Text style={styles.helper}>
             Pour bénéficier des opportunités d'accompagnement du programme {challengeName}.
@@ -344,6 +364,7 @@ export const EnrollmentFormModal = memo(function EnrollmentFormModal({
             placeholder="Numéro de téléphone"
             placeholderTextColor="rgba(255,255,255,0.25)"
             keyboardType="phone-pad"
+            onFocus={() => handleFieldFocus(phoneFieldYRef.current)}
           />
         </Animated.View>
 
@@ -397,6 +418,11 @@ const styles = StyleSheet.create({
   scroll: {
     maxHeight: screenHeight * 0.45,
     width: '100%',
+  },
+  scrollContent: {
+    // Marge basse pour permettre au dernier champ (téléphone) de remonter
+    // au-dessus du clavier quand il reçoit le focus.
+    paddingBottom: SPACING[6],
   },
   label: {
     fontFamily: FONTS.title,

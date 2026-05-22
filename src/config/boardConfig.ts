@@ -35,6 +35,7 @@ export const TOKENS_TO_FINISH = 8;   // Jetons requis pour finir
 export const MAX_TOKENS = 8;         // Maximum de jetons qu'un joueur peut avoir
 export const DICE_TO_EXIT = 6;       // Dé pour sortir de la maison
 export const DEFAULT_PAWNS_COUNT = 1; // 1 pion par défaut (configurable à 4)
+export const FINAL_ENTRY_WARNING_DISTANCE = 7; // Cases avant l'entrée finale → avertissement préventif
 
 // Centre du plateau (zone 3x3) - position 5,6,7
 export const CENTER_COORDS: Coordinate = { row: 6, col: 6 };

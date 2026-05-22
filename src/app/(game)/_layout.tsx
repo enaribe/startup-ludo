@@ -21,6 +21,7 @@ export default function GameLayout() {
       {/* Online Game Flow */}
       <Stack.Screen name="online-hub" />
       <Stack.Screen name="quick-match" />
+      <Stack.Screen name="available-players" />
       <Stack.Screen name="create-room" />
       <Stack.Screen name="join-room" />
 

@@ -34,17 +34,23 @@ const shapeImage = require('@/../assets/images/shape.png');
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { login, loginWithGoogle, loginWithApple, isLoading, error, clearError, isAuthenticated } = useAuthStore();
+  const { login, loginWithGoogle, loginWithApple, isLoading, error, clearError, isAuthenticated, user, needsProfileCompletion } = useAuthStore();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  // Redirection automatique vers home une fois authentifié (login email, Google, Apple, téléphone)
+  // Redirection automatique une fois authentifié (login email, Google, Apple, téléphone).
+  // Si le compte n'a pas encore de pseudo unique → écran de complétion du profil.
+  // On ignore les invités : un guest doit pouvoir accéder à cet écran pour se créer un vrai compte.
   useEffect(() => {
-    if (isAuthenticated) {
-      router.replace('/(tabs)/home');
+    if (isAuthenticated && !user?.isGuest) {
+      if (needsProfileCompletion) {
+        router.replace('/(auth)/complete-profile');
+      } else {
+        router.replace('/(tabs)/home');
+      }
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, user?.isGuest, needsProfileCompletion, router]);
 
   const isFormValid = email.trim().includes('@') && password.trim().length >= 6;
 

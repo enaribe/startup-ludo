@@ -146,6 +146,8 @@ export interface FirestoreUserStats {
   // Dénormalisé depuis users/ pour éviter les N+1 dans le classement
   displayName?: string;
   avatarUrl?: string | null;
+  // IDs des succès débloqués
+  achievements?: string[];
 }
 
 // Realtime Database room structure
@@ -204,10 +206,17 @@ export interface RealtimeAction {
   timestamp?: number; // Alias (verbose)
 }
 
+export type RealtimePresenceState = 'online' | 'in_game' | 'offline';
+
 export interface RealtimePresence {
+  /** Champ historique conservé pour compatibilité avec les anciennes présences. */
   online: boolean;
+  /** Statut exploitable par l'écran Joueurs disponibles. */
+  state?: RealtimePresenceState;
   lastSeen: number;
+  updatedAt?: number;
   currentRoom: string | null;
+  currentGame?: string | null;
 }
 
 // ===== MATCHMAKING =====

@@ -9,8 +9,8 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Dimensions, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Dimensions, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -19,6 +19,8 @@ import { DynamicGradientBorder, GameButton, RadialBackground } from '@/component
 import { Avatar } from '@/components/ui/Avatar';
 import { getDefaultProjectsForEdition, getMatchingUserStartups } from '@/data/defaultProjects';
 import { useMultiplayer } from '@/hooks/useMultiplayer';
+import { buildShareMessage } from '@/services/multiplayer/inviteLink';
+import { InviteContactModal } from '@/components/game/InviteContactModal';
 import { useAuthStore, useUserStore } from '@/stores';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
@@ -43,6 +45,7 @@ export default function CreateRoomScreen() {
     room,
     players,
     isLoading,
+    roomClosed,
     createRoom,
     leaveRoom,
     setStartupSelection,
@@ -53,6 +56,8 @@ export default function CreateRoomScreen() {
   const isQuickMatch = params.quickMatch === 'true';
   const [showLobby, setShowLobby] = useState(isWaitingRoom);
   const [showStartupModal, setShowStartupModal] = useState(false);
+  const [showInviteContact, setShowInviteContact] = useState(false);
+  const isGuest = user?.isGuest ?? true;
 
   // Helper function to format room code
   const formatRoomCode = (code: string) => {
@@ -101,11 +106,21 @@ export default function CreateRoomScreen() {
     [players, user?.id]
   );
   const hasSelectedStartup = !!myPlayer?.startupId;
+  const startupModalAutoOpenedRef = useRef(false);
 
   const handleStartupSelected = useCallback(async (startupId: string, startupName: string, isDefault: boolean, sector: string) => {
     setShowStartupModal(false);
     await setStartupSelection(startupId, startupName, isDefault, sector);
   }, [setStartupSelection]);
+
+  // Ouvre automatiquement le choix de projet dès que le joueur est dans le salon sans projet.
+  useEffect(() => {
+    if (startupModalAutoOpenedRef.current) return;
+    if (showLobby && myPlayer && !hasSelectedStartup) {
+      startupModalAutoOpenedRef.current = true;
+      setShowStartupModal(true);
+    }
+  }, [showLobby, myPlayer, hasSelectedStartup]);
 
   // Listen for game start (room status change to 'playing')
   useEffect(() => {
@@ -116,6 +131,17 @@ export default function CreateRoomScreen() {
       });
     }
   }, [room?.status, room?.gameId, currentRoomId, router]);
+
+  // Salon dissous par l'hôte : éjecter les joueurs non-hôtes
+  useEffect(() => {
+    if (roomClosed && params.isHost !== 'true') {
+      Alert.alert(
+        'Salon fermé',
+        "L'hôte a quitté le salon.",
+        [{ text: 'OK', onPress: () => router.replace('/(game)/online-hub') }]
+      );
+    }
+  }, [roomClosed, params.isHost, router]);
 
   // Auto-start pour le match rapide :
   // En quick match, tous les joueurs ont déjà sélectionné leur startup avant la queue
@@ -211,7 +237,7 @@ export default function CreateRoomScreen() {
       try {
         const codeWithoutDash = roomCode.replace('-', '');
         await Share.share({
-          message: `Rejoins ma partie Startup Ludo ! Code: ${codeWithoutDash}`,
+          message: buildShareMessage(codeWithoutDash),
         });
       } catch {
         // Share cancelled
@@ -269,8 +295,10 @@ export default function CreateRoomScreen() {
             <Text style={styles.configTitle}>CONFIGURATION DU SALON</Text>
           </Animated.View>
 
-          {/* Carte centrale avec configuration */}
-          <Animated.View entering={FadeInDown.delay(200).duration(500)}>
+          {/* Carte centrale avec configuration — pas d'animation Reanimated ici :
+              sur Android, le wrapper Animated.View peut empêcher l'InputMethodManager
+              de remonter le clavier sur tap répété (focus retenu, keyboard reste caché). */}
+          <View>
             <DynamicGradientBorder
               borderRadius={24}
               fill="rgba(0, 0, 0, 0.35)"
@@ -278,51 +306,40 @@ export default function CreateRoomScreen() {
               style={{ marginTop: SPACING[5] }}
             >
               <View style={styles.configCard}>
-                {/* Nom du Salon */}
+                {/* Nom du Salon — TextInput nu, bord en CSS natif (pas de SVG par-dessus
+                    sinon Android n'attache pas l'EditText à l'InputMethodManager). */}
                 <View style={styles.fieldGroup}>
                   <Text style={styles.fieldLabel}>Nom du Salon</Text>
-                  <DynamicGradientBorder
-                    borderRadius={14}
-                    fill="rgba(0, 0, 0, 0.35)"
-                    style={styles.inputBorderWrapper}
-                  >
-                    <View style={styles.inputInner}>
-                      <TextInput
-                        value={roomName}
-                        onChangeText={setRoomName}
-                        placeholder="Ex. Salon de Abdoulaye"
-                        placeholderTextColor="rgba(255,255,255,0.3)"
-                        style={styles.configInput}
-                        autoCapitalize="words"
-                      />
-                    </View>
-                  </DynamicGradientBorder>
+                  <View style={styles.inputBorderShell}>
+                    <TextInput
+                      value={roomName}
+                      onChangeText={setRoomName}
+                      placeholder="Ex. Salon de Abdoulaye"
+                      placeholderTextColor="rgba(255,255,255,0.3)"
+                      style={styles.configInput}
+                      autoCapitalize="words"
+                    />
+                  </View>
                 </View>
 
                 {/* Nombre de joueur */}
                 <View style={styles.fieldGroup}>
                   <Text style={styles.fieldLabel}>Nombre de joueur</Text>
-                  <DynamicGradientBorder
-                    borderRadius={14}
-                    fill="rgba(0, 0, 0, 0.35)"
-                    style={styles.inputBorderWrapper}
-                  >
-                    <View style={styles.inputInner}>
-                      <TextInput
-                        value={maxPlayers}
-                        onChangeText={setMaxPlayers}
-                        placeholder="2-4"
-                        placeholderTextColor="rgba(255,255,255,0.3)"
-                        style={styles.configInput}
-                        keyboardType="number-pad"
-                        maxLength={1}
-                      />
-                    </View>
-                  </DynamicGradientBorder>
+                  <View style={styles.inputBorderShell}>
+                    <TextInput
+                      value={maxPlayers}
+                      onChangeText={setMaxPlayers}
+                      placeholder="2-4"
+                      placeholderTextColor="rgba(255,255,255,0.3)"
+                      style={styles.configInput}
+                      keyboardType="number-pad"
+                      maxLength={1}
+                    />
+                  </View>
                 </View>
               </View>
             </DynamicGradientBorder>
-          </Animated.View>
+          </View>
         </ScrollView>
 
         {/* Bottom button */}
@@ -381,6 +398,15 @@ export default function CreateRoomScreen() {
                   <Ionicons name="share-outline" size={18} color="#FFBC40" />
                   <Text style={styles.codeActionText}>Partager</Text>
                 </Pressable>
+                {!isGuest && (
+                  <Pressable
+                    onPress={() => setShowInviteContact(true)}
+                    style={styles.codeAction}
+                  >
+                    <Ionicons name="person-add-outline" size={18} color="#FFBC40" />
+                    <Text style={styles.codeActionText}>Inviter</Text>
+                  </Pressable>
+                )}
               </View>
             </View>
           </DynamicGradientBorder>
@@ -478,7 +504,7 @@ export default function CreateRoomScreen() {
         </Animated.View>
       </ScrollView>
 
-      {/* Startup Selection Modal */}
+      {/* Startup Selection Modal — non-fermable tant qu'aucun projet n'est choisi */}
       <StartupSelectionModal
         visible={showStartupModal}
         edition={edition}
@@ -486,7 +512,16 @@ export default function CreateRoomScreen() {
         defaultProjects={defaultProjects}
         playerName={user?.displayName}
         onSelect={handleStartupSelected}
-        onClose={() => setShowStartupModal(false)}
+        onClose={() => {
+          if (hasSelectedStartup) setShowStartupModal(false);
+        }}
+      />
+
+      <InviteContactModal
+        visible={showInviteContact}
+        onClose={() => setShowInviteContact(false)}
+        roomId={currentRoomId}
+        roomCode={roomCode.replace('-', '')}
       />
 
       {/* Bottom button */}
@@ -559,11 +594,13 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.sm,
     color: 'rgba(255, 255, 255, 0.7)',
   },
-  inputBorderWrapper: {
+  // Bord arrondi en CSS natif RN (pas de SVG over-input → Android touch direct).
+  inputBorderShell: {
     width: '100%',
-    overflow: 'hidden',
-  },
-  inputInner: {
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
@@ -571,6 +608,8 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.bodySemiBold,
     fontSize: FONT_SIZES.md,
     color: '#FFFFFF',
+    minHeight: Platform.OS === 'android' ? 28 : undefined,
+    padding: 0,
   },
   label: {
     fontFamily: FONTS.title,

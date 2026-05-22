@@ -45,6 +45,10 @@ export interface Player {
   isDefaultProject?: boolean;
   sector?: string;    // Secteur du projet sélectionné (online)
   edition?: string;   // Édition dérivée du secteur (online)
+  isForfeited?: boolean; // Joueur déconnecté définitivement (online uniquement)
+  forfeitedAt?: number;  // Timestamp du forfait
+  rank?: number;         // Position finale du joueur (1 = premier arrivé, n = dernier)
+  finishedAt?: number;   // Timestamp où le joueur a terminé sa partie (atteint l'arrivée)
 }
 
 // Ancien format (pour compatibilité)
@@ -82,6 +86,7 @@ export interface GameState {
   selectedPawnIndex: number | null;
   pendingEvent: GameEvent | null;
   winner: string | null;
+  ranking?: string[]; // Liste ordonnée des playerIds par rang final (index 0 = 1er, etc.)
   challengeContext?: ChallengeContext;
   createdAt: number;
   updatedAt: number;
@@ -137,6 +142,15 @@ export interface DuelEvent {
 }
 
 // État du duel en cours
+/** Réponse IA pré-calculée pour une question (points-based plutôt qu'index pour
+ *  rester stable malgré le shuffle des options dans le popup). */
+export interface AIDuelAnswer {
+  /** Points de l'option choisie par l'IA (cible directe quel que soit l'ordre des options affichées). */
+  points: number;
+  /** Délai de réflexion simulée en ms avant que l'IA "réponde". */
+  delayMs: number;
+}
+
 export interface DuelState {
   challengerId: string;
   opponentId: string;
@@ -147,6 +161,10 @@ export interface DuelState {
   opponentScore: number;
   phase: 'select_opponent' | 'intro' | 'challenger_turn' | 'opponent_prepare' | 'opponent_turn' | 'answering' | 'waiting' | 'result';
   currentQuestionIndex: number;
+  /** Réponses IA pré-calculées (présent seulement si l'un des 2 joueurs est IA). */
+  aiAnswers?: AIDuelAnswer[];
+  /** Identifiant du joueur IA (challenger ou opponent), pour orchestrer le mode live. */
+  aiPlayerId?: string;
 }
 
 // Résultat du duel
@@ -322,6 +340,21 @@ export interface Settings {
   language: 'fr' | 'en';
   theme: 'light' | 'dark' | 'system';
   notifications: boolean;
+}
+
+// ===== GAME INVITATION TYPES =====
+export type GameInvitationStatus = 'pending' | 'accepted' | 'declined' | 'expired';
+
+export interface GameInvitation {
+  id: string;
+  fromUserId: string;
+  fromUserName: string;
+  toUserId: string;
+  roomId: string;
+  roomCode: string;
+  status: GameInvitationStatus;
+  createdAt: number;
+  expiresAt: number;
 }
 
 // ===== NAVIGATION TYPES =====

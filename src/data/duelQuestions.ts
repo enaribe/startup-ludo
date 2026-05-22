@@ -206,3 +206,29 @@ export function calculateScore(questions: DuelQuestion[], answers: number[]): nu
     return total;
   }, 0);
 }
+
+/**
+ * Génère les réponses pré-calculées de l'IA pour un duel "live".
+ * - L'IA a `accuracy` chances de choisir l'option avec le maximum de points.
+ * - Sinon elle prend une option aléatoire parmi les autres.
+ * - On retourne `points` (et pas un index) pour rester stable malgré le shuffle UI.
+ * - Délai de réflexion variable (1–3s) pour donner un effet "humain".
+ */
+export function generateAIDuelAnswers(
+  questions: import('@/types').DuelQuestion[],
+  accuracy: number = 0.6,
+): import('@/types').AIDuelAnswer[] {
+  return questions.map((q) => {
+    if (!q.options || q.options.length === 0) {
+      return { points: 0, delayMs: 1500 };
+    }
+    const maxPoints = Math.max(...q.options.map((o) => o.points || 0));
+    const correctOptions = q.options.filter((o) => (o.points || 0) === maxPoints);
+    const wrongOptions = q.options.filter((o) => (o.points || 0) !== maxPoints);
+    const willPickCorrect = Math.random() < accuracy || wrongOptions.length === 0;
+    const pool = willPickCorrect ? correctOptions : wrongOptions;
+    const picked = pool[Math.floor(Math.random() * pool.length)] ?? q.options[0]!;
+    const delayMs = 1000 + Math.floor(Math.random() * 2000); // 1000–3000ms
+    return { points: picked.points || 0, delayMs };
+  });
+}

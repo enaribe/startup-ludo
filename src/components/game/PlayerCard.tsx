@@ -3,14 +3,15 @@
  */
 
 import { Dice } from '@/components/game/Dice';
+import { AfkCountdownBorder } from '@/components/game/AfkCountdownBorder';
 import { useResponsiveLayout } from '@/hooks/useResponsiveLayout';
 import { Avatar } from '@/components/ui/Avatar';
 import { COLORS } from '@/styles/colors';
 import { FONTS } from '@/styles/typography';
 import type { Player } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
-import { memo, useEffect } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { memo, useEffect, useState } from 'react';
+import { Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import Animated, {
     useAnimatedStyle,
     useSharedValue,
@@ -29,7 +30,12 @@ interface PlayerCardProps {
   isDiceDisabled?: boolean;
   onRollDice?: () => number;
   onDiceComplete?: (value: number) => void;
+  /** Décompte anti-AFK (en ligne) — null si inactif. */
+  afkSecondsLeft?: number | null;
 }
+
+/** Durée totale du décompte anti-AFK — doit correspondre à useTurnMachine. */
+const AFK_TOTAL_SECONDS = 15;
 
 export const PlayerCard = memo(function PlayerCard({
   player,
@@ -41,10 +47,20 @@ export const PlayerCard = memo(function PlayerCard({
   isDiceDisabled = true,
   onRollDice,
   onDiceComplete,
+  afkSecondsLeft = null,
 }: PlayerCardProps) {
   const { sizes } = useResponsiveLayout();
   const animScale = useSharedValue(1);
   const glowOpacity = useSharedValue(0);
+
+  // Dimensions de la carte — mesurées pour dessiner la jauge de décompte AFK sur la bordure
+  const [cardSize, setCardSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+  const handleCardLayout = (e: LayoutChangeEvent) => {
+    const { width, height } = e.nativeEvent.layout;
+    setCardSize((prev) =>
+      prev.width === width && prev.height === height ? prev : { width, height }
+    );
+  };
 
   // Pulse animation for current turn
   useEffect(() => {
@@ -110,18 +126,36 @@ export const PlayerCard = memo(function PlayerCard({
     );
   }
 
+  const showAfkBorder = afkSecondsLeft !== null && isCurrentTurn;
+
   return (
     <Animated.View style={[styles.container, animatedStyle]}>
       <Pressable onPress={onPress} disabled={!onPress}>
         <View
+          onLayout={handleCardLayout}
           style={[
             styles.card,
             {
+              // Pendant le décompte AFK, la bordure native est masquée :
+              // c'est le tracé SVG (même couleur, même épaisseur) qui la remplace
+              // pour pouvoir se décharger sur le périmètre.
               borderColor: isCurrentTurn ? playerColor : 'transparent',
-              borderWidth: isCurrentTurn ? 1 : 0,
+              borderWidth: showAfkBorder ? 0 : isCurrentTurn ? 1 : 0,
             },
           ]}
         >
+          {/* Bordure-décompte anti-AFK (multijoueur en ligne) — même trait que la carte */}
+          {showAfkBorder && (
+            <AfkCountdownBorder
+              secondsLeft={afkSecondsLeft}
+              totalSeconds={AFK_TOTAL_SECONDS}
+              width={cardSize.width}
+              height={cardSize.height}
+              borderRadius={14}
+              color={playerColor}
+              strokeWidth={2.5}
+            />
+          )}
           {/* Top Row: User Info + Dice 3D */}
           <View style={styles.topRow}>
             <View style={styles.userInfo}>

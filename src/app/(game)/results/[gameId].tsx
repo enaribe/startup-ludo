@@ -27,10 +27,13 @@ import Animated, {
 import Svg, { Defs, G, Path, RadialGradient, Rect, Stop, LinearGradient } from 'react-native-svg';
 
 import { GameButton } from '@/components/ui';
+import { AchievementUnlockedPopup } from '@/components/game/popups/AchievementUnlockedPopup';
 import { XP_REWARDS, getChallengeXPReward } from '@/config/progression';
+import type { Achievement } from '@/config/achievements';
 import { isOwnStartup } from '@/data/defaultProjects';
 import { useSound } from '@/hooks/useSound';
-import { saveGameSession, updateChallengeEnrollment, updateStartupValorisation, updateUserStats } from '@/services/firebase/firestore';
+import { evaluateAchievements } from '@/services/game/achievementService';
+import { saveGameSession, updateChallengeEnrollment, updateStartupValorisation, updateUserStats, updateUserAchievements } from '@/services/firebase/firestore';
 import { useAuthStore, useChallengeStore, useGameStore, useUserStore } from '@/stores';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
@@ -135,13 +138,14 @@ function SadFaceIcon() {
 
 // ===== RANK CARD avec bordure gradient =====
 
-function RankCard({ rank, playerColor, gradId, startupName, playerName, xp }: {
+function RankCard({ rank, playerColor, gradId, startupName, playerName, xp, isForfeited }: {
   rank: number;
   playerColor: string;
   gradId: string;
   startupName?: string;
   playerName: string;
   xp: number;
+  isForfeited?: boolean;
 }) {
   const [h, setH] = useState(0);
   const w = POPUP_WIDTH - SPACING[5] * 2; // largeur de la carte dans le popup
@@ -186,8 +190,12 @@ function RankCard({ rank, playerColor, gradId, startupName, playerName, xp }: {
         {startupName ? <Text style={rankCardStyles.sub}>{playerName}</Text> : null}
       </View>
 
-      {/* XP */}
-      <Text style={rankCardStyles.xp}>+{xp.toLocaleString()} XP</Text>
+      {/* XP ou badge forfait */}
+      {isForfeited ? (
+        <Text style={rankCardStyles.forfeitTag}>Quitté</Text>
+      ) : (
+        <Text style={rankCardStyles.xp}>+{xp.toLocaleString()} XP</Text>
+      )}
     </View>
   );
 }
@@ -232,6 +240,12 @@ const rankCardStyles = StyleSheet.create({
     fontFamily: FONTS.bodySemiBold,
     fontSize: FONT_SIZES.sm,
     color: COLORS.success,
+  },
+  forfeitTag: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.xs,
+    color: 'rgba(255, 255, 255, 0.5)',
+    fontStyle: 'italic',
   },
 });
 
@@ -302,6 +316,7 @@ export default function ResultsScreen() {
   const incrementGamesWon = useUserStore((s) => s.incrementGamesWon);
   const addTokensEarned = useUserStore((s) => s.addTokensEarned);
   const updateStartup = useUserStore((s) => s.updateStartup);
+  const addAchievement = useUserStore((s) => s.addAchievement);
 
   const challengeAddXp = useChallengeStore((s) => s.addXp);
   const checkAndUnlockNextSubLevel = useChallengeStore((s) => s.checkAndUnlockNextSubLevel);
@@ -318,6 +333,8 @@ export default function ResultsScreen() {
   const [showConvertPopup, setShowConvertPopup] = useState(false);
   const [showXpNeededMessage, setShowXpNeededMessage] = useState(false);
   const [xpNeededAmount, setXpNeededAmount] = useState(0);
+  // Succès débloqués par cette partie — affichés dans AchievementUnlockedPopup
+  const [unlockedAchievements, setUnlockedAchievements] = useState<Achievement[]>([]);
 
   // Animations
   const crownScale = useSharedValue(0);
@@ -337,7 +354,18 @@ export default function ResultsScreen() {
   const effectivePlayers = isTestMode ? testPlayers : (game?.players ?? []);
   const effectiveWinnerId = isTestMode ? 'player_0' : game?.winner;
   const winner = effectivePlayers.find((p) => p.id === effectiveWinnerId);
-  const sortedPlayers = effectivePlayers.slice().sort((a, b) => b.tokens - a.tokens);
+
+  // Classement final : si un rank est défini (multi 3+ joueurs), il prime.
+  // Sinon (2 joueurs ou modes sans ranking), fallback sur le tri par tokens.
+  // Les joueurs forfait sont placés en dernier (rank = +Infinity).
+  const sortedPlayers = effectivePlayers.slice().sort((a, b) => {
+    const aAny = a as { rank?: number; isForfeited?: boolean };
+    const bAny = b as { rank?: number; isForfeited?: boolean };
+    const aRank = aAny.isForfeited ? Number.POSITIVE_INFINITY : (aAny.rank ?? Number.POSITIVE_INFINITY);
+    const bRank = bAny.isForfeited ? Number.POSITIVE_INFINITY : (bAny.rank ?? Number.POSITIVE_INFINITY);
+    if (aRank !== bRank) return aRank - bRank;
+    return b.tokens - a.tokens;
+  });
 
   const userId = isTestMode ? testUserId : (profile?.userId ?? user?.id);
   const myPlayer = effectivePlayers.find((p) => p.id === userId);
@@ -461,6 +489,55 @@ export default function ResultsScreen() {
       }).catch((err) => {
         console.warn('[Results] Failed to update Firestore stats:', err);
       });
+    }
+
+    // ===== ACHIEVEMENTS =====
+    // Évalue les succès avec les stats APRÈS partie (incréments synchrones déjà faits).
+    if (profile) {
+      const tokensInGame = myPlayer?.tokens ?? 0;
+      const statsAfter = {
+        gamesPlayed: profile.gamesPlayed + 1,
+        gamesWon: profile.gamesWon + (isWinner ? 1 : 0),
+        totalTokensEarned: profile.totalTokensEarned + tokensInGame,
+        startupsCreated: profile.startups.length,
+        level: profile.level,
+        rank: profile.rank,
+        // multijoueur : approximé par les parties online (compteur dédié non encore tracké)
+        multiplayerGames: isOnline ? profile.gamesPlayed + 1 : 0,
+        // compteurs non encore persistés — restent à 0 tant que le tracking n'existe pas
+        quizCorrect: 0,
+        duelsWon: 0,
+        bestWinStreak: 0,
+        bestQuizStreak: 0,
+      };
+      const gameCtx = {
+        isWinner,
+        tokensInGame,
+        turnsPlayed: game.currentTurn ?? 0,
+        // approximations prudentes : non débloqué tant que non tracké finement
+        noTokensLost: false,
+        wasLastThenWon: false,
+      };
+      const newlyUnlocked = evaluateAchievements(
+        profile.achievements,
+        statsAfter,
+        gameCtx
+      );
+
+      if (newlyUnlocked.length > 0) {
+        for (const ach of newlyUnlocked) {
+          addAchievement(ach.id);
+          if (ach.xpReward > 0) addXP(ach.xpReward);
+        }
+        setUnlockedAchievements(newlyUnlocked);
+        // Persiste la liste complète des succès dans Firestore
+        if (userId && !isGuest) {
+          const allIds = [...profile.achievements, ...newlyUnlocked.map((a) => a.id)];
+          updateUserAchievements(userId, allIds).catch((err) => {
+            console.warn('[Results] Failed to persist achievements:', err);
+          });
+        }
+      }
     }
 
     if (game && userId && !isGuest) {
@@ -699,6 +776,7 @@ export default function ResultsScreen() {
                   startupName={player.startupName}
                   playerName={player.name}
                   xp={playerXP}
+                  isForfeited={(player as { isForfeited?: boolean }).isForfeited}
                 />
               </Animated.View>
             );
@@ -758,6 +836,12 @@ export default function ResultsScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Popup de déblocage de succès — affiché par-dessus les résultats */}
+      <AchievementUnlockedPopup
+        achievements={unlockedAchievements}
+        onClose={() => setUnlockedAchievements([])}
+      />
     </View>
   );
 }

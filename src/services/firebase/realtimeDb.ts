@@ -319,8 +319,11 @@ export const setPresence = async (userId: string, roomId: string | null): Promis
     const presenceRef = database().ref(REALTIME_PATHS.userPresence(userId));
     const presenceData: RealtimePresence = {
       online: true,
+      state: roomId ? 'in_game' : 'online',
       lastSeen: Date.now(),
+      updatedAt: Date.now(),
       currentRoom: roomId,
+      currentGame: null,
     };
 
     await presenceRef.set(presenceData);
@@ -328,8 +331,11 @@ export const setPresence = async (userId: string, roomId: string | null): Promis
     // Set up disconnect handler
     await presenceRef.onDisconnect().set({
       online: false,
+      state: 'offline',
       lastSeen: Date.now(),
+      updatedAt: Date.now(),
       currentRoom: null,
+      currentGame: null,
     });
 
     firebaseLog('Presence set');

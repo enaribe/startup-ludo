@@ -109,7 +109,7 @@ const CircularLoader = memo(function CircularLoader({ size }: { size: number }) 
 export default function WelcomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { loginAsGuest, isAuthenticated, isInitialized, phoneAuthStep } = useAuthStore();
+  const { loginAsGuest, isAuthenticated, isInitialized, phoneAuthStep, user, needsProfileCompletion } = useAuthStore();
   const [isGuestLoading, setIsGuestLoading] = useState(false);
   const { accepted, loading: privacyLoading, acceptPrivacy } = usePrivacyAcceptance();
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
@@ -131,11 +131,17 @@ export default function WelcomeScreen() {
   }, [showSplash, privacyLoading, accepted]);
 
   // Redirect if already authenticated (wait for auth to be initialized first)
+  // Les invités restent sur l'accueil pour pouvoir choisir entre jouer en invité ou créer un compte.
+  // Si le compte n'a pas de pseudo unique → écran de complétion du profil.
   useEffect(() => {
-    if (!showSplash && isInitialized && isAuthenticated) {
-      router.replace('/(tabs)/home');
+    if (!showSplash && isInitialized && isAuthenticated && !user?.isGuest) {
+      if (needsProfileCompletion) {
+        router.replace('/(auth)/complete-profile');
+      } else {
+        router.replace('/(tabs)/home');
+      }
     }
-  }, [showSplash, isAuthenticated, isInitialized, router]);
+  }, [showSplash, isAuthenticated, isInitialized, user?.isGuest, needsProfileCompletion, router]);
 
   // Retour depuis Safari (reCAPTCHA iOS) : phoneAuthStep est encore 'code_sent' ou 'verifying'
   // Expo Router atterrit sur index via le scheme URL → rediriger vers phone-auth pour afficher l'OTP

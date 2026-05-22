@@ -152,10 +152,11 @@ export default function MyProgramsScreen() {
   const activeChallengeId = useChallengeStore((state) => state.activeChallengeId);
   const setActiveChallenge = useChallengeStore((state) => state.setActiveChallenge);
 
-  // Filtrer les inscriptions de l'utilisateur
+  // Filtrer les inscriptions de l'utilisateur — seules les inscriptions
+  // effectives (formulaire rempli) comptent comme un programme rejoint.
   const userEnrollments = useMemo(() => {
     if (!user?.id) return [];
-    return enrollments.filter((e) => e.userId === user.id);
+    return enrollments.filter((e) => e.userId === user.id && e.formData != null);
   }, [enrollments, user?.id]);
 
   // Séparer inscription active et autres

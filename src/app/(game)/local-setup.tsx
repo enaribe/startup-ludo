@@ -782,6 +782,17 @@ export default function LocalSetupScreen() {
                 ]}
               >
                 {players.map((player, index) => {
+                  // Layout diagonale pour 2 joueurs :
+                  //  - joueur 0 → haut-gauche
+                  //  - joueur 1 → bas-droite
+                  // (les deux cellules de l'autre diagonale restent vides pour
+                  // garder la grille 2×2 et laisser le badge VS pile au milieu)
+                  const isTwoPlayersDiagonal = players.length === 2;
+                  const diagonalSlotStyle = isTwoPlayersDiagonal
+                    ? index === 0
+                      ? styles.ideationDiagonalTopLeft
+                      : styles.ideationDiagonalBottomRight
+                    : null;
                   const selection = startupSelections[index];
                   const isCurrent = currentSelectingPlayer === index && !selection;
                   const themeHex =
@@ -816,7 +827,7 @@ export default function LocalSetupScreen() {
                     <Animated.View
                       key={`ideation-${index}`}
                       entering={FadeInDown.delay(150 + index * 80).duration(400)}
-                      style={styles.ideationGridItem}
+                      style={[styles.ideationGridItem, diagonalSlotStyle]}
                     >
                       <Pressable
                         onPress={openChooser}
@@ -1341,9 +1352,18 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
-  /** 2 joueurs : layout sur 1 ligne (côte à côte) */
+  /** 2 joueurs : layout en diagonale (haut-gauche / bas-droite) sur une grille 2×2 */
   ideationGridTwo: {
-    flexWrap: 'nowrap',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
+  },
+  /** Joueur 0 ancré à gauche, joueur 1 forcé à passer à la ligne via marginRight=100% */
+  ideationDiagonalTopLeft: {
+    marginRight: '100%',
+  },
+  /** Joueur 1 ancré à droite — marginLeft auto le pousse à droite */
+  ideationDiagonalBottomRight: {
+    marginLeft: 'auto',
   },
   ideationGridItem: {
     width: IDEATION_CARD_WIDTH,
@@ -1360,14 +1380,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING[3],
     paddingTop: SPACING[3],
     paddingBottom: SPACING[3],
-    minHeight: 168,
+    minHeight: 200,
     alignItems: 'center',
+    justifyContent: 'space-evenly',
     position: 'relative',
   },
   ideationAvatarCenter: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: SPACING[2],
   },
   ideationAvatarCircle: {
     width: 48,
@@ -1379,7 +1399,6 @@ const styles = StyleSheet.create({
   ideationPlayerPillCenter: {
     alignSelf: 'stretch',
     alignItems: 'center',
-    marginBottom: SPACING[2],
   },
   ideationPlayerPillBorder: {
     alignSelf: 'stretch',
@@ -1398,7 +1417,6 @@ const styles = StyleSheet.create({
   ideationTitleBlock: {
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: SPACING[1],
     alignSelf: 'stretch',
   },
   ideationPlaceholder: {

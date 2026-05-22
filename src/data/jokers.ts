@@ -46,10 +46,40 @@ export const JOKER_CATALOG: Record<JokerType, JokerMetadata> = {
 
 export const ALL_JOKER_TYPES: JokerType[] = ['dice_choice', 'reroll', 'shield', 'steal'];
 
-/** Tire un joker aléatoire uniformément parmi tous les types disponibles */
+/** Historique anti-répétition : jokers déjà tirés depuis le dernier reset. */
+const usedJokerTypes = new Set<JokerType>();
+
+/** Réinitialise l'historique des jokers tirés (à appeler au début d'une partie). */
+export function resetJokerPool(): void {
+  usedJokerTypes.clear();
+}
+
+/**
+ * Tire un joker aléatoire en évitant les répétitions : un même joker ne
+ * revient pas tant que les 4 types n'ont pas tous été tirés.
+ */
 export function rollRandomJoker(): JokerType {
-  const index = Math.floor(Math.random() * ALL_JOKER_TYPES.length);
-  return ALL_JOKER_TYPES[index] ?? 'dice_choice';
+  let available = ALL_JOKER_TYPES.filter((t) => !usedJokerTypes.has(t));
+  // Pool épuisé : on recycle
+  if (available.length === 0) {
+    usedJokerTypes.clear();
+    available = [...ALL_JOKER_TYPES];
+  }
+  const index = Math.floor(Math.random() * available.length);
+  const picked = available[index] ?? 'dice_choice';
+  usedJokerTypes.add(picked);
+  return picked;
+}
+
+/**
+ * Marque un type de joker comme déjà tiré sans le tirer.
+ * Utilisé en multijoueur quand un autre client tire un joker (sync de l'historique).
+ */
+export function markJokerUsed(type: JokerType): void {
+  usedJokerTypes.add(type);
+  if (usedJokerTypes.size >= ALL_JOKER_TYPES.length) {
+    usedJokerTypes.clear();
+  }
 }
 
 /** Génère un ID unique pour une instance de joker */

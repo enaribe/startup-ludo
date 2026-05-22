@@ -74,6 +74,11 @@ interface DynamicGradientBorderProps {
   fill?: string;
   borderWidth?: number;
   gradientColors?: { offset: string; color: string; opacity: number }[];
+  /**
+   * Sur Android, `overflow: 'hidden'` peut interférer avec les hit-tests
+   * des TextInput imbriqués. Permet de désactiver le clipping pour ces cas.
+   */
+  clipContent?: boolean;
 }
 
 const DEFAULT_GRADIENT = [
@@ -93,6 +98,7 @@ export const DynamicGradientBorder = memo(function DynamicGradientBorder({
   fill = 'transparent',
   borderWidth: borderW = 1,
   gradientColors = DEFAULT_GRADIENT,
+  clipContent = true,
 }: DynamicGradientBorderProps) {
   const [boxHeight, setBoxHeight] = useState(0);
   const reactId = useId();
@@ -100,7 +106,11 @@ export const DynamicGradientBorder = memo(function DynamicGradientBorder({
 
   return (
     <View
-      style={[{ position: 'relative', borderRadius, overflow: 'hidden' }, style]}
+      style={[
+        { position: 'relative', borderRadius },
+        clipContent && { overflow: 'hidden' as const },
+        style,
+      ]}
       onLayout={(e) => setBoxHeight(e.nativeEvent.layout.height)}
     >
       {boxHeight > 0 && (

@@ -42,7 +42,7 @@
       
       "$userId": {
         ".write": "auth != null && $userId === auth.uid",
-        ".validate": "newData.hasChildren(['online', 'lastSeen'])"
+        ".validate": "newData.hasChildren(['online', 'state', 'lastSeen', 'updatedAt']) && newData.child('online').isBoolean() && newData.child('state').isString() && (newData.child('state').val() === 'online' || newData.child('state').val() === 'in_game' || newData.child('state').val() === 'offline') && newData.child('lastSeen').isNumber() && newData.child('updatedAt').isNumber()"
       }
     },
     

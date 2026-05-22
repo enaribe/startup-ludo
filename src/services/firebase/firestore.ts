@@ -154,7 +154,8 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
       gamesPlayed: statsData?.totalGames ?? 0,
       gamesWon: statsData?.gamesWon ?? 0,
       totalTokensEarned: statsData?.totalTokensEarned ?? 0,
-      achievements: [], // TODO: Fetch from achievements subcollection
+      // Les succès débloqués sont stockés en tableau dans le doc userStats
+      achievements: (statsData?.achievements as string[] | undefined) ?? [],
       startups,
       createdAt: createdAtMs,
     };
@@ -195,6 +196,31 @@ export const updateFirestoreUserProfile = async (
     firebaseLog('User profile updated successfully');
   } catch (error) {
     firebaseLog('Failed to update user profile', error);
+    throw new Error(getFirebaseErrorMessage(error));
+  }
+};
+
+/**
+ * Met à jour la liste des succès débloqués d'un utilisateur.
+ * Stockée comme tableau d'IDs dans le document `userStats`.
+ * Idempotent : on écrit toujours la liste complète dédupliquée.
+ */
+export const updateUserAchievements = async (
+  userId: string,
+  achievementIds: string[]
+): Promise<void> => {
+  try {
+    const unique = Array.from(new Set(achievementIds));
+    firebaseLog('Updating user achievements', { userId, count: unique.length });
+    const statsRef = doc(getFirestore(), FIRESTORE_COLLECTIONS.userStats, userId);
+    await setDoc(
+      statsRef,
+      { achievements: unique, updatedAt: serverTimestamp() },
+      { merge: true }
+    );
+    firebaseLog('User achievements updated successfully');
+  } catch (error) {
+    firebaseLog('Failed to update user achievements', error);
     throw new Error(getFirebaseErrorMessage(error));
   }
 };

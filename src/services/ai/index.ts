@@ -1,2 +1,2 @@
-export { generateStartupIdeas } from './openai';
-export type { GeneratedIdea } from './openai';
+export { generateStartupIdeas, generateValuation } from './openai';
+export type { GeneratedIdea, GeneratedValuation, ValuationFactor } from './openai';

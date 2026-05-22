@@ -15,11 +15,16 @@
  */
 
 import database, { FirebaseDatabaseTypes } from '@react-native-firebase/database';
+import { JoinRoomError, isNetworkError } from '@/services/multiplayer/JoinRoomError';
 import {
   firebaseLog,
   getFirebaseErrorMessage,
   REALTIME_PATHS,
 } from '@/services/firebase/config';
+import {
+  setUserInGame,
+  setUserOnline,
+} from '@/services/firebase/presenceService';
 import type { PlayerColor, PawnState } from '@/types';
 import type {
   RealtimeRoom,
@@ -183,7 +188,7 @@ export class MultiplayerSync {
       const snapshot = await roomsRef.once('value');
 
       if (!snapshot.exists()) {
-        throw new Error('Aucun salon trouvé avec ce code');
+        throw new JoinRoomError('ROOM_NOT_FOUND', 'Aucun salon trouvé avec ce code');
       }
 
       let matchedRoom: RealtimeRoom | null = null;
@@ -200,15 +205,21 @@ export class MultiplayerSync {
       });
 
       if (!matchedRoom || !matchedRoomId) {
-        throw new Error('Aucun salon trouvé avec ce code');
+        throw new JoinRoomError('ROOM_NOT_FOUND', 'Aucun salon trouvé avec ce code');
       }
 
       // Re-assign to local const to satisfy TS narrowing
       const foundRoom: RealtimeRoom = matchedRoom;
       const foundRoomId: string = matchedRoomId;
 
+      if (foundRoom.status === 'playing') {
+        throw new JoinRoomError('ROOM_STARTED', 'Cette partie a déjà commencé');
+      }
+      if (foundRoom.status === 'finished') {
+        throw new JoinRoomError('ROOM_FINISHED', 'Cette partie est terminée');
+      }
       if (foundRoom.status !== 'waiting') {
-        throw new Error('Ce salon n\'est plus disponible');
+        throw new JoinRoomError('ROOM_STARTED', 'Ce salon n\'est plus disponible');
       }
 
       // Get existing players to determine available color
@@ -228,7 +239,7 @@ export class MultiplayerSync {
         // Check max players
         const maxPlayers = foundRoom.maxPlayers ?? foundRoom.gameSettings?.maxPlayers ?? 4;
         if (playerCount >= maxPlayers) {
-          throw new Error('Ce salon est plein');
+          throw new JoinRoomError('ROOM_FULL', 'Ce salon est plein');
         }
       }
 
@@ -269,7 +280,16 @@ export class MultiplayerSync {
       return { roomId: foundRoomId, color: availableColor };
     } catch (error) {
       firebaseLog('Failed to join room', error);
-      throw new Error(error instanceof Error ? error.message : getFirebaseErrorMessage(error));
+      if (error instanceof JoinRoomError) {
+        throw error;
+      }
+      if (isNetworkError(error)) {
+        throw new JoinRoomError('NETWORK_ERROR', 'Erreur réseau');
+      }
+      throw new JoinRoomError(
+        'UNKNOWN',
+        error instanceof Error ? error.message : getFirebaseErrorMessage(error)
+      );
     }
   }
 
@@ -283,12 +303,18 @@ export class MultiplayerSync {
 
       const roomSnap = await database().ref(REALTIME_PATHS.room(roomId)).once('value');
       if (!roomSnap.exists()) {
-        throw new Error('Salon introuvable');
+        throw new JoinRoomError('ROOM_NOT_FOUND', 'Salon introuvable');
       }
 
       const room = roomSnap.val() as RealtimeRoom;
+      if (room.status === 'playing') {
+        throw new JoinRoomError('ROOM_STARTED', 'Cette partie a déjà commencé');
+      }
+      if (room.status === 'finished') {
+        throw new JoinRoomError('ROOM_FINISHED', 'Cette partie est terminée');
+      }
       if (room.status !== 'waiting') {
-        throw new Error('Ce salon n\'est plus disponible');
+        throw new JoinRoomError('ROOM_STARTED', 'Ce salon n\'est plus disponible');
       }
 
       const playersRef = database().ref(REALTIME_PATHS.roomPlayers(roomId));
@@ -321,7 +347,7 @@ export class MultiplayerSync {
 
       const maxPlayers = room.maxPlayers ?? room.gameSettings?.maxPlayers ?? 4;
       if (playerCount >= maxPlayers) {
-        throw new Error('Ce salon est plein');
+        throw new JoinRoomError('ROOM_FULL', 'Ce salon est plein');
       }
 
       const availableColor = PLAYER_COLORS.find((c) => !usedColors.has(c)) ?? 'yellow';
@@ -357,7 +383,16 @@ export class MultiplayerSync {
       return { roomId, color: availableColor };
     } catch (error) {
       firebaseLog('Failed to join room by id', error);
-      throw new Error(error instanceof Error ? error.message : getFirebaseErrorMessage(error));
+      if (error instanceof JoinRoomError) {
+        throw error;
+      }
+      if (isNetworkError(error)) {
+        throw new JoinRoomError('NETWORK_ERROR', 'Erreur réseau');
+      }
+      throw new JoinRoomError(
+        'UNKNOWN',
+        error instanceof Error ? error.message : getFirebaseErrorMessage(error)
+      );
     }
   }
 
@@ -370,25 +405,40 @@ export class MultiplayerSync {
     try {
       firebaseLog('Leaving room', { roomId: this.roomId, playerId: this.playerId });
 
-      // Remove player from Firebase
-      await database().ref(REALTIME_PATHS.roomPlayer(this.roomId, this.playerId)).remove();
+      // Lire la room pour savoir si on est l'hôte et si la partie a démarré
+      const roomSnap = await database().ref(REALTIME_PATHS.room(this.roomId)).once('value');
+      const room = roomSnap.val() as RealtimeRoom | null;
+      const isHost = !!room && room.hostId === this.playerId;
+      const gameNotStarted = !room || room.status === 'waiting';
 
-      // Check if room is now empty
-      const playersRef = database().ref(REALTIME_PATHS.roomPlayers(this.roomId));
-      const playersSnap = await playersRef.once('value');
-
-      if (!playersSnap.exists() || playersSnap.numChildren() === 0) {
-        // Delete empty room
+      if (isHost && gameNotStarted) {
+        // L'hôte quitte la salle d'attente : on dissout tout le salon.
+        // La suppression de la room notifie les autres clients via subscribeToRoom.
         await database().ref(REALTIME_PATHS.room(this.roomId)).remove();
-        firebaseLog('Room deleted (empty)');
+        firebaseLog('Room deleted (host left waiting room)');
+      } else {
+        // Joueur non-hôte (ou partie déjà en cours) : on retire juste ce joueur.
+        await database().ref(REALTIME_PATHS.roomPlayer(this.roomId, this.playerId)).remove();
+
+        // Si la room est maintenant vide, on la supprime.
+        const playersRef = database().ref(REALTIME_PATHS.roomPlayers(this.roomId));
+        const playersSnap = await playersRef.once('value');
+        if (!playersSnap.exists() || playersSnap.numChildren() === 0) {
+          await database().ref(REALTIME_PATHS.room(this.roomId)).remove();
+          firebaseLog('Room deleted (empty)');
+        }
       }
 
       // Cleanup
+      const leavingPlayerId = this.playerId;
       this.cleanup();
+      if (leavingPlayerId) {
+        setUserOnline(leavingPlayerId).catch(() => {});
+      }
 
       this.emit({
         type: 'player_left',
-        data: { playerId: this.playerId },
+        data: { playerId: leavingPlayerId },
         timestamp: Date.now(),
       });
 
@@ -899,6 +949,11 @@ export class MultiplayerSync {
         status,
         updatedAt: Date.now(),
       });
+      if (status === 'finished' && this.playerId) {
+        setUserOnline(this.playerId).catch(() => {});
+      } else if (status === 'playing' && this.playerId) {
+        setUserInGame(this.playerId, this.roomId).catch(() => {});
+      }
     } catch (error) {
       firebaseLog('Failed to update room status', error);
     }
@@ -945,26 +1000,7 @@ export class MultiplayerSync {
         });
       }
 
-      // Also set user-level presence
-      const presenceRef = database().ref(REALTIME_PATHS.userPresence(this.playerId));
-      presenceRef.set({
-        online: true,
-        lastSeen: Date.now(),
-        currentRoom: this.roomId,
-      });
-
-      presenceRef.onDisconnect().set({
-        online: false,
-        lastSeen: Date.now(),
-        currentRoom: null,
-      });
-      if (__DEV__) {
-        console.log('[Presence] onDisconnect enregistré (user presence):', {
-          playerId: this.playerId,
-          path: REALTIME_PATHS.userPresence(this.playerId),
-          timestamp: Date.now(),
-        });
-      }
+      setUserInGame(this.playerId, this.roomId).catch(() => {});
 
       firebaseLog('Presence setup complete');
     } catch (error) {
@@ -1296,6 +1332,26 @@ export class MultiplayerSync {
       }
     });
     this.listeners.clear();
+  }
+
+  /**
+   * Appelé quand la room disparaît côté serveur (ex. hôte parti avant démarrage).
+   * Nettoie uniquement l'état local, sans tenter d'écrire dans une room supprimée.
+   */
+  handleRemoteRoomClosed(): void {
+    const playerId = this.playerId;
+    this.cleanup();
+    if (playerId) {
+      setUserOnline(playerId).catch(() => {});
+    }
+    this.roomId = null;
+    this.playerId = null;
+    this.isConnected = false;
+    this.emit({
+      type: 'connection_changed',
+      data: false,
+      timestamp: Date.now(),
+    });
   }
 
   // ===== GETTERS =====

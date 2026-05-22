@@ -165,6 +165,47 @@ export class EventManager {
   }
 
   /**
+   * Marque un événement comme déjà utilisé sans le tirer.
+   * Indispensable en multijoueur : quand un joueur reçoit un événement
+   * généré par un autre client, il l'enregistre dans son propre historique
+   * pour ne pas le re-tirer plus tard. Garde les 4 EventManagers synchronisés.
+   */
+  markUsed(eventType: EventType, id: string): void {
+    if (!id) return;
+    switch (eventType) {
+      case 'quiz':
+        this.usedQuizIds.add(id);
+        break;
+      case 'duel':
+        this.usedDuelIds.add(id);
+        break;
+      case 'funding':
+        this.usedFundingIds.add(id);
+        break;
+      case 'opportunity':
+        this.usedOpportunityIds.add(id);
+        break;
+      case 'challenge':
+        this.usedChallengeIds.add(id);
+        break;
+      case 'event':
+        // L'événement aléatoire est en réalité une opportunité ou un challenge.
+        // L'ID préfixé indique lequel ; sinon on marque dans les deux par sécurité.
+        if (id.startsWith('opp')) {
+          this.usedOpportunityIds.add(id);
+        } else if (id.startsWith('chal')) {
+          this.usedChallengeIds.add(id);
+        } else {
+          this.usedOpportunityIds.add(id);
+          this.usedChallengeIds.add(id);
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+  /**
    * Génère un événement basé sur le type de case
    */
   generateEvent(eventType: EventType): GeneratedGameEvent | null {
@@ -230,7 +271,9 @@ export class EventManager {
     const quiz = this.pickRandomUnused(filtered, this.usedQuizIds);
 
     if (!quiz) {
-      return this.getFallbackQuiz();
+      const fallback = this.getFallbackQuiz();
+      this.usedQuizIds.add(fallback.data.id);
+      return fallback;
     }
 
     // Marquer comme utilisé
@@ -267,7 +310,9 @@ export class EventManager {
     const funding = this.pickRandomUnused(pool, this.usedFundingIds);
 
     if (!funding) {
-      return this.getFallbackFunding();
+      const fallback = this.getFallbackFunding();
+      this.usedFundingIds.add(fallback.data.id);
+      return fallback;
     }
 
     this.usedFundingIds.add(funding.id);
@@ -296,7 +341,9 @@ export class EventManager {
     const duel = this.pickRandomUnused(pool, this.usedDuelIds);
 
     if (!duel) {
-      return this.getFallbackDuel();
+      const fallback = this.getFallbackDuel();
+      this.usedDuelIds.add(fallback.data.id);
+      return fallback;
     }
 
     this.usedDuelIds.add(duel.id);
@@ -323,7 +370,9 @@ export class EventManager {
     const opportunity = this.pickRandomUnused(pool, this.usedOpportunityIds);
 
     if (!opportunity) {
-      return this.getFallbackOpportunity();
+      const fallback = this.getFallbackOpportunity();
+      this.usedOpportunityIds.add(fallback.data.id);
+      return fallback;
     }
 
     this.usedOpportunityIds.add(opportunity.id);
@@ -352,7 +401,9 @@ export class EventManager {
     const challenge = this.pickRandomUnused(pool, this.usedChallengeIds);
 
     if (!challenge) {
-      return this.getFallbackChallenge();
+      const fallback = this.getFallbackChallenge();
+      this.usedChallengeIds.add(fallback.data.id);
+      return fallback;
     }
 
     this.usedChallengeIds.add(challenge.id);

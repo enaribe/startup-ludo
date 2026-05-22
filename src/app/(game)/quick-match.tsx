@@ -13,6 +13,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Dimensions,
   Pressable,
   StyleSheet,
@@ -33,6 +34,7 @@ import { DynamicGradientBorder, GameButton, RadialBackground } from '@/component
 import { StartupSelectionModal } from '@/components/game/StartupSelectionModal';
 import { getDefaultProjectsForEdition, getMatchingUserStartups, getSectorEdition } from '@/data/defaultProjects';
 import { useQuickMatch } from '@/hooks/useQuickMatch';
+import { JoinRoomError, getJoinRoomErrorDisplay } from '@/services/multiplayer/JoinRoomError';
 import { useAuthStore, useUserStore } from '@/stores';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
@@ -178,6 +180,11 @@ export default function QuickMatchScreen() {
         });
       } catch (e) {
         console.error('[QuickMatch] Failed to join room by id', e);
+        const code = e instanceof JoinRoomError ? e.code : 'UNKNOWN';
+        const { title, message } = getJoinRoomErrorDisplay(code);
+        Alert.alert(title, message, [
+          { text: 'OK', onPress: () => router.back() },
+        ]);
       }
     };
 

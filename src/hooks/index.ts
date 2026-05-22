@@ -12,6 +12,7 @@ export {
   type HapticType,
 } from './useHaptics';
 export { useMultiplayer } from './useMultiplayer';
+export { usePresenceMap } from './usePresence';
 export { useQuickMatch, type QuickMatchState } from './useQuickMatch';
 export { useResponsiveLayout } from './useResponsiveLayout';
 export { useChallengeEnroll } from './useChallengeEnroll';

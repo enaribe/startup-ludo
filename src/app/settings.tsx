@@ -1,12 +1,13 @@
 /**
  * SettingsScreen - Écran des paramètres
  *
- * Design basé sur le système de design avec RadialBackground,
- * GradientBorder, GameButton et les styles cohérents.
+ * Design aligné sur les autres écrans de l'app (profil, statistiques, réseau) :
+ * header fixe #0A1929 arrondi, cartes DynamicGradientBorder fond rgba(0,0,0,0.35).
  */
 
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import { memo, useCallback, useState } from 'react';
 import {
@@ -17,7 +18,6 @@ import {
   View,
   StyleSheet,
   Dimensions,
-  Image,
   Modal,
   Alert,
 } from 'react-native';
@@ -27,17 +27,19 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RadialBackground } from '@/components/ui/RadialBackground';
 import { DynamicGradientBorder } from '@/components/ui/GradientBorder';
 import { GameButton } from '@/components/ui/GameButton';
-import { useAuthStore, useSettingsStore } from '@/stores';
+import { Avatar } from '@/components/ui/Avatar';
+import { useAuthStore, useSettingsStore, useUserStore, useTutorialStore } from '@/stores';
+import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-// Import des assets
-const shapeImage = require('@/../assets/images/shape.png');
+/** Largeur de contenu — alignée sur profil.tsx / network.tsx. */
+const CONTENT_WIDTH = SCREEN_WIDTH - SPACING[4] * 2;
 
-// Padding horizontal des écrans (design system)
-const SCREEN_PADDING_H = 18;
+/** Version affichée — lue depuis app.json. */
+const APP_VERSION = Constants.expoConfig?.version ?? '2.0.8';
 
 interface SettingRowProps {
   icon: keyof typeof Ionicons.glyphMap;
@@ -53,7 +55,7 @@ interface SettingRowProps {
 
 const SettingRow = memo(function SettingRow({
   icon,
-  iconColor = '#FFBC40',
+  iconColor = COLORS.primary,
   title,
   subtitle,
   value,
@@ -66,27 +68,21 @@ const SettingRow = memo(function SettingRow({
 
   const handlePress = useCallback(() => {
     if (onPress) {
-      if (hapticsEnabled) {
-        Haptics.selectionAsync();
-      }
+      if (hapticsEnabled) Haptics.selectionAsync();
       onPress();
     }
   }, [onPress, hapticsEnabled]);
 
   const handleToggle = useCallback((newValue: boolean) => {
     if (onToggle) {
-      if (hapticsEnabled) {
-        Haptics.selectionAsync();
-      }
+      if (hapticsEnabled) Haptics.selectionAsync();
       onToggle(newValue);
     }
   }, [onToggle, hapticsEnabled]);
 
   const content = (
     <View style={[styles.settingRow, !isLast && styles.settingRowBorder]}>
-      <View style={[styles.iconContainer, { backgroundColor: `${iconColor}20` }]}>
-        <Ionicons name={icon} size={20} color={iconColor} />
-      </View>
+      <Ionicons name={icon} size={22} color={iconColor} style={styles.settingIcon} />
       <View style={styles.settingTextContainer}>
         <Text style={styles.settingTitle}>{title}</Text>
         {subtitle && <Text style={styles.settingSubtitle}>{subtitle}</Text>}
@@ -95,7 +91,7 @@ const SettingRow = memo(function SettingRow({
         <Switch
           value={value}
           onValueChange={handleToggle}
-          trackColor={{ false: 'rgba(255, 255, 255, 0.2)', true: '#FFBC40' }}
+          trackColor={{ false: 'rgba(255, 255, 255, 0.2)', true: COLORS.primary }}
           thumbColor="#FFFFFF"
           ios_backgroundColor="rgba(255, 255, 255, 0.2)"
         />
@@ -135,15 +131,14 @@ const SettingSection = memo(function SettingSection({
 }: SettingSectionProps) {
   return (
     <Animated.View
-      entering={FadeInDown.delay(delay).duration(500)}
+      entering={FadeInDown.delay(delay).duration(450)}
       style={styles.section}
     >
       <Text style={styles.sectionTitle}>{title}</Text>
       <DynamicGradientBorder
-        boxWidth={SCREEN_WIDTH - SCREEN_PADDING_H * 2}
+        boxWidth={CONTENT_WIDTH}
         borderRadius={16}
-        fill="rgba(0, 0, 0, 0.3)"
-        style={styles.sectionCard}
+        fill="rgba(0, 0, 0, 0.35)"
       >
         <View style={styles.sectionContent}>
           {children}
@@ -171,13 +166,36 @@ export default function SettingsScreen() {
   const logout = useAuthStore((state) => state.logout);
   const deleteAccount = useAuthStore((state) => state.deleteAccount);
   const user = useAuthStore((state) => state.user);
+  const profile = useUserStore((state) => state.profile);
+  const isGuest = user?.isGuest ?? true;
+
+  const displayName = isGuest ? 'Invité' : user?.displayName || profile?.displayName || 'Utilisateur';
+  const avatarUrl = profile?.avatarUrl || user?.photoURL || null;
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const resetTutorial = useTutorialStore((s) => s.reset);
+
   const handleBack = useCallback(() => {
-    router.back();
+    if (router.canGoBack()) router.back();
   }, [router]);
+
+  const handleReplayTutorial = useCallback(() => {
+    // Réarme le tutoriel puis propose de lancer une partie pour le tester tout de suite
+    resetTutorial();
+    Alert.alert(
+      'Revoir le tutoriel',
+      'Le guide se relancera au début de ta prochaine partie. Lancer une partie maintenant ?',
+      [
+        { text: 'Plus tard', style: 'cancel' },
+        {
+          text: 'Lancer une partie',
+          onPress: () => router.push('/(game)/mode-selection'),
+        },
+      ]
+    );
+  }, [resetTutorial, router]);
 
   const handleLogout = useCallback(async () => {
     await logout();
@@ -203,74 +221,63 @@ export default function SettingsScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Fond radial */}
       <RadialBackground centerColor="#0F3A6B" edgeColor="#081A2A" />
 
-      {/* Shape (rayons) en arrière-plan */}
-      <View style={styles.shapeContainer}>
-        <Image
-          source={shapeImage}
-          style={styles.shapeImage}
-          resizeMode="contain"
-        />
+      {/* Header fixe — aligné sur profil.tsx / network.tsx */}
+      <View style={[styles.header, { paddingTop: insets.top + SPACING[2] }]}>
+        <View style={styles.headerRow}>
+          <Pressable onPress={handleBack} style={styles.backBtn} hitSlop={8}>
+            <Ionicons name="chevron-back" size={22} color={COLORS.primary} />
+          </Pressable>
+          <Text style={styles.headerTitle}>PARAMÈTRES</Text>
+          <View style={styles.backBtnPlaceholder} />
+        </View>
       </View>
 
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
           {
-            paddingTop: insets.top + SPACING[4],
-            paddingBottom: insets.bottom + SPACING[6],
+            paddingTop: insets.top + 80,
+            paddingBottom: insets.bottom + SPACING[8],
           },
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <Animated.View
-          entering={FadeInDown.delay(100).duration(500)}
-          style={styles.header}
-        >
-          <Pressable onPress={handleBack} style={styles.backButton}>
-            <View style={styles.backIconContainer}>
-              <Ionicons name="arrow-back" size={20} color="#FFBC40" />
-            </View>
-            <Text style={styles.backText}>Retour</Text>
-          </Pressable>
-
-          <Text style={styles.title}>PARAMÈTRES</Text>
-        </Animated.View>
-
-        {/* Account Section */}
-        <SettingSection title="COMPTE" delay={200}>
+        {/* Section Compte */}
+        <SettingSection title="COMPTE" delay={100}>
           <View style={styles.accountRow}>
-            <View style={styles.avatarContainer}>
-              {user?.photoURL ? (
-                <Image
-                  source={{ uri: user.photoURL }}
-                  style={styles.avatar}
-                />
-              ) : (
+            {avatarUrl ? (
+              <Avatar source={avatarUrl} name={displayName} size="lg" showBorder />
+            ) : (
+              <View style={styles.avatarFallback}>
                 <Text style={styles.avatarText}>
-                  {user?.displayName?.charAt(0).toUpperCase() || 'U'}
+                  {isGuest ? 'I' : displayName.charAt(0).toUpperCase()}
                 </Text>
-              )}
-            </View>
+              </View>
+            )}
             <View style={styles.accountInfo}>
-              <Text style={styles.accountName}>
-                {user?.displayName || 'Utilisateur'}
-              </Text>
-              <Text style={styles.accountEmail}>
-                {user?.isGuest ? 'Compte invité' : user?.email || ''}
+              <View style={styles.accountNameRow}>
+                <Text style={styles.accountName} numberOfLines={1}>
+                  {displayName}
+                </Text>
+                {isGuest && (
+                  <View style={styles.guestBadge}>
+                    <Text style={styles.guestBadgeText}>INVITÉ</Text>
+                  </View>
+                )}
+              </View>
+              <Text style={styles.accountEmail} numberOfLines={2}>
+                {isGuest
+                  ? 'Crée un compte pour sauvegarder ta progression'
+                  : user?.email || ''}
               </Text>
             </View>
-            <Pressable style={styles.editButton}>
-              <Ionicons name="pencil" size={16} color="#FFBC40" />
-            </Pressable>
           </View>
         </SettingSection>
 
-        {/* Audio & Feedback Section */}
-        <SettingSection title="AUDIO & RETOURS" delay={300}>
+        {/* Section Audio & retours */}
+        <SettingSection title="AUDIO & RETOURS" delay={180}>
           <SettingRow
             icon="volume-high"
             iconColor="#3498DB"
@@ -281,7 +288,7 @@ export default function SettingsScreen() {
           />
           <SettingRow
             icon="musical-notes"
-            iconColor="#FFBC40"
+            iconColor={COLORS.primary}
             title="Musique"
             subtitle="Musique de fond"
             value={musicEnabled}
@@ -306,8 +313,8 @@ export default function SettingsScreen() {
           />
         </SettingSection>
 
-        {/* About Section */}
-        <SettingSection title="À PROPOS" delay={400}>
+        {/* Section À propos */}
+        <SettingSection title="À PROPOS" delay={260}>
           <SettingRow
             icon="help-circle"
             iconColor="#1ABC9C"
@@ -317,9 +324,17 @@ export default function SettingsScreen() {
             showArrow
           />
           <SettingRow
-            icon="time"
+            icon="school"
+            iconColor="#3498DB"
+            title="Revoir le tutoriel"
+            subtitle="Relance le guide à ta prochaine partie"
+            onPress={handleReplayTutorial}
+            showArrow
+          />
+          <SettingRow
+            icon="stats-chart"
             iconColor="#F39C12"
-            title="Historique"
+            title="Statistiques"
             subtitle="Voir tes parties passées"
             onPress={() => router.push('/history')}
             showArrow
@@ -341,46 +356,63 @@ export default function SettingsScreen() {
           />
         </SettingSection>
 
-        {/* Version */}
+        {/* Zone de danger — masquée pour les invités */}
+        {!isGuest && (
+          <SettingSection title="ZONE DE DANGER" delay={340}>
+            <SettingRow
+              icon="trash"
+              iconColor="#E74C3C"
+              title="Supprimer mon compte"
+              subtitle="Cette action est irréversible"
+              onPress={() => setShowDeleteModal(true)}
+              showArrow
+              isLast
+            />
+          </SettingSection>
+        )}
+
+        {/* Action d'authentification */}
         <Animated.View
-          entering={FadeInDown.delay(500).duration(500)}
-          style={styles.versionContainer}
-        >
-          <Text style={styles.versionText}>Startup Ludo v1.0.0</Text>
-          <Text style={styles.copyrightText}>by concree</Text>
-        </Animated.View>
-
-        {/* Danger Zone Section */}
-        <SettingSection title="ZONE DE DANGER" delay={500}>
-          <SettingRow
-            icon="trash"
-            iconColor="#E74C3C"
-            title="Supprimer mon compte"
-            subtitle="Cette action est irréversible"
-            onPress={() => setShowDeleteModal(true)}
-            showArrow
-            isLast
-          />
-        </SettingSection>
-
-        {/* Spacer */}
-        <View style={styles.spacer} />
-
-        {/* Logout Button */}
-        <Animated.View
-          entering={FadeInDown.delay(600).duration(500)}
+          entering={FadeInDown.delay(420).duration(450)}
           style={styles.logoutContainer}
         >
-          <GameButton
-            title="SE DÉCONNECTER"
-            variant="red"
-            fullWidth
-            onPress={handleLogout}
-          />
+          {isGuest ? (
+            <>
+              <GameButton
+                title="CRÉER UN COMPTE"
+                variant="yellow"
+                fullWidth
+                onPress={() => router.push('/(auth)/register')}
+              />
+              <GameButton
+                title="SE CONNECTER"
+                variant="blue"
+                fullWidth
+                onPress={() => router.push('/(auth)/login')}
+                style={styles.secondaryAuthButton}
+              />
+            </>
+          ) : (
+            <GameButton
+              title="SE DÉCONNECTER"
+              variant="red"
+              fullWidth
+              onPress={handleLogout}
+            />
+          )}
+        </Animated.View>
+
+        {/* Version */}
+        <Animated.View
+          entering={FadeIn.delay(500).duration(450)}
+          style={styles.versionContainer}
+        >
+          <Text style={styles.versionText}>Startup Ludo v{APP_VERSION}</Text>
+          <Text style={styles.copyrightText}>by concree</Text>
         </Animated.View>
       </ScrollView>
 
-      {/* Delete Account Confirmation Modal */}
+      {/* Modale de confirmation de suppression */}
       <Modal
         visible={showDeleteModal}
         transparent
@@ -402,22 +434,17 @@ export default function SettingsScreen() {
             </Text>
 
             <View style={styles.modalList}>
-              <View style={styles.modalListItem}>
-                <Ionicons name="close-circle" size={16} color="#E74C3C" />
-                <Text style={styles.modalListText}>Toutes vos parties et statistiques</Text>
-              </View>
-              <View style={styles.modalListItem}>
-                <Ionicons name="close-circle" size={16} color="#E74C3C" />
-                <Text style={styles.modalListText}>Votre progression dans les challenges</Text>
-              </View>
-              <View style={styles.modalListItem}>
-                <Ionicons name="close-circle" size={16} color="#E74C3C" />
-                <Text style={styles.modalListText}>Votre portfolio d'entreprises</Text>
-              </View>
-              <View style={styles.modalListItem}>
-                <Ionicons name="close-circle" size={16} color="#E74C3C" />
-                <Text style={styles.modalListText}>Tous vos succès et récompenses</Text>
-              </View>
+              {[
+                'Toutes vos parties et statistiques',
+                'Votre progression dans les challenges',
+                "Votre portfolio d'entreprises",
+                'Tous vos succès et récompenses',
+              ].map((item) => (
+                <View key={item} style={styles.modalListItem}>
+                  <Ionicons name="close-circle" size={16} color="#E74C3C" />
+                  <Text style={styles.modalListText}>{item}</Text>
+                </View>
+              ))}
             </View>
 
             <View style={styles.modalButtons}>
@@ -449,52 +476,48 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#0C243E',
   },
-  shapeContainer: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
-    top: -Dimensions.get('window').height * 0.4,
-  },
-  shapeImage: {
-    width: SCREEN_WIDTH * 1.2,
-    height: SCREEN_WIDTH * 1.2,
-    opacity: 0.1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: SCREEN_PADDING_H,
-  },
+
+  // Header — aligné sur profil.tsx / network.tsx
   header: {
-    marginBottom: SPACING[6],
+    position: 'absolute',
+    top: 0, left: 0, right: 0,
+    zIndex: 10,
+    paddingBottom: SPACING[3],
+    paddingHorizontal: SPACING[4],
+    backgroundColor: '#0A1929',
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    borderBottomWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
-  backButton: {
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: SPACING[4],
+    justifyContent: 'space-between',
   },
-  backIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 188, 64, 0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: SPACING[2],
+  backBtn: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.25)',
+    justifyContent: 'center', alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
-  backText: {
-    fontFamily: FONTS.body,
-    fontSize: FONT_SIZES.md,
-    color: 'rgba(255, 255, 255, 0.7)',
-  },
-  title: {
+  backBtnPlaceholder: { width: 40, height: 40 },
+  headerTitle: {
     fontFamily: FONTS.title,
-    fontSize: FONT_SIZES['2xl'],
-    color: '#FFFFFF',
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
+    fontSize: FONT_SIZES.lg,
+    color: COLORS.white,
+    letterSpacing: 0.5,
   },
+
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: SPACING[4],
+  },
+
+  // Sections
   section: {
     marginBottom: SPACING[5],
   },
@@ -506,13 +529,12 @@ const styles = StyleSheet.create({
     marginBottom: SPACING[2],
     marginLeft: SPACING[1],
   },
-  sectionCard: {
-    width: '100%',
-    alignSelf: 'stretch',
-  },
   sectionContent: {
     padding: SPACING[4],
+    width: '100%',
   },
+
+  // Lignes de réglage
   settingRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -525,13 +547,10 @@ const styles = StyleSheet.create({
   settingRowPressed: {
     opacity: 0.7,
   },
-  iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
+  settingIcon: {
+    width: 24,
     marginRight: SPACING[3],
+    textAlign: 'center',
   },
   settingTextContainer: {
     flex: 1,
@@ -550,23 +569,21 @@ const styles = StyleSheet.create({
   arrowContainer: {
     marginLeft: SPACING[2],
   },
+
+  // Bloc compte
   accountRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    width: '100%',
+    gap: SPACING[3],
   },
-  avatarContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#FFBC40',
+  avatarFallback: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: SPACING[3],
-  },
-  avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
   },
   avatarText: {
     fontFamily: FONTS.title,
@@ -576,10 +593,30 @@ const styles = StyleSheet.create({
   accountInfo: {
     flex: 1,
   },
+  accountNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   accountName: {
     fontFamily: FONTS.bodySemiBold,
     fontSize: FONT_SIZES.lg,
     color: '#FFFFFF',
+    flexShrink: 1,
+  },
+  guestBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 188, 64, 0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 188, 64, 0.45)',
+  },
+  guestBadgeText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 10,
+    color: COLORS.primary,
+    letterSpacing: 0.5,
   },
   accountEmail: {
     fontFamily: FONTS.body,
@@ -587,17 +624,17 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.5)',
     marginTop: 2,
   },
-  editButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 188, 64, 0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
+
+  // Bas de page
+  logoutContainer: {
+    marginTop: SPACING[2],
+  },
+  secondaryAuthButton: {
+    marginTop: SPACING[3],
   },
   versionContainer: {
     alignItems: 'center',
-    marginTop: SPACING[4],
+    marginTop: SPACING[6],
   },
   versionText: {
     fontFamily: FONTS.body,
@@ -610,14 +647,8 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.3)',
     marginTop: SPACING[1],
   },
-  spacer: {
-    flex: 1,
-    minHeight: SPACING[6],
-  },
-  logoutContainer: {
-    marginTop: SPACING[4],
-  },
-  // Modal
+
+  // Modale
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.85)',

@@ -4,9 +4,12 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
+  withRepeat,
+  withSequence,
   SlideInUp,
   FadeIn,
 } from 'react-native-reanimated';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Modal } from '@/components/ui/Modal';
 import { DuelHeader } from '@/components/game/popups/DuelHeader';
@@ -15,13 +18,29 @@ import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { SPACING, BORDER_RADIUS, SHADOWS } from '@/styles/spacing';
 import { useSettingsStore } from '@/stores';
 import { usePlaySoundOnOpen } from '@/hooks/useSound';
-import type { DuelQuestion } from '@/types';
+import type { AIDuelAnswer, DuelQuestion } from '@/types';
+
+interface AIOpponentConfig {
+  /** Nom affiché de l'IA (ex: "Bot Vert") */
+  name: string;
+  /** Réponses pré-calculées de l'IA, une par question (points + délai). */
+  answers: AIDuelAnswer[];
+  /** Appelée à la fin avec humain + IA scores en parallèle. */
+  onComplete: (humanAnswers: number[], humanScore: number, aiScore: number) => void;
+}
 
 interface DuelQuestionPopupProps {
   visible: boolean;
   questions: DuelQuestion[];
+  /** Mode classique humain — appelé à la fin avec les réponses du humain. */
   onComplete: (answers: number[], totalScore: number) => void;
   onClose: () => void;
+  /** Appelé après chaque question répondue avec le score cumulé partiel
+   *  (utilisé en ligne pour diffuser la progression aux spectateurs). */
+  onProgress?: (score: number, answeredCount: number) => void;
+  /** Si fourni, active le mode "humain vs IA en direct". onComplete n'est pas appelé,
+   *  c'est aiOpponent.onComplete qui reçoit les 2 scores. */
+  aiOpponent?: AIOpponentConfig;
 }
 
 function shuffleArray<T>(array: T[]): T[] {
@@ -38,16 +57,29 @@ export const DuelQuestionPopup = memo(function DuelQuestionPopup({
   questions,
   onComplete,
   onClose,
+  onProgress,
+  aiOpponent,
 }: DuelQuestionPopupProps) {
   const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
   usePlaySoundOnOpen(visible && questions.length > 0, 'popup-open');
+
+  const isAIMode = !!aiOpponent;
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<number[]>([]);
   const [totalScore, setTotalScore] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
 
+  // État IA : "thinking" → "answered" → reset au passage de question
+  const [aiAnswered, setAiAnswered] = useState(false);
+  const [aiScoreCumul, setAiScoreCumul] = useState(0);
+  const aiTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const progressAnim = useSharedValue(0);
+  // Animation 3-points "réflexion" IA
+  const dot1 = useSharedValue(0.3);
+  const dot2 = useSharedValue(0.3);
+  const dot3 = useSharedValue(0.3);
 
   // Reset quand le popup s'ouvre
   useEffect(() => {
@@ -56,8 +88,14 @@ export const DuelQuestionPopup = memo(function DuelQuestionPopup({
       setAnswers([]);
       setTotalScore(0);
       setSelectedAnswer(null);
+      setAiAnswered(false);
+      setAiScoreCumul(0);
       isTransitioningRef.current = false;
       progressAnim.value = 0;
+      if (aiTimerRef.current) {
+        clearTimeout(aiTimerRef.current);
+        aiTimerRef.current = null;
+      }
     }
   }, [visible, progressAnim]);
 
@@ -70,6 +108,32 @@ export const DuelQuestionPopup = memo(function DuelQuestionPopup({
     width: `${progressAnim.value}%`,
   }));
 
+  // Animation des 3 points pendant la réflexion IA
+  useEffect(() => {
+    if (!isAIMode || aiAnswered) {
+      dot1.value = withTiming(0.3, { duration: 150 });
+      dot2.value = withTiming(0.3, { duration: 150 });
+      dot3.value = withTiming(0.3, { duration: 150 });
+      return;
+    }
+    const pulse = () =>
+      withRepeat(
+        withSequence(
+          withTiming(1, { duration: 400 }),
+          withTiming(0.3, { duration: 400 }),
+        ),
+        -1,
+        false,
+      );
+    dot1.value = pulse();
+    setTimeout(() => { dot2.value = pulse(); }, 130);
+    setTimeout(() => { dot3.value = pulse(); }, 260);
+  }, [isAIMode, aiAnswered, currentIndex, dot1, dot2, dot3]);
+
+  const dot1Style = useAnimatedStyle(() => ({ opacity: dot1.value }));
+  const dot2Style = useAnimatedStyle(() => ({ opacity: dot2.value }));
+  const dot3Style = useAnimatedStyle(() => ({ opacity: dot3.value }));
+
   const isTransitioningRef = useRef(false);
 
   const currentQuestion = questions[currentIndex];
@@ -80,39 +144,68 @@ export const DuelQuestionPopup = memo(function DuelQuestionPopup({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentQuestion?.id]);
 
-  const handleSelectAnswer = useCallback((answerIndex: number) => {
-    if (selectedAnswer !== null || isTransitioningRef.current) return;
-    if (!questions[currentIndex]) return;
+  // Démarrer le timer IA au début de chaque question (mode IA)
+  useEffect(() => {
+    if (!isAIMode || !visible || !aiOpponent || !currentQuestion) return;
+    setAiAnswered(false);
+    const ai = aiOpponent.answers[currentIndex];
+    if (!ai) return;
+    aiTimerRef.current = setTimeout(() => {
+      setAiAnswered(true);
+      setAiScoreCumul((s) => s + ai.points);
+    }, ai.delayMs);
+    return () => {
+      if (aiTimerRef.current) {
+        clearTimeout(aiTimerRef.current);
+        aiTimerRef.current = null;
+      }
+    };
+  }, [currentIndex, isAIMode, visible, aiOpponent, currentQuestion]);
 
+  // Avancer à la question suivante quand humain ET IA ont répondu (mode IA)
+  // ou seulement humain (mode classique).
+  useEffect(() => {
+    if (selectedAnswer === null) return;
+    if (isAIMode && !aiAnswered) return; // attend l'IA
+
+    const answerIndex = selectedAnswer;
     const points = shuffledOptions[answerIndex]?.points || 0;
-    isTransitioningRef.current = true;
+    const newAnswers = [...answers, answerIndex];
+    const newScore = totalScore + points;
 
-    setSelectedAnswer(answerIndex);
-
-    if (hapticsEnabled) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    }
-
-    // Passer à la question suivante après un délai
-    setTimeout(() => {
-      // Important: éviter les side-effects (onComplete / setState multiples)
-      // à l'intérieur des updaters setState pour ne pas déclencher
-      // "Cannot update a component while rendering a different component".
-      const newAnswers = [...answers, answerIndex];
-      const newScore = totalScore + points;
-
+    const advanceTimer = setTimeout(() => {
       setAnswers(newAnswers);
       setTotalScore(newScore);
+
+      // Diffuse la progression partielle (score cumulé après cette question)
+      onProgress?.(newScore, newAnswers.length);
 
       if (currentIndex < questions.length - 1) {
         setCurrentIndex((prev) => prev + 1);
         setSelectedAnswer(null);
+        setAiAnswered(false);
         isTransitioningRef.current = false;
+      } else if (isAIMode && aiOpponent) {
+        const aiTotalScore = aiOpponent.answers.reduce((s, a) => s + a.points, 0);
+        aiOpponent.onComplete(newAnswers, newScore, aiTotalScore);
       } else {
         onComplete(newAnswers, newScore);
       }
-    }, 600);
-  }, [selectedAnswer, currentIndex, questions, shuffledOptions, hapticsEnabled, onComplete, answers, totalScore]);
+    }, 800);
+
+    return () => clearTimeout(advanceTimer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAnswer, aiAnswered, isAIMode]);
+
+  const handleSelectAnswer = useCallback((answerIndex: number) => {
+    if (selectedAnswer !== null || isTransitioningRef.current) return;
+    if (!questions[currentIndex]) return;
+    isTransitioningRef.current = true;
+    setSelectedAnswer(answerIndex);
+    if (hapticsEnabled) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+  }, [selectedAnswer, currentIndex, questions, hapticsEnabled]);
 
   if (!visible || questions.length === 0 || !currentQuestion) return null;
 
@@ -134,6 +227,33 @@ export const DuelQuestionPopup = memo(function DuelQuestionPopup({
               <Animated.View style={[styles.progressFill, progressStyle]} />
             </View>
           </View>
+
+          {/* Bandeau IA — visible uniquement en mode IA */}
+          {isAIMode && aiOpponent && (
+            <View style={styles.aiBanner}>
+              <View style={styles.aiAvatar}>
+                <Ionicons name="sparkles" size={18} color={COLORS.white} />
+              </View>
+              <View style={styles.aiBannerCenter}>
+                <Text style={styles.aiBannerName} numberOfLines={1}>
+                  {aiOpponent.name}
+                </Text>
+                {aiAnswered ? (
+                  <View style={styles.aiAnsweredRow}>
+                    <Ionicons name="checkmark-circle" size={14} color={COLORS.success} />
+                    <Text style={styles.aiAnsweredText}>A répondu</Text>
+                  </View>
+                ) : (
+                  <View style={styles.aiThinkingRow}>
+                    <Text style={styles.aiThinkingText}>Réfléchit</Text>
+                    <Animated.View style={[styles.aiDot, dot1Style]} />
+                    <Animated.View style={[styles.aiDot, dot2Style]} />
+                    <Animated.View style={[styles.aiDot, dot3Style]} />
+                  </View>
+                )}
+              </View>
+            </View>
+          )}
 
           {/* Question */}
           <View style={styles.questionBox}>
@@ -193,10 +313,24 @@ export const DuelQuestionPopup = memo(function DuelQuestionPopup({
           </View>
 
           {/* Score actuel */}
-          <View style={styles.scoreSection}>
-            <Text style={styles.scoreLabel}>Score actuel</Text>
-            <Text style={styles.scoreValue}>{totalScore}</Text>
-          </View>
+          {isAIMode && aiOpponent ? (
+            <View style={styles.scoreVsRow}>
+              <View style={styles.scoreCol}>
+                <Text style={styles.scoreVsLabel}>Vous</Text>
+                <Text style={styles.scoreVsValue}>{totalScore}</Text>
+              </View>
+              <Text style={styles.scoreVsSep}>VS</Text>
+              <View style={styles.scoreCol}>
+                <Text style={styles.scoreVsLabel}>{aiOpponent.name}</Text>
+                <Text style={styles.scoreVsValue}>{aiScoreCumul}</Text>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.scoreSection}>
+              <Text style={styles.scoreLabel}>Score actuel</Text>
+              <Text style={styles.scoreValue}>{totalScore}</Text>
+            </View>
+          )}
         </View>
       </Animated.View>
     </Modal>
@@ -324,5 +458,99 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.title,
     fontSize: FONT_SIZES.xl,
     color: COLORS.success,
+  },
+  // Bandeau IA
+  aiBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[3],
+    backgroundColor: '#F0F4F8',
+    borderRadius: BORDER_RADIUS.xl,
+    paddingVertical: SPACING[2],
+    paddingHorizontal: SPACING[3],
+    width: '100%',
+    marginBottom: SPACING[3],
+    borderWidth: 1,
+    borderColor: '#D9E2EB',
+  },
+  aiAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#7C3AED',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  aiBannerCenter: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: SPACING[2],
+  },
+  aiBannerName: {
+    flex: 1,
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.sm,
+    color: '#2C3E50',
+  },
+  aiThinkingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  aiThinkingText: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.xs,
+    color: '#8E99A4',
+    marginRight: 4,
+  },
+  aiDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#7C3AED',
+  },
+  aiAnsweredRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  aiAnsweredText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.success,
+  },
+  // Score VS (mode IA)
+  scoreVsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: SPACING[3],
+    paddingHorizontal: SPACING[2],
+    borderTopWidth: 1,
+    borderTopColor: '#E8EEF4',
+    width: '100%',
+  },
+  scoreCol: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  scoreVsLabel: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.xs,
+    color: '#8E99A4',
+    marginBottom: 2,
+  },
+  scoreVsValue: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES.xl,
+    color: COLORS.success,
+  },
+  scoreVsSep: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES.sm,
+    color: '#8E99A4',
+    paddingHorizontal: SPACING[2],
   },
 });

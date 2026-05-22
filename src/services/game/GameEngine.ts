@@ -18,6 +18,7 @@ import {
   DICE_TO_EXIT,
   CENTER_COORDS,
   DEFAULT_PAWNS_COUNT,
+  FINAL_ENTRY_WARNING_DISTANCE,
   isSafePosition,
   getEventAtCircuitPosition,
   getCircuitDistance,
@@ -33,10 +34,15 @@ export interface MoveResult {
   capturedPawn?: { playerId: string; pawnIndex: number };
   triggeredEvent?: EventType;
   isFinished?: boolean;
-  /** Vrai si le pion vient de passer devant son entrée finale sans avoir assez de jetons */
+  /** Vrai si le pion vient de passer devant son entrée finale sans avoir assez de jetons.
+   *  Sert au hook pour réinitialiser la garde "déjà averti" (= nouveau lap commence). */
   missedFinalEntry?: boolean;
   /** Jetons manquants pour pouvoir entrer (TOKENS_TO_FINISH - tokens actuels) */
   tokensNeeded?: number;
+  /** Vrai si après ce coup, le pion sera dans la zone d'avertissement préventif
+   *  (≤ FINAL_ENTRY_WARNING_DISTANCE cases avant exit) sans avoir assez de jetons.
+   *  Sert au hook pour déclencher le popup d'avertissement (1×/lap, joueurs humains). */
+  finalEntryWarning?: boolean;
 }
 
 export interface ValidMove {
@@ -220,6 +226,16 @@ export class GameEngine {
     // Détecte si le pion vient de passer devant son entrée finale faute de jetons
     const passedExit = diceValue >= stepsToExit && player.tokens < TOKENS_TO_FINISH;
 
+    // Avertissement préventif : après ce coup, le pion sera dans la zone d'approche
+    // (≤ FINAL_ENTRY_WARNING_DISTANCE cases) et n'a pas encore les jetons requis.
+    // Mutuellement exclusif avec passedExit pour ne jamais empiler les deux popups.
+    const stepsToExitAfterMove = getCircuitDistance(newPos, config.exitIndex);
+    const inWarningZone =
+      !passedExit &&
+      stepsToExitAfterMove > 0 &&
+      stepsToExitAfterMove <= FINAL_ENTRY_WARNING_DISTANCE &&
+      player.tokens < TOKENS_TO_FINISH;
+
     return {
       canMove: true,
       newState,
@@ -227,7 +243,9 @@ export class GameEngine {
       capturedPawn,
       triggeredEvent,
       missedFinalEntry: passedExit || undefined,
-      tokensNeeded: passedExit ? TOKENS_TO_FINISH - player.tokens : undefined,
+      tokensNeeded:
+        passedExit || inWarningZone ? TOKENS_TO_FINISH - player.tokens : undefined,
+      finalEntryWarning: inWarningZone || undefined,
     };
   }
 

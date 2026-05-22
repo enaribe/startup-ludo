@@ -64,13 +64,20 @@ export interface UseTurnMachineParams {
   userId: string | null;
   actions: TurnActions;
   onEvent: (eventType: string) => void;
-  onWin: (playerId: string) => void;
+  /**
+   * Appelé quand un joueur finit son pion (atteint l'arrivée).
+   * Retourne true si la partie continue (3+ joueurs et il reste des actifs),
+   * false si la partie est complètement terminée (2 joueurs OU dernier actif).
+   */
+  onWin: (playerId: string) => boolean;
   hapticsEnabled: boolean;
   setAnimating: (v: boolean) => void;
   clearSelection: () => void;
   /** Whether the online game considers it my turn (for dice disable) */
   isMyTurnOnline?: boolean;
-  /** Appelé quand un pion passe devant son entrée finale sans assez de jetons */
+  /** Appelé quand un pion entre dans la zone d'approche de son entrée finale
+   *  (≤ FINAL_ENTRY_WARNING_DISTANCE cases) sans avoir encore les jetons requis.
+   *  Déclenché 1× par lap pour ne pas spammer. */
   onMissedFinalEntry?: (tokensNeeded: number) => void;
   /** Appelé quand une capture doit être résolue via popup de choix (captureur humain) */
   onCapturePending?: (capturedPlayerId: string, capturedPawnIndex: number) => void;
@@ -91,8 +98,11 @@ export interface UseTurnMachineReturn {
   setChosenDiceValue: (value: number) => void;
   /** À appeler par PlayScreen une fois le popup de choix capture résolu (débloquera le passage de tour) */
   resolveCaptureChoice: () => void;
-  /** À appeler par PlayScreen une fois le popup "tour de pénalité" fermé (débloquera l'event de case + fin de tour) */
+  /** À appeler par PlayScreen une fois le popup d'avertissement (entrée finale) fermé
+   *  (débloquera l'event de case + fin de tour). */
   resolveMissedFinalEntry: () => void;
+  /** Décompte anti-AFK du tour courant en ligne (15..0), null si inactif. */
+  afkSecondsLeft: number | null;
 }
 
 // ===== INITIAL STATE =====
@@ -278,6 +288,9 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
   // n'a pas été fermé. Sinon le popup d'event s'ouvre derrière le popup d'avertissement
   // et l'utilisateur ne le voit pas.
   const waitingForMissedFinalEntryRef = useRef(false);
+  // Pions déjà avertis pendant leur lap courant — clé `${playerId}:${pawnIndex}`.
+  // Reset quand le pion finit par passer son entrée (nouveau lap).
+  const warnedPawnsRef = useRef<Set<string>>(new Set());
 
   const resolveCaptureChoice = useCallback(() => {
     waitingForCaptureChoiceRef.current = false;
@@ -314,6 +327,11 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
   const [chosenDiceValue, setChosenDiceValueState] = useState<number | null>(null);
   const [hasUsedDiceChoice, setHasUsedDiceChoice] = useState(false);
   const chosenDiceValueRef = useRef<number | null>(null);
+
+  // ===== AFK TIMER STATE (multijoueur en ligne) =====
+  // Décompte affiché pour le tour courant : 15..0, ou null si aucun timer actif.
+  const [afkSecondsLeft, setAfkSecondsLeft] = useState<number | null>(null);
+  const afkIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const setChosenDiceValue = useCallback((value: number) => {
     chosenDiceValueRef.current = value;
@@ -424,10 +442,28 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
 
     const move = moves[0]!;
 
-    // Avertir AVANT le mouvement si le pion va passer devant son entrée finale
-    if (move.type === 'move' && move.result.missedFinalEntry && move.result.tokensNeeded) {
-      waitingForMissedFinalEntryRef.current = true;
-      onMissedFinalEntryRef.current?.(move.result.tokensNeeded);
+    // Avertissement préventif quand le pion entre dans la zone d'approche
+    // de son entrée finale (≤ FINAL_ENTRY_WARNING_DISTANCE cases) sans avoir
+    // les jetons requis. Affiché 1× max par lap pour ce pion, silencieux pour
+    // les IA. Quand le pion finit par passer son entrée faute de jetons (= nouveau
+    // lap), on reset la garde pour autoriser un nouvel avertissement au prochain
+    // passage en zone d'approche.
+    if (move.type === 'move' && move.result.missedFinalEntry) {
+      const warnKey = `${currentPlayer.id}:${move.pawnIndex}`;
+      warnedPawnsRef.current.delete(warnKey);
+    }
+    if (
+      move.type === 'move' &&
+      !currentPlayer.isAI &&
+      move.result.finalEntryWarning &&
+      move.result.tokensNeeded
+    ) {
+      const warnKey = `${currentPlayer.id}:${move.pawnIndex}`;
+      if (!warnedPawnsRef.current.has(warnKey)) {
+        warnedPawnsRef.current.add(warnKey);
+        waitingForMissedFinalEntryRef.current = true;
+        onMissedFinalEntryRef.current?.(move.result.tokensNeeded);
+      }
     }
 
     setAnimating(true);
@@ -532,10 +568,16 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
         // Handle win check
         if (result.isFinished) {
           timers.set('winCheck', () => {
+            let stillRunning = false;
             if (currentPlayerRef.current && actionsRef.current.checkWinCondition(currentPlayerRef.current.id)) {
-              onWinRef.current(currentPlayerRef.current.id);
+              stillRunning = onWinRef.current(currentPlayerRef.current.id);
             }
             setAnimating(false);
+            // Si la partie continue (multi 3+), passer la main au joueur suivant
+            // (sauf en cas de rolledSix : on garde le tour).
+            if (stillRunning && !rolledSix) {
+              actionsRef.current.nextTurn();
+            }
           }, animDelay);
           // Still dispatch MOVE_COMPLETE to update state
           timers.set('moveComplete', () => {
@@ -561,7 +603,7 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
             });
             // Si une capture est en attente (popup choix ouvert), reporter le
             // déclenchement de l'event pour qu'il n'apparaisse pas en parallèle.
-            // Idem si le popup "tour de pénalité" (missed final entry) est ouvert.
+            // Idem si le popup d'avertissement entrée finale est ouvert.
             if (waitingForCaptureChoiceRef.current || waitingForMissedFinalEntryRef.current) {
               pendingEventTriggerRef.current = () => onEventRef.current(triggeredEvent);
             } else {
@@ -736,6 +778,95 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPlayer?.isAI, currentPlayer?.id, turnState.phase, game?.status, game?.pendingEvent, game?.diceRolled]);
 
+  // ===== EFFECT: timer anti-AFK (multijoueur en ligne) =====
+  // Si le joueur humain local ne lance pas le dé en 15 s, on le lance pour lui.
+  // Sur les autres clients, le décompte est aussi affiché (lecture seule) mais
+  // seul le client du joueur actif déclenche réellement l'auto-roll.
+  const AFK_TIMEOUT_SECONDS = 15;
+
+  useEffect(() => {
+    const stopCountdown = () => {
+      if (afkIntervalRef.current) {
+        clearInterval(afkIntervalRef.current);
+        afkIntervalRef.current = null;
+      }
+      setAfkSecondsLeft(null);
+    };
+
+    // Conditions d'activation : partie en ligne, en cours, en attente du lancer,
+    // joueur courant humain (pas IA), dé pas encore lancé, pas d'event en attente.
+    const eligible =
+      isOnline &&
+      !!game &&
+      game.status === 'playing' &&
+      !!currentPlayer &&
+      !currentPlayer.isAI &&
+      turnState.phase === 'idle' &&
+      !game.pendingEvent &&
+      !game.diceRolled;
+
+    if (!eligible) {
+      stopCountdown();
+      return undefined;
+    }
+
+    // Démarre le décompte 15 -> 0
+    setAfkSecondsLeft(AFK_TIMEOUT_SECONDS);
+    afkIntervalRef.current = setInterval(() => {
+      setAfkSecondsLeft((prev) => {
+        if (prev === null) return null;
+        const next = prev - 1;
+        if (next <= 0) {
+          if (afkIntervalRef.current) {
+            clearInterval(afkIntervalRef.current);
+            afkIntervalRef.current = null;
+          }
+          return 0;
+        }
+        return next;
+      });
+    }, 1000);
+
+    // Auto-roll après 15 s — uniquement sur le client du joueur actif local.
+    const isMyTurnLocal = !!userId && currentPlayer.id === userId;
+    if (isMyTurnLocal) {
+      timers.set(
+        'afkRoll',
+        () => {
+          // Re-vérifie l'état au moment du déclenchement (anti stale closure)
+          if (turnStateRef.current.phase !== 'idle') return;
+          if (!currentPlayerRef.current || currentPlayerRef.current.isAI) return;
+          if (currentPlayerRef.current.id !== userId) return;
+          if (gameRef.current?.diceRolled) return;
+
+          const value = actionsRef.current.rollDice();
+          if (value > 0) {
+            dispatch({ type: 'ROLL_START', value });
+            timers.set('afkRollComplete', () => {
+              dispatch({ type: 'ROLL_COMPLETE', value });
+            }, 1200);
+          }
+        },
+        AFK_TIMEOUT_SECONDS * 1000
+      );
+    }
+
+    return () => {
+      stopCountdown();
+      timers.clear('afkRoll');
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    isOnline,
+    currentPlayer?.id,
+    currentPlayer?.isAI,
+    turnState.phase,
+    game?.status,
+    game?.pendingEvent,
+    game?.diceRolled,
+    userId,
+  ]);
+
   return {
     turnState,
     dispatch,
@@ -746,5 +877,6 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
     setChosenDiceValue,
     resolveCaptureChoice,
     resolveMissedFinalEntry,
+    afkSecondsLeft,
   };
 }

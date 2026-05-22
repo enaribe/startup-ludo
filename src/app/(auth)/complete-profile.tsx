@@ -5,11 +5,11 @@
  * le nom d'affichage et autres informations.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
-  Pressable,
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -18,6 +18,7 @@ import {
   Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -28,7 +29,17 @@ import { RadialBackground } from '@/components/ui/RadialBackground';
 import { AuthInput, AuthHeader } from '@/components/auth';
 import { useAuthStore, useUserStore } from '@/stores';
 import { updateUserProfile } from '@/services/firebase/auth';
-import { createUserProfile, getUserProfile } from '@/services/firebase';
+import { createUserProfile, getUserProfile, updateFirestoreUserProfile } from '@/services/firebase';
+import {
+  isUsernameAvailable,
+  reserveUsername,
+  validateUsernameFormat,
+  getUsernameErrorMessage,
+  USERNAME_MAX_LENGTH,
+} from '@/services/firebase';
+
+/** État de la vérification de disponibilité du pseudo. */
+type AvailabilityState = 'idle' | 'checking' | 'available' | 'taken' | 'invalid';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -46,11 +57,41 @@ export default function CompleteProfileScreen() {
   const [displayName, setDisplayName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [availability, setAvailability] = useState<AvailabilityState>('idle');
 
-  const isValid = displayName.trim().length >= 2;
+  // Jeton pour ignorer les résultats de vérifications obsolètes (course de debounce)
+  const checkSeqRef = useRef(0);
+
+  const formatError = validateUsernameFormat(displayName);
+  const canSubmit = availability === 'available' && !isLoading;
+
+  // Vérification de disponibilité en temps réel (debounce 500ms)
+  useEffect(() => {
+    const trimmed = displayName.trim();
+
+    if (trimmed.length === 0) {
+      setAvailability('idle');
+      return;
+    }
+    if (formatError) {
+      setAvailability('invalid');
+      return;
+    }
+
+    setAvailability('checking');
+    const seq = ++checkSeqRef.current;
+    const timer = setTimeout(async () => {
+      const free = await isUsernameAvailable(trimmed);
+      // Ignorer si une saisie plus récente a eu lieu entre-temps
+      if (seq !== checkSeqRef.current) return;
+      setAvailability(free ? 'available' : 'taken');
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [displayName, formatError]);
 
   const handleSubmit = useCallback(async () => {
-    if (!isValid || !user) return;
+    if (!canSubmit || !user) return;
 
     setIsLoading(true);
     setError(null);
@@ -58,16 +99,19 @@ export default function CompleteProfileScreen() {
     try {
       const trimmedName = displayName.trim();
 
+      // Réserve le pseudo — échoue si pris entre-temps (anti-course)
+      await reserveUsername(trimmedName, user.id, trimmedName);
+
       // Update Firebase Auth profile
       await updateUserProfile({ displayName: trimmedName });
 
       // Update or create Firestore profile
       let profile = await getUserProfile(user.id);
       if (profile) {
-        // Update existing profile
+        // Propage le pseudo dans users + userStats (classement, recherche)
+        await updateFirestoreUserProfile(user.id, { displayName: trimmedName });
         profile = { ...profile, displayName: trimmedName };
       } else {
-        // Create new profile
         profile = await createUserProfile(user.id, {
           email: user.email || null,
           displayName: trimmedName,
@@ -79,21 +123,22 @@ export default function CompleteProfileScreen() {
       setProfile(profile);
       clearNeedsProfileCompletion();
 
-      // Navigate to home
       router.replace('/(tabs)/home');
     } catch (err) {
       console.error('Failed to update profile:', err);
-      setError(err instanceof Error ? err.message : 'Erreur lors de la mise à jour du profil');
+      // Si la réservation a échoué, le pseudo a été pris entre-temps
+      setAvailability('taken');
+      setError(
+        err instanceof Error && err.message.includes('déjà utilisé')
+          ? 'Ce pseudo vient d\'être pris. Choisis-en un autre.'
+          : err instanceof Error
+            ? err.message
+            : 'Erreur lors de la mise à jour du profil'
+      );
     } finally {
       setIsLoading(false);
     }
-  }, [displayName, isValid, user, setUser, setProfile, clearNeedsProfileCompletion, router]);
-
-  const handleSkip = useCallback(() => {
-    // Allow skipping - they can update later in settings
-    clearNeedsProfileCompletion();
-    router.replace('/(tabs)/home');
-  }, [router, clearNeedsProfileCompletion]);
+  }, [displayName, canSubmit, user, setUser, setProfile, clearNeedsProfileCompletion, router]);
 
   return (
     <View style={styles.container}>
@@ -141,28 +186,55 @@ export default function CompleteProfileScreen() {
             style={styles.formSection}
           >
             <AuthInput
-              label="TON PSEUDO"
-              placeholder="Ex: Moussa, Fatou..."
+              label="TON PSEUDO UNIQUE"
+              placeholder="Ex: moussa_ndiaye"
               value={displayName}
               onChangeText={setDisplayName}
-              autoCapitalize="words"
+              autoCapitalize="none"
               autoCorrect={false}
-              maxLength={20}
+              maxLength={USERNAME_MAX_LENGTH}
             />
+
+            {/* Indicateur de disponibilité en temps réel */}
+            {availability === 'checking' && (
+              <View style={styles.statusRow}>
+                <ActivityIndicator size="small" color="rgba(255,255,255,0.5)" />
+                <Text style={styles.statusChecking}>Vérification...</Text>
+              </View>
+            )}
+            {availability === 'available' && (
+              <View style={styles.statusRow}>
+                <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
+                <Text style={styles.statusOk}>Pseudo disponible</Text>
+              </View>
+            )}
+            {availability === 'taken' && (
+              <View style={styles.statusRow}>
+                <Ionicons name="close-circle" size={16} color="#E74C3C" />
+                <Text style={styles.statusError}>Ce pseudo est déjà pris</Text>
+              </View>
+            )}
+            {availability === 'invalid' && formatError && (
+              <View style={styles.statusRow}>
+                <Ionicons name="alert-circle" size={16} color="#E67E22" />
+                <Text style={styles.statusWarn}>{getUsernameErrorMessage(formatError)}</Text>
+              </View>
+            )}
 
             {error && (
               <Text style={styles.errorText}>{error}</Text>
             )}
 
             <Text style={styles.hint}>
-              Tu pourras le modifier plus tard dans les paramètres
+              3 à {USERNAME_MAX_LENGTH} caractères : lettres, chiffres et _.{'\n'}
+              Ce pseudo t'identifie de façon unique dans le jeu.
             </Text>
           </Animated.View>
 
           {/* Spacer */}
           <View style={styles.spacer} />
 
-          {/* Buttons */}
+          {/* Buttons — pas de "passer" : le pseudo unique est obligatoire */}
           <Animated.View
             entering={FadeInDown.delay(300).duration(400)}
             style={styles.buttonsSection}
@@ -172,13 +244,9 @@ export default function CompleteProfileScreen() {
               variant="yellow"
               fullWidth
               loading={isLoading}
-              disabled={!isValid}
+              disabled={!canSubmit}
               onPress={handleSubmit}
             />
-
-            <Pressable onPress={handleSkip} style={styles.skipButton}>
-              <Text style={styles.skipText}>PASSER CETTE ÉTAPE</Text>
-            </Pressable>
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -253,14 +321,31 @@ const styles = StyleSheet.create({
   buttonsSection: {
     gap: SPACING[4],
   },
-  skipButton: {
+  statusRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: SPACING[3],
+    gap: SPACING[2],
+    paddingHorizontal: SPACING[1],
   },
-  skipText: {
-    fontFamily: FONTS.bodySemiBold,
+  statusChecking: {
+    fontFamily: FONTS.body,
     fontSize: FONT_SIZES.sm,
     color: 'rgba(255, 255, 255, 0.5)',
-    letterSpacing: 0.5,
+  },
+  statusOk: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.sm,
+    color: '#4CAF50',
+  },
+  statusError: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.sm,
+    color: '#E74C3C',
+  },
+  statusWarn: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.sm,
+    color: '#E67E22',
+    flex: 1,
   },
 });

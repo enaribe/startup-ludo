@@ -6,6 +6,7 @@ export {
   createUserProfile,
   getUserProfile,
   updateFirestoreUserProfile,
+  updateUserAchievements,
   updateUserStats,
   addStartup,
   deleteStartup,
@@ -29,3 +30,32 @@ export {
   searchUsers as searchSocialUsers,
   type SocialUser,
 } from './socialService';
+export {
+  uploadAvatar,
+  deleteAvatar,
+} from './storageService';
+export {
+  startPresenceSession,
+  stopPresenceSession,
+  setPresenceAppActive,
+  setUserOnline,
+  setUserInGame,
+  subscribeToPresence,
+  getPresenceState,
+  getPresenceLabel,
+  type PlayerPresenceState,
+  type PresenceMap,
+} from './presenceService';
+export {
+  isUsernameAvailable,
+  reserveUsername,
+  releaseUsername,
+  getUserIdByUsername,
+  getUsernameForUser,
+  ensureUsernameForUser,
+  validateUsernameFormat,
+  getUsernameErrorMessage,
+  USERNAME_MIN_LENGTH,
+  USERNAME_MAX_LENGTH,
+  type UsernameValidationError,
+} from './usernameService';

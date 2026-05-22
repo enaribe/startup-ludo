@@ -20,3 +20,4 @@ export { ProgressionPopup } from './ProgressionPopup';
 export { GamePopup, GamePopupSpinningShape, GamePopupGradientBorder, GAME_POPUP_WIDTH } from './GamePopup';
 export { OutlinedText } from './OutlinedText';
 export { GuestGate } from './GuestGate';
+export { GuestPromoBanner } from './GuestPromoBanner';

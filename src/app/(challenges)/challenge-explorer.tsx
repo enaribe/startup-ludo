@@ -67,7 +67,11 @@ export default function ChallengeExplorerScreen() {
 
   const enrolledChallenges = useMemo(() => {
     if (!userId) return [];
-    const userEnrollments = enrollments.filter((e) => e.userId === userId);
+    // Un enrollment ne compte comme inscription effective que si le formulaire
+    // a été rempli (formData != null). Sinon le programme reste à découvrir.
+    const userEnrollments = enrollments.filter(
+      (e) => e.userId === userId && e.formData != null
+    );
     const challengeIds = userEnrollments.map((e) => e.challengeId);
     return ALL_CHALLENGES.filter((c) => challengeIds.includes(c.id) && c.isActive);
   }, [enrollments, userId]);

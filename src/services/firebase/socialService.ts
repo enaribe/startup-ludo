@@ -7,14 +7,15 @@ import {
   doc,
   getDoc,
   getDocs,
-  setDoc,
-  deleteDoc,
   query,
   where,
   limit,
   runTransaction,
   Timestamp,
+  type FirebaseFirestoreTypes,
 } from '@react-native-firebase/firestore';
+
+type QDocSnap = FirebaseFirestoreTypes.QueryDocumentSnapshot;
 import { firebaseLog, getFirebaseErrorMessage } from './config';
 
 export const SOCIAL_COLLECTIONS = {
@@ -201,22 +202,31 @@ export const getFollowers = async (userId: string, limitCount = 50): Promise<Soc
   }
 };
 
+/**
+ * Recherche d'utilisateurs par pseudo, via la collection `usernames`.
+ * Les pseudos \u00e9tant uniques et stock\u00e9s en minuscules (id du doc), la recherche
+ * est insensible \u00e0 la casse et ne renvoie jamais de doublon.
+ */
 export const searchUsers = async (queryStr: string, limitCount = 20): Promise<SocialUser[]> => {
   try {
-    if (!queryStr.trim()) return [];
-    firebaseLog('searchUsers', { queryStr });
+    const normalized = queryStr.trim().toLowerCase();
+    if (!normalized) return [];
+    firebaseLog('searchUsers', { queryStr: normalized });
     const db = getFirestore();
-    const end = queryStr + '\uf8ff';
+
+    // Recherche par pr\u00e9fixe sur le champ usernameLower (pseudo en minuscules)
+    const end = normalized + '\uf8ff';
     const q = query(
-      collection(db, SOCIAL_COLLECTIONS.users),
-      where('displayName', '>=', queryStr),
-      where('displayName', '<=', end),
+      collection(db, 'usernames'),
+      where('usernameLower', '>=', normalized),
+      where('usernameLower', '<=', end),
       limit(limitCount)
     );
     const snap = await getDocs(q);
-    const users = await Promise.all(
-      snap.docs.map((d) => mapDocToSocialUser(db, d.id))
-    );
+    const userIds: string[] = (snap.docs as QDocSnap[])
+      .map((d) => d.data().userId as string)
+      .filter((id): id is string => !!id);
+    const users = await Promise.all(userIds.map((id) => mapDocToSocialUser(db, id)));
     return users.filter((u): u is SocialUser => u !== null);
   } catch (error) {
     firebaseLog('searchUsers error', error);

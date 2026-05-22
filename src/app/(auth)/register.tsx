@@ -36,18 +36,24 @@ const shapeImage = require('@/../assets/images/shape.png');
 
 export default function RegisterScreen() {
   const router = useRouter();
-  const { register, loginWithGoogle, loginWithApple, isLoading, error, clearError, isAuthenticated } = useAuthStore();
+  const { register, loginWithGoogle, loginWithApple, isLoading, error, clearError, isAuthenticated, user, needsProfileCompletion } = useAuthStore();
 
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  // Redirection auto vers home dès que l'utilisateur est authentifié
+  // Redirection auto une fois l'utilisateur authentifié.
+  // Si le compte n'a pas encore de pseudo unique → écran de complétion du profil.
+  // On ignore les invités : un guest doit pouvoir accéder à cet écran pour se créer un vrai compte.
   useEffect(() => {
-    if (isAuthenticated) {
-      router.replace('/(tabs)/home');
+    if (isAuthenticated && !user?.isGuest) {
+      if (needsProfileCompletion) {
+        router.replace('/(auth)/complete-profile');
+      } else {
+        router.replace('/(tabs)/home');
+      }
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, user?.isGuest, needsProfileCompletion, router]);
 
   const isFormValid =
     displayName.trim().length >= 2 &&

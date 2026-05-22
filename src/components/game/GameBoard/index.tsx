@@ -138,6 +138,7 @@ export const GameBoard = memo(function GameBoard({
       isHome: boolean;
       isFinished: boolean;
       isAI: boolean;
+      isForfeited: boolean;
     }[] = [];
 
     players.forEach(player => {
@@ -165,6 +166,7 @@ export const GameBoard = memo(function GameBoard({
             isHome: pawn.status === 'home',
             isFinished: pawn.status === 'finished',
             isAI: player.isAI,
+            isForfeited: !!player.isForfeited,
           });
         } catch (error) {
           gameError('board', `Error getting coords for pawn ${index} of ${player.color}:`, error);
@@ -292,14 +294,15 @@ export const GameBoard = memo(function GameBoard({
                 targetY={y}
                 cellSize={cellSize}
                 movePath={isMovingPawn ? movePathPixels : undefined}
-                isActive={isCurrentPlayer && !pawn.isHome}
+                isActive={isCurrentPlayer && !pawn.isHome && !pawn.isForfeited}
                 isSelected={isSelected}
                 isInHome={pawn.isHome}
                 isAI={pawn.isAI}
+                isForfeited={pawn.isForfeited}
                 pawnIndex={pawn.pawnIndex}
                 onAnimationComplete={onPawnMoveComplete}
                 onPress={
-                  isCurrentPlayer && onPawnPress
+                  isCurrentPlayer && !pawn.isForfeited && onPawnPress
                     ? () => onPawnPress(pawn.playerId, pawn.pawnIndex)
                     : undefined
                 }

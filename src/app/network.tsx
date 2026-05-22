@@ -1,5 +1,8 @@
 /**
  * Réseau & Amis - Écran de gestion des abonnements/abonnés
+ *
+ * Design aligné sur les autres écrans de l'app (profil, statistiques) :
+ * header #0A1929 arrondi, cartes DynamicGradientBorder fond rgba(0,0,0,0.35).
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
@@ -9,6 +12,7 @@ import {
   TextInput,
   Pressable,
   ActivityIndicator,
+  Dimensions,
   StyleSheet,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -20,11 +24,14 @@ import { RadialBackground, DynamicGradientBorder, GameButton, Avatar } from '@/c
 import { useAuthStore, useUserStore } from '@/stores';
 import { useSocialStore } from '@/stores/useSocialStore';
 import { COLORS } from '@/styles/colors';
-import { SPACING, BORDER_RADIUS } from '@/styles/spacing';
+import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import type { SocialUser } from '@/services/firebase/socialService';
 
 type Tab = 'following' | 'followers' | 'search';
+
+const { width: screenWidth } = Dimensions.get('window');
+const contentWidth = screenWidth - SPACING[4] * 2;
 
 // ===== USER CARD =====
 
@@ -45,9 +52,9 @@ function UserCard({ user, isFollowed, isGuest, currentUserId, onToggleFollow, in
 
   return (
     <Animated.View entering={FadeInDown.delay(index * 60).duration(350)}>
-      <DynamicGradientBorder borderRadius={16} fill="rgba(0,0,0,0.30)">
+      <DynamicGradientBorder borderRadius={16} fill="rgba(0,0,0,0.35)" boxWidth={contentWidth}>
         <View style={styles.userCard}>
-          <Avatar name={user.displayName} size="md" />
+          <Avatar source={user.avatarUrl} name={user.displayName} size="lg" showBorder />
           <View style={styles.userInfo}>
             <Text style={styles.userName} numberOfLines={1}>{user.displayName}</Text>
             <Text style={styles.userRank}>{user.rank} • {user.xp.toLocaleString()} XP</Text>
@@ -55,7 +62,7 @@ function UserCard({ user, isFollowed, isGuest, currentUserId, onToggleFollow, in
           </View>
           {!isMe && (
             <GameButton
-              title={isFollowed ? 'NE PLUS SUIVRE' : 'SUIVRE'}
+              title={isFollowed ? 'SUIVI' : 'SUIVRE'}
               variant={isFollowed ? 'blue' : 'yellow'}
               size="sm"
               disabled={isGuest}
@@ -74,14 +81,20 @@ function EmptyState({ tab }: { tab: Tab }) {
   const messages: Record<Tab, { icon: keyof typeof Ionicons.glyphMap; text: string }> = {
     following: { icon: 'person-add-outline', text: "Tu ne suis personne pour l'instant.\nRecherche des joueurs pour les suivre !" },
     followers: { icon: 'people-outline', text: "Personne ne te suit encore.\nJoue et améliore ton rang pour attirer des abonnés !" },
-    search: { icon: 'search-outline', text: 'Tape un nom pour rechercher un joueur.' },
+    search: { icon: 'search-outline', text: 'Tape un pseudo pour rechercher un joueur.' },
   };
   const msg = messages[tab];
   return (
-    <View style={styles.emptyState}>
-      <Ionicons name={msg.icon} size={48} color={COLORS.textMuted} />
-      <Text style={styles.emptyText}>{msg.text}</Text>
-    </View>
+    <Animated.View entering={FadeInDown.duration(350)} style={styles.emptyWrapper}>
+      <DynamicGradientBorder borderRadius={20} fill="rgba(0,0,0,0.35)" boxWidth={contentWidth}>
+        <View style={styles.emptyState}>
+          <View style={styles.emptyIconCircle}>
+            <Ionicons name={msg.icon} size={32} color={COLORS.primary} />
+          </View>
+          <Text style={styles.emptyText}>{msg.text}</Text>
+        </View>
+      </DynamicGradientBorder>
+    </Animated.View>
   );
 }
 
@@ -157,80 +170,128 @@ export default function NetworkScreen() {
     <View style={styles.container}>
       <RadialBackground />
 
-      {/* Header */}
+      {/* Header fixe */}
       <View style={[styles.header, { paddingTop: insets.top + SPACING[2] }]}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={8}>
-          <Ionicons name="arrow-back" size={22} color={COLORS.white} />
-        </Pressable>
-        <Text style={styles.headerTitle}>RÉSEAU & AMIS</Text>
-        <View style={styles.headerPlaceholder} />
+        <View style={styles.headerRow}>
+          <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={8}>
+            <Ionicons name="chevron-back" size={22} color={COLORS.primary} />
+          </Pressable>
+          <Text style={styles.headerTitle}>RÉSEAU & AMIS</Text>
+          <View style={styles.backBtnPlaceholder} />
+        </View>
       </View>
 
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: insets.top + 72, paddingBottom: insets.bottom + SPACING[8] },
+          { paddingTop: insets.top + 80, paddingBottom: insets.bottom + SPACING[8] },
         ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Compteurs */}
-        <View style={styles.countersRow}>
-          <View style={styles.counterItem}>
-            <Text style={styles.counterValue}>{followCounts.followingCount}</Text>
-            <Text style={styles.counterLabel}>Abonnements</Text>
-          </View>
-          <View style={styles.counterDivider} />
-          <View style={styles.counterItem}>
-            <Text style={styles.counterValue}>{followCounts.followersCount}</Text>
-            <Text style={styles.counterLabel}>Abonnés</Text>
-          </View>
-        </View>
+        {/* Compteurs — style statsGrid */}
+        <Animated.View entering={FadeInDown.delay(80).duration(450)}>
+          <DynamicGradientBorder borderRadius={20} fill="rgba(0,0,0,0.35)" boxWidth={contentWidth}>
+            <View style={styles.countersRow}>
+              <View style={styles.counterItem}>
+                <View style={[styles.counterIconCircle, { backgroundColor: 'rgba(255,188,64,0.15)' }]}>
+                  <Ionicons name="person-add" size={20} color={COLORS.primary} />
+                </View>
+                <Text style={[styles.counterValue, { color: COLORS.primary }]}>
+                  {followCounts.followingCount}
+                </Text>
+                <Text style={styles.counterLabel}>Abonnements</Text>
+              </View>
+
+              <View style={styles.counterDivider} />
+
+              <View style={styles.counterItem}>
+                <View style={[styles.counterIconCircle, { backgroundColor: 'rgba(33,150,243,0.15)' }]}>
+                  <Ionicons name="people" size={20} color={COLORS.info} />
+                </View>
+                <Text style={[styles.counterValue, { color: COLORS.info }]}>
+                  {followCounts.followersCount}
+                </Text>
+                <Text style={styles.counterLabel}>Abonnés</Text>
+              </View>
+            </View>
+          </DynamicGradientBorder>
+        </Animated.View>
 
         {/* Barre de recherche */}
-        <View style={styles.searchBar}>
-          <Ionicons name="search" size={18} color={COLORS.textMuted} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Rechercher un joueur..."
-            placeholderTextColor={COLORS.textMuted}
-            value={searchQuery}
-            onChangeText={handleSearch}
-            autoCorrect={false}
-            autoCapitalize="none"
-          />
-          {searchQuery.length > 0 && (
-            <Pressable onPress={handleClearSearch} hitSlop={8}>
-              <Ionicons name="close-circle" size={18} color={COLORS.textMuted} />
-            </Pressable>
-          )}
-        </View>
+        <Animated.View
+          entering={FadeInDown.delay(140).duration(450)}
+          style={styles.searchWrapper}
+        >
+          <DynamicGradientBorder borderRadius={14} fill="rgba(0,0,0,0.35)" boxWidth={contentWidth}>
+            <View style={styles.searchBar}>
+              <Ionicons name="search" size={18} color={COLORS.textMuted} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Rechercher un joueur..."
+                placeholderTextColor={COLORS.textMuted}
+                value={searchQuery}
+                onChangeText={handleSearch}
+                autoCorrect={false}
+                autoCapitalize="none"
+              />
+              {searchQuery.length > 0 && (
+                <Pressable onPress={handleClearSearch} hitSlop={8}>
+                  <Ionicons name="close-circle" size={18} color={COLORS.textMuted} />
+                </Pressable>
+              )}
+            </View>
+          </DynamicGradientBorder>
+        </Animated.View>
 
-        {/* Tabs */}
+        {/* Switch Abonnements / Abonnés — même design que l'écran liste programmes */}
         {activeTab !== 'search' && (
-          <View style={styles.tabs}>
-            {(['following', 'followers'] as Tab[]).map((tab) => (
-              <Pressable
-                key={tab}
-                style={[styles.tab, activeTab === tab && styles.tabActive]}
-                onPress={() => setActiveTab(tab)}
-              >
-                <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-                  {tab === 'following' ? 'ABONNEMENTS' : 'ABONNÉS'}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
+          <Animated.View entering={FadeInDown.delay(200).duration(450)} style={styles.switchWrap}>
+            <DynamicGradientBorder borderRadius={24} fill="rgba(0, 0, 0, 0.35)" boxWidth={contentWidth}>
+              <View style={styles.switchInner}>
+                <Pressable
+                  style={[styles.switchButton, activeTab === 'following' && styles.switchButtonActive]}
+                  onPress={() => setActiveTab('following')}
+                >
+                  <Text style={[styles.switchText, activeTab === 'following' && styles.switchTextActive]}>
+                    Abonnements
+                  </Text>
+                  {following.length > 0 && (
+                    <View style={[styles.switchBadge, activeTab === 'following' && styles.switchBadgeActive]}>
+                      <Text style={styles.switchBadgeText}>{following.length}</Text>
+                    </View>
+                  )}
+                </Pressable>
+                <Pressable
+                  style={[styles.switchButton, activeTab === 'followers' && styles.switchButtonActive]}
+                  onPress={() => setActiveTab('followers')}
+                >
+                  <Text style={[styles.switchText, activeTab === 'followers' && styles.switchTextActive]}>
+                    Abonnés
+                  </Text>
+                  {followers.length > 0 && (
+                    <View style={[styles.switchBadge, activeTab === 'followers' && styles.switchBadgeActive]}>
+                      <Text style={styles.switchBadgeText}>{followers.length}</Text>
+                    </View>
+                  )}
+                </Pressable>
+              </View>
+            </DynamicGradientBorder>
+          </Animated.View>
         )}
 
         {/* Message guest */}
         {isGuest && (
-          <View style={styles.guestBanner}>
-            <Ionicons name="lock-closed" size={16} color={COLORS.primary} />
-            <Text style={styles.guestText}>
-              Crée un compte pour suivre des joueurs et construire ton réseau !
-            </Text>
-          </View>
+          <Animated.View entering={FadeInDown.delay(240).duration(450)} style={styles.guestWrapper}>
+            <DynamicGradientBorder borderRadius={14} fill="rgba(255,188,64,0.10)" boxWidth={contentWidth}>
+              <View style={styles.guestBanner}>
+                <Ionicons name="lock-closed" size={16} color={COLORS.primary} />
+                <Text style={styles.guestText}>
+                  Crée un compte pour suivre des joueurs et construire ton réseau !
+                </Text>
+              </View>
+            </DynamicGradientBorder>
+          </Animated.View>
         )}
 
         {/* Liste */}
@@ -259,72 +320,80 @@ export default function NetworkScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+  container: { flex: 1, backgroundColor: '#0C243E' },
 
+  // Header — aligné sur profil.tsx / history.tsx
   header: {
     position: 'absolute',
     top: 0, left: 0, right: 0,
     zIndex: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SPACING[4],
     paddingBottom: SPACING[3],
+    paddingHorizontal: SPACING[4],
     backgroundColor: '#0A1929',
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
+    borderBottomWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   backBtn: {
     width: 40, height: 40, borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(0,0,0,0.25)',
     justifyContent: 'center', alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
+  backBtnPlaceholder: { width: 40, height: 40 },
   headerTitle: {
-    flex: 1,
     fontFamily: FONTS.title,
-    fontSize: FONT_SIZES.xl,
+    fontSize: FONT_SIZES.lg,
     color: COLORS.white,
-    textAlign: 'center',
     letterSpacing: 0.5,
   },
-  headerPlaceholder: { width: 40 },
 
   scrollContent: { paddingHorizontal: SPACING[4] },
 
+  // Compteurs
   countersRow: {
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: SPACING[4],
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderRadius: BORDER_RADIUS.xl,
-    paddingVertical: SPACING[4],
+    padding: SPACING[4],
+    width: '100%',
   },
   counterItem: { alignItems: 'center', flex: 1 },
+  counterIconCircle: {
+    width: 40, height: 40, borderRadius: 20,
+    justifyContent: 'center', alignItems: 'center',
+    marginBottom: SPACING[2],
+  },
   counterValue: {
     fontFamily: FONTS.title,
     fontSize: FONT_SIZES['2xl'],
-    color: COLORS.primary,
   },
   counterLabel: {
     fontFamily: FONTS.body,
     fontSize: FONT_SIZES.xs,
-    color: COLORS.textSecondary,
+    color: 'rgba(255,255,255,0.5)',
     marginTop: 2,
   },
   counterDivider: {
-    width: 1, height: 36,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    width: 1, height: 48,
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
 
+  // Recherche
+  searchWrapper: { marginTop: SPACING[4] },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING[2],
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderRadius: BORDER_RADIUS.lg,
     paddingHorizontal: SPACING[3],
     paddingVertical: SPACING[3],
-    marginBottom: SPACING[3],
+    width: '100%',
   },
   searchInput: {
     flex: 1,
@@ -334,36 +403,62 @@ const styles = StyleSheet.create({
     padding: 0,
   },
 
-  tabs: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: BORDER_RADIUS.lg,
-    padding: 4,
-    marginBottom: SPACING[4],
+  // Switch Abonnements / Abonnés — repris de l'écran liste programmes
+  switchWrap: {
+    marginTop: SPACING[4],
   },
-  tab: {
+  switchInner: {
+    flexDirection: 'row',
+    padding: 4,
+    height: 48,
+    width: '100%',
+  },
+  switchButton: {
     flex: 1,
-    paddingVertical: SPACING[2],
-    borderRadius: BORDER_RADIUS.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING[2],
+    borderRadius: 20,
+    paddingHorizontal: SPACING[3],
+  },
+  switchButtonActive: {
+    backgroundColor: '#1F91D0',
+  },
+  switchText: {
+    fontFamily: FONTS.bodyMedium,
+    fontSize: FONT_SIZES.sm,
+    color: 'rgba(255, 255, 255, 0.6)',
+  },
+  switchTextActive: {
+    fontFamily: FONTS.bodySemiBold,
+    color: '#FFFFFF',
+  },
+  switchBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 10,
+    minWidth: 22,
     alignItems: 'center',
   },
-  tabActive: { backgroundColor: COLORS.primary },
-  tabText: {
+  switchBadgeActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.28)',
+  },
+  switchBadgeText: {
     fontFamily: FONTS.bodySemiBold,
     fontSize: FONT_SIZES.xs,
-    color: COLORS.textMuted,
-    letterSpacing: 0.5,
+    color: COLORS.white,
   },
-  tabTextActive: { color: COLORS.background },
 
+  // Bandeau invité
+  guestWrapper: { marginTop: SPACING[4] },
   guestBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING[2],
-    backgroundColor: 'rgba(255,188,64,0.10)',
-    borderRadius: BORDER_RADIUS.lg,
     padding: SPACING[3],
-    marginBottom: SPACING[4],
+    width: '100%',
   },
   guestText: {
     flex: 1,
@@ -372,13 +467,14 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
   },
 
-  list: { gap: SPACING[3] },
-
+  // Liste
+  list: { gap: SPACING[3], marginTop: SPACING[4] },
   userCard: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: SPACING[3],
     gap: SPACING[3],
+    width: '100%',
   },
   userInfo: { flex: 1 },
   userName: {
@@ -401,11 +497,19 @@ const styles = StyleSheet.create({
 
   loader: { marginTop: SPACING[10] },
 
+  // État vide
+  emptyWrapper: { marginTop: SPACING[4] },
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: SPACING[12],
-    gap: SPACING[4],
+    paddingVertical: SPACING[8],
+    paddingHorizontal: SPACING[4],
+    gap: SPACING[3],
+  },
+  emptyIconCircle: {
+    width: 64, height: 64, borderRadius: 32,
+    backgroundColor: 'rgba(255,188,64,0.12)',
+    justifyContent: 'center', alignItems: 'center',
   },
   emptyText: {
     fontFamily: FONTS.body,

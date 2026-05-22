@@ -32,6 +32,7 @@ interface PawnProps {
   isSelected?: boolean;
   isInHome?: boolean;
   isAI?: boolean;
+  isForfeited?: boolean;
   pawnIndex: number;
   onAnimationComplete?: () => void;
   onPress?: () => void;
@@ -51,6 +52,7 @@ export const Pawn = memo(function Pawn({
   isSelected = false,
   isInHome = false,
   isAI = false,
+  isForfeited = false,
   pawnIndex,
   onAnimationComplete,
   onPress,
@@ -245,7 +247,7 @@ export const Pawn = memo(function Pawn({
   return (
     <AnimatedPressable
       onPress={onPress}
-      disabled={!onPress}
+      disabled={!onPress || isForfeited}
       style={[
         styles.container,
         {
@@ -253,6 +255,7 @@ export const Pawn = memo(function Pawn({
           height: pawnSize,
         },
         animatedStyle,
+        isForfeited && styles.forfeitedPawn,
       ]}
     >
       {/* Corps du pion */}
@@ -355,6 +358,9 @@ const styles = StyleSheet.create({
   },
   homePawn: {
     opacity: 0.85,
+  },
+  forfeitedPawn: {
+    opacity: 0.35,
   },
   pawnInner: {
     justifyContent: 'center',

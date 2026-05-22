@@ -22,6 +22,7 @@ import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useMultiplayer } from '@/hooks/useMultiplayer';
+import { JoinRoomError, getJoinRoomErrorDisplay } from '@/services/multiplayer/JoinRoomError';
 
 export default function OnlineSetupScreen() {
   const router = useRouter();
@@ -78,13 +79,22 @@ export default function OnlineSetupScreen() {
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    const result = await joinRoom(roomCode.toUpperCase(), playerName);
+    try {
+      const result = await joinRoom(roomCode.toUpperCase(), playerName);
 
-    if (result) {
-      router.push({
-        pathname: '/(game)/lobby/[roomId]',
-        params: { roomId: result.roomId, code: roomCode.toUpperCase(), isHost: 'false' },
-      });
+      if (result) {
+        router.push({
+          pathname: '/(game)/lobby/[roomId]',
+          params: { roomId: result.roomId, code: roomCode.toUpperCase(), isHost: 'false' },
+        });
+      } else {
+        const { title, message } = getJoinRoomErrorDisplay('ROOM_NOT_FOUND');
+        Alert.alert(title, message);
+      }
+    } catch (err) {
+      const code = err instanceof JoinRoomError ? err.code : 'UNKNOWN';
+      const { title, message } = getJoinRoomErrorDisplay(code);
+      Alert.alert(title, message);
     }
   }, [roomCode, playerName, user, joinRoom, router]);
 

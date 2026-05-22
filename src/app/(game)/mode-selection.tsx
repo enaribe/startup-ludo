@@ -2,8 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Dimensions, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import Animated, { FadeInDown, FadeOut, SlideInUp } from 'react-native-reanimated';
+import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LocalModeIcon, OnlineModeIcon } from '@/components/game/ModeSelectionIcons';
@@ -246,60 +246,34 @@ export default function GameModeSelectionScreen() {
         </Text>
       </GamePopup>
 
-      {/* Popup - Compte requis (design system) */}
-      <Modal
+      {/* Popup - Compte requis (GamePopup design system) */}
+      <GamePopup
         visible={showGuestPopup}
-        transparent
-        animationType="fade"
         onRequestClose={handleCloseGuestPopup}
+        header="Mode en ligne"
+        title="COMPTE REQUIS"
+        footer={
+          <>
+            <GameButton
+              variant="yellow"
+              fullWidth
+              title="Créer un compte"
+              onPress={handleCreateAccount}
+              style={styles.popupPrimaryBtn}
+            />
+            <GameButton
+              variant="blue"
+              fullWidth
+              title="Annuler"
+              onPress={handleCloseGuestPopup}
+            />
+          </>
+        }
       >
-        <View style={styles.popupOverlay}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={handleCloseGuestPopup} />
-          <Animated.View
-            entering={SlideInUp.duration(100).springify().damping(32)}
-            exiting={FadeOut.duration(100)}
-            style={styles.popupWrapper}
-          >
-            <DynamicGradientBorder
-              borderRadius={24}
-              fill="#0D2744"
-              style={styles.popupCardBorder}
-            >
-              <View style={styles.popupInner}>
-                <View style={styles.popupHeaderRow}>
-                  <View style={styles.popupHeaderLeft}>
-                    <View style={styles.popupIconBox}>
-                      <Ionicons name="lock-closed" size={18} color="#FF6B6B" />
-                    </View>
-                    <Text style={styles.popupTitle}>Compte requis</Text>
-                  </View>
-                  <Pressable onPress={handleCloseGuestPopup} hitSlop={12} style={styles.popupCloseBtn}>
-                    <Ionicons name="close" size={22} color="rgba(255,255,255,0.6)" />
-                  </Pressable>
-                </View>
-                <View style={styles.popupDivider} />
-                <Text style={styles.popupSubtitle}>
-                  Crée un compte pour jouer en ligne et sauvegarder ta progression !
-                </Text>
-                <GameButton
-                  variant="yellow"
-                  fullWidth
-                  title="Créer un compte"
-                  onPress={handleCreateAccount}
-                  style={styles.popupPrimaryBtn}
-                />
-                <GameButton
-                  variant="blue"
-                  fullWidth
-                  title="Annuler"
-                  onPress={handleCloseGuestPopup}
-                  style={styles.popupSecondaryBtn}
-                />
-              </View>
-            </DynamicGradientBorder>
-          </Animated.View>
-        </View>
-      </Modal>
+        <Text style={styles.popupBodyText}>
+          Crée un compte pour jouer en ligne et sauvegarder ta progression !
+        </Text>
+      </GamePopup>
 
       {/* Popup progression post-partie */}
       <ProgressionPopup
@@ -435,45 +409,6 @@ const styles = StyleSheet.create({
     color: '#FF6B6B',
     textTransform: 'none',
   },
-  // Modal "Aucun projet" (conservé tel quel pour l’instant)
-  // Popups (design system)
-  popupOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 18,
-  },
-  popupWrapper: {
-    width: '100%',
-    maxWidth: 340,
-  },
-  popupCardBorder: {
-    width: '100%',
-    overflow: 'hidden',
-  },
-  popupInner: {
-    padding: SPACING[5],
-  },
-  popupHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 0,
-  },
-  popupHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  popupIconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 107, 107, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   popupBodyText: {
     fontFamily: FONTS.body,
     fontSize: FONT_SIZES.sm,
@@ -483,36 +418,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING[3],
     paddingHorizontal: SPACING[2],
   },
-  popupTitle: {
-    fontFamily: FONTS.title,
-    fontSize: 16,
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-  },
-  popupCloseBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  popupDivider: {
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    marginVertical: SPACING[4],
-  },
-  popupSubtitle: {
-    fontFamily: FONTS.body,
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.7)',
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: SPACING[5],
-  },
   popupPrimaryBtn: {
     marginBottom: SPACING[3],
   },
-  popupSecondaryBtn: {},
 });

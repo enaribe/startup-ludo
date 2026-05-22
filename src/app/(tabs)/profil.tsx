@@ -1,5 +1,5 @@
-import { memo } from 'react';
-import { View, Text, ScrollView, Pressable, Dimensions, StyleSheet, Linking } from 'react-native';
+import { memo, useState } from 'react';
+import { View, Text, ScrollView, Pressable, Dimensions, StyleSheet, Linking, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -11,8 +11,10 @@ import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { useAuthStore, useUserStore } from '@/stores';
 import { useSocialStore } from '@/stores/useSocialStore';
-import { RadialBackground, DynamicGradientBorder } from '@/components/ui';
+import { RadialBackground, DynamicGradientBorder, Avatar } from '@/components/ui';
 import { getRankFromXP, getRankProgress, getXPForNextRank } from '@/config/progression';
+import { useAvatarPicker } from '@/hooks/useAvatarPicker';
+import { AvatarPickerModal } from '@/components/profile/AvatarPickerModal';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -99,8 +101,17 @@ export default function ProfilScreen() {
   const xpProgress = getRankProgress(totalXP);
 
   const displayName = user?.displayName || profile?.displayName || 'Joueur';
+  const avatarUrl = profile?.avatarUrl || user?.photoURL || null;
+  const isGuest = user?.isGuest ?? false;
 
   const followCounts = useSocialStore((s) => s.followCounts);
+  const { saveAvatar, isSaving } = useAvatarPicker();
+  const [avatarModalVisible, setAvatarModalVisible] = useState(false);
+
+  const handleSelectAvatar = async (value: string) => {
+    await saveAvatar(value);
+    setAvatarModalVisible(false);
+  };
 
   const handleMenuPress = (itemId: string) => {
     switch (itemId) {
@@ -156,11 +167,34 @@ export default function ProfilScreen() {
         </View>
 
         <Animated.View entering={FadeInDown.duration(450)} style={styles.profileBlock}>
-          <View style={styles.avatarContainer}>
-            <View style={styles.avatarCircle}>
-              <Ionicons name="person" size={40} color="#CBD5E1" />
-            </View>
-          </View>
+          <Pressable
+            style={styles.avatarContainer}
+            onPress={isGuest ? undefined : () => setAvatarModalVisible(true)}
+            disabled={isGuest || isSaving}
+            hitSlop={8}
+          >
+            {avatarUrl ? (
+              <Avatar source={avatarUrl} name={displayName} size="xl" showBorder />
+            ) : (
+              <View style={styles.avatarCircle}>
+                <Ionicons name="person" size={40} color="#CBD5E1" />
+              </View>
+            )}
+
+            {/* Overlay de chargement pendant l'enregistrement */}
+            {isSaving && (
+              <View style={styles.avatarOverlay}>
+                <ActivityIndicator color={COLORS.primary} />
+              </View>
+            )}
+
+            {/* Badge — masqué pour les invités (pas de compte à personnaliser) */}
+            {!isGuest && !isSaving && (
+              <View style={styles.avatarEditBadge}>
+                <Ionicons name="pencil" size={15} color="#0C243E" />
+              </View>
+            )}
+          </Pressable>
 
           <Text style={styles.userName}>{displayName}</Text>
 
@@ -225,6 +259,15 @@ export default function ProfilScreen() {
           </View>
         </View>
       </ScrollView>
+
+      {/* Modale de sélection d'avatar prédéfini */}
+      <AvatarPickerModal
+        visible={avatarModalVisible}
+        currentValue={avatarUrl}
+        isSaving={isSaving}
+        onRequestClose={() => setAvatarModalVisible(false)}
+        onSelect={handleSelectAvatar}
+      />
     </View>
   );
 }
@@ -278,16 +321,38 @@ const styles = StyleSheet.create({
   },
   avatarContainer: {
     marginBottom: SPACING[3],
+    width: 96,
+    height: 96,
   },
   avatarCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 96,
+    height: 96,
+    borderRadius: 48,
     backgroundColor: '#1E293B',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.1)',
+  },
+  avatarOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 48,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarEditBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#0C243E',
   },
   userName: {
     fontFamily: FONTS.title,

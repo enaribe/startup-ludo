@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import type { Player, DuelQuestion, DuelState, DuelResult } from '@/types';
-import { getRandomDuelQuestions, generateAIScore } from '@/data/duelQuestions';
+import type { Player, DuelQuestion, DuelState, DuelResult, AIDuelAnswer } from '@/types';
+import { getRandomDuelQuestions, generateAIDuelAnswers } from '@/data/duelQuestions';
 
 const DEBUG_DUEL = __DEV__;
 function logDuel(...args: unknown[]) {
@@ -52,6 +52,8 @@ interface UseDuelReturn {
   submitMyAnswers: (answers: number[], score: number) => void;
   /** Legacy: submit challenger answers (local mode) */
   submitChallengerAnswers: (answers: number[], score: number) => void;
+  /** AI live duel : soumet le résultat final (humain + IA en parallèle). */
+  submitDuelLiveResult: (humanAnswers: number[], humanScore: number, aiScore: number) => void;
   /** Start opponent's turn (local mode only) */
   startOpponentTurn: () => void;
   /** Submit opponent answers (local mode only) */
@@ -178,6 +180,24 @@ export function useDuel({
 
   // ===== ACTIONS =====
 
+  /** Détecte si un joueur IA est présent dans le duel local et pré-calcule ses réponses. */
+  const buildAIPayload = useCallback(
+    (challengerId: string, opponentId: string, questions: DuelQuestion[]):
+      | { aiPlayerId: string; aiAnswers: AIDuelAnswer[] }
+      | null => {
+      if (isOnline) return null;
+      const challenger = getPlayerById(challengerId);
+      const opponent = getPlayerById(opponentId);
+      const aiPlayer = challenger?.isAI ? challenger : opponent?.isAI ? opponent : null;
+      if (!aiPlayer) return null;
+      return {
+        aiPlayerId: aiPlayer.id,
+        aiAnswers: generateAIDuelAnswers(questions),
+      };
+    },
+    [getPlayerById, isOnline],
+  );
+
   // Start duel (select opponent phase if 3+ players, or intro if 2)
   const startDuel = useCallback((challengerId: string) => {
     const questions = getRandomDuelQuestions(3);
@@ -188,9 +208,11 @@ export function useDuel({
     myLocalScoreRef.current = null;
 
     if (otherPlayers.length === 1 && otherPlayers[0]) {
+      const opponentId = otherPlayers[0].id;
+      const aiPayload = buildAIPayload(challengerId, opponentId, questions);
       setDuelStateSync({
         challengerId,
-        opponentId: otherPlayers[0].id,
+        opponentId,
         questions,
         challengerAnswers: [],
         opponentAnswers: [],
@@ -198,6 +220,7 @@ export function useDuel({
         opponentScore: 0,
         phase: 'intro',
         currentQuestionIndex: 0,
+        ...(aiPayload ?? {}),
       });
     } else {
       setDuelStateSync({
@@ -213,13 +236,14 @@ export function useDuel({
       });
     }
     setResult(null);
-  }, [players]);
+  }, [players, buildAIPayload]);
 
   // Start duel with predefined questions (online 2 players or after opponent selection)
   const startDuelWithQuestions = useCallback((challengerId: string, opponentId: string, questions: DuelQuestion[]) => {
     logDuel('startDuelWithQuestions', { challengerId, opponentId, questionsLength: questions.length });
     hasReceivedRemoteScoreRef.current = false;
     myLocalScoreRef.current = null;
+    const aiPayload = buildAIPayload(challengerId, opponentId, questions);
     setDuelStateSync({
       challengerId,
       opponentId,
@@ -230,9 +254,10 @@ export function useDuel({
       opponentScore: 0,
       phase: 'intro',
       currentQuestionIndex: 0,
+      ...(aiPayload ?? {}),
     });
     setResult(null);
-  }, [setDuelStateSync]);
+  }, [setDuelStateSync, buildAIPayload]);
 
   // Join duel online (opponent side) — same questions, goes to intro then answering
   const joinDuel = useCallback((challengerId: string, opponentId: string, questions: DuelQuestion[]) => {
@@ -259,9 +284,15 @@ export function useDuel({
     if (!duelState) return;
     setDuelStateSync((prev) => {
       if (!prev) return prev;
-      return { ...prev, opponentId, phase: 'intro' };
+      const aiPayload = buildAIPayload(prev.challengerId, opponentId, prev.questions);
+      return {
+        ...prev,
+        opponentId,
+        phase: 'intro',
+        ...(aiPayload ?? { aiPlayerId: undefined, aiAnswers: undefined }),
+      };
     });
-  }, [duelState]);
+  }, [duelState, buildAIPayload]);
 
   // Start answering — universal function for online mode (both players call this)
   const startAnswering = useCallback(() => {
@@ -335,33 +366,17 @@ export function useDuel({
 
   // Legacy: submit challenger answers (local + AI mode)
   const submitChallengerAnswers = useCallback((answers: number[], score: number) => {
-    // Use ref to avoid stale closure in setTimeout calls from play screen
     const currentState = duelStateRef.current ?? duelState;
     if (!currentState) return;
-
-    const opponentPlayer = getPlayerById(currentState.opponentId);
 
     setDuelStateSync((prev) => {
       if (!prev) return prev;
 
-      // AI opponent — calculate immediately
-      if (opponentPlayer?.isAI) {
-        const aiScore = generateAIScore();
-        const duelResult = calculateResult(prev.challengerId, prev.opponentId, score, aiScore);
-        setTimeout(() => {
-          setResult(duelResult);
-          onDuelComplete?.(duelResult);
-        }, 500);
-        return {
-          ...prev,
-          challengerAnswers: answers,
-          challengerScore: score,
-          opponentScore: aiScore,
-          phase: 'result' as const,
-        };
-      }
+      // Mode IA local : le score adversaire est déjà calculé via aiAnswers (live mode).
+      // Le popup question gère la progression et soumet à la fin avec les 2 scores.
+      // Ce chemin (submitChallengerAnswers) n'est plus utilisé pour l'IA — voir submitDuelLiveResult.
 
-      // Local mode: go to opponent prepare
+      // Local mode (humain vs humain) : go to opponent prepare
       if (!isOnline) {
         return {
           ...prev,
@@ -389,7 +404,47 @@ export function useDuel({
       }
       return next;
     });
-  }, [duelState, getPlayerById, isOnline, onDuelComplete]);
+  }, [duelState, isOnline, onDuelComplete]);
+
+  /**
+   * Mode IA local : appelée par le popup question quand le humain ET l'IA
+   * ont fini leurs réponses sur toutes les questions. Le humain joue avec son rôle
+   * réel (challenger ou opponent), l'IA prend l'autre rôle.
+   */
+  const submitDuelLiveResult = useCallback(
+    (humanAnswers: number[], humanScore: number, aiScore: number) => {
+      const currentState = duelStateRef.current ?? duelState;
+      if (!currentState) return;
+      logDuel('submitDuelLiveResult', { humanScore, aiScore });
+
+      setDuelStateSync((prev) => {
+        if (!prev) return prev;
+        const aiId = prev.aiPlayerId;
+        const humanIsChallenger = aiId !== prev.challengerId;
+        const challengerScore = humanIsChallenger ? humanScore : aiScore;
+        const opponentScore = humanIsChallenger ? aiScore : humanScore;
+        const duelResult = calculateResult(
+          prev.challengerId,
+          prev.opponentId,
+          challengerScore,
+          opponentScore,
+        );
+        setTimeout(() => {
+          setResult(duelResult);
+          onDuelComplete?.(duelResult);
+        }, 400);
+        return {
+          ...prev,
+          challengerAnswers: humanIsChallenger ? humanAnswers : prev.challengerAnswers,
+          opponentAnswers: humanIsChallenger ? prev.opponentAnswers : humanAnswers,
+          challengerScore,
+          opponentScore,
+          phase: 'result' as const,
+        };
+      });
+    },
+    [duelState, onDuelComplete],
+  );
 
   // Start opponent turn (local mode only)
   const startOpponentTurn = useCallback(() => {
@@ -537,6 +592,7 @@ export function useDuel({
     startChallengerTurn,
     submitMyAnswers,
     submitChallengerAnswers,
+    submitDuelLiveResult,
     startOpponentTurn,
     submitOpponentAnswers,
     receiveRemoteScore,

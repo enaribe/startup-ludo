@@ -4,6 +4,7 @@ import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
 import { COLORS } from '@/styles/colors';
 import { BORDER_RADIUS } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
+import { resolveAvatarSource } from '@/config/avatars';
 import type { PlayerColor } from '@/types';
 
 type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
@@ -152,11 +153,13 @@ export const Avatar = memo(function Avatar({
     );
   }
 
-  if (source) {
+  // Résout `source` : URL http(s), schéma `avatar://` (asset local), ou null
+  const resolvedSource = resolveAvatarSource(source);
+  if (resolvedSource) {
     return (
       <View style={[containerStyle, style]}>
         <Image
-          source={{ uri: source }}
+          source={resolvedSource}
           style={{
             width: '100%',
             height: '100%',

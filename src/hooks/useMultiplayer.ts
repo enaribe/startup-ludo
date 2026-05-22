@@ -30,6 +30,8 @@ interface UseMultiplayerState {
   isConnected: boolean;
   isLoading: boolean;
   error: string | null;
+  /** True quand le salon a été dissous avant le démarrage (hôte parti). */
+  roomClosed: boolean;
 }
 
 interface UseMultiplayerActions {
@@ -60,6 +62,7 @@ export function useMultiplayer(userId: string | null): UseMultiplayerReturn {
     isConnected: false,
     isLoading: false,
     error: null,
+    roomClosed: false,
   });
 
   const unsubscribesRef = useRef<(() => void)[]>([]);
@@ -177,7 +180,8 @@ export function useMultiplayer(userId: string | null): UseMultiplayerReturn {
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Erreur lors de la connexion';
         setState((prev) => ({ ...prev, isLoading: false, error: message }));
-        return null;
+        // Re-throw pour que l'appelant puisse identifier le type d'erreur (JoinRoomError)
+        throw error;
       }
     },
     [userId]
@@ -190,7 +194,20 @@ export function useMultiplayer(userId: string | null): UseMultiplayerReturn {
 
     // Subscribe to room
     const unsubRoom = multiplayerSync.subscribeToRoom((room) => {
-      setState((prev) => ({ ...prev, room }));
+      setState((prev) => {
+        // La room disparaît (null) alors qu'on en avait une qui n'avait pas
+        // démarré → le salon a été dissous (hôte parti).
+        const roomDissolved =
+          !room && !!prev.room && prev.room.status === 'waiting';
+        if (roomDissolved) {
+          setTimeout(() => multiplayerSync.handleRemoteRoomClosed(), 0);
+        }
+        return {
+          ...prev,
+          room,
+          roomClosed: roomDissolved ? true : prev.roomClosed,
+        };
+      });
     });
     unsubscribesRef.current.push(unsubRoom);
 
@@ -247,6 +264,7 @@ export function useMultiplayer(userId: string | null): UseMultiplayerReturn {
         isConnected: false,
         isLoading: false,
         error: null,
+        roomClosed: false,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erreur lors de la déconnexion';

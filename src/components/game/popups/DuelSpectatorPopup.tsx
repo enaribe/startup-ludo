@@ -22,6 +22,16 @@ interface DuelSpectatorPopupProps {
   challenger: Player;
   opponent: Player;
   onClose?: () => void;
+  /** Score live du challenger (progression en direct). */
+  challengerScore?: number;
+  /** Score live de l'opponent (progression en direct). */
+  opponentScore?: number;
+  /** Nombre de questions répondues par le challenger. */
+  challengerAnswered?: number;
+  /** Nombre de questions répondues par l'opponent. */
+  opponentAnswered?: number;
+  /** Nombre total de questions du duel. */
+  totalQuestions?: number;
 }
 
 export const DuelSpectatorPopup = memo(function DuelSpectatorPopup({
@@ -29,6 +39,11 @@ export const DuelSpectatorPopup = memo(function DuelSpectatorPopup({
   challenger,
   opponent,
   onClose,
+  challengerScore = 0,
+  opponentScore = 0,
+  challengerAnswered = 0,
+  opponentAnswered = 0,
+  totalQuestions = 3,
 }: DuelSpectatorPopupProps) {
   usePlaySoundOnOpen(visible, 'popup-open');
 
@@ -59,7 +74,12 @@ export const DuelSpectatorPopup = memo(function DuelSpectatorPopup({
       <Animated.View entering={SlideInUp.duration(280)} style={styles.card}>
         <DuelHeader />
         <View style={styles.content}>
-          {/* VS Section */}
+          {/* Bandeau spectateur */}
+          <View style={styles.spectatorBadge}>
+            <Text style={styles.spectatorBadgeText}>MODE SPECTATEUR</Text>
+          </View>
+
+          {/* VS Section avec scores live */}
           <View style={styles.vsSection}>
             {/* Challenger */}
             <View style={styles.playerSide}>
@@ -71,6 +91,12 @@ export const DuelSpectatorPopup = memo(function DuelSpectatorPopup({
               />
               <Text style={styles.playerName} numberOfLines={1}>
                 {challenger.startupName}
+              </Text>
+              <View style={styles.scoreChip}>
+                <Text style={styles.scoreChipValue}>{challengerScore}</Text>
+              </View>
+              <Text style={styles.answeredText}>
+                {challengerAnswered}/{totalQuestions} répondu
               </Text>
             </View>
 
@@ -90,6 +116,12 @@ export const DuelSpectatorPopup = memo(function DuelSpectatorPopup({
               <Text style={styles.playerName} numberOfLines={1}>
                 {opponent.startupName}
               </Text>
+              <View style={styles.scoreChip}>
+                <Text style={styles.scoreChipValue}>{opponentScore}</Text>
+              </View>
+              <Text style={styles.answeredText}>
+                {opponentAnswered}/{totalQuestions} répondu
+              </Text>
             </View>
           </View>
 
@@ -97,7 +129,7 @@ export const DuelSpectatorPopup = memo(function DuelSpectatorPopup({
           <View style={styles.messageBox}>
             <ActivityIndicator size="small" color={COLORS.success} style={styles.loader} />
             <Text style={styles.message}>
-              En attente du résultat...
+              Duel en cours...
             </Text>
           </View>
         </View>
@@ -139,6 +171,41 @@ const styles = StyleSheet.create({
     marginTop: SPACING[2],
     textAlign: 'center',
     maxWidth: 80,
+  },
+  spectatorBadge: {
+    backgroundColor: '#EAF4FB',
+    borderRadius: BORDER_RADIUS.full,
+    paddingVertical: SPACING[1],
+    paddingHorizontal: SPACING[3],
+    marginBottom: SPACING[3],
+  },
+  spectatorBadgeText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.primary,
+    letterSpacing: 1,
+  },
+  scoreChip: {
+    marginTop: SPACING[2],
+    minWidth: 44,
+    paddingVertical: SPACING[1],
+    paddingHorizontal: SPACING[2],
+    borderRadius: BORDER_RADIUS.lg,
+    backgroundColor: '#F0F7F0',
+    borderWidth: 1,
+    borderColor: 'rgba(76, 175, 80, 0.3)',
+    alignItems: 'center',
+  },
+  scoreChipValue: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES.xl,
+    color: COLORS.success,
+  },
+  answeredText: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.xs,
+    color: '#8E99A4',
+    marginTop: 3,
   },
   messageBox: {
     flexDirection: 'row',

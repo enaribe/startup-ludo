@@ -1,10 +1,12 @@
 /**
- * MissedFinalEntryPopup — Affiché quand un pion passe devant son entrée finale
- * sans avoir assez de jetons (TOKENS_TO_FINISH = 8).
+ * MissedFinalEntryPopup — Avertissement préventif affiché quand le pion entre
+ * dans la zone d'approche du couloir final (≤ FINAL_ENTRY_WARNING_DISTANCE cases)
+ * sans avoir encore les jetons requis (TOKENS_TO_FINISH = 8). Donne au joueur
+ * une chance d'accumuler les jetons manquants avant de devoir refaire un tour.
  *
- * Design : smiley triste en haut → titre → track de jetons horizontale
+ * Design : smiley en haut → titre d'avertissement → track de jetons horizontale
  * (rectangles colorés + pion SVG à la position actuelle + cercles vides + drapeau)
- * → liste des joueurs → bouton CONTINUER
+ * → liste des joueurs → bouton COMPRIS
  */
 
 import { memo, useState } from 'react';
@@ -219,14 +221,19 @@ export const MissedFinalEntryPopup = memo(function MissedFinalEntryPopup({
 
   const titleText =
     tokensNeeded === 1
-      ? 'ENCORE 1 JETON\nPOUR TERMINER'
-      : `ENCORE ${tokensNeeded} JETONS\nPOUR TERMINER`;
+      ? 'ENCORE 1 JETON\nÀ COLLECTER'
+      : `ENCORE ${tokensNeeded} JETONS\nÀ COLLECTER`;
+
+  const warningText =
+    tokensNeeded === 1
+      ? "Sans 1 jeton supplémentaire avant l'entrée du couloir final, votre pion devra refaire un tour complet."
+      : `Sans ${tokensNeeded} jetons supplémentaires avant l'entrée du couloir final, votre pion devra refaire un tour complet.`;
 
   return (
     <GamePopup
       visible={visible}
       onRequestClose={onContinue}
-      header="Dommage"
+      header="Attention"
       icon={<SadFaceIcon />}
     >
       {/* Titre avec stroke bleu */}
@@ -237,6 +244,11 @@ export const MissedFinalEntryPopup = memo(function MissedFinalEntryPopup({
           outlineColor="#1F91D0"
           outlineWidth={1.5}
         />
+      </View>
+
+      {/* Message d'avertissement */}
+      <View style={styles.warningWrapper}>
+        <Text style={styles.warningText}>{warningText}</Text>
       </View>
 
       {/* Track de jetons */}
@@ -261,7 +273,7 @@ export const MissedFinalEntryPopup = memo(function MissedFinalEntryPopup({
 
       {/* Bouton */}
       <View style={styles.buttonContainer}>
-        <GameButton variant="yellow" fullWidth title="CONTINUER" onPress={onContinue} />
+        <GameButton variant="yellow" fullWidth title="COMPRIS" onPress={onContinue} />
       </View>
     </GamePopup>
   );
@@ -274,7 +286,7 @@ const styles = StyleSheet.create({
   titleWrapper: {
     width: '100%',
     alignItems: 'center',
-    marginBottom: SPACING[4],
+    marginBottom: SPACING[3],
   },
   title: {
     fontFamily: FONTS.title,
@@ -282,6 +294,21 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     textAlign: 'center',
     lineHeight: 28,
+  },
+
+  // Message d'avertissement
+  warningWrapper: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: SPACING[3],
+    paddingHorizontal: SPACING[2],
+  },
+  warningText: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 
   // Track

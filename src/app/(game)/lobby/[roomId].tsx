@@ -5,7 +5,7 @@
  * le code de la salle, et permet a l'hote de lancer la partie.
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -37,10 +37,12 @@ import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useUserStore } from '@/stores/useUserStore';
 import { useMultiplayer } from '@/hooks/useMultiplayer';
+import { buildShareMessage } from '@/services/multiplayer/inviteLink';
 import { EmojiChat } from '@/components/game/EmojiChat';
 import { Avatar } from '@/components/ui/Avatar';
 import { RadialBackground, DynamicGradientBorder, GameButton } from '@/components/ui';
 import { StartupSelectionModal } from '@/components/game/StartupSelectionModal';
+import { InviteContactModal } from '@/components/game/InviteContactModal';
 import { getDefaultProjectsForEdition, getMatchingUserStartups } from '@/data/defaultProjects';
 import type { PlayerColor } from '@/types';
 
@@ -66,6 +68,7 @@ export default function LobbyScreen() {
     players,
     chatMessages,
     isLoading,
+    roomClosed,
     leaveRoom,
     setReady,
     setStartupSelection,
@@ -75,6 +78,8 @@ export default function LobbyScreen() {
 
   const [isReady, setIsReady] = useState(false);
   const [showStartupModal, setShowStartupModal] = useState(false);
+  const [showInviteContact, setShowInviteContact] = useState(false);
+  const isGuest = user?.isGuest ?? true;
   const isHostPlayer = isHost === 'true';
 
   // Edition et projets
@@ -94,6 +99,16 @@ export default function LobbyScreen() {
     [players, user?.id]
   );
   const hasSelectedStartup = !!myPlayer?.startupId;
+  const startupModalAutoOpenedRef = useRef(false);
+
+  // Ouvre automatiquement le choix de projet dès que le joueur est dans le salon sans projet.
+  useEffect(() => {
+    if (startupModalAutoOpenedRef.current) return;
+    if (myPlayer && !hasSelectedStartup) {
+      startupModalAutoOpenedRef.current = true;
+      setShowStartupModal(true);
+    }
+  }, [myPlayer, hasSelectedStartup]);
 
   // Pulse animation for the waiting indicator
   const pulseOpacity = useSharedValue(0.4);
@@ -121,6 +136,17 @@ export default function LobbyScreen() {
       });
     }
   }, [room?.status, room?.gameId, roomId, router]);
+
+  // Salon dissous par l'hôte : éjecter les joueurs non-hôtes
+  useEffect(() => {
+    if (roomClosed && !isHostPlayer) {
+      Alert.alert(
+        'Salon fermé',
+        "L'hôte a quitté le salon.",
+        [{ text: 'OK', onPress: () => router.replace('/(game)/online-hub') }]
+      );
+    }
+  }, [roomClosed, isHostPlayer, router]);
 
   const playersList = useMemo(() => {
     return Object.entries(players).map(([playerId, player]) => ({
@@ -167,7 +193,7 @@ export default function LobbyScreen() {
     if (code) {
       try {
         await Share.share({
-          message: `Rejoins ma partie Startup Ludo avec le code: ${code}`,
+          message: buildShareMessage(code),
         });
       } catch {
         // Share cancelled
@@ -236,9 +262,20 @@ export default function LobbyScreen() {
           <Ionicons name="arrow-back" size={22} color="white" />
         </Pressable>
         <Text style={styles.headerTitle}>SALLE D'ATTENTE</Text>
-        <Pressable onPress={handleShareCode} hitSlop={8} style={styles.headerBtn}>
-          <Ionicons name="share-outline" size={22} color="white" />
-        </Pressable>
+        <View style={styles.headerActions}>
+          {!isGuest && (
+            <Pressable
+              onPress={() => setShowInviteContact(true)}
+              hitSlop={8}
+              style={styles.headerBtn}
+            >
+              <Ionicons name="person-add-outline" size={22} color="white" />
+            </Pressable>
+          )}
+          <Pressable onPress={handleShareCode} hitSlop={8} style={styles.headerBtn}>
+            <Ionicons name="share-outline" size={22} color="white" />
+          </Pressable>
+        </View>
       </View>
 
       {/* Main content */}
@@ -438,7 +475,7 @@ export default function LobbyScreen() {
         </View>
       </View>
 
-      {/* Startup Selection Modal */}
+      {/* Startup Selection Modal — non-fermable tant qu'aucun projet n'est choisi */}
       <StartupSelectionModal
         visible={showStartupModal}
         edition={edition}
@@ -446,7 +483,16 @@ export default function LobbyScreen() {
         defaultProjects={defaultProjects}
         playerName={user?.displayName}
         onSelect={handleStartupSelected}
-        onClose={() => setShowStartupModal(false)}
+        onClose={() => {
+          if (hasSelectedStartup) setShowStartupModal(false);
+        }}
+      />
+
+      <InviteContactModal
+        visible={showInviteContact}
+        onClose={() => setShowInviteContact(false)}
+        roomId={roomId ?? ''}
+        roomCode={code ?? ''}
       />
 
       {/* Emoji Chat */}
@@ -490,6 +536,10 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerActions: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
   headerTitle: {

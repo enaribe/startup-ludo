@@ -22,6 +22,7 @@ import {
 import {
   createUserProfile,
   getUserProfile,
+  ensureUsernameForUser,
   type UserProfile,
 } from '@/services/firebase';
 import { useUserStore } from './useUserStore';
@@ -148,6 +149,25 @@ export const useAuthStore = create<AuthStore>()(
             if (!authUser.isGuest) {
               useSocialStore.getState().loadFollowing(authUser.id);
               useSocialStore.getState().loadFollowCounts(authUser.id);
+
+              // Migration pseudo unique : pour les comptes existants sans pseudo
+              // réservé, on tente une migration auto depuis leur displayName.
+              ensureUsernameForUser(authUser.id, authUser.displayName ?? '')
+                .then((result) => {
+                  if (result.needsManualChoice) {
+                    set((state) => {
+                      state.needsProfileCompletion = true;
+                    });
+                  } else if (result.username) {
+                    // Pseudo migré : aligner le displayName local sur le pseudo
+                    set((state) => {
+                      if (state.user) state.user.displayName = result.username!;
+                    });
+                  }
+                })
+                .catch((err) => {
+                  console.warn('[Auth] ensureUsernameForUser failed:', err);
+                });
             }
             try {
               const profile = await getUserProfile(authUser.id);
@@ -270,6 +290,8 @@ export const useAuthStore = create<AuthStore>()(
             state.user = user;
             state.isAuthenticated = true;
             state.isLoading = false;
+            // Nouveau compte → doit choisir un pseudo unique
+            state.needsProfileCompletion = true;
           });
 
           useUserStore.getState().setProfile(profile);
@@ -324,6 +346,7 @@ export const useAuthStore = create<AuthStore>()(
 
           // Create or update user profile in Firestore
           let profile = await getUserProfile(authUser.id);
+          const isNewUser = !profile;
           if (!profile) {
             profile = await createUserProfile(authUser.id, {
               email: authUser.email,
@@ -336,6 +359,8 @@ export const useAuthStore = create<AuthStore>()(
             state.user = user;
             state.isAuthenticated = true;
             state.isLoading = false;
+            // Nouveau compte → doit choisir un pseudo unique
+            state.needsProfileCompletion = isNewUser;
           });
 
           useUserStore.getState().setProfile(profile);
@@ -359,6 +384,7 @@ export const useAuthStore = create<AuthStore>()(
 
           // Create or update user profile in Firestore
           let profile = await getUserProfile(authUser.id);
+          const isNewUser = !profile;
           if (!profile) {
             profile = await createUserProfile(authUser.id, {
               email: authUser.email,
@@ -370,6 +396,8 @@ export const useAuthStore = create<AuthStore>()(
             state.user = user;
             state.isAuthenticated = true;
             state.isLoading = false;
+            // Nouveau compte → doit choisir un pseudo unique
+            state.needsProfileCompletion = isNewUser;
           });
 
           useUserStore.getState().setProfile(profile);

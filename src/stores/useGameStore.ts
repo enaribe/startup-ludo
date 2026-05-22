@@ -23,6 +23,7 @@ import { useChallengeStore } from '@/stores/useChallengeStore';
 import { MAX_TOKENS } from '@/config/boardConfig';
 import { gameLog } from '@/utils/gameLog';
 import { resetDuelQuestionPool } from '@/data/duelQuestions';
+import { resetJokerPool, markJokerUsed } from '@/data/jokers';
 
 /** Action compacte recue d'un joueur distant via RTDB */
 export interface RemoteAction {
@@ -67,6 +68,16 @@ interface GameStoreActions {
   initGame: (mode: GameMode, edition: string, players: Omit<Player, 'tokens' | 'pawns'>[], challengeContext?: ChallengeContext) => void;
   resetGame: () => void;
   endGame: (winnerId: string) => void;
+
+  // Forfait (online)
+  forfeitPlayer: (playerId: string) => void;
+
+  /**
+   * Marque un joueur comme ayant terminé (atteint l'arrivée).
+   * Lui assigne un rank, l'ajoute au ranking[], et décide si la partie continue ou se termine.
+   * Retourne true si la partie continue (le joueur courant doit nextTurn), false si la partie est finie.
+   */
+  finishPlayer: (playerId: string) => boolean;
 
   // Gestion des tours
   rollDice: () => number;
@@ -161,6 +172,9 @@ export const useGameStore = create<GameStore>()(
         // Reset du pool de questions de duel (évite les doublons entre parties)
         resetDuelQuestionPool();
 
+        // Reset du pool de jokers (évite les doublons entre parties)
+        resetJokerPool();
+
         // Si mode challenge, charger le contenu du sous-niveau
         eventManager.clearSubLevelContent();
         if (challengeContext) {
@@ -226,6 +240,7 @@ export const useGameStore = create<GameStore>()(
             selectedPawnIndex: null,
             pendingEvent: null,
             winner: null,
+            ranking: [],
             challengeContext,
             createdAt: Date.now(),
             updatedAt: Date.now(),
@@ -264,6 +279,117 @@ export const useGameStore = create<GameStore>()(
             state.game.updatedAt = Date.now();
           }
         });
+      },
+
+      forfeitPlayer: (playerId) => {
+        const { game } = get();
+        if (!game) return;
+
+        const target = game.players.find((p) => p.id === playerId);
+        if (!target || target.isForfeited) return;
+
+        const wasCurrentPlayer = game.players[game.currentPlayerIndex]?.id === playerId;
+
+        set((state) => {
+          if (!state.game) return;
+          const player = state.game.players.find((p) => p.id === playerId);
+          if (!player || player.isForfeited) return;
+          player.isForfeited = true;
+          player.forfeitedAt = Date.now();
+          state.game.updatedAt = Date.now();
+        });
+
+        // "Actifs" = pas forfait ET pas déjà classés (rank non défini)
+        const remainingActive =
+          get().game?.players.filter((p) => !p.isForfeited && p.rank === undefined) ?? [];
+
+        if (remainingActive.length <= 1) {
+          // Plus qu'un actif (ou zéro) → fin de partie.
+          // Le dernier actif (s'il existe) est classé en dernier.
+          const last = remainingActive[0];
+          if (last) {
+            get().finishPlayer(last.id);
+          } else {
+            // Aucun actif restant (tous forfait/finis) → fin sans plus rien à faire.
+            const ranking = get().game?.ranking ?? [];
+            const winner = ranking[0] ?? null;
+            if (winner) get().endGame(winner);
+          }
+          return;
+        }
+
+        if (wasCurrentPlayer) {
+          get().nextTurn();
+        }
+      },
+
+      finishPlayer: (playerId) => {
+        const { game } = get();
+        if (!game) return false;
+
+        const target = game.players.find((p) => p.id === playerId);
+        if (!target || target.rank !== undefined || target.isForfeited) {
+          // Déjà classé ou forfait : rien à faire
+          return game.status !== 'finished';
+        }
+
+        // Calculer le rank = nombre de joueurs déjà classés + 1
+        const alreadyFinished = game.players.filter((p) => p.rank !== undefined).length;
+        const newRank = alreadyFinished + 1;
+
+        set((state) => {
+          if (!state.game) return;
+          const player = state.game.players.find((p) => p.id === playerId);
+          if (!player) return;
+          player.rank = newRank;
+          player.finishedAt = Date.now();
+          if (!state.game.ranking) state.game.ranking = [];
+          state.game.ranking.push(playerId);
+          state.game.updatedAt = Date.now();
+        });
+
+        // Le 1er à finir devient winner
+        if (newRank === 1) {
+          set((state) => {
+            if (state.game) state.game.winner = playerId;
+          });
+        }
+
+        // Combien d'actifs restants (pas forfait ET pas classés) ?
+        const remainingActive =
+          get().game?.players.filter((p) => !p.isForfeited && p.rank === undefined) ?? [];
+
+        // Mode 2 joueurs : dès qu'un finit, partie close (comportement actuel)
+        const totalPlayers = game.players.length;
+        if (totalPlayers <= 2) {
+          get().endGame(playerId);
+          return false;
+        }
+
+        // 3+ joueurs : on continue tant qu'il reste ≥ 2 actifs
+        if (remainingActive.length >= 2) {
+          return true;
+        }
+
+        // Plus qu'un actif (ou zéro) → classer le dernier et clôturer
+        if (remainingActive.length === 1) {
+          const last = remainingActive[0]!;
+          const lastRank = newRank + 1;
+          set((state) => {
+            if (!state.game) return;
+            const player = state.game.players.find((p) => p.id === last.id);
+            if (!player) return;
+            player.rank = lastRank;
+            player.finishedAt = Date.now();
+            if (!state.game.ranking) state.game.ranking = [];
+            state.game.ranking.push(last.id);
+            state.game.updatedAt = Date.now();
+          });
+        }
+
+        const finalWinner = get().game?.ranking?.[0] ?? playerId;
+        get().endGame(finalWinner);
+        return false;
       },
 
       // ===== GESTION DES TOURS =====
@@ -323,11 +449,15 @@ export const useGameStore = create<GameStore>()(
           if (state.game) {
             let nextIndex = (state.game.currentPlayerIndex + 1) % state.game.players.length;
 
-            // Vérifier si le prochain joueur doit passer son tour
+            // Vérifier si le prochain joueur doit passer son tour (skip ou forfait ou déjà classé)
             let skipCount = 0;
             while (skipCount < state.game.players.length) {
               const nextPlayer = state.game.players[nextIndex];
-              if (nextPlayer && state.playerEffects[nextPlayer.id]?.skipNextTurn) {
+              if (nextPlayer && (nextPlayer.isForfeited || nextPlayer.rank !== undefined)) {
+                // Skip silencieux des joueurs forfait ou déjà arrivés (rank défini)
+                nextIndex = (nextIndex + 1) % state.game.players.length;
+                skipCount++;
+              } else if (nextPlayer && state.playerEffects[nextPlayer.id]?.skipNextTurn) {
                 // Consommer le skip
                 state.playerEffects[nextPlayer.id]!.skipNextTurn = false;
                 nextIndex = (nextIndex + 1) % state.game.players.length;
@@ -657,6 +787,9 @@ export const useGameStore = create<GameStore>()(
 
       grantJoker: (playerId, jokerType, id) => {
         const jokerId = id ?? newJokerId();
+        // Synchronise l'historique anti-répétition des jokers (couvre local + online :
+        // toute attribution, y compris via applyRemoteAction, passe ici).
+        markJokerUsed(jokerType);
         set((state) => {
           if (!state.game) return;
           const player = state.game.players.find((p) => p.id === playerId);
@@ -880,6 +1013,26 @@ export const useGameStore = create<GameStore>()(
             // Forfeit — opponent quit, winner declared
             const winnerId = (action.d as { winner: string }).winner;
             get().endGame(winnerId);
+            break;
+          }
+
+          case 'pf': {
+            // Player forfeit — un joueur déconnecté définitivement, on l'éjecte
+            const data = action.d as { pid: string };
+            if (data.pid) {
+              get().forfeitPlayer(data.pid);
+            }
+            break;
+          }
+
+          case 'pfin': {
+            // Player finished — un joueur a terminé son pion (arrivée).
+            // En multi 3+ joueurs : assigne un rank, partie continue si actifs restants.
+            // En 2 joueurs : finishPlayer déclenche endGame directement.
+            const data = action.d as { pid: string };
+            if (data.pid) {
+              get().finishPlayer(data.pid);
+            }
             break;
           }
         }

@@ -5,8 +5,8 @@
  * Phase 2: Salle d'attente avec liste joueurs, bouton Pret
  */
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
-import { View, Text, Pressable, ScrollView, TextInput, Alert, Dimensions, StyleSheet } from 'react-native';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { View, Text, Pressable, ScrollView, TextInput, Alert, Dimensions, StyleSheet, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
@@ -21,6 +21,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { RadialBackground, DynamicGradientBorder, GameButton } from '@/components/ui';
 import { StartupSelectionModal } from '@/components/game/StartupSelectionModal';
 import { getDefaultProjectsForEdition, getMatchingUserStartups } from '@/data/defaultProjects';
+import { JoinRoomError, getJoinRoomErrorDisplay } from '@/services/multiplayer/JoinRoomError';
 
 const { width: screenWidth } = Dimensions.get('window');
 const contentWidth = screenWidth - SPACING[4] * 2;
@@ -28,7 +29,7 @@ const contentWidth = screenWidth - SPACING[4] * 2;
 export default function JoinRoomScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  useLocalSearchParams<{ challenge?: string }>();
+  const { code: codeParam } = useLocalSearchParams<{ challenge?: string; code?: string }>();
 
   const user = useAuthStore((state) => state.user);
   const profile = useUserStore((state) => state.profile);
@@ -36,13 +37,21 @@ export default function JoinRoomScreen() {
     room,
     players,
     isLoading,
+    roomClosed,
     joinRoom,
     setReady,
     setStartupSelection,
     leaveRoom,
   } = useMultiplayer(user?.id ?? null);
 
-  const [code, setCode] = useState('');
+  // Pré-remplit le code si fourni en paramètre (ex: invitation acceptée)
+  const initialCode = useMemo(() => {
+    const clean = (codeParam ?? '').replace(/-/g, '').trim().toUpperCase();
+    if (!clean) return '';
+    return clean.length > 4 ? `${clean.slice(0, 4)}-${clean.slice(4)}` : clean;
+  }, [codeParam]);
+
+  const [code, setCode] = useState(initialCode);
   const [playerName] = useState(user?.displayName ?? 'Joueur');
   const [isReady, setIsReady] = useState(false);
   const [joiningRoom, setJoiningRoom] = useState(false);
@@ -61,11 +70,22 @@ export default function JoinRoomScreen() {
     [players, user?.id]
   );
   const hasSelectedStartup = !!myPlayer?.startupId;
+  const startupModalAutoOpenedRef = useRef(false);
 
   const handleStartupSelected = useCallback(async (startupId: string, startupName: string, isDefault: boolean, sector: string) => {
     setShowStartupModal(false);
     await setStartupSelection(startupId, startupName, isDefault, sector);
   }, [setStartupSelection]);
+
+  // Ouvre automatiquement le choix de projet dès que le joueur a rejoint le salon
+  // sans projet — quelle que soit la voie (saisie code, deep link, invitation).
+  useEffect(() => {
+    if (startupModalAutoOpenedRef.current) return;
+    if (showLobby && myPlayer && !hasSelectedStartup) {
+      startupModalAutoOpenedRef.current = true;
+      setShowStartupModal(true);
+    }
+  }, [showLobby, myPlayer, hasSelectedStartup]);
 
   // Helper function to format room code
   const formatRoomCode = (codeStr: string) => {
@@ -91,6 +111,17 @@ export default function JoinRoomScreen() {
       });
     }
   }, [room?.status, room?.gameId, room?.id, router]);
+
+  // Salon dissous par l'hôte : on rejoint toujours en tant que non-hôte ici
+  useEffect(() => {
+    if (roomClosed) {
+      Alert.alert(
+        'Salon fermé',
+        "L'hôte a quitté le salon.",
+        [{ text: 'OK', onPress: () => router.replace('/(game)/online-hub') }]
+      );
+    }
+  }, [roomClosed, router]);
 
   const handleBack = useCallback(async () => {
     if (showLobby) {
@@ -138,12 +169,19 @@ export default function JoinRoomScreen() {
       if (result) {
         setShowLobby(true);
       } else {
-        Alert.alert('Erreur', 'Impossible de rejoindre le salon. Verifie le code et reessaye.');
+        // Pas d'erreur jetée mais résultat null : code invalide côté hook
+        const { title, message } = getJoinRoomErrorDisplay('ROOM_NOT_FOUND');
+        Alert.alert(title, message);
       }
     } catch (error) {
       setJoiningRoom(false);
-      const message = error instanceof Error ? error.message : 'Erreur inconnue';
-      Alert.alert('Erreur', message);
+      if (error instanceof JoinRoomError) {
+        const { title, message } = getJoinRoomErrorDisplay(error.code);
+        Alert.alert(title, message);
+      } else {
+        const { title, message } = getJoinRoomErrorDisplay('UNKNOWN');
+        Alert.alert(title, message);
+      }
     }
   }, [code, user, playerName, joinRoom]);
 
@@ -182,8 +220,9 @@ export default function JoinRoomScreen() {
             <Text style={styles.configTitle}>REJOINDRE UN SALON</Text>
           </Animated.View>
 
-          {/* Carte centrale avec configuration */}
-          <Animated.View entering={FadeInDown.delay(200).duration(500)}>
+          {/* Carte centrale — pas d'animation Reanimated ici : sur Android, le wrapper
+              Animated.View peut empêcher InputMethodManager de remonter le clavier. */}
+          <View>
             <DynamicGradientBorder
               borderRadius={24}
               fill="rgba(0, 0, 0, 0.35)"
@@ -191,35 +230,30 @@ export default function JoinRoomScreen() {
               style={{ marginTop: SPACING[5] }}
             >
               <View style={styles.configCard}>
-                {/* Code du Salon */}
+                {/* Code du Salon — TextInput nu, bord en CSS natif (pas de SVG par-dessus
+                    sinon Android n'attache pas l'EditText à l'InputMethodManager). */}
                 <View style={styles.fieldGroup}>
                   <Text style={styles.fieldLabel}>Code du Salon</Text>
-                  <DynamicGradientBorder
-                    borderRadius={14}
-                    fill="rgba(0, 0, 0, 0.35)"
-                    style={styles.inputBorderWrapper}
-                  >
-                    <View style={styles.inputInner}>
-                      <TextInput
-                        value={code}
-                        onChangeText={(text) => {
-                          const cleaned = text.replace(/-/g, '').toUpperCase();
-                          if (cleaned.length <= 8) {
-                            setCode(cleaned.length > 4 ? `${cleaned.slice(0, 4)}-${cleaned.slice(4)}` : cleaned);
-                          }
-                        }}
-                        placeholder="UPM7-T94Z"
-                        placeholderTextColor="rgba(255,255,255,0.3)"
-                        style={styles.configInput}
-                        autoCapitalize="characters"
-                        maxLength={9}
-                      />
-                    </View>
-                  </DynamicGradientBorder>
+                  <View style={styles.inputBorderShell}>
+                    <TextInput
+                      value={code}
+                      onChangeText={(text) => {
+                        const cleaned = text.replace(/-/g, '').toUpperCase();
+                        if (cleaned.length <= 8) {
+                          setCode(cleaned.length > 4 ? `${cleaned.slice(0, 4)}-${cleaned.slice(4)}` : cleaned);
+                        }
+                      }}
+                      placeholder="UPM7-T94Z"
+                      placeholderTextColor="rgba(255,255,255,0.3)"
+                      style={styles.configInput}
+                      autoCapitalize="characters"
+                      maxLength={9}
+                    />
+                  </View>
                 </View>
               </View>
             </DynamicGradientBorder>
-          </Animated.View>
+          </View>
         </ScrollView>
 
         {/* Bottom button */}
@@ -369,7 +403,7 @@ export default function JoinRoomScreen() {
         </Animated.View>
       </ScrollView>
 
-      {/* Startup Selection Modal */}
+      {/* Startup Selection Modal — non-fermable tant qu'aucun projet n'est choisi */}
       <StartupSelectionModal
         visible={showStartupModal}
         edition={edition}
@@ -377,7 +411,9 @@ export default function JoinRoomScreen() {
         defaultProjects={defaultProjects}
         playerName={user?.displayName}
         onSelect={handleStartupSelected}
-        onClose={() => setShowStartupModal(false)}
+        onClose={() => {
+          if (hasSelectedStartup) setShowStartupModal(false);
+        }}
       />
 
       {/* Bottom - Ready button */}
@@ -443,11 +479,13 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.sm,
     color: 'rgba(255, 255, 255, 0.7)',
   },
-  inputBorderWrapper: {
+  // Bord arrondi en CSS natif RN (pas de SVG over-input → Android touch direct).
+  inputBorderShell: {
     width: '100%',
-    overflow: 'hidden',
-  },
-  inputInner: {
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
@@ -456,6 +494,8 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.md,
     color: '#FFFFFF',
     letterSpacing: 2,
+    minHeight: Platform.OS === 'android' ? 28 : undefined,
+    padding: 0,
   },
   confirmationCard: {
     padding: SPACING[6],

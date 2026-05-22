@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { View, Text, ScrollView, StyleSheet, Dimensions } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Pressable, View, Text, ScrollView, StyleSheet, Dimensions } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -7,12 +7,14 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
 import { RadialBackground, DynamicGradientBorder, GameButton } from '@/components/ui';
+import { GamePopup } from '@/components/ui/GamePopup';
 import { PortfolioIcon } from '@/components/icons';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { useUserStore, useSettingsStore, useAuthStore } from '@/stores';
 import { addStartup as firestoreAddStartup, updateUserStats } from '@/services/firebase/firestore';
+import { generateValuation, type ValuationFactor } from '@/services/ai';
 import { formatFCFARaw } from '@/utils/currency';
 import { TARGET_CARDS, MISSION_CARDS, SECTOR_CARDS } from '@/constants/ideation';
 import { XP_REWARDS } from '@/config/progression';
@@ -68,6 +70,12 @@ export default function StartupConfirmationScreen() {
   const userId = useAuthStore((state) => state.user?.id);
   const userName = useAuthStore((state) => state.user?.displayName);
   const hasApplied = useRef(false);
+  const hasRequestedValuation = useRef(false);
+  const [showValuationInfo, setShowValuationInfo] = useState(false);
+  const [isLoadingValuation, setIsLoadingValuation] = useState(true);
+  const [aiValuation, setAiValuation] = useState<number | null>(null);
+  const [aiExplanation, setAiExplanation] = useState<string | null>(null);
+  const [aiFactors, setAiFactors] = useState<ValuationFactor[] | null>(null);
 
   const params = useLocalSearchParams<{
     startupName?: string;
@@ -100,10 +108,12 @@ export default function StartupConfirmationScreen() {
   const missionMultiplier = missionCardData?.xpMultiplier ?? 1.0;
   const sectorMultiplier = sectorCardData?.xpMultiplier ?? 1.0;
 
-  // Real valorisation based on card multipliers
-  const valorisation = Math.round(
+  // Fallback valorisation based on card multipliers (utilisée si l'IA échoue ou en attente)
+  const fallbackValorisation = Math.round(
     BASE_VALUATION * targetMultiplier * missionMultiplier * sectorMultiplier
   );
+  // Valorisation finale : IA si dispo, sinon fallback
+  const valorisation = aiValuation ?? fallbackValorisation;
 
   // Real XP reward based on card multipliers
   const baseXP = XP_REWARDS.STARTUP_CREATED?.amount ?? 25;
@@ -134,8 +144,39 @@ export default function StartupConfirmationScreen() {
       }
     : undefined;
 
+  // Appel IA pour générer la valorisation initiale (avec fallback automatique)
+  useEffect(() => {
+    if (hasRequestedValuation.current) return;
+    hasRequestedValuation.current = true;
+
+    const fetchValuation = async () => {
+      try {
+        const result = await generateValuation({
+          target: params.targetCardTitle,
+          mission: params.missionCardTitle,
+          sector: sectorInfo.name,
+          startupName,
+          startupDescription,
+        });
+        if (result) {
+          setAiValuation(result.valorisation);
+          setAiExplanation(result.explanation);
+          setAiFactors(result.factors);
+        }
+      } catch (err) {
+        console.warn('[Confirmation] Valuation fetch failed:', err);
+      } finally {
+        setIsLoadingValuation(false);
+      }
+    };
+
+    fetchValuation();
+  }, [params.targetCardTitle, params.missionCardTitle, sectorInfo.name, startupName, startupDescription]);
+
+  // Création de la startup une fois la valorisation finale connue
   useEffect(() => {
     if (hasApplied.current) return;
+    if (isLoadingValuation) return;
     hasApplied.current = true;
 
     // Create and save the startup with real valorisation
@@ -175,7 +216,7 @@ export default function StartupConfirmationScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isLoadingValuation]);
 
   const handlePlay = () => {
     router.replace('/(tabs)/home');
@@ -267,11 +308,28 @@ export default function StartupConfirmationScreen() {
 
               <View style={styles.infoSeparator} />
               <View style={styles.infoRow}>
-                <View style={styles.infoLabel}>
+                <Pressable
+                  style={styles.infoLabel}
+                  onPress={() => !isLoadingValuation && setShowValuationInfo(true)}
+                  hitSlop={8}
+                  disabled={isLoadingValuation}
+                >
                   <Ionicons name="diamond" size={14} color={COLORS.textSecondary} />
                   <Text style={styles.infoLabelText}>Valorisation initiale</Text>
-                </View>
-                <Text style={styles.infoValueHighlight}>{formatValorisation(valorisation)}</Text>
+                  {!isLoadingValuation && (
+                    <Ionicons
+                      name="information-circle-outline"
+                      size={16}
+                      color="#FFBC40"
+                      style={{ marginLeft: 2 }}
+                    />
+                  )}
+                </Pressable>
+                {isLoadingValuation ? (
+                  <Text style={styles.valuationLoading}>Estimation…</Text>
+                ) : (
+                  <Text style={styles.infoValueHighlight}>{formatValorisation(valorisation)}</Text>
+                )}
               </View>
 
               <View style={styles.infoSeparator} />
@@ -350,6 +408,85 @@ export default function StartupConfirmationScreen() {
           />
         </Animated.View>
       </ScrollView>
+
+      {/* Modale d'explication de la valorisation initiale (F10) */}
+      <GamePopup
+        visible={showValuationInfo}
+        onRequestClose={() => setShowValuationInfo(false)}
+        header="Comment c'est calculé ?"
+        icon={<Ionicons name="diamond" size={56} color="#FFBC40" />}
+        title="VALORISATION INITIALE"
+        footer={
+          <GameButton
+            variant="yellow"
+            fullWidth
+            title="J'ai compris"
+            onPress={() => setShowValuationInfo(false)}
+          />
+        }
+      >
+        <View style={styles.valuationModalBody}>
+          {aiFactors && aiFactors.length > 0 ? (
+            <>
+              <Text style={styles.valuationIntro}>
+                {aiExplanation ?? "Analyse de ton projet par notre IA."}
+              </Text>
+              <View style={styles.valuationFormulaCard}>
+                {aiFactors.map((factor, idx) => (
+                  <View key={`${factor.label}-${idx}`}>
+                    {idx > 0 && <View style={styles.valuationFormulaSep} />}
+                    <View style={styles.valuationFormulaRow}>
+                      <Text style={styles.valuationFormulaLabel}>{factor.label}</Text>
+                      <Text style={styles.valuationFormulaMultiplier}>{factor.value}</Text>
+                    </View>
+                  </View>
+                ))}
+                <View style={styles.valuationFormulaSep} />
+                <View style={styles.valuationFormulaRow}>
+                  <Text style={styles.valuationFormulaTotal}>= Total</Text>
+                  <Text style={styles.valuationFormulaTotalValue}>{formatValorisation(valorisation)}</Text>
+                </View>
+              </View>
+            </>
+          ) : (
+            <>
+              <Text style={styles.valuationIntro}>
+                Ta valorisation initiale dépend de 3 multiplicateurs liés à tes cartes d'inspiration.
+              </Text>
+              <View style={styles.valuationFormulaCard}>
+                <View style={styles.valuationFormulaRow}>
+                  <Text style={styles.valuationFormulaLabel}>Base</Text>
+                  <Text style={styles.valuationFormulaValue}>{formatValorisation(BASE_VALUATION)}</Text>
+                </View>
+                <View style={styles.valuationFormulaSep} />
+                <View style={styles.valuationFormulaRow}>
+                  <Text style={styles.valuationFormulaLabel}>× Cible</Text>
+                  <Text style={styles.valuationFormulaMultiplier}>×{targetMultiplier.toFixed(2)}</Text>
+                </View>
+                <View style={styles.valuationFormulaSep} />
+                <View style={styles.valuationFormulaRow}>
+                  <Text style={styles.valuationFormulaLabel}>× Mission</Text>
+                  <Text style={styles.valuationFormulaMultiplier}>×{missionMultiplier.toFixed(2)}</Text>
+                </View>
+                <View style={styles.valuationFormulaSep} />
+                <View style={styles.valuationFormulaRow}>
+                  <Text style={styles.valuationFormulaLabel}>× Secteur</Text>
+                  <Text style={styles.valuationFormulaMultiplier}>×{sectorMultiplier.toFixed(2)}</Text>
+                </View>
+                <View style={styles.valuationFormulaSep} />
+                <View style={styles.valuationFormulaRow}>
+                  <Text style={styles.valuationFormulaTotal}>= Total</Text>
+                  <Text style={styles.valuationFormulaTotalValue}>{formatValorisation(valorisation)}</Text>
+                </View>
+              </View>
+            </>
+          )}
+
+          <Text style={styles.valuationNote}>
+            C'est une estimation de départ. Elle évoluera selon tes performances en partie : levées de fonds, événements, croissance de ton entreprise.
+          </Text>
+        </View>
+      </GamePopup>
     </View>
   );
 }
@@ -496,5 +633,76 @@ const styles = StyleSheet.create({
   buttonsContainer: {
     gap: SPACING[3],
     marginTop: SPACING[6],
+  },
+  // Modale F10 — Explication de la valorisation initiale
+  valuationModalBody: {
+    width: '100%',
+    paddingHorizontal: SPACING[2],
+    gap: SPACING[3],
+  },
+  valuationIntro: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.sm,
+    color: 'rgba(255, 255, 255, 0.75)',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  valuationFormulaCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    paddingVertical: SPACING[3],
+    paddingHorizontal: SPACING[3],
+  },
+  valuationFormulaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+  },
+  valuationFormulaSep: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  valuationFormulaLabel: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.sm,
+    color: 'rgba(255, 255, 255, 0.75)',
+  },
+  valuationFormulaValue: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.sm,
+    color: '#FFFFFF',
+  },
+  valuationFormulaMultiplier: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.sm,
+    color: '#1F91D0',
+  },
+  valuationFormulaTotal: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.md,
+    color: '#FFBC40',
+  },
+  valuationFormulaTotalValue: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES.lg,
+    color: '#FFBC40',
+    letterSpacing: 0.5,
+  },
+  valuationNote: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.xs,
+    color: 'rgba(255, 255, 255, 0.55)',
+    textAlign: 'center',
+    lineHeight: 17,
+    fontStyle: 'italic',
+  },
+  valuationLoading: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.sm,
+    color: 'rgba(255, 188, 64, 0.7)',
+    fontStyle: 'italic',
   },
 });

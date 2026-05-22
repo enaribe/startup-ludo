@@ -1,7 +1,7 @@
 /**
  * online-game-hub - Hub partie en ligne
  *
- * Affiche les 3 options: Match Rapide, Créer un Salon, Rejoindre un Salon
+ * Affiche les options: Match Rapide, Joueurs disponibles, Créer un Salon, Rejoindre un Salon
  * + statut de connexion + bouton principal
  */
 
@@ -28,6 +28,13 @@ const ONLINE_OPTIONS = [
     description: 'Trouve automatiquement des adversaires et lance une partie',
     icon: 'flash' as keyof typeof Ionicons.glyphMap,
     color: '#FFBC40',
+  },
+  {
+    id: 'available-players' as const,
+    title: 'JOUEURS DISPONIBLES',
+    description: 'Vois qui est connecté et invite un joueur à une partie',
+    icon: 'radio' as keyof typeof Ionicons.glyphMap,
+    color: '#9B59B6',
   },
   {
     id: 'create-room' as const,
@@ -67,6 +74,7 @@ export default function OnlineHubScreen() {
 
     const routeMap = {
       'quick-match': '/(game)/quick-match',
+      'available-players': '/(game)/available-players',
       'create-room': '/(game)/create-room',
       'join-room': '/(game)/join-room',
     } as const;
@@ -234,6 +242,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   optionContent: {
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     padding: SPACING[4],

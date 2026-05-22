@@ -126,6 +126,38 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Usernames - pseudos uniques (id du doc = pseudo en minuscules)
+    match /usernames/{username} {
+      // Lecture publique : nécessaire pour vérifier la disponibilité d'un pseudo
+      allow read: if true;
+      // Création : seul l'utilisateur peut réserver un pseudo en son nom,
+      // et uniquement si le pseudo n'est pas déjà pris (existing == null)
+      allow create: if isAuthenticated() &&
+                      request.resource.data.userId == request.auth.uid;
+      // Suppression : seul le propriétaire du pseudo peut le libérer
+      allow delete: if isAuthenticated() &&
+                      resource.data.userId == request.auth.uid;
+      // Pas de mise à jour : on supprime + recrée pour changer de pseudo
+      allow update: if false;
+    }
+
+    // Game Invitations - invitations de partie en ligne entre joueurs
+    // invitationId = "inv_{roomId}_{toUserId}" (id déterministe)
+    match /gameInvitations/{invitationId} {
+      // Lecture : l'expéditeur ou le destinataire de l'invitation
+      allow read: if isAuthenticated() &&
+                    (resource.data.fromUserId == request.auth.uid ||
+                     resource.data.toUserId == request.auth.uid);
+      // Création : seul l'expéditeur peut créer une invitation en son nom
+      allow create: if isAuthenticated() &&
+                      request.resource.data.fromUserId == request.auth.uid;
+      // Mise à jour : l'expéditeur (réinvitation) ou le destinataire (accepter/refuser)
+      allow update: if isAuthenticated() &&
+                      (resource.data.fromUserId == request.auth.uid ||
+                       resource.data.toUserId == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+
     // Follows collection - relations de suivi entre joueurs
     // followId = "{followerId}_{followingId}"
     match /follows/{followId} {

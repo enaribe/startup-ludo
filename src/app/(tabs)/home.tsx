@@ -17,12 +17,13 @@ import Svg, { Path } from 'react-native-svg';
 import { ChallengeHomeCard, EnrollmentFormModal } from '@/components/challenges';
 import { CreateStartupPromptPopup, OnboardingModal, ReturnBonusPopup } from '@/components/game/popups';
 import { ProgramIcon } from '@/components/icons';
-import { Avatar, DynamicGradientBorder, GameButton, InfoModal, ProgressionPopup, RadialBackground } from '@/components/ui';
+import { Avatar, DynamicGradientBorder, GameButton, GuestPromoBanner, InfoModal, ProgressionPopup, RadialBackground } from '@/components/ui';
 import type { InfoSection } from '@/components/ui';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { useReturnBonus } from '@/hooks/useReturnBonus';
 import { useStartupCreationPrompt } from '@/hooks/useStartupCreationPrompt';
 import { useChallengeEnroll } from '@/hooks/useChallengeEnroll';
+import { useGuestBannerDismiss } from '@/hooks/useGuestBannerDismiss';
 
 import { formatXP, getRankProgress, getXPForNextRank } from '@/config/progression';
 import { ALL_CHALLENGES, refreshChallengesFromFirestore } from '@/data/challenges';
@@ -234,10 +235,13 @@ export default function HomeScreen() {
 
   // Stats du portfolio
   const startupsCount = profile?.startups?.length ?? 0;
-  const portfolioValue = profile?.startups?.reduce((sum, s) => sum + s.tokensInvested, 0) ?? 0;
+  // « Valorisation » = somme des valorisations des startups (même source que l'écran Portfolio)
+  const portfolioValue = profile?.startups?.reduce((sum, s) => sum + (s.valorisation ?? 0), 0) ?? 0;
 
   const isGuest = user?.isGuest ?? true;
   const displayName = user?.displayName || profile?.displayName || 'Joueur';
+  const { isDismissed: isGuestBannerDismissed, isLoaded: isGuestBannerLoaded, dismiss: dismissGuestBanner } = useGuestBannerDismiss();
+  const showGuestBanner = isGuest && isGuestBannerLoaded && !isGuestBannerDismissed;
 
   // Guard anti double-tap : un second clic rapide pendant la navigation
   // peut être avalé par expo-router (la première navigation gèle l'écran
@@ -366,6 +370,9 @@ export default function HomeScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
+        {/* Bannière permanente pour les invités */}
+        {showGuestBanner && <GuestPromoBanner onDismiss={dismissGuestBanner} />}
+
         {/* Play Button */}
         <Animated.View entering={FadeInDown.delay(500).duration(500)}>
           <Pressable onPress={handlePlay} hitSlop={12} android_disableSound={false}>
@@ -421,25 +428,28 @@ export default function HomeScreen() {
         </View>
 
         {isGuest ? (
-          /* Teaser programmes pour les invités */
+          /* Teaser programmes pour les invités — même design que l'état "aucun programme" */
           <View style={styles.challengeCardWrapper}>
             <Animated.View entering={FadeInDown.delay(600).duration(500)}>
-              <Pressable onPress={() => router.push('/(auth)/register')}>
-                <DynamicGradientBorder borderRadius={16} fill="rgba(0, 0, 0, 0.35)">
-                  <View style={styles.emptyCardContent}>
-                    <View style={styles.emptyCardLeft}>
-                      <View style={styles.emptyLogoContainer}>
-                        <Ionicons name="lock-closed-outline" size={26} color="rgba(255, 188, 64, 0.6)" />
-                      </View>
-                      <View style={styles.emptyCardInfo}>
-                        <Text style={styles.emptyCardTitle}>PROGRAMMES</Text>
-                        <Text style={styles.emptyCardSub}>Crée un compte pour accéder aux programmes</Text>
-                      </View>
-                    </View>
-                    <Ionicons name="arrow-forward" size={16} color="#FFBC40" />
+              <DynamicGradientBorder borderRadius={20} fill="rgba(0, 0, 0, 0.35)">
+                <View style={styles.emptyProgramContent}>
+                  <Ionicons name="lock-closed-outline" size={44} color="#71808E" />
+                  <View style={styles.emptyProgramTextWrap}>
+                    <Text style={styles.emptyProgramTitle}>ACCÈS RESTREINT</Text>
+                    <Text style={styles.emptyProgramSub}>
+                      Crée un compte pour accéder{'\n'}aux programmes et challenges{'\n'}d'entrepreneuriat
+                    </Text>
                   </View>
-                </DynamicGradientBorder>
-              </Pressable>
+                  <View style={styles.emptyProgramButtonWrap}>
+                    <GameButton
+                      variant="yellow"
+                      fullWidth
+                      title="CRÉER UN COMPTE"
+                      onPress={() => router.push('/(auth)/register')}
+                    />
+                  </View>
+                </View>
+              </DynamicGradientBorder>
             </Animated.View>
           </View>
         ) : enrolledChallenges.length > 0 ? (
@@ -950,45 +960,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: '#F35145',
   },
-  emptyCardContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  emptyCardLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  emptyLogoContainer: {
-    width: 52,
-    height: 52,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 188, 64, 0.08)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 188, 64, 0.15)',
-  },
-  emptyCardInfo: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  emptyCardTitle: {
-    fontFamily: FONTS.title,
-    fontSize: 15,
-    color: '#FFFFFF',
-  },
-  emptyCardSub: {
-    fontFamily: FONTS.body,
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.5)',
-    marginTop: 2,
-  },
-
-  // Empty state — design refait
+  // Empty state — design refait (utilisé aussi pour le teaser invité)
   emptyProgramContent: {
     paddingVertical: 22,
     paddingHorizontal: 20,

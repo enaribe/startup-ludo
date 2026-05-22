@@ -45,6 +45,14 @@ export interface RemoteDuelScore {
   score: number;
 }
 
+/** Progression en direct d'un duelliste (score partiel après chaque question). */
+export interface RemoteDuelProgress {
+  playerId: string;
+  score: number;
+  /** Nombre de questions déjà répondues. */
+  answeredCount: number;
+}
+
 /** Info about a remote duel result (pour informer les spectateurs) */
 export interface RemoteDuelResult {
   challengerId: string;
@@ -110,19 +118,31 @@ interface UseOnlineGameReturn {
   broadcastDuelStart: (challengerId: string, opponentId: string, questions: Record<string, unknown>[]) => void;
   /** Broadcast son score en duel (action 'dr') */
   broadcastDuelScore: (score: number) => void;
+  /** Broadcast sa progression en direct pendant le duel (action 'dp') */
+  broadcastDuelProgress: (score: number, answeredCount: number) => void;
   /** Broadcast le résultat du duel aux spectateurs (action 'dres') */
   broadcastDuelResult: (result: RemoteDuelResult) => void;
   /** Forfeit (quit) the game — opponent wins */
   forfeit: () => void;
+  /** Broadcast l'éjection d'un joueur déconnecté (action 'pf') */
+  broadcastPlayerForfeit: (playerId: string) => void;
+  /**
+   * Broadcast l'arrivée d'un joueur (pion terminé, action 'pfin').
+   * Retourne true si la partie continue (le tour suivant doit être joué),
+   * false si la partie est complètement terminée.
+   */
+  broadcastPlayerFinished: (playerId: string) => boolean;
 
   /** True when it's this player's turn */
   isMyTurn: boolean;
   /** True when connected to RTDB */
   isConnected: boolean;
-  /** True when an opponent has disconnected */
+  /** True when an opponent has disconnected (legacy — vrai dès qu'un joueur est down) */
   opponentDisconnected: boolean;
-  /** Name of the disconnected opponent */
+  /** Name of the disconnected opponent (le premier détecté) */
   disconnectedPlayerName: string | null;
+  /** ID du joueur déconnecté (le premier détecté, après grace period) */
+  disconnectedPlayerId: string | null;
 
   /** Remote dice roll to animate (set briefly, then cleared) */
   remoteDiceRoll: RemoteDiceRoll | null;
@@ -138,6 +158,10 @@ interface UseOnlineGameReturn {
   remoteDuelScore: RemoteDuelScore | null;
   /** Clear remote duel score after processing */
   clearRemoteDuelScore: () => void;
+  /** Progression en direct des duellistes (pour affichage spectateur), indexée par playerId */
+  remoteDuelProgress: Record<string, RemoteDuelProgress>;
+  /** Réinitialise la progression de duel (fin de duel) */
+  clearRemoteDuelProgress: () => void;
   /** Résultat du duel reçu (pour les spectateurs) */
   remoteDuelResult: RemoteDuelResult | null;
   /** Clear remote duel result after processing */
@@ -175,16 +199,20 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
   const storeEndGame = useGameStore((s) => s.endGame);
   const storeGrantJoker = useGameStore((s) => s.grantJoker);
   const storeConsumeJoker = useGameStore((s) => s.consumeJoker);
+  const storeForfeitPlayer = useGameStore((s) => s.forfeitPlayer);
+  const storeFinishPlayer = useGameStore((s) => s.finishPlayer);
 
   const [isConnected, setIsConnected] = useState(true);
   const [opponentDisconnected, setOpponentDisconnected] = useState(false);
   const [disconnectedPlayerName, setDisconnectedPlayerName] = useState<string | null>(null);
+  const [disconnectedPlayerId, setDisconnectedPlayerId] = useState<string | null>(null);
 
   // Remote notifications for PlayScreen to react to
   const [remoteDiceRoll, setRemoteDiceRoll] = useState<RemoteDiceRoll | null>(null);
   const [remoteEvent, setRemoteEvent] = useState<RemoteEvent | null>(null);
   const [remoteEventResult, setRemoteEventResult] = useState<RemoteEventResult | null>(null);
   const [remoteDuelScore, setRemoteDuelScore] = useState<RemoteDuelScore | null>(null);
+  const [remoteDuelProgress, setRemoteDuelProgress] = useState<Record<string, RemoteDuelProgress>>({});
   const [remoteDuelResult, setRemoteDuelResult] = useState<RemoteDuelResult | null>(null);
   const [remoteEmojiReaction, setRemoteEmojiReaction] = useState<RemoteEmojiReaction | null>(null);
   const [remoteCaptureFailure, setRemoteCaptureFailure] = useState<{ capturedPlayerId: string; seed: number } | null>(null);
@@ -193,6 +221,7 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
   const clearRemoteEvent = useCallback(() => setRemoteEvent(null), []);
   const clearRemoteEventResult = useCallback(() => setRemoteEventResult(null), []);
   const clearRemoteDuelScore = useCallback(() => setRemoteDuelScore(null), []);
+  const clearRemoteDuelProgress = useCallback(() => setRemoteDuelProgress({}), []);
   const clearRemoteDuelResult = useCallback(() => setRemoteDuelResult(null), []);
   const clearRemoteEmojiReaction = useCallback(() => setRemoteEmojiReaction(null), []);
   const clearRemoteCaptureFailure = useCallback(() => setRemoteCaptureFailure(null), []);
@@ -287,6 +316,19 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
           // Duel result (score) : l'autre joueur envoie son score
           const data = action.d as { score: number };
           setRemoteDuelScore({ playerId: action.p, score: data?.score ?? 0 });
+          return;
+        }
+        case 'dp': {
+          // Duel progress : score partiel d'un duelliste après une question (spectateurs)
+          const data = action.d as { score: number; answeredCount: number };
+          setRemoteDuelProgress((prev) => ({
+            ...prev,
+            [action.p]: {
+              playerId: action.p,
+              score: data?.score ?? 0,
+              answeredCount: data?.answeredCount ?? 0,
+            },
+          }));
           return;
         }
         case 'dres': {
@@ -395,6 +437,7 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
         prevOpponentDisconnectedRef.current = true;
         setOpponentDisconnected(true);
         setDisconnectedPlayerName(disconnected.displayName || disconnected.name || null);
+        setDisconnectedPlayerId(disconnected.id);
       } else if (potentiallyDisconnected) {
         // Déconnexion potentielle - démarrer le timer de grâce si pas déjà en cours
         const playerName = potentiallyDisconnected.displayName || potentiallyDisconnected.name || null;
@@ -443,6 +486,7 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
         prevOpponentDisconnectedRef.current = false;
         setOpponentDisconnected(false);
         setDisconnectedPlayerName(null);
+        setDisconnectedPlayerId(null);
       }
     });
 
@@ -767,6 +811,18 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
     [userId]
   );
 
+  const broadcastDuelProgress = useCallback(
+    (score: number, answeredCount: number) => {
+      if (!userId) return;
+      multiplayerSync.sendAction({
+        t: 'dp',
+        p: userId,
+        d: { score, answeredCount },
+      });
+    },
+    [userId]
+  );
+
   const broadcastDuelResult = useCallback(
     (result: RemoteDuelResult) => {
       if (!userId) return;
@@ -786,6 +842,38 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
       });
     },
     [userId]
+  );
+
+  const broadcastPlayerForfeit = useCallback(
+    (playerId: string) => {
+      if (!userId || !playerId) return;
+      // Apply local (idempotent — store ignore si déjà forfait)
+      storeForfeitPlayer(playerId);
+      multiplayerSync.sendAction({
+        t: 'pf',
+        p: userId,
+        d: { pid: playerId },
+      });
+    },
+    [userId, storeForfeitPlayer],
+  );
+
+  const broadcastPlayerFinished = useCallback(
+    (playerId: string) => {
+      if (!userId || !playerId) return false;
+      const stillRunning = storeFinishPlayer(playerId);
+      multiplayerSync.sendAction({
+        t: 'pfin',
+        p: userId,
+        d: { pid: playerId },
+      });
+      if (!stillRunning) {
+        // Partie terminée → mettre à jour la room
+        multiplayerSync.updateRoomStatus('finished');
+      }
+      return stillRunning;
+    },
+    [userId, storeFinishPlayer],
   );
 
   const forfeit = useCallback(() => {
@@ -834,10 +922,13 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
     broadcastWin,
     broadcastEvent,
     forfeit,
+    broadcastPlayerForfeit,
+    broadcastPlayerFinished,
     isMyTurn,
     isConnected,
     opponentDisconnected,
     disconnectedPlayerName,
+    disconnectedPlayerId,
     remoteDiceRoll,
     remoteEvent,
     remoteEventResult,
@@ -845,10 +936,13 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
     clearRemoteEventResult,
     remoteDuelScore,
     clearRemoteDuelScore,
+    remoteDuelProgress,
+    clearRemoteDuelProgress,
     remoteDuelResult,
     clearRemoteDuelResult,
     broadcastDuelStart,
     broadcastDuelScore,
+    broadcastDuelProgress,
     broadcastDuelResult,
     sendEmojiReaction,
     remoteEmojiReaction,

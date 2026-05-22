@@ -10,3 +10,5 @@ export {
   selectIsEnrolled,
 } from './useChallengeStore';
 export { useSocialStore } from './useSocialStore';
+export { useInvitationStore } from './useInvitationStore';
+export { useTutorialStore, type TutorialTargetId, type TargetRect } from './useTutorialStore';

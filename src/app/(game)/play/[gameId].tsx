@@ -7,7 +7,10 @@ import Svg, { Defs, LinearGradient as SvgLinearGradient, Rect, Stop } from 'reac
 
 import { GameBoard } from '@/components/game/GameBoard';
 import { PlayerCard } from '@/components/game/PlayerCard';
+import { TutorialOverlay } from '@/components/game/TutorialOverlay';
 import { useResponsiveLayout } from '@/hooks/useResponsiveLayout';
+import { useTutorialTarget } from '@/hooks/useTutorialTarget';
+import { useTutorialStore } from '@/stores/useTutorialStore';
 import {
   EmojiReactionBar,
   EmojiReactionOverlay,
@@ -101,6 +104,48 @@ export default function PlayScreen() {
     return () => setBgmGameplayDuck(false);
   }, [setBgmGameplayDuck]);
 
+  // ─── Tutoriel interactif ───
+  // Cibles pointables : plateau, jetons, jokers (le dé est dans la zone joueur).
+  const boardTarget = useTutorialTarget('board');
+  const tokensTarget = useTutorialTarget('tokens');
+  const jokersTarget = useTutorialTarget('jokers');
+  const diceTarget = useTutorialTarget('dice');
+  const tutorialActive = useTutorialStore((s) => s.active);
+  const tutorialStepIndex = useTutorialStore((s) => s.stepIndex);
+  const tutorialCompleted = useTutorialStore((s) => s.completed);
+  const tutorialHydrated = useTutorialStore((s) => s.isHydrated);
+  const startTutorial = useTutorialStore((s) => s.start);
+  const resetTutorial = useTutorialStore((s) => s.reset);
+
+  // Lance le tutoriel à la première partie, une fois l'écran posé.
+  useEffect(() => {
+    if (!tutorialHydrated || tutorialCompleted || tutorialActive) return;
+    // Petit délai : laisse le plateau se mesurer avant d'afficher l'overlay
+    const timer = setTimeout(() => startTutorial(), 700);
+    return () => clearTimeout(timer);
+  }, [tutorialHydrated, tutorialCompleted, tutorialActive, startTutorial]);
+
+  // Re-mesure les cibles à chaque étape du tutoriel : onLayout ne se
+  // redéclenche pas si rien ne bouge (ex. relance via Paramètres), et
+  // measureInWindow peut renvoyer 0 si appelé trop tôt au montage.
+  useEffect(() => {
+    if (!tutorialActive) return;
+    const remeasure = () => {
+      boardTarget.measure();
+      tokensTarget.measure();
+      jokersTarget.measure();
+      diceTarget.measure();
+    };
+    // Plusieurs tentatives : laisse le layout se stabiliser
+    remeasure();
+    const t1 = setTimeout(remeasure, 120);
+    const t2 = setTimeout(remeasure, 360);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [tutorialActive, tutorialStepIndex, boardTarget, tokensTarget, jokersTarget, diceTarget]);
+
   const params = useLocalSearchParams<{ mode?: string; roomId?: string }>();
   const isOnline = params.mode === 'online';
   const userId = useAuthStore((s) => s.user?.id) ?? null;
@@ -123,6 +168,7 @@ export default function PlayScreen() {
   const storeNextTurn = useGameStore((s) => s.nextTurn);
   const storeGrantExtraTurn = useGameStore((s) => s.grantExtraTurn);
   const storeEndGame = useGameStore((s) => s.endGame);
+  const storeFinishPlayer = useGameStore((s) => s.finishPlayer);
   const grantJoker = useGameStore((s) => s.grantJoker);
   const consumeJoker = useGameStore((s) => s.consumeJoker);
   const applyEffect = useGameStore((s) => s.applyEffect);
@@ -217,6 +263,10 @@ export default function PlayScreen() {
   // Online disconnection/forfeit state
   const [showDisconnectPopup, setShowDisconnectPopup] = useState(false);
   const disconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Banner "X a quitté" pour les forfaits silencieux (3-4 joueurs)
+  const [forfeitedNotice, setForfeitedNotice] = useState<string | null>(null);
+  const forfeitedNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const broadcastedForfeitsRef = useRef<Set<string>>(new Set());
 
   // Emoji reactions state
   const [activeReactions, setActiveReactions] = useState<EmojiReaction[]>([]);
@@ -410,17 +460,12 @@ export default function PlayScreen() {
             if (otherPlayers.length >= 1) {
               const humanPlayer = otherPlayers[0]!;
               const questions = getRandomDuelQuestions(3, currentPlayer?.edition || game?.edition);
-              // AI is challenger, human is opponent
-              // Start duel with AI as challenger, then auto-submit AI's answers
-              // so the human gets to play as opponent
+              // AI est challenger, humain est opponent. Le mode "live AI" est activé
+              // automatiquement par useDuel (détection isAI). Le humain verra l'IA
+              // "réfléchir" et répondre en parallèle dans DuelQuestionPopup.
               setDuelTriggered(true);
-              setIsEventSpectator(false); // Human will actively participate as opponent
+              setIsEventSpectator(false);
               duel.startDuelWithQuestions(currentPlayer!.id, humanPlayer.id, questions);
-              // Auto-submit AI challenger answers after a short delay (skip intro for AI)
-              setTimeout(() => {
-                const aiScore = Math.floor(Math.random() * 60) + 30; // AI scores 30-90
-                duel.submitChallengerAnswers([], aiScore);
-              }, 500);
             } else {
               resolveAndClose({ ok: true, reward: 1 });
             }
@@ -479,22 +524,31 @@ export default function PlayScreen() {
   );
 
   // ===== WIN HANDLER =====
+  // Le "win" ici signifie "ce joueur a fini sa partie (pion arrivé)".
+  // En 2 joueurs : partie close, redirection immédiate.
+  // En 3-4 joueurs : on classe le joueur, et la partie continue avec les autres.
+  // La redirection ne se fait que quand la partie est complètement terminée.
 
   const handleWin = useCallback(
     (playerId: string) => {
+      let stillRunning = false;
       if (isOnline) {
-        onlineGame.broadcastWin(playerId);
+        stillRunning = onlineGame.broadcastPlayerFinished(playerId);
       } else {
-        storeEndGame(playerId);
+        stillRunning = storeFinishPlayer(playerId);
       }
-      router.push(`/(game)/results/${game?.id}`);
+      if (!stillRunning) {
+        // Partie totalement terminée → redirection vers résultats
+        router.push(`/(game)/results/${game?.id}`);
+      }
+      return stillRunning;
     },
-    [isOnline, onlineGame, storeEndGame, router, game?.id]
+    [isOnline, onlineGame, storeFinishPlayer, router, game?.id]
   );
 
   // ===== TURN MACHINE =====
 
-  const { turnState, diceProps, handleEventResolve, resolveCaptureChoice, resolveMissedFinalEntry, setChosenDiceValue } = useTurnMachine({
+  const { turnState, diceProps, handleEventResolve, resolveCaptureChoice, resolveMissedFinalEntry, setChosenDiceValue, afkSecondsLeft } = useTurnMachine({
     game,
     currentPlayer,
     isOnline,
@@ -505,7 +559,18 @@ export default function PlayScreen() {
     hapticsEnabled,
     setAnimating,
     clearSelection,
-    onMissedFinalEntry: (tokensNeeded) => setMissedFinalEntry({ tokensNeeded }),
+    onMissedFinalEntry: (tokensNeeded) => {
+      // Avertissement préventif : le hook filtre déjà les IA en amont. En online,
+      // on ne montre le popup que pour le joueur local (l'autre humain le verra
+      // de son côté via son propre hook).
+      const cp = currentPlayer;
+      const isMine = !!cp && (!isOnline || cp.id === userId);
+      if (isMine) {
+        setMissedFinalEntry({ tokensNeeded });
+      } else {
+        resolveMissedFinalEntry();
+      }
+    },
     onCapturePending: (capturedPlayerId, capturedPawnIndex) => {
       setCaptureChoice({ capturedPlayerId, capturedPawnIndex });
     },
@@ -584,9 +649,18 @@ export default function PlayScreen() {
 
       crashLog('duel remote received', { challengerId, opponentId, questionsCount: questions?.length, myId: userId });
 
+      console.log('[DUEL-DEBUG] remoteEvent duel reçu', {
+        challengerId,
+        opponentId,
+        questionsCount: questions?.length,
+        myUserId: userId,
+        amChallenger: userId === challengerId,
+        amOpponent: userId === opponentId,
+      });
       if (challengerId && opponentId && questions && questions.length > 0) {
         if (userId === challengerId) {
           // Je suis le challenger — duel déjà configuré localement
+          console.log('[DUEL-DEBUG] je suis le challenger, rien à faire');
         } else if (userId === opponentId) {
           // Je suis l'adversaire — rejoindre le duel si différent
           const currentDuel = duelRef.current;
@@ -595,10 +669,15 @@ export default function PlayScreen() {
             currentDuel.duelState?.challengerId !== challengerId ||
             currentDuel.duelState?.opponentId !== opponentId;
 
+          console.log('[DUEL-DEBUG] je suis l\'adversaire', {
+            isActive: currentDuel.isActive,
+            isDifferentDuel,
+          });
           if (isDifferentDuel) {
             setIsEventSpectator(false);
             setDuelTriggered(true);
             duelRef.current.joinDuel(challengerId, opponentId, questions);
+            console.log('[DUEL-DEBUG] joinDuel appelé');
           }
         } else {
           // Je suis spectateur (3-4 joueurs)
@@ -606,6 +685,8 @@ export default function PlayScreen() {
           setDuelTriggered(true);
           setSpectatorDuelChallengerId(challengerId);
           setSpectatorDuelOpponentId(opponentId);
+          // Repartir d'une progression vierge pour ce nouveau duel
+          onlineGame.clearRemoteDuelProgress();
         }
       } else {
         // Données incomplètes, mode spectateur par défaut
@@ -617,6 +698,13 @@ export default function PlayScreen() {
     } else {
       setDuelTriggered(false);
       setIsEventSpectator(true);
+
+      // Anti-répétition : synchroniser l'historique local avec l'événement
+      // généré par l'autre client, pour ne pas le re-tirer ensuite.
+      const remoteEventId = (eventData as { id?: string })?.id;
+      if (remoteEventId) {
+        eventManager.markUsed(eventType as import('@/types').EventType, remoteEventId);
+      }
 
       switch (eventType) {
         case 'quiz':
@@ -705,6 +793,7 @@ export default function PlayScreen() {
             setIsEventSpectator(false);
             setSpectatorDuelOpponentId(null);
             onlineGame.clearRemoteDuelResult();
+            onlineGame.clearRemoteDuelProgress();
             onlineGame.clearRemoteEvent();
             return null;
           }
@@ -718,27 +807,54 @@ export default function PlayScreen() {
     return undefined;
   }, [isOnline, onlineGame.remoteDuelResult, isEventSpectator]);
 
-  // ===== ONLINE: Detect opponent disconnect → forfeit after 30s =====
+  // ===== ONLINE: Detect opponent disconnect =====
+  // Comportement :
+  // - 2 joueurs actifs (déconnecté inclus) → popup "Réclamer la victoire" + forfait auto 30s
+  // - 3+ joueurs actifs → forfait silencieux du déconnecté, les autres continuent
 
   useEffect(() => {
-    if (!isOnline) return;
+    if (!isOnline || !game) return;
 
-    if (onlineGame.opponentDisconnected) {
-      crashLog('opponent disconnected popup', {
-        disconnectedPlayerName: onlineGame.disconnectedPlayerName,
+    const disconnectedId = onlineGame.disconnectedPlayerId;
+    const disconnectedName = onlineGame.disconnectedPlayerName;
+
+    if (!onlineGame.opponentDisconnected || !disconnectedId) {
+      setShowDisconnectPopup(false);
+      if (disconnectTimerRef.current) {
+        clearTimeout(disconnectTimerRef.current);
+        disconnectTimerRef.current = null;
+      }
+      return;
+    }
+
+    const activePlayers = game.players.filter((p) => !p.isForfeited);
+    const isLastTwo = activePlayers.length === 2;
+
+    if (isLastTwo) {
+      crashLog('opponent disconnected popup (last two)', {
+        disconnectedPlayerName: disconnectedName,
       });
       setShowDisconnectPopup(true);
       disconnectTimerRef.current = setTimeout(() => {
         if (userId) {
           onlineGame.broadcastWin(userId);
-          router.push(`/(game)/results/${game?.id}`);
+          router.push(`/(game)/results/${game.id}`);
         }
       }, 30000);
     } else {
-      setShowDisconnectPopup(false);
-      if (disconnectTimerRef.current) {
-        clearTimeout(disconnectTimerRef.current);
-        disconnectTimerRef.current = null;
+      // 3+ joueurs actifs : éjecter le déconnecté silencieusement.
+      // Stratégie idempotente : tous les clients déclenchent, le store ignore
+      // les forfaits déjà appliqués. On évite juste les rebroadcasts locaux multiples.
+      if (!broadcastedForfeitsRef.current.has(disconnectedId)) {
+        broadcastedForfeitsRef.current.add(disconnectedId);
+        onlineGame.broadcastPlayerForfeit(disconnectedId);
+
+        // Banner non-bloquant 4s
+        setForfeitedNotice(`${disconnectedName || 'Un joueur'} a quitté la partie`);
+        if (forfeitedNoticeTimerRef.current) clearTimeout(forfeitedNoticeTimerRef.current);
+        forfeitedNoticeTimerRef.current = setTimeout(() => {
+          setForfeitedNotice(null);
+        }, 4000);
       }
     }
 
@@ -748,7 +864,26 @@ export default function PlayScreen() {
       }
       clearAiTimers();
     };
-  }, [isOnline, onlineGame.opponentDisconnected, userId, game?.id, router, onlineGame, clearAiTimers]);
+  }, [
+    isOnline,
+    onlineGame.opponentDisconnected,
+    onlineGame.disconnectedPlayerId,
+    onlineGame.disconnectedPlayerName,
+    game?.players,
+    userId,
+    game?.id,
+    game,
+    router,
+    onlineGame,
+    clearAiTimers,
+  ]);
+
+  // Cleanup forfeit notice timer on unmount
+  useEffect(() => {
+    return () => {
+      if (forfeitedNoticeTimerRef.current) clearTimeout(forfeitedNoticeTimerRef.current);
+    };
+  }, []);
 
   // ===== ONLINE: Detect game ended (forfeit from remote) =====
 
@@ -1173,6 +1308,7 @@ export default function PlayScreen() {
         isDiceDisabled={dp.isDiceDisabled}
         onRollDice={dp.onRollDice}
         onDiceComplete={dp.onDiceComplete}
+        afkSecondsLeft={isTurn ? afkSecondsLeft : null}
       />
     );
   };
@@ -1232,7 +1368,12 @@ export default function PlayScreen() {
             </Svg>
           )}
           {/* Top Players Row — yellow (top-left) and blue (top-right) */}
-          <View style={styles.playersRow}>
+          {/* Cible tutoriel « dé » : la rangée de cartes joueur contient le dé du joueur actif */}
+          <View
+            ref={diceTarget.ref}
+            onLayout={diceTarget.measure}
+            style={styles.playersRow}
+          >
             <View style={styles.playerSlot}>
               {renderPlayerCard('yellow')}
             </View>
@@ -1241,8 +1382,12 @@ export default function PlayScreen() {
             </View>
           </View>
 
-          {/* Game Board */}
-          <View style={styles.boardContainer}>
+          {/* Game Board — cible tutoriel « cases » */}
+          <View
+            ref={boardTarget.ref}
+            onLayout={boardTarget.measure}
+            style={styles.boardContainer}
+          >
             <GameBoard
               players={game.players}
               currentPlayerId={currentPlayer?.id || ''}
@@ -1257,7 +1402,12 @@ export default function PlayScreen() {
           </View>
 
           {/* Bottom Players Row — green (bottom-left) and red (bottom-right) */}
-          <View style={styles.playersRow}>
+          {/* Cible tutoriel « jetons » : chaque carte joueur affiche son compteur de jetons */}
+          <View
+            ref={tokensTarget.ref}
+            onLayout={tokensTarget.measure}
+            style={styles.playersRow}
+          >
             <View style={styles.playerSlot}>
               {renderPlayerCard('green')}
             </View>
@@ -1303,15 +1453,18 @@ export default function PlayScreen() {
                 <Rect x="0" y="0" width="1" height="36" fill="url(#sep_grad)" />
               </Svg>
             </View>
-            <DiceChoiceButton
-              count={currentPlayer?.jokers?.length ?? 0}
-              canUse={
-                turnState.phase === 'idle' &&
-                !currentPlayer?.isAI &&
-                (!isOnline || onlineGame.isMyTurn)
-              }
-              onOpen={() => setShowJokerInventory(true)}
-            />
+            {/* Cible tutoriel « jokers » */}
+            <View ref={jokersTarget.ref} onLayout={jokersTarget.measure}>
+              <DiceChoiceButton
+                count={currentPlayer?.jokers?.length ?? 0}
+                canUse={
+                  turnState.phase === 'idle' &&
+                  !currentPlayer?.isAI &&
+                  (!isOnline || onlineGame.isMyTurn)
+                }
+                onOpen={() => setShowJokerInventory(true)}
+              />
+            </View>
           </>
         )}
       </View>
@@ -1435,10 +1588,26 @@ export default function PlayScreen() {
               thumbColor="#FFFFFF"
             />
           </View>
+
+          {/* Revoir le tutoriel — le relance immédiatement sur ce plateau */}
+          <View style={settingsStyles.separator} />
+          <Pressable
+            style={settingsStyles.row}
+            onPress={() => {
+              setShowSettings(false);
+              // reset puis start : fonctionne même si le tutoriel a déjà été fait
+              resetTutorial();
+              setTimeout(() => startTutorial(), 350);
+            }}
+          >
+            <Ionicons name="school-outline" size={22} color="#FFFFFF" />
+            <Text style={settingsStyles.rowLabel}>Revoir le tutoriel</Text>
+            <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.5)" />
+          </Pressable>
         </View>
       </GamePopup>
 
-      {/* Missed Final Entry Popup */}
+      {/* Avertissement préventif "approche du couloir final" */}
       <MissedFinalEntryPopup
         visible={missedFinalEntry !== null}
         onContinue={() => {
@@ -1505,7 +1674,7 @@ export default function PlayScreen() {
         onCancel={handleDiceJokerCancel}
       />
 
-      {/* Opponent Disconnected Modal (online) */}
+      {/* Opponent Disconnected Modal (online — 2 joueurs restants seulement) */}
       {isOnline && (
         <Modal visible={showDisconnectPopup} onClose={() => {}} closeOnBackdrop={false}>
           <View style={styles.modalContent}>
@@ -1529,6 +1698,14 @@ export default function PlayScreen() {
             />
           </View>
         </Modal>
+      )}
+
+      {/* Forfait silencieux banner (online — 3+ joueurs restants) */}
+      {isOnline && forfeitedNotice && (
+        <View pointerEvents="none" style={styles.forfeitBanner}>
+          <Ionicons name="exit-outline" size={20} color="#FFFFFF" />
+          <Text style={styles.forfeitBannerText}>{forfeitedNotice}</Text>
+        </View>
       )}
 
       {/* Event Popups */}
@@ -1588,15 +1765,43 @@ export default function PlayScreen() {
       )}
 
       {(() => {
+        // Mode IA local : 1 seul popup question, l'IA répond en direct via prop aiOpponent
+        const aiPlayerId = duel.duelState?.aiPlayerId;
+        const aiAnswers = duel.duelState?.aiAnswers;
+        const isAILocalDuel = !!aiPlayerId && !!aiAnswers && !isOnline;
+        const aiPlayer = isAILocalDuel
+          ? game?.players.find((p) => p.id === aiPlayerId) ?? null
+          : null;
+
         // Online: intro for both players, then 'answering' for both in parallel
-        // Local: intro for challenger, opponent_prepare for opponent, then challenger_turn / opponent_turn
-        // When AI is challenger, skip intro phase (AI auto-submits, human only sees opponent_prepare)
-        const aiIsChallenger = duel.challenger?.isAI === true;
-        const showPrepare = (
-          (duel.currentPhase === 'intro' && !aiIsChallenger) ||
-          duel.currentPhase === 'opponent_prepare'
-        ) && !!duel.challenger && !!duel.opponent;
-        const showQuestion = (duel.currentPhase === 'challenger_turn' || duel.currentPhase === 'opponent_turn' || duel.currentPhase === 'answering') && duel.questions.length > 0;
+        // Local humain vs humain: intro pour challenger, opponent_prepare pour opponent
+        const showPrepare =
+          !isAILocalDuel &&
+          (duel.currentPhase === 'intro' || duel.currentPhase === 'opponent_prepare') &&
+          !!duel.challenger &&
+          !!duel.opponent;
+        const showQuestion =
+          duel.questions.length > 0 &&
+          (
+            (isAILocalDuel && (duel.currentPhase === 'intro' || duel.currentPhase === 'answering' || duel.currentPhase === 'challenger_turn' || duel.currentPhase === 'opponent_turn')) ||
+            duel.currentPhase === 'challenger_turn' ||
+            duel.currentPhase === 'opponent_turn' ||
+            duel.currentPhase === 'answering'
+          );
+
+        console.log('[DUEL-DEBUG] rendu popup', {
+          phase: duel.currentPhase,
+          isActive: duel.isActive,
+          hasChallenger: !!duel.challenger,
+          hasOpponent: !!duel.opponent,
+          questionsLength: duel.questions.length,
+          myRole: duel.myRole,
+          showPrepare,
+          showQuestion,
+          isEventSpectator,
+          duelTriggered,
+        });
+
         return (
           <>
             {showPrepare && (
@@ -1628,10 +1833,26 @@ export default function PlayScreen() {
                       ? handleDuelChallengerComplete
                       : handleDuelOpponentComplete
                 }
+                onProgress={
+                  isOnline
+                    ? (score, answeredCount) => onlineGame.broadcastDuelProgress(score, answeredCount)
+                    : undefined
+                }
                 onClose={() => {
                   setDuelTriggered(false);
                   duel.resetDuel();
                 }}
+                aiOpponent={
+                  isAILocalDuel && aiAnswers && aiPlayer
+                    ? {
+                        name: aiPlayer.name || 'IA',
+                        answers: aiAnswers,
+                        onComplete: (humanAnswers, humanScore, aiScore) => {
+                          duel.submitDuelLiveResult(humanAnswers, humanScore, aiScore);
+                        },
+                      }
+                    : undefined
+                }
               />
             )}
           </>
@@ -1656,11 +1877,18 @@ export default function PlayScreen() {
           challengerForPopup != null &&
           opponentForPopup != null;
         if (!challengerForPopup || !opponentForPopup) return null;
+        const challProgress = onlineGame.remoteDuelProgress[challengerForPopup.id];
+        const oppProgress = onlineGame.remoteDuelProgress[opponentForPopup.id];
         return (
           <DuelSpectatorPopup
             visible={!!showSpectator}
             challenger={challengerForPopup}
             opponent={opponentForPopup}
+            challengerScore={challProgress?.score ?? 0}
+            opponentScore={oppProgress?.score ?? 0}
+            challengerAnswered={challProgress?.answeredCount ?? 0}
+            opponentAnswered={oppProgress?.answeredCount ?? 0}
+            totalQuestions={duel.questions.length || 3}
           />
         );
       })()}
@@ -1680,6 +1908,13 @@ export default function PlayScreen() {
             : undefined
         }
         onClose={handleDuelClose}
+      />
+
+      {/* Tutoriel interactif — overlay de guidage (1re partie uniquement) */}
+      {/* safeTop/safeBottom : zones header/footer où la bulle ne doit pas aller */}
+      <TutorialOverlay
+        safeTop={insets.top + sizes.header + SPACING[3]}
+        safeBottom={insets.bottom + sizes.footer + SPACING[3]}
       />
     </View>
   );
@@ -1772,6 +2007,27 @@ const styles = StyleSheet.create({
   },
   modalButton: {
     minWidth: 100,
+  },
+  forfeitBanner: {
+    position: 'absolute',
+    top: 80,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+    zIndex: 9999,
+  },
+  forfeitBannerText: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.sm,
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
   },
   noGame: {
     flex: 1,
