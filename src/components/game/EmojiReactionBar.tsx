@@ -21,6 +21,8 @@ import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from 'react-nativ
 function IconSad({ size = 22 }: { size?: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 22 22" fill="none">
+      {/* Fond blanc : transparaît à travers les yeux/bouche (trous du path doré) */}
+      <Circle cx={11} cy={11} r={9.5} fill="#FFFFFF" />
       <Path
         fillRule="evenodd"
         clipRule="evenodd"
@@ -34,6 +36,7 @@ function IconSad({ size = 22 }: { size?: number }) {
 function IconNeutral({ size = 22 }: { size?: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 22 22" fill="none">
+      <Circle cx={11} cy={11} r={9.5} fill="#FFFFFF" />
       <Path
         fillRule="evenodd"
         clipRule="evenodd"
@@ -47,6 +50,7 @@ function IconNeutral({ size = 22 }: { size?: number }) {
 function IconSlightSmile({ size = 22 }: { size?: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 22 22" fill="none">
+      <Circle cx={11} cy={11} r={9.5} fill="#FFFFFF" />
       <Path
         fillRule="evenodd"
         clipRule="evenodd"
@@ -60,6 +64,7 @@ function IconSlightSmile({ size = 22 }: { size?: number }) {
 function IconBigSmile({ size = 22 }: { size?: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 22 22" fill="none">
+      <Circle cx={11} cy={11} r={9.5} fill="#FFFFFF" />
       <Path
         fillRule="evenodd"
         clipRule="evenodd"
@@ -73,6 +78,8 @@ function IconBigSmile({ size = 22 }: { size?: number }) {
 function IconStar({ size = 21 }: { size?: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 21 21" fill="none">
+      {/* Fond blanc : transparaît à travers les yeux/bouche (trous du path doré) */}
+      <Circle cx={10.5} cy={11} r={8.5} fill="#FFFFFF" />
       <Path
         fillRule="evenodd"
         clipRule="evenodd"

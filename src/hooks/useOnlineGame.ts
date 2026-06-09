@@ -100,7 +100,7 @@ interface UseOnlineGameReturn {
   broadcastJokerUsed: (
     jokerId: string,
     jokerType: JokerType,
-    payload?: { diceValue?: number; shieldTarget?: string; stealTarget?: string; stealAmount?: number },
+    payload?: { diceValue?: number; shieldTarget?: string; stealTarget?: string; stealAmount?: number; stake?: number },
   ) => void;
   /** Remote capture failure reçu (pour afficher popup échec chez le capturé) */
   remoteCaptureFailure: { capturedPlayerId: string; seed: number } | null;
@@ -738,7 +738,7 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
     (
       jokerId: string,
       jokerType: JokerType,
-      payload?: { diceValue?: number; shieldTarget?: string; stealTarget?: string; stealAmount?: number },
+      payload?: { diceValue?: number; shieldTarget?: string; stealTarget?: string; stealAmount?: number; stake?: number },
     ) => {
       if (!userId) return;
       storeConsumeJoker(userId, jokerId);

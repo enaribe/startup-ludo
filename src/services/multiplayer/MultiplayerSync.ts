@@ -141,6 +141,8 @@ export class MultiplayerSync {
           maxTurns: 30,
           tokenGoal: 1000,
         },
+        // Mise par joueur (FCFA). On n'écrit le champ que si > 0 (RTDB n'accepte pas undefined).
+        ...(config.betAmount && config.betAmount > 0 ? { stake: config.betAmount } : {}),
       };
 
       const hostPlayer: RealtimePlayer = {
@@ -1071,6 +1073,8 @@ export class MultiplayerSync {
         createdAt: Date.now(),
         status: 'waiting',
         roomId: null,
+        // RTDB n'accepte pas undefined : on force 0 si pas de mise.
+        stake: payload.stake ?? 0,
       };
 
       await newTicketRef.set(ticket);
@@ -1252,6 +1256,7 @@ export class MultiplayerSync {
         hostId: hostUserId,
         hostName: hostDisplayName,
         isQuickMatch: true,
+        betAmount: host.stake ?? 0,
       });
 
       // Le host a déjà été ajouté par createRoom avec isHost=true, on propage sa startup

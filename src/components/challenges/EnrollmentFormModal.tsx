@@ -174,14 +174,20 @@ export const EnrollmentFormModal = memo(function EnrollmentFormModal({
   const [phone, setPhone] = useState('');
 
   const scrollRef = useRef<ScrollView>(null);
-  // Position Y du bloc téléphone dans la ScrollView (mesurée via onLayout).
-  const phoneFieldYRef = useRef(0);
+  // Position Y de chaque champ dans la ScrollView (mesurée via onLayout),
+  // pour faire défiler le champ focalisé au-dessus du clavier.
+  const fieldYRef = useRef<Record<string, number>>({});
+
+  const setFieldY = useCallback((key: string) => (e: { nativeEvent: { layout: { y: number } } }) => {
+    fieldYRef.current[key] = e.nativeEvent.layout.y;
+  }, []);
 
   // Quand un champ reçoit le focus, on s'assure qu'il reste visible au-dessus
   // du clavier en faisant défiler la ScrollView jusqu'à sa position.
-  const handleFieldFocus = useCallback((y: number) => {
+  const handleFieldFocus = useCallback((key: string) => {
     // Petit délai pour laisser le clavier s'ouvrir avant de défiler.
     setTimeout(() => {
+      const y = fieldYRef.current[key] ?? 0;
       scrollRef.current?.scrollTo({ y: Math.max(0, y - 20), animated: true });
     }, 250);
   }, []);
@@ -252,7 +258,7 @@ export const EnrollmentFormModal = memo(function EnrollmentFormModal({
         </Text>
 
         {/* Nom */}
-        <Animated.View entering={FadeInDown.delay(100).duration(300)}>
+        <Animated.View entering={FadeInDown.delay(100).duration(300)} onLayout={setFieldY('lastName')}>
           <Text style={styles.label}>NOM</Text>
           <GradientInput
             style={styles.input}
@@ -261,11 +267,12 @@ export const EnrollmentFormModal = memo(function EnrollmentFormModal({
             placeholder="Votre nom de famille"
             placeholderTextColor="rgba(255,255,255,0.25)"
             autoCapitalize="words"
+            onFocus={() => handleFieldFocus('lastName')}
           />
         </Animated.View>
 
         {/* Prenom */}
-        <Animated.View entering={FadeInDown.delay(150).duration(300)}>
+        <Animated.View entering={FadeInDown.delay(150).duration(300)} onLayout={setFieldY('firstName')}>
           <Text style={styles.label}>PRÉNOM</Text>
           <GradientInput
             style={styles.input}
@@ -274,11 +281,12 @@ export const EnrollmentFormModal = memo(function EnrollmentFormModal({
             placeholder="Votre prénom"
             placeholderTextColor="rgba(255,255,255,0.25)"
             autoCapitalize="words"
+            onFocus={() => handleFieldFocus('firstName')}
           />
         </Animated.View>
 
         {/* Age */}
-        <Animated.View entering={FadeInDown.delay(200).duration(300)}>
+        <Animated.View entering={FadeInDown.delay(200).duration(300)} onLayout={setFieldY('age')}>
           <Text style={styles.label}>ÂGE</Text>
           <GradientInput
             style={styles.input}
@@ -287,11 +295,12 @@ export const EnrollmentFormModal = memo(function EnrollmentFormModal({
             placeholder="Votre âge"
             placeholderTextColor="rgba(255,255,255,0.25)"
             keyboardType="number-pad"
+            onFocus={() => handleFieldFocus('age')}
           />
         </Animated.View>
 
         {/* Pays */}
-        <Animated.View entering={FadeInDown.delay(250).duration(300)}>
+        <Animated.View entering={FadeInDown.delay(250).duration(300)} onLayout={setFieldY('pays')}>
           <Text style={styles.label}>PAYS</Text>
           <GradientInput
             style={styles.input}
@@ -300,11 +309,12 @@ export const EnrollmentFormModal = memo(function EnrollmentFormModal({
             placeholder="Votre pays"
             placeholderTextColor="rgba(255,255,255,0.25)"
             autoCapitalize="words"
+            onFocus={() => handleFieldFocus('pays')}
           />
         </Animated.View>
 
         {/* Region */}
-        <Animated.View entering={FadeInDown.delay(300).duration(300)}>
+        <Animated.View entering={FadeInDown.delay(300).duration(300)} onLayout={setFieldY('region')}>
           <Text style={styles.label}>RÉGION</Text>
           <GradientInput
             style={styles.input}
@@ -313,6 +323,7 @@ export const EnrollmentFormModal = memo(function EnrollmentFormModal({
             placeholder="Votre région"
             placeholderTextColor="rgba(255,255,255,0.25)"
             autoCapitalize="words"
+            onFocus={() => handleFieldFocus('region')}
           />
         </Animated.View>
 
@@ -351,7 +362,7 @@ export const EnrollmentFormModal = memo(function EnrollmentFormModal({
         {/* Phone — obligatoire pour être contacté */}
         <Animated.View
           entering={FadeInDown.delay(500).duration(300)}
-          onLayout={(e) => { phoneFieldYRef.current = e.nativeEvent.layout.y; }}
+          onLayout={setFieldY('phone')}
         >
           <Text style={styles.label}>NUMÉRO DE TÉLÉPHONE</Text>
           <Text style={styles.helper}>
@@ -364,7 +375,7 @@ export const EnrollmentFormModal = memo(function EnrollmentFormModal({
             placeholder="Numéro de téléphone"
             placeholderTextColor="rgba(255,255,255,0.25)"
             keyboardType="phone-pad"
-            onFocus={() => handleFieldFocus(phoneFieldYRef.current)}
+            onFocus={() => handleFieldFocus('phone')}
           />
         </Animated.View>
 

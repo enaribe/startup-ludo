@@ -42,9 +42,16 @@ export const JOKER_CATALOG: Record<JokerType, JokerMetadata> = {
     iconName: 'flash',
     color: '#F35145',
   },
+  investment: {
+    title: 'INVESTISSEMENT',
+    shortTitle: 'Investir',
+    description: 'Mise 1 ou 2 jetons. Si tu gagnes des jetons à ton prochain tour, remporte le double de ta mise. Sinon, tu perds ta mise.',
+    iconName: 'trending-up',
+    color: '#9C27B0',
+  },
 };
 
-export const ALL_JOKER_TYPES: JokerType[] = ['dice_choice', 'reroll', 'shield', 'steal'];
+export const ALL_JOKER_TYPES: JokerType[] = ['dice_choice', 'reroll', 'shield', 'steal', 'investment'];
 
 /** Historique anti-répétition : jokers déjà tirés depuis le dernier reset. */
 const usedJokerTypes = new Set<JokerType>();

@@ -41,18 +41,29 @@ const { height: SCREEN_HEIGHT, width: screenWidth } = Dimensions.get('window');
 
 type GeneratedIdea = { id: string; title: string; description: string };
 
+/** Garde la 1re partie « propre » d'un libellé (avant un séparateur) et capitalise. */
+function shortWord(label?: string, fallback = 'Pro'): string {
+  const raw = (label || fallback).trim().split(/\s*[:：,(-]/)[0]?.trim() || fallback;
+  const word = raw.split(/\s+/)[0] || fallback; // premier mot uniquement
+  const cleaned = word.replace(/[^A-Za-zÀ-ÿ0-9]/g, '');
+  if (!cleaned) return fallback;
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1).toLowerCase();
+}
+
 function getMockIdeas(
   target?: string,
   mission?: string,
   sector?: string
 ): GeneratedIdea[] {
-  const t = target || 'cible';
-  const m = mission || 'mission';
-  const s = sector || 'secteur';
+  // Fallback hors-ligne : on compose de VRAIS noms de marque courts
+  // (un seul mot ou deux mots collés), jamais des phrases explicatives.
+  const t = shortWord(target, 'Afri');
+  const m = shortWord(mission, 'Link');
+  const s = shortWord(sector, 'Tech');
   return [
-    { id: '1', title: `${t} + ${m} dans le ${s}`, description: 'Solution digitale pour connecter les acteurs du secteur.' },
-    { id: '2', title: `Plateforme ${t} pour ${m}`, description: 'Service innovant ciblant le marché ' + s + '.' },
-    { id: '3', title: `${m} durable en ${s}`, description: 'Modèle hybride associant ' + t + ' et ' + s + '.' },
+    { id: '1', title: `${t}${m}`, description: 'Solution digitale pour connecter les acteurs du secteur.' },
+    { id: '2', title: `${m}${s}`, description: `Service innovant ciblant le marché ${(sector || 'visé').toLowerCase()}.` },
+    { id: '3', title: `${t}${s}`, description: 'Modèle hybride pensé pour le marché africain.' },
   ];
 }
 

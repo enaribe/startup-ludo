@@ -18,7 +18,7 @@ export interface ChallengeContext {
 }
 
 // ===== JOKER TYPES =====
-export type JokerType = 'dice_choice' | 'reroll' | 'shield' | 'steal';
+export type JokerType = 'dice_choice' | 'reroll' | 'shield' | 'steal' | 'investment';
 
 export interface Joker {
   /** Identifiant unique par instance (ex: 'jk_abc123') */

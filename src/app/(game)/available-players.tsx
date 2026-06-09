@@ -20,7 +20,8 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/ui/Avatar';
-import { DynamicGradientBorder, RadialBackground } from '@/components/ui';
+import { DynamicGradientBorder, GameButton, RadialBackground } from '@/components/ui';
+import { GamePopup } from '@/components/ui/GamePopup';
 import { useMultiplayer } from '@/hooks/useMultiplayer';
 import { usePresenceMap } from '@/hooks/usePresence';
 import { sendGameInvitation } from '@/services/firebase/gameInvitationService';
@@ -31,6 +32,13 @@ import {
 } from '@/services/firebase/presenceService';
 import type { SocialUser } from '@/services/firebase/socialService';
 import { useAuthStore, useSocialStore, useUserStore } from '@/stores';
+import {
+  STAKE_OPTIONS_PTW,
+  stakePtwToFcfa,
+  getStakableBalanceFcfa,
+  canAffordStake,
+} from '@/services/game/stakeService';
+import { formatPtwRaw } from '@/utils/currency';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
@@ -69,6 +77,15 @@ export default function AvailablePlayersScreen() {
 
   const [refreshing, setRefreshing] = useState(false);
   const [invitingId, setInvitingId] = useState<string | null>(null);
+  // Contact en attente de choix de mise (modale ouverte) + mise sélectionnée (Ptw).
+  const [pendingInvite, setPendingInvite] = useState<SocialUser | null>(null);
+  const [stakePtw, setStakePtw] = useState<number>(0);
+
+  const isGuest = user?.isGuest ?? true;
+  const stakableBalanceFcfa = useMemo(
+    () => getStakableBalanceFcfa(profile?.startups),
+    [profile?.startups]
+  );
 
   const contacts = useMemo(
     () => mergeUsers([...following, ...followers], user?.id),
@@ -106,8 +123,9 @@ export default function AvailablePlayersScreen() {
     setRefreshing(false);
   }, [loadContacts]);
 
+  // Étape 1 : clic « INVITER » → vérifs puis ouverture de la modale de choix de mise.
   const handleInvite = useCallback(
-    async (contact: SocialUser) => {
+    (contact: SocialUser) => {
       if (!user?.id || invitingId) return;
 
       const state = getPresenceState(presenceMap[contact.id]);
@@ -118,53 +136,73 @@ export default function AvailablePlayersScreen() {
         return;
       }
 
-      setInvitingId(contact.id);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setStakePtw(0);
+      setPendingInvite(contact);
+    },
+    [hasProject, invitingId, presenceMap, user?.id]
+  );
+
+  // Étape 2 : la mise est choisie → création de la room + envoi de l'invitation.
+  const confirmInvite = useCallback(async () => {
+    const contact = pendingInvite;
+    if (!user?.id || !contact || invitingId) return;
+
+    const stakeFcfa = stakePtwToFcfa(stakePtw);
+    if (stakeFcfa > 0 && !canAffordStake(profile?.startups, stakeFcfa)) {
+      Alert.alert(
+        'Solde insuffisant',
+        `Tu n'as que ${formatPtwRaw(stakableBalanceFcfa)} de valorisation. Choisis une mise plus petite.`
+      );
+      return;
+    }
+
+    setInvitingId(contact.id);
+    setPendingInvite(null);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    try {
+      const result = await createRoom({
+        edition: challenge ?? 'classic',
+        maxPlayers: 2,
+        hostName: user.displayName ?? 'Joueur',
+        roomName: `Salon de ${user.displayName ?? 'Joueur'}`,
+        betAmount: stakeFcfa,
+      });
+
+      if (!result) {
+        Alert.alert('Invitation impossible', 'Le salon n’a pas pu être créé.');
+        return;
+      }
 
       try {
-        const result = await createRoom({
-          edition: challenge ?? 'classic',
-          maxPlayers: 2,
-          hostName: user.displayName ?? 'Joueur',
-          roomName: `Salon de ${user.displayName ?? 'Joueur'}`,
-          betAmount: 250,
+        await sendGameInvitation({
+          fromUserId: user.id,
+          fromUserName: user.displayName ?? 'Un joueur',
+          toUserId: contact.id,
+          roomId: result.roomId,
+          roomCode: result.code,
         });
-
-        if (!result) {
-          Alert.alert('Invitation impossible', 'Le salon n’a pas pu être créé.');
-          return;
-        }
-
-        try {
-          await sendGameInvitation({
-            fromUserId: user.id,
-            fromUserName: user.displayName ?? 'Un joueur',
-            toUserId: contact.id,
-            roomId: result.roomId,
-            roomCode: result.code,
-          });
-        } catch {
-          Alert.alert(
-            'Salon créé',
-            "Le salon est prêt, mais l'invitation n'a pas pu être envoyée. Tu peux partager le code depuis le salon."
-          );
-        }
-
-        router.replace({
-          pathname: '/(game)/create-room',
-          params: {
-            roomId: result.roomId,
-            code: result.code,
-            isHost: 'true',
-            ...(challenge ? { challenge } : {}),
-          },
-        });
-      } finally {
-        setInvitingId(null);
+      } catch {
+        Alert.alert(
+          'Salon créé',
+          "Le salon est prêt, mais l'invitation n'a pas pu être envoyée. Tu peux partager le code depuis le salon."
+        );
       }
-    },
-    [challenge, createRoom, hasProject, invitingId, presenceMap, router, user?.displayName, user?.id]
-  );
+
+      router.replace({
+        pathname: '/(game)/create-room',
+        params: {
+          roomId: result.roomId,
+          code: result.code,
+          isHost: 'true',
+          ...(challenge ? { challenge } : {}),
+        },
+      });
+    } finally {
+      setInvitingId(null);
+    }
+  }, [challenge, createRoom, invitingId, pendingInvite, profile?.startups, router, stakableBalanceFcfa, stakePtw, user?.displayName, user?.id]);
 
   const renderPlayer = (contact: SocialUser, index: number) => {
     const state = getPresenceState(presenceMap[contact.id]);
@@ -276,6 +314,60 @@ export default function AvailablePlayersScreen() {
           )}
         </View>
       </ScrollView>
+
+      {/* Choix de la mise avant d'inviter */}
+      {pendingInvite && (
+        <GamePopup
+          visible
+          onRequestClose={() => setPendingInvite(null)}
+          header="PARTIE EN LIGNE"
+          title={`Inviter ${pendingInvite.displayName}`}
+          footer={
+            <View style={{ gap: SPACING[3] }}>
+              <GameButton
+                title={stakePtw > 0 ? `INVITER · MISE ${stakePtw} Ptw` : 'INVITER SANS MISE'}
+                variant="yellow"
+                fullWidth
+                onPress={confirmInvite}
+              />
+              <GameButton title="ANNULER" variant="blue" fullWidth onPress={() => setPendingInvite(null)} />
+            </View>
+          }
+        >
+          <Text style={styles.stakeModalLabel}>Mise par joueur</Text>
+          <View style={styles.stakeRow}>
+            {STAKE_OPTIONS_PTW.map((opt) => {
+              const optFcfa = stakePtwToFcfa(opt);
+              const affordable = opt === 0 || canAffordStake(profile?.startups, optFcfa);
+              const disabled = opt > 0 && (isGuest || !affordable);
+              const selected = stakePtw === opt;
+              return (
+                <Pressable
+                  key={opt}
+                  onPress={() => !disabled && setStakePtw(opt)}
+                  disabled={disabled}
+                  style={[
+                    styles.stakeChip,
+                    selected && styles.stakeChipActive,
+                    disabled && styles.stakeChipDisabled,
+                  ]}
+                >
+                  <Text style={[styles.stakeChipText, selected && styles.stakeChipTextActive]}>
+                    {opt === 0 ? 'Sans' : `${opt} Ptw`}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <Text style={styles.stakeModalHint}>
+            {isGuest
+              ? 'Les invités jouent sans mise.'
+              : stakePtw > 0
+                ? `Solde : ${formatPtwRaw(stakableBalanceFcfa)} · Pot : ${formatPtwRaw(stakePtwToFcfa(stakePtw) * 2)}`
+                : 'Le gagnant remporte le pot des mises.'}
+          </Text>
+        </GamePopup>
+      )}
     </View>
   );
 }
@@ -435,5 +527,49 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     textAlign: 'center',
     lineHeight: 20,
+  },
+  // Modale de mise
+  stakeModalLabel: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.text,
+    marginBottom: SPACING[3],
+    textAlign: 'center',
+  },
+  stakeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: SPACING[2],
+  },
+  stakeChip: {
+    paddingHorizontal: SPACING[3],
+    paddingVertical: SPACING[2],
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  stakeChipActive: {
+    borderColor: '#FFBC40',
+    backgroundColor: 'rgba(255,188,64,0.15)',
+  },
+  stakeChipDisabled: {
+    opacity: 0.35,
+  },
+  stakeChipText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.sm,
+    color: 'rgba(255,255,255,0.7)',
+  },
+  stakeChipTextActive: {
+    color: '#FFBC40',
+  },
+  stakeModalHint: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.xs,
+    color: 'rgba(255,255,255,0.5)',
+    textAlign: 'center',
+    marginTop: SPACING[3],
   },
 });

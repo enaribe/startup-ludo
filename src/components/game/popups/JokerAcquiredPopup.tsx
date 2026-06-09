@@ -47,19 +47,27 @@ const DECOR_RIGHT = (
   </>
 );
 
+/** Jokers activables dès la récolte (effet immédiat ou différé, pas de lancer requis). */
+const USABLE_NOW: ReadonlySet<JokerType> = new Set<JokerType>(['shield', 'steal', 'investment']);
+
 // ─── Popup ───────────────────────────────────────────────────────────────────
 interface JokerAcquiredPopupProps {
   visible: boolean;
   jokerType: JokerType | null;
+  /** Collecter dans l'inventaire (utiliser plus tard). */
   onContinue: () => void;
+  /** Activer immédiatement le joker (uniquement pour les jokers activables maintenant). */
+  onUseNow?: (jokerType: JokerType) => void;
 }
 
 export const JokerAcquiredPopup = memo(function JokerAcquiredPopup({
   visible,
   jokerType,
   onContinue,
+  onUseNow,
 }: JokerAcquiredPopupProps) {
   const meta = jokerType ? JOKER_CATALOG[jokerType] : null;
+  const canUseNow = jokerType ? USABLE_NOW.has(jokerType) : false;
 
   return (
     <Modal visible={visible} onClose={onContinue} closeOnBackdrop={false} showCloseButton={false} bareContent>
@@ -87,6 +95,19 @@ export const JokerAcquiredPopup = memo(function JokerAcquiredPopup({
           )}
 
           <View style={styles.buttonWrap}>
+            <GameButton
+              title="ACTIVER MAINTENANT"
+              variant="green"
+              fullWidth
+              disabled={!canUseNow}
+              onPress={() => {
+                if (canUseNow && jokerType) onUseNow?.(jokerType);
+              }}
+            />
+            {!canUseNow && (
+              <Text style={styles.useNowHint}>Utilisable à ton prochain tour</Text>
+            )}
+            <View style={styles.buttonSpacer} />
             <GameButton title="COLLECTER" variant="yellow" fullWidth onPress={onContinue} />
           </View>
         </View>
@@ -148,5 +169,15 @@ const styles = StyleSheet.create({
   },
   buttonWrap: {
     width: '100%',
+  },
+  buttonSpacer: {
+    height: SPACING[3],
+  },
+  useNowHint: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.xs,
+    color: '#8E99A4',
+    textAlign: 'center',
+    marginTop: SPACING[1],
   },
 });

@@ -27,6 +27,8 @@ interface QuickMatchParams {
   isDefaultProject: boolean;
   sector: string;
   edition: string;
+  /** Mise par joueur en FCFA (0 = sans mise). Seuls les tickets de même mise sont appariés. */
+  stake?: number;
 }
 
 interface QuickMatchResult {
@@ -120,6 +122,7 @@ export function useQuickMatch(): QuickMatchResult {
         isDefaultProject: params.isDefaultProject,
         sector: params.sector,
         edition: params.edition,
+        stake: params.stake ?? 0,
       });
       myTicketIdRef.current = ticketId;
 
@@ -147,7 +150,8 @@ export function useQuickMatch(): QuickMatchResult {
           const compatible = allTickets.filter(
             (t) =>
               t.status === 'waiting' &&
-              t.maxPlayers === myParams.maxPlayers
+              t.maxPlayers === myParams.maxPlayers &&
+              (t.stake ?? 0) === (myParams.stake ?? 0)
           );
 
           setFoundTickets(compatible);

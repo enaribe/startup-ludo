@@ -8,12 +8,12 @@ export interface GeneratedIdea {
 
 export interface ValuationFactor {
   label: string;
-  /** Effet du facteur (ex: "+25%", "-10%", "10 000 FCFA") */
+  /** Effet du facteur (ex: "+25%", "-10%", "10 Ptw") */
   value: string;
 }
 
 export interface GeneratedValuation {
-  /** Montant final en FCFA */
+  /** Montant final, valeur interne en FCFA (1000 FCFA = 1 Ptw) */
   valorisation: number;
   /** Phrase courte expliquant le raisonnement */
   explanation: string;
@@ -26,6 +26,43 @@ const MODEL = 'gpt-4o-mini';
 
 function getApiKey(): string | undefined {
   return process.env.EXPO_PUBLIC_OPENAI_API_KEY;
+}
+
+/**
+ * Nettoie un nom de projet généré par l'IA pour ne garder qu'un nom de marque
+ * court, même si l'IA a renvoyé une expression explicative.
+ * Ex: "EcoFarm : la solution agricole connectée" → "EcoFarm"
+ *     "Payio - paiements mobiles" → "Payio"
+ *     "AgriLink, votre partenaire" → "AgriLink"
+ */
+function sanitizeStartupName(rawTitle: string): string {
+  let name = (rawTitle ?? '').trim();
+
+  // Retire d'éventuels guillemets/markdown autour du nom
+  name = name.replace(/^["'«»*`]+|["'«»*`]+$/g, '').trim();
+
+  // Coupe au premier séparateur explicatif : deux-points, tiret entouré
+  // d'espaces (- ou — ou –), ou virgule. On ne garde que la partie avant.
+  const sepMatch = name.split(/\s*[:：]\s*|\s+[-—–]\s+|\s*,\s*/);
+  if (sepMatch.length > 0 && sepMatch[0]) {
+    name = sepMatch[0].trim();
+  }
+
+  // Limite à 3 mots maximum (garde-fou contre les slogans restants)
+  const words = name.split(/\s+/).filter(Boolean);
+  if (words.length > 3) {
+    name = words.slice(0, 3).join(' ');
+  }
+
+  // Retire la ponctuation finale résiduelle
+  name = name.replace(/[.!?…\-–—,;:]+$/g, '').trim();
+
+  // Garde-fou longueur : tronque proprement à 24 caractères
+  if (name.length > 24) {
+    name = name.slice(0, 24).trim();
+  }
+
+  return name;
 }
 
 /**
@@ -54,8 +91,14 @@ export async function generateStartupIdeas(
 - Mission : ${m}
 - Secteur : ${s}
 
+RÈGLE IMPORTANTE sur le champ "title" :
+- Ce doit être un VRAI NOM DE MARQUE : un seul mot, ou deux mots courts collés (ex: "AgriLink", "Payio", "EcoFarm", "Wari", "Sokoni").
+- INTERDIT : phrases, slogans, descriptions, deux-points, tirets explicatifs. PAS de "Nom : description", PAS de "Nom - la solution qui...".
+- Maximum 3 mots, 20 caractères. Le nom seul, rien d'autre.
+- La description (1-2 phrases) va UNIQUEMENT dans le champ "description", jamais dans "title".
+
 Réponds avec ce format JSON exact :
-{"ideas":[{"title":"Nom court","description":"Description en 1-2 phrases"},{"title":"Nom court","description":"Description en 1-2 phrases"},{"title":"Nom court","description":"Description en 1-2 phrases"}]}`;
+{"ideas":[{"title":"NomDeMarque","description":"Description en 1-2 phrases"},{"title":"NomDeMarque","description":"Description en 1-2 phrases"},{"title":"NomDeMarque","description":"Description en 1-2 phrases"}]}`;
 
   try {
     const response = await fetch(OPENAI_API_URL, {
@@ -94,11 +137,15 @@ Réponds avec ce format JSON exact :
       return null;
     }
 
-    return parsed.ideas.map((idea, index) => ({
-      id: String(index + 1),
-      title: idea.title,
-      description: idea.description,
-    }));
+    return parsed.ideas.map((idea, index) => {
+      const cleaned = sanitizeStartupName(idea.title);
+      return {
+        id: String(index + 1),
+        // Repli sur le titre brut si le nettoyage donne une chaîne vide
+        title: cleaned || (idea.title ?? '').trim(),
+        description: idea.description,
+      };
+    });
   } catch (error) {
     console.warn('[AI] Generation failed:', error);
     return null;
@@ -106,12 +153,12 @@ Réponds avec ce format JSON exact :
 }
 
 /**
- * Generate an initial valuation (in FCFA) for a startup using GPT-4o-mini.
+ * Generate an initial valuation for a startup using GPT-4o-mini.
  * Takes into account the cards chosen, name and description.
  * Returns null if the API call fails (caller should fallback to multiplier-based algo).
  *
- * Valuation range expected: 8 000 to 35 000 FCFA (close to the multiplier-based system
- * to keep the in-game economy balanced).
+ * Devise du jeu : le Petaw (Ptw), 1000 FCFA = 1 Ptw.
+ * L'IA raisonne en Petaw (8 à 35 Ptw) ; on reconvertit en FCFA (valeur interne) au retour.
  */
 export async function generateValuation(input: {
   target?: string;
@@ -133,7 +180,7 @@ export async function generateValuation(input: {
 
   const systemPrompt = `Tu es un analyste financier expert des startups africaines. Tu attribues des valorisations initiales réalistes adaptées au marché sénégalais. Tu réponds UNIQUEMENT en JSON valide, sans markdown, sans commentaires.`;
 
-  const userPrompt = `Analyse cette startup et propose une valorisation initiale en FCFA.
+  const userPrompt = `Analyse cette startup et propose une valorisation initiale en Petaw (Ptw), la devise du jeu.
 
 Paramètres :
 - Nom : ${input.startupName}
@@ -143,18 +190,18 @@ Paramètres :
 - Secteur : ${sector}
 
 Règles :
-- La valorisation doit être entre 8 000 et 35 000 FCFA
+- La valorisation doit être entre 8 et 35 Ptw
 - Prends en compte la cohérence entre cible/mission/secteur, l'originalité, le potentiel marché au Sénégal
 - Bonus pour les combinaisons cohérentes et originales, malus pour les combinaisons confuses
 - Fournis 3 à 5 facteurs explicites (ex: "Cohérence cible/mission", "Secteur porteur", "Originalité")
 - L'explication doit être en 1-2 phrases courtes, ton pédagogique, en français
 
-Réponds avec ce format JSON exact :
+Réponds avec ce format JSON exact (la valorisation est un nombre de Petaw) :
 {
-  "valorisation": 18500,
+  "valorisation": 18.5,
   "explanation": "Phrase courte expliquant le raisonnement",
   "factors": [
-    {"label": "Base", "value": "10 000 FCFA"},
+    {"label": "Base", "value": "10 Ptw"},
     {"label": "Cohérence cible/mission", "value": "+30%"},
     {"label": "Secteur porteur", "value": "+25%"}
   ]
@@ -201,11 +248,13 @@ Réponds avec ce format JSON exact :
       return null;
     }
 
-    // Garde-fou : on borne la valeur retournée par l'IA pour ne pas casser l'économie
-    const clamped = Math.max(8_000, Math.min(35_000, Math.round(parsed.valorisation)));
+    // L'IA raisonne en Petaw (8 à 35 Ptw). On borne en Petaw puis on reconvertit
+    // en FCFA (valeur interne, 1000 FCFA = 1 Ptw) pour rester compatible avec le stockage.
+    const ptwClamped = Math.max(8, Math.min(35, parsed.valorisation));
+    const valorisationFcfa = Math.round(ptwClamped * 1000);
 
     return {
-      valorisation: clamped,
+      valorisation: valorisationFcfa,
       explanation: parsed.explanation,
       factors: parsed.factors.slice(0, 5),
     };

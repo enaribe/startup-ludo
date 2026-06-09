@@ -83,6 +83,11 @@ export interface UseTurnMachineParams {
   onCapturePending?: (capturedPlayerId: string, capturedPawnIndex: number) => void;
   /** Appelé quand une IA capture → choix automatique = renvoi à la base (permet d'afficher popup échec) */
   onAICapture?: (capturedPlayerId: string, capturedPawnIndex: number) => void;
+  /** Appelé au début du tour d'un joueur (après le lancer du dé). Sert au joker Investissement. */
+  onTurnStart?: (playerId: string) => void;
+  /** Appelé quand le tour passe RÉELLEMENT au joueur suivant (pas un rejeu-6),
+   *  avec l'id du joueur dont le tour se termine. Sert à résoudre le joker Investissement. */
+  onRealTurnEnd?: (playerId: string) => void;
 }
 
 export interface UseTurnMachineReturn {
@@ -146,8 +151,9 @@ export function turnReducer(state: TurnState, action: TurnAction): TurnState {
 
       const { result, rolledSix } = action;
 
-      // On a 6: ignore any triggered event — extra turn takes priority
-      // On non-6: show event popup immediately before ending the turn
+      // Sur un 6 : on n'affiche PAS l'event de la case. Le tour supplémentaire
+      // (rejouer) est prioritaire — l'event du 6 est ignoré et on enchaîne sur
+      // un nouveau lancer. L'event de la case ne s'affiche que sur un lancer ≠ 6.
       if (result?.triggeredEvent && !rolledSix) {
         return {
           ...state,
@@ -183,20 +189,9 @@ export function turnReducer(state: TurnState, action: TurnAction): TurnState {
 
     case 'TURN_ENDED': {
       if (state.phase !== 'ending') return state;
-
-      // Extra turn on 6: only if a move was actually executed (moveResult !== null)
-      // and the pawn didn't finish. Rolling 6 with no valid move → no extra turn.
-      const earnedExtraTurn =
-        state.rolledSix &&
-        state.moveResult !== null &&
-        !state.moveResult.isFinished;
-
-      if (earnedExtraTurn) {
-        // Reset to idle for same player — ready for extra turn
-        return { ...initialTurnState };
-      }
-
-      // Normal end
+      // La décision rejouer/passer est prise dans runEndTurn (effet phase='ending').
+      // Ici on remet simplement la machine à zéro pour le tour suivant (même joueur
+      // si extra turn, joueur suivant sinon).
       return { ...initialTurnState };
     }
 
@@ -266,6 +261,8 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
     onMissedFinalEntry,
     onCapturePending,
     onAICapture,
+    onTurnStart,
+    onRealTurnEnd,
   } = params;
 
   const onMissedFinalEntryRef = useRef(onMissedFinalEntry);
@@ -274,6 +271,10 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
   onCapturePendingRef.current = onCapturePending;
   const onAICaptureRef = useRef(onAICapture);
   onAICaptureRef.current = onAICapture;
+  const onTurnStartRef = useRef(onTurnStart);
+  onTurnStartRef.current = onTurnStart;
+  const onRealTurnEndRef = useRef(onRealTurnEnd);
+  onRealTurnEndRef.current = onRealTurnEnd;
 
   // Flag bloquant le passage de tour tant que le popup de choix capture n'est pas résolu
   const waitingForCaptureChoiceRef = useRef(false);
@@ -549,14 +550,11 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
               );
             } else {
               // IA capture : on bloque aussi pour empêcher l'event de la case
-              // (quiz, duel, ...) de s'ouvrir en parallèle du CaptureFailurePopup.
-              // PlayScreen appellera resolveCaptureChoice() quand le popup d'échec
-              // sera fermé (ou immédiatement si aucun popup d'échec n'est affiché).
+              // (quiz, duel, ...) de s'ouvrir en parallèle du popup capturé.
+              // C'est PlayScreen (onAICapture) qui décide automatiquement de
+              // l'issue (voler les jetons si l'adversaire en a, sinon renvoi base)
+              // et applique l'effet + le bon popup. On NE renvoie PAS d'office ici.
               waitingForCaptureChoiceRef.current = true;
-              actionsRef.current.handleCapture(
-                result!.capturedPawn!.playerId,
-                result!.capturedPawn!.pawnIndex,
-              );
               onAICaptureRef.current?.(
                 result!.capturedPawn!.playerId,
                 result!.capturedPawn!.pawnIndex,
@@ -649,9 +647,11 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
         isFinished: state.moveResult?.isFinished ?? null,
       });
 
-      // Extra turn on 6: only if a move was actually made (moveResult !== null)
-      // and the pawn didn't finish. No valid move on 6 → no extra turn.
-      if (state.rolledSix && state.moveResult && !state.moveResult.isFinished) {
+      // Tour supplémentaire sur un 6 : accordé tant que le pion n'a pas FINI.
+      // Cas inclus : 6 qui déplace sans finir, ET 6 sans coup valide (ex. pion
+      // bloqué en zone finale faute du compte exact) → on rejoue quand même.
+      // Seul un pion qui atteint l'arrivée (isFinished) ne donne pas de rejeu.
+      if (state.rolledSix && !state.moveResult?.isFinished) {
         actionsRef.current.grantExtraTurn();
         clearSelection();
         setAnimating(false);
@@ -721,16 +721,23 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
   useEffect(() => {
     const playerId = currentPlayer?.id ?? null;
 
-    // First mount — just record
+    // First mount — just record + démarrer le suivi d'investissement du 1er joueur
     if (activePlayerIdRef.current === null) {
       activePlayerIdRef.current = playerId;
+      if (playerId) onTurnStartRef.current?.(playerId);
       return;
     }
 
     // Same player (e.g. extra turn on 6) — no reset needed
     if (playerId === activePlayerIdRef.current) return;
 
-    // Player changed — reset machine for the new player
+    // Player changed — le tour du joueur précédent se termine RÉELLEMENT ici
+    // (après d'éventuels rejeux-6). On résout son pari « Investissement », puis on
+    // démarre le suivi pour le nouveau joueur.
+    const previousPlayerId = activePlayerIdRef.current;
+    if (previousPlayerId) onRealTurnEndRef.current?.(previousPlayerId);
+    if (playerId) onTurnStartRef.current?.(playerId);
+
     activePlayerIdRef.current = playerId;
     // Reset valeur de dé armée par joker (dice_choice/reroll) : elle ne doit
     // jamais déborder sur le tour d'un autre joueur.

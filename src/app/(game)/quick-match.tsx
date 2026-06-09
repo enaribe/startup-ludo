@@ -38,6 +38,13 @@ import { JoinRoomError, getJoinRoomErrorDisplay } from '@/services/multiplayer/J
 import { useAuthStore, useUserStore } from '@/stores';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
+import {
+  STAKE_OPTIONS_PTW,
+  stakePtwToFcfa,
+  getStakableBalanceFcfa,
+  canAffordStake,
+} from '@/services/game/stakeService';
+import { formatPtwRaw } from '@/utils/currency';
 
 const { width: screenWidth } = Dimensions.get('window');
 const contentWidth = screenWidth - SPACING[4] * 2;
@@ -74,6 +81,14 @@ export default function QuickMatchScreen() {
   const [selectedSector, setSelectedSector] = useState<string | null>(null);
   const [showStartupModal, setShowStartupModal] = useState(false);
   const [matchFoundCountdown, setMatchFoundCountdown] = useState(3);
+  const [stakePtw, setStakePtw] = useState<number>(0);
+
+  const isGuest = user?.isGuest ?? true;
+  const stakableBalanceFcfa = useMemo(
+    () => getStakableBalanceFcfa(profile?.startups),
+    [profile?.startups]
+  );
+  const stakeFcfa = stakePtwToFcfa(stakePtw);
 
   const edition = challenge || 'classic';
   const defaultProjects = useMemo(
@@ -209,6 +224,20 @@ export default function QuickMatchScreen() {
       return;
     }
 
+    if (stakeFcfa > 0) {
+      if (isGuest) {
+        Alert.alert('Mise impossible', 'Les invités ne peuvent pas jouer avec une mise. Crée un compte pour miser.');
+        return;
+      }
+      if (!canAffordStake(profile?.startups, stakeFcfa)) {
+        Alert.alert(
+          'Solde insuffisant',
+          `Tu n'as que ${formatPtwRaw(stakableBalanceFcfa)} de valorisation. Choisis une mise plus petite.`
+        );
+        return;
+      }
+    }
+
     const derivedEdition = getSectorEdition(selectedSector);
 
     setPhase('searching');
@@ -222,8 +251,9 @@ export default function QuickMatchScreen() {
       isDefaultProject: selectedIsDefault,
       sector: selectedSector,
       edition: derivedEdition,
+      stake: stakeFcfa,
     });
-  }, [user, selectedStartupId, selectedStartupName, selectedIsDefault, selectedSector, maxPlayers, start]);
+  }, [user, selectedStartupId, selectedStartupName, selectedIsDefault, selectedSector, maxPlayers, stakeFcfa, isGuest, profile?.startups, stakableBalanceFcfa, start]);
 
   const handleCancel = useCallback(async () => {
     await cancel();
@@ -350,6 +380,40 @@ export default function QuickMatchScreen() {
                   </View>
                 </DynamicGradientBorder>
               </Pressable>
+
+              {/* Mise */}
+              <Text style={styles.sectionLabel}>MISE PAR JOUEUR</Text>
+              <View style={styles.stakeRow}>
+                {STAKE_OPTIONS_PTW.map((opt) => {
+                  const optFcfa = stakePtwToFcfa(opt);
+                  const affordable = opt === 0 || canAffordStake(profile?.startups, optFcfa);
+                  const disabled = opt > 0 && (isGuest || !affordable);
+                  const selected = stakePtw === opt;
+                  return (
+                    <Pressable
+                      key={opt}
+                      onPress={() => !disabled && setStakePtw(opt)}
+                      disabled={disabled}
+                      style={[
+                        styles.stakeChip,
+                        selected && styles.stakeChipActive,
+                        disabled && styles.stakeChipDisabled,
+                      ]}
+                    >
+                      <Text style={[styles.stakeChipText, selected && styles.stakeChipTextActive]}>
+                        {opt === 0 ? 'Sans' : `${opt}`}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Text style={styles.stakeHint}>
+                {isGuest
+                  ? 'Les invités jouent sans mise.'
+                  : stakePtw > 0
+                    ? `Solde : ${formatPtwRaw(stakableBalanceFcfa)} · Pot : ${formatPtwRaw(stakeFcfa * maxPlayers)}`
+                    : 'Le gagnant remporte le pot des mises.'}
+              </Text>
             </Animated.View>
           )}
 
@@ -528,6 +592,40 @@ const styles = StyleSheet.create({
   playerCountRow: {
     flexDirection: 'row',
     gap: SPACING[3],
+  },
+  stakeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING[2],
+  },
+  stakeChip: {
+    paddingHorizontal: SPACING[3],
+    paddingVertical: SPACING[2],
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  stakeChipActive: {
+    borderColor: '#FFBC40',
+    backgroundColor: 'rgba(255,188,64,0.15)',
+  },
+  stakeChipDisabled: {
+    opacity: 0.35,
+  },
+  stakeChipText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.sm,
+    color: 'rgba(255,255,255,0.7)',
+  },
+  stakeChipTextActive: {
+    color: '#FFBC40',
+  },
+  stakeHint: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.xs,
+    color: 'rgba(255,255,255,0.5)',
+    marginTop: SPACING[2],
   },
   playerCountCard: {
     alignItems: 'center',

@@ -8,6 +8,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -23,7 +24,7 @@ import {
 } from '@/components/ui';
 import { GamePopup, GamePopupGradientBorder } from '@/components/ui/GamePopup';
 import type { InfoSection } from '@/components/ui';
-import { deleteStartup } from '@/services/firebase/firestore';
+import { deleteStartup, updateStartupName } from '@/services/firebase/firestore';
 import { useAuthStore, useUserStore } from '@/stores';
 import { COLORS } from '@/styles/colors';
 import { BORDER_RADIUS, SPACING } from '@/styles/spacing';
@@ -103,18 +104,78 @@ function StartupDetailPopup({
   startup,
   onClose,
   onDelete,
+  onRename,
 }: {
   startup: Startup;
   onClose: () => void;
   onDelete?: () => void;
+  onRename?: (newName: string) => void;
 }) {
   const [detailPageIndex, setDetailPageIndex] = useState(0);
   const [detailCardH, setDetailCardH] = useState(0);
   const [detailCardW, setDetailCardW] = useState(0);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState(startup.name);
   const valorisationStr = formatValorisationPopup(startup.valorisation ?? 0);
   const createdAtStr = formatDateDDMMYYYY(startup.createdAt);
   const descriptionRaw = startup.description?.trim() ?? '';
   const descriptionDisplay = descriptionRaw.length > 0 ? descriptionRaw : 'Aucune description pour le moment.';
+
+  const startEditName = useCallback(() => {
+    setNameDraft(startup.name);
+    setIsEditingName(true);
+  }, [startup.name]);
+
+  const cancelEditName = useCallback(() => {
+    setIsEditingName(false);
+    setNameDraft(startup.name);
+  }, [startup.name]);
+
+  const confirmEditName = useCallback(() => {
+    const trimmed = nameDraft.trim();
+    if (trimmed.length < 2) {
+      Alert.alert('Nom invalide', 'Le nom doit contenir au moins 2 caractères.');
+      return;
+    }
+    setIsEditingName(false);
+    if (trimmed !== startup.name) {
+      onRename?.(trimmed);
+    }
+  }, [nameDraft, startup.name, onRename]);
+
+  const titleNode = isEditingName ? (
+    <View style={popupStyles.renameRow}>
+      <TextInput
+        style={popupStyles.renameInput}
+        value={nameDraft}
+        onChangeText={setNameDraft}
+        placeholder="Nom du projet"
+        placeholderTextColor="rgba(255,255,255,0.3)"
+        autoFocus
+        maxLength={30}
+        selectTextOnFocus
+        returnKeyType="done"
+        onSubmitEditing={confirmEditName}
+      />
+      <Pressable onPress={confirmEditName} hitSlop={8} style={popupStyles.renameIconBtn}>
+        <Ionicons name="checkmark" size={22} color={COLORS.success} />
+      </Pressable>
+      <Pressable onPress={cancelEditName} hitSlop={8} style={popupStyles.renameIconBtn}>
+        <Ionicons name="close" size={22} color="#7F8E9E" />
+      </Pressable>
+    </View>
+  ) : (
+    <Pressable
+      onPress={onRename ? startEditName : undefined}
+      style={popupStyles.titleRow}
+      disabled={!onRename}
+    >
+      <Text style={popupStyles.titleText} numberOfLines={2}>{startup.name}</Text>
+      {onRename != null && (
+        <Ionicons name="pencil" size={16} color={COLORS.primary} style={popupStyles.titlePencil} />
+      )}
+    </Pressable>
+  );
 
   return (
     <GamePopup
@@ -122,7 +183,7 @@ function StartupDetailPopup({
       onRequestClose={onClose}
       icon={<RocketIcon color="#1F91D0" size={72} withShadow={false} />}
       spinningShape
-      title={startup.name}
+      title={titleNode}
       footer={
         <View style={popupStyles.actionsRow}>
           {onDelete != null && (
@@ -238,6 +299,54 @@ function StartupDetailPopup({
 }
 
 const popupStyles = StyleSheet.create({
+  // Titre + édition du nom
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING[2],
+    marginBottom: SPACING[4],
+    paddingHorizontal: SPACING[2],
+  },
+  titleText: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES.xl,
+    color: COLORS.text,
+    textAlign: 'center',
+    flexShrink: 1,
+  },
+  titlePencil: {
+    flexShrink: 0,
+  },
+  renameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[2],
+    marginBottom: SPACING[4],
+    width: '100%',
+  },
+  renameInput: {
+    flex: 1,
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES.lg,
+    color: COLORS.text,
+    textAlign: 'center',
+    backgroundColor: 'rgba(0,0,0,0.25)',
+    borderRadius: 12,
+    paddingVertical: SPACING[2],
+    paddingHorizontal: SPACING[3],
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+  },
+  renameIconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+
   // Stats block (Valorisation | Niveau)
   statsBlock: {
     position: 'relative',
@@ -566,6 +675,19 @@ export default function PortfolioScreen() {
         <StartupDetailPopup
           startup={selectedStartup}
           onClose={() => setSelectedStartup(null)}
+          onRename={(newName) => {
+            const startupId = selectedStartup.id;
+            // Mise à jour locale immédiate (store + popup)
+            useUserStore.getState().updateStartup(startupId, { name: newName });
+            setSelectedStartup((prev) => (prev ? { ...prev, name: newName } : prev));
+            // Persistance Firestore (best-effort)
+            const userId = useAuthStore.getState().user?.id;
+            if (userId) {
+              updateStartupName(userId, startupId, newName).catch(() => {
+                Alert.alert('Erreur', "Le nom n'a pas pu être synchronisé. Réessaie plus tard.");
+              });
+            }
+          }}
           onDelete={() => {
             Alert.alert(
               "Supprimer l'entreprise",

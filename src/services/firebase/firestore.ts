@@ -378,6 +378,27 @@ export const updateStartupValorisation = async (
   }
 };
 
+// Renommer une startup
+export const updateStartupName = async (
+  userId: string,
+  startupId: string,
+  newName: string,
+): Promise<void> => {
+  try {
+    firebaseLog('Updating startup name', { userId, startupId });
+
+    await updateDoc(
+      doc(getFirestore(), FIRESTORE_COLLECTIONS.userStartups(userId), startupId),
+      { name: newName }
+    );
+
+    firebaseLog('Startup name updated successfully');
+  } catch (error) {
+    firebaseLog('Failed to update startup name', error);
+    throw new Error(getFirebaseErrorMessage(error));
+  }
+};
+
 // Delete a startup
 export const deleteStartup = async (userId: string, startupId: string): Promise<void> => {
   try {
@@ -669,6 +690,24 @@ export const updateChallengeEnrollment = async (
     firebaseLog('Challenge enrollment updated successfully');
   } catch (error) {
     firebaseLog('Failed to update challenge enrollment', error);
+    throw new Error(getFirebaseErrorMessage(error));
+  }
+};
+
+/** Supprime définitivement une inscription à un challenge dans Firestore */
+export const deleteChallengeEnrollment = async (
+  userId: string,
+  challengeId: string
+): Promise<void> => {
+  try {
+    firebaseLog('Deleting challenge enrollment', { userId, challengeId });
+
+    const docId = enrollmentDocId(userId, challengeId);
+    await deleteDoc(doc(getFirestore(), FIRESTORE_COLLECTIONS.challengeEnrollments, docId));
+
+    firebaseLog('Challenge enrollment deleted successfully');
+  } catch (error) {
+    firebaseLog('Failed to delete challenge enrollment', error);
     throw new Error(getFirebaseErrorMessage(error));
   }
 };

@@ -22,8 +22,9 @@ import type { Startup, TargetCard, MissionCard } from '@/types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-// Valorisation initiale en FCFA à la création du projet
-const BASE_VALUATION = 10_000; // 10 000 FCFA de base (modulé par les multiplicateurs de cartes)
+// Valorisation initiale à la création du projet.
+// Valeur interne en FCFA (1000 FCFA = 1 Ptw) ; affichée en Petaw via formatFCFARaw.
+const BASE_VALUATION = 10_000; // = 10 Ptw de base (modulé par les multiplicateurs de cartes)
 
 const SECTOR_INFO: Record<string, { name: string; icon: string }> = {
   fintech: { name: 'Fintech', icon: 'cash' },

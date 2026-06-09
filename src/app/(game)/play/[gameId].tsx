@@ -24,6 +24,10 @@ import {
   TokensStolenPopup,
   JokerAcquiredPopup,
   JokerInventoryPopup,
+  StealTargetSelectPopup,
+  STEAL_AMOUNT,
+  InvestmentStakePickerPopup,
+  InvestmentResultPopup,
   EventPopup,
   FundingPopup,
   MissedFinalEntryPopup,
@@ -146,8 +150,24 @@ export default function PlayScreen() {
     };
   }, [tutorialActive, tutorialStepIndex, boardTarget, tokensTarget, jokersTarget, diceTarget]);
 
-  const params = useLocalSearchParams<{ mode?: string; roomId?: string }>();
+  const params = useLocalSearchParams<{ mode?: string; roomId?: string; stake?: string }>();
   const isOnline = params.mode === 'online';
+  // Mise de la partie (FCFA), propagée jusqu'à l'écran de résultats pour le payout.
+  const stakeParam = params.stake ?? '0';
+
+  /** Navigue vers les résultats en transmettant mode/roomId/stake (pour le payout). */
+  const goToResults = useCallback((gid: string | undefined) => {
+    if (!gid) return;
+    router.push({
+      pathname: '/(game)/results/[gameId]',
+      params: {
+        gameId: gid,
+        mode: params.mode ?? 'local',
+        ...(params.roomId ? { roomId: params.roomId } : {}),
+        stake: stakeParam,
+      },
+    });
+  }, [router, params.mode, params.roomId, stakeParam]);
   const userId = useAuthStore((s) => s.user?.id) ?? null;
 
   // Online game hook (only active in online mode)
@@ -172,6 +192,9 @@ export default function PlayScreen() {
   const grantJoker = useGameStore((s) => s.grantJoker);
   const consumeJoker = useGameStore((s) => s.consumeJoker);
   const applyEffect = useGameStore((s) => s.applyEffect);
+  const startInvestment = useGameStore((s) => s.startInvestment);
+  const markInvestmentTurnStart = useGameStore((s) => s.markInvestmentTurnStart);
+  const resolveInvestment = useGameStore((s) => s.resolveInvestment);
   const clearSelection = useGameStore((s) => s.clearSelection);
   const setAnimating = useGameStore((s) => s.setAnimating);
   const getCurrentPlayer = useGameStore((s) => s.getCurrentPlayer);
@@ -203,6 +226,10 @@ export default function PlayScreen() {
   const [jokerAcquired, setJokerAcquired] = useState<{ type: JokerType } | null>(null);
   const [showJokerInventory, setShowJokerInventory] = useState(false);
   const [pendingDiceJoker, setPendingDiceJoker] = useState<{ jokerId: string } | null>(null);
+  const [pendingStealJoker, setPendingStealJoker] = useState<{ jokerId: string } | null>(null);
+  const [pendingInvestmentJoker, setPendingInvestmentJoker] = useState<{ jokerId: string } | null>(null);
+  // Résultat du pari « Investissement » à afficher (popup)
+  const [investmentResult, setInvestmentResult] = useState<{ won: boolean; stake: number; gain: number } | null>(null);
   const [boardWrapSize, setBoardWrapSize] = useState({ w: 0, h: 0 });
   const handleBoardWrapLayout = useCallback((e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
@@ -539,7 +566,7 @@ export default function PlayScreen() {
       }
       if (!stillRunning) {
         // Partie totalement terminée → redirection vers résultats
-        router.push(`/(game)/results/${game?.id}`);
+        goToResults(game?.id);
       }
       return stillRunning;
     },
@@ -574,12 +601,54 @@ export default function PlayScreen() {
     onCapturePending: (capturedPlayerId, capturedPawnIndex) => {
       setCaptureChoice({ capturedPlayerId, capturedPawnIndex });
     },
-    onAICapture: (capturedPlayerId) => {
-      // IA a capturé → pion déjà renvoyé, affiche popup échec narratif
-      // seulement si le capturé est le joueur local (ou en local partage du device)
-      const seed = Math.floor(Math.random() * 10000);
-      if (!isOnline || capturedPlayerId === userId) {
-        setCaptureFailure({ seed });
+    onAICapture: (capturedPlayerId, capturedPawnIndex) => {
+      // L'IA capture → choix AUTOMATIQUE : voler les jetons si l'adversaire en a,
+      // sinon le renvoyer à la base. Le tour est bloqué jusqu'à resolveCaptureChoice().
+      const g = useGameStore.getState().game;
+      const captured = g?.players.find((p) => p.id === capturedPlayerId);
+      const aiCapturer = g?.players[g.currentPlayerIndex];
+      const amount = captured?.tokens ?? 0;
+
+      if (amount > 0) {
+        // Vol des jetons : le pion reste en jeu
+        if (isOnline) {
+          onlineGame.broadcastCaptureSteal(capturedPlayerId, amount);
+        } else {
+          removeTokens(capturedPlayerId, amount);
+          if (aiCapturer) addTokens(aiCapturer.id, amount);
+          // En local/solo, on montre le popup "jetons cédés" au capturé
+          setTokensStolen({ amount });
+        }
+      } else {
+        // Aucun jeton → renvoi à la base
+        const seed = Math.floor(Math.random() * 10000);
+        if (isOnline) {
+          onlineGame.broadcastCapture(capturedPlayerId, capturedPawnIndex);
+          onlineGame.broadcastCaptureFailure(capturedPlayerId, seed);
+        } else {
+          storeHandleCapture(capturedPlayerId, capturedPawnIndex);
+          setCaptureFailure({ seed });
+        }
+      }
+
+      // En solo/local, le popup affiché ci-dessus appellera resolveCaptureChoice()
+      // à sa fermeture. Si aucun popup n'est montré (cas online non-local), on
+      // débloque immédiatement le tour.
+      if (isOnline && capturedPlayerId !== userId) {
+        resolveCaptureChoice();
+      }
+    },
+    onTurnStart: (playerId) => {
+      // Joker Investissement : capture les jetons du joueur au début de son tour.
+      markInvestmentTurnStart(playerId);
+    },
+    onRealTurnEnd: (playerId) => {
+      // Joker Investissement : résout le pari du joueur dont le tour se termine.
+      const result = resolveInvestment(playerId);
+      if (!result) return;
+      // On n'affiche le popup que pour le joueur LOCAL (online) ou en solo/local.
+      if (!isOnline || playerId === userId) {
+        setInvestmentResult({ won: result.won, stake: result.stake, gain: result.gain });
       }
     },
   });
@@ -838,7 +907,7 @@ export default function PlayScreen() {
       disconnectTimerRef.current = setTimeout(() => {
         if (userId) {
           onlineGame.broadcastWin(userId);
-          router.push(`/(game)/results/${game.id}`);
+          goToResults(game.id);
         }
       }, 30000);
     } else {
@@ -891,7 +960,7 @@ export default function PlayScreen() {
     if (!isOnline || !game) return;
     if (game.status === 'finished' && game.winner) {
       const timer = setTimeout(() => {
-        router.push(`/(game)/results/${game.id}`);
+        goToResults(game.id);
       }, 1500);
       return () => clearTimeout(timer);
     }
@@ -1007,33 +1076,69 @@ export default function PlayScreen() {
           break;
         }
         case 'steal': {
-          // Cible : le joueur avec le plus de jetons (autre que soi)
-          const others = game.players.filter((p) => p.id !== currentPlayer.id);
-          const leader = others.reduce(
-            (best, p) => (p.tokens > (best?.tokens ?? 0) ? p : best),
-            null as Player | null,
+          // Le joueur choisit lui-même sa cible parmi les adversaires.
+          // On vérifie d'abord qu'au moins un adversaire possède des jetons à voler.
+          const stealable = game.players.filter(
+            (p) => p.id !== currentPlayer.id && !p.isForfeited && p.rank === undefined && p.tokens > 0,
           );
-          const amount = Math.min(3, leader?.tokens ?? 0);
 
-          // Consomme toujours le joker (pas de cible valide → joker gaspillé)
-          consumeJoker(currentPlayer.id, joker.id);
-
-          if (leader && amount > 0) {
-            removeTokens(leader.id, amount);
-            addTokens(currentPlayer.id, amount);
+          if (stealable.length === 0) {
+            // Aucune cible valide → joker gaspillé (consommé), synchro online.
+            consumeJoker(currentPlayer.id, joker.id);
             if (isOnline) {
-              onlineGame.broadcastJokerUsed(joker.id, 'steal', { stealTarget: leader.id, stealAmount: amount });
+              onlineGame.broadcastJokerUsed(joker.id, 'steal', { stealAmount: 0 });
             }
-          } else if (isOnline) {
-            // Broadcast quand même la consommation pour synchroniser les inventaires
-            onlineGame.broadcastJokerUsed(joker.id, 'steal', { stealAmount: 0 });
+            break;
           }
+
+          // Ouvre le popup de sélection — la consommation et le vol se font après le choix.
+          setPendingStealJoker({ jokerId: joker.id });
+          break;
+        }
+        case 'investment': {
+          // Il faut au moins 1 jeton pour pouvoir miser.
+          if (currentPlayer.tokens < 1) {
+            consumeJoker(currentPlayer.id, joker.id);
+            if (isOnline) {
+              onlineGame.broadcastJokerUsed(joker.id, 'investment', { stake: 0 });
+            }
+            break;
+          }
+          // Ouvre le picker de mise (1 ou 2) — la mise et l'effet sont posés après le choix.
+          setPendingInvestmentJoker({ jokerId: joker.id });
           break;
         }
       }
     },
     [currentPlayer, game, isOnline, onlineGame, setChosenDiceValue, consumeJoker, applyEffect, addTokens, removeTokens, diceProps],
   );
+
+  /** Callback du picker de mise (joker investment) : pose le pari. */
+  const handleInvestmentStakePick = useCallback(
+    (stake: number) => {
+      if (!pendingInvestmentJoker || !currentPlayer) return;
+      const { jokerId } = pendingInvestmentJoker;
+      setPendingInvestmentJoker(null);
+
+      // Plafonne la mise aux jetons disponibles (sécurité), min 1.
+      const effectiveStake = Math.max(1, Math.min(stake, currentPlayer.tokens));
+
+      removeTokens(currentPlayer.id, effectiveStake);
+      startInvestment(currentPlayer.id, effectiveStake);
+      consumeJoker(currentPlayer.id, jokerId);
+
+      if (isOnline) {
+        onlineGame.broadcastJokerUsed(jokerId, 'investment', { stake: effectiveStake });
+      }
+    },
+    [pendingInvestmentJoker, currentPlayer, isOnline, onlineGame, removeTokens, startInvestment, consumeJoker],
+  );
+
+  const handleInvestmentCancel = useCallback(() => {
+    // Annulation : le joker n'est PAS consommé, retour à l'inventaire.
+    setPendingInvestmentJoker(null);
+    setShowJokerInventory(true);
+  }, []);
 
   /** Callback du picker de valeur de dé (joker dice_choice) */
   const handleDiceJokerPick = useCallback(
@@ -1057,6 +1162,35 @@ export default function PlayScreen() {
 
   const handleDiceJokerCancel = useCallback(() => {
     setPendingDiceJoker(null);
+    setShowJokerInventory(true);
+  }, []);
+
+  /** Callback de sélection de la cible du joker « VOL ÉCLAIR » */
+  const handleStealTargetSelected = useCallback(
+    (target: Player) => {
+      if (!pendingStealJoker || !currentPlayer) return;
+      const { jokerId } = pendingStealJoker;
+      setPendingStealJoker(null);
+
+      const amount = Math.min(STEAL_AMOUNT, target.tokens);
+      consumeJoker(currentPlayer.id, jokerId);
+
+      if (amount > 0) {
+        removeTokens(target.id, amount);
+        addTokens(currentPlayer.id, amount);
+        if (isOnline) {
+          onlineGame.broadcastJokerUsed(jokerId, 'steal', { stealTarget: target.id, stealAmount: amount });
+        }
+      } else if (isOnline) {
+        onlineGame.broadcastJokerUsed(jokerId, 'steal', { stealAmount: 0 });
+      }
+    },
+    [pendingStealJoker, currentPlayer, isOnline, onlineGame, consumeJoker, removeTokens, addTokens],
+  );
+
+  const handleStealCancel = useCallback(() => {
+    // Annulation : le joker n'est PAS consommé, retour à l'inventaire.
+    setPendingStealJoker(null);
     setShowJokerInventory(true);
   }, []);
 
@@ -1657,6 +1791,18 @@ export default function PlayScreen() {
           setJokerAcquired(null);
           handleEventResolveRef.current?.();
         }}
+        onUseNow={(jokerType) => {
+          setJokerAcquired(null);
+          // Le joker vient d'être ajouté à l'inventaire : on récupère son instance.
+          const cp = useGameStore.getState().game?.players.find((p) => p.id === currentPlayer?.id);
+          const justGranted = cp?.jokers?.slice().reverse().find((j) => j.type === jokerType);
+          // On termine d'abord l'event de la case (le tour suit son cours normal),
+          // puis on déclenche l'activation du joker (effet immédiat ou picker).
+          handleEventResolveRef.current?.();
+          if (justGranted) {
+            setTimeout(() => handleUseJoker(justGranted), 0);
+          }
+        }}
       />
 
       {/* Joker Inventory Popup */}
@@ -1672,6 +1818,35 @@ export default function PlayScreen() {
         visible={pendingDiceJoker !== null}
         onPick={handleDiceJokerPick}
         onCancel={handleDiceJokerCancel}
+      />
+
+      {/* Sélection de la cible du joker « VOL ÉCLAIR » */}
+      <StealTargetSelectPopup
+        visible={pendingStealJoker !== null}
+        opponents={
+          game?.players.filter(
+            (p) => p.id !== currentPlayer?.id && !p.isForfeited && p.rank === undefined,
+          ) ?? []
+        }
+        onSelectTarget={handleStealTargetSelected}
+        onClose={handleStealCancel}
+      />
+
+      {/* Joker Investissement : choix de la mise */}
+      <InvestmentStakePickerPopup
+        visible={pendingInvestmentJoker !== null}
+        maxStake={Math.min(2, currentPlayer?.tokens ?? 0)}
+        onPick={handleInvestmentStakePick}
+        onCancel={handleInvestmentCancel}
+      />
+
+      {/* Joker Investissement : résultat du pari */}
+      <InvestmentResultPopup
+        visible={investmentResult !== null}
+        won={investmentResult?.won ?? false}
+        stake={investmentResult?.stake ?? 0}
+        gain={investmentResult?.gain ?? 0}
+        onClose={() => setInvestmentResult(null)}
       />
 
       {/* Opponent Disconnected Modal (online — 2 joueurs restants seulement) */}
@@ -1691,7 +1866,7 @@ export default function PlayScreen() {
                 if (disconnectTimerRef.current) clearTimeout(disconnectTimerRef.current);
                 if (userId) {
                   onlineGame.broadcastWin(userId);
-                  router.push(`/(game)/results/${game.id}`);
+                  goToResults(game.id);
                 }
               }}
               style={styles.modalButton}

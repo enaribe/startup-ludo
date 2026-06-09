@@ -60,7 +60,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { Dimensions, Image, Modal, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, Image, KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
   FadeIn,
@@ -228,7 +228,10 @@ export function GamePopup({
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onRequestClose}>
-      <View style={styles.backdrop}>
+      <KeyboardAvoidingView
+        style={styles.backdrop}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
         <Animated.View style={popupStyle}>
           <OuterBorderWrapper height={popupHeight}>
             <View
@@ -288,7 +291,7 @@ export function GamePopup({
             </View>
           </OuterBorderWrapper>
         </Animated.View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

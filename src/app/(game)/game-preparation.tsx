@@ -28,12 +28,14 @@ import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { RadialBackground, DynamicGradientBorder } from '@/components/ui';
 import { multiplayerSync } from '@/services/multiplayer';
-import { useGameStore } from '@/stores';
+import { useGameStore, useAuthStore, useUserStore } from '@/stores';
 import database from '@react-native-firebase/database';
 import { REALTIME_PATHS } from '@/services/firebase/config';
 import type { RealtimePlayer } from '@/services/firebase/config';
 import { decodeCheckpoint } from '@/utils/onlineCodec';
 import type { CompactCheckpoint } from '@/utils/onlineCodec';
+import { debitFromStartups } from '@/services/game/stakeService';
+import { updateStartupValorisation } from '@/services/firebase/firestore';
 
 const { width: screenWidth } = Dimensions.get('window');
 const contentWidth = screenWidth - SPACING[4] * 2;
@@ -98,6 +100,7 @@ export default function GamePreparationScreen() {
   const initGame = useGameStore((s) => s.initGame);
   const loadFromCheckpoint = useGameStore((s) => s.loadFromCheckpoint);
   const hasInitRef = useRef(false);
+  const debitedRef = useRef(false);
 
   // Pulse animation for the active step icon
   const pulse = useSharedValue(1);
@@ -167,6 +170,28 @@ export default function GamePreparationScreen() {
         const roomSnap = await database().ref(REALTIME_PATHS.room(roomId)).once('value');
         const roomData = roomSnap.val();
         const edition = roomData?.edition || 'classic';
+        const stakeFcfa: number = roomData?.stake ?? 0;
+
+        // ===== DÉBIT DE LA MISE (côté client, une fois) =====
+        // Chaque joueur se débite lui-même de sa mise en puisant dans la valorisation
+        // de ses startups (entreprise utilisée dans la partie d'abord). Les invités
+        // ne misent pas. Voir [[project_petaw_currency]].
+        if (stakeFcfa > 0 && !debitedRef.current) {
+          debitedRef.current = true;
+          const authUser = useAuthStore.getState().user;
+          const profile = useUserStore.getState().profile;
+          if (authUser && !authUser.isGuest && profile?.startups?.length) {
+            const myRtdbPlayer = rtdbPlayers.find((p) => p.id === authUser.id);
+            const deltas = debitFromStartups(profile.startups, stakeFcfa, myRtdbPlayer?.startupId ?? null);
+            const updateStartup = useUserStore.getState().updateStartup;
+            for (const d of deltas) {
+              updateStartup(d.startupId, { valorisation: d.newValorisation });
+              updateStartupValorisation(authUser.id, d.startupId, d.newValorisation).catch((err) => {
+                console.warn('[GamePreparation] Échec persistance débit mise:', err);
+              });
+            }
+          }
+        }
 
         await new Promise((r) => setTimeout(r, 300));
         setState('finalizing');
@@ -202,6 +227,7 @@ export default function GamePreparationScreen() {
               gameId: params.gameId || `game_${roomId}_${Date.now()}`,
               mode: 'online',
               roomId,
+              stake: String(stakeFcfa),
             },
           });
         }, 600);

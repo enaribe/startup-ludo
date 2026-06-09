@@ -10,6 +10,7 @@ export {
   updateUserStats,
   addStartup,
   deleteStartup,
+  deleteChallengeEnrollment,
   getLeaderboard,
   saveGameSession,
   getGameHistory,

@@ -35,6 +35,8 @@ import { useSound } from '@/hooks/useSound';
 import { evaluateAchievements } from '@/services/game/achievementService';
 import { saveGameSession, updateChallengeEnrollment, updateStartupValorisation, updateUserStats, updateUserAchievements } from '@/services/firebase/firestore';
 import { useAuthStore, useChallengeStore, useGameStore, useUserStore } from '@/stores';
+import { payoutForRankFcfa } from '@/services/game/stakeService';
+import { formatPtwRaw } from '@/utils/currency';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
@@ -306,6 +308,8 @@ export default function ResultsScreen() {
     gameId: string;
     mode?: string;
     isOnline?: string;
+    roomId?: string;
+    stake?: string;
   }>();
 
   const { game, resetGame, initGame } = useGameStore();
@@ -434,8 +438,20 @@ export default function ResultsScreen() {
   const valorisationGain = hasAnyStartup
     ? Math.round((myPlayer?.tokens ?? 0) * 6250 * (isOnline ? 1.5 : 1))
     : 0;
-  const valorisationAfter = valorisationBefore + valorisationGain;
   const defaultProjectXPBonus = !usedOwnStartup && myPlayer?.startupId ? 5 : 0;
+
+  // ===== MISE (stake) — payout du pot selon le rang =====
+  // La mise a été débitée au lancement (game-preparation). Ici on crédite le gain
+  // sur l'entreprise principale. Un joueur forfait ne reçoit rien (perd sa mise).
+  const stakeFcfa = parseInt(params.stake ?? '0', 10) || 0;
+  const myIsForfeited = (myPlayer as { isForfeited?: boolean } | undefined)?.isForfeited === true;
+  const stakePayoutFcfa =
+    isOnline && stakeFcfa > 0 && !myIsForfeited
+      ? payoutForRankFcfa(stakeFcfa, sortedPlayers.length, myRank)
+      : 0;
+
+  // Le payout du pot vient s'ajouter au gain de valorisation, sur la même entreprise.
+  const valorisationAfter = valorisationBefore + valorisationGain + stakePayoutFcfa;
 
   // ===== APPLY REWARDS =====
   useEffect(() => {
@@ -449,7 +465,7 @@ export default function ResultsScreen() {
     if (totalXP > 0) addXP(totalXP);
     if (myPlayer) addTokensEarned(myPlayer.tokens);
 
-    if (myStartup && valorisationGain > 0) {
+    if (myStartup && (valorisationGain > 0 || stakePayoutFcfa > 0)) {
       updateStartup(myStartup.id, { valorisation: valorisationAfter });
       if (userId && !isGuest) {
         updateStartupValorisation(userId, myStartup.id, valorisationAfter).catch((err) => {
@@ -756,6 +772,24 @@ export default function ResultsScreen() {
           />
         </Animated.View>
 
+        {/* Récap de la mise (parties en ligne avec mise) */}
+        {isOnline && stakeFcfa > 0 && (
+          <Animated.View entering={FadeInDown.delay(350).duration(400)} style={styles.stakeRecap}>
+            <Ionicons
+              name={stakePayoutFcfa > 0 ? 'trophy' : 'cash-outline'}
+              size={20}
+              color={stakePayoutFcfa > 0 ? '#FFBC40' : 'rgba(255,255,255,0.6)'}
+            />
+            <Text style={styles.stakeRecapText}>
+              {stakePayoutFcfa > stakeFcfa
+                ? `Mise ${formatPtwRaw(stakeFcfa)} · Tu remportes ${formatPtwRaw(stakePayoutFcfa)} !`
+                : stakePayoutFcfa > 0
+                  ? `Mise ${formatPtwRaw(stakeFcfa)} · Récupéré ${formatPtwRaw(stakePayoutFcfa)}`
+                  : `Mise ${formatPtwRaw(stakeFcfa)} · Perdue cette fois`}
+            </Text>
+          </Animated.View>
+        )}
+
         {/* Classement */}
         <View style={styles.rankingContainer}>
           {sortedPlayers.map((player, index) => {
@@ -917,6 +951,25 @@ const styles = StyleSheet.create({
   },
 
   // Classement
+  stakeRecap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING[2],
+    backgroundColor: 'rgba(255,188,64,0.10)',
+    borderRadius: 14,
+    paddingVertical: SPACING[3],
+    paddingHorizontal: SPACING[4],
+    marginBottom: SPACING[4],
+    width: '100%',
+  },
+  stakeRecapText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.text,
+    textAlign: 'center',
+    flexShrink: 1,
+  },
   rankingContainer: {
     width: '100%',
     gap: SPACING[2],

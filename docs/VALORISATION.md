@@ -1,15 +1,19 @@
 # La valorisation d'une entreprise
 
 Ce document explique, simplement, comment Startup Ludo donne une **valeur de
-départ** (en FCFA) à une entreprise quand un joueur la crée.
+départ** (en **Petaw**, la devise du jeu) à une entreprise quand un joueur la
+crée.
+
+> La devise officielle du jeu est le **Petaw** (abrégé **Ptw**).
+> **1000 FCFA = 1 Ptw.**
 
 ---
 
 ## C'est quoi la valorisation ?
 
 Quand un joueur crée son entreprise dans le jeu, celle-ci reçoit une
-**valorisation initiale** : un montant en FCFA qui représente combien vaut
-l'entreprise au moment de sa naissance.
+**valorisation initiale** : un montant en Petaw (Ptw) qui représente combien
+vaut l'entreprise au moment de sa naissance.
 
 C'est un peu comme l'estimation d'un investisseur : « Ton idée, aujourd'hui,
 vaut environ tant. »
@@ -40,21 +44,20 @@ de l'idée »).
 
 L'IA est guidée par quelques règles :
 
-- la valorisation reste **entre 8 000 et 35 000 FCFA** ;
+- la valorisation reste **entre 8 et 35 Ptw** ;
 - une idée **cohérente et originale** est récompensée (montant plus élevé) ;
 - une combinaison **confuse** est pénalisée (montant plus bas) ;
 - le raisonnement doit être **court, pédagogique et en français**.
 
 Même si l'IA propose un chiffre en dehors de la fourchette, le jeu le ramène
-toujours entre 8 000 et 35 000 FCFA pour ne pas déséquilibrer l'économie du
-jeu.
+toujours entre 8 et 35 Ptw pour ne pas déséquilibrer l'économie du jeu.
 
 ### Méthode de secours : le calcul automatique
 
 Si l'IA n'est pas disponible (pas de connexion, problème technique, ou en
 attendant sa réponse), le jeu calcule lui-même la valorisation.
 
-Le principe : on part d'une **base de 10 000 FCFA**, puis on l'ajuste selon les
+Le principe : on part d'une **base de 10 Ptw**, puis on l'ajuste selon les
 trois cartes choisies par le joueur (cible, mission, secteur). Chaque carte a
 un coefficient : une carte plus « forte » augmente la valorisation.
 
@@ -89,7 +92,7 @@ Le joueur suit l'évolution de la valeur de ses entreprises dans son
 | | |
 |---|---|
 | **Quand ?** | À la création d'une entreprise |
-| **Combien ?** | Entre 8 000 et 35 000 FCFA |
+| **Combien ?** | Entre 8 et 35 Ptw (1 Ptw = 1000 FCFA) |
 | **Méthode principale** | Une IA estime la valeur et explique pourquoi |
-| **Méthode de secours** | Calcul automatique : 10 000 FCFA de base ajustés par les cartes |
+| **Méthode de secours** | Calcul automatique : 10 Ptw de base ajustés par les cartes |
 | **Ensuite ?** | La valorisation grandit à chaque partie jouée |

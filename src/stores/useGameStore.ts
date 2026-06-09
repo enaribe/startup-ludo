@@ -49,6 +49,13 @@ interface PlayerEffects {
   shield: boolean;       // Protection contre la capture
   skipNextTurn: boolean; // Passer le prochain tour
   extraTurn: boolean;    // Tour supplémentaire
+  /**
+   * Pari « Investissement » en attente de résolution.
+   * stake = mise (1 ou 2), déjà débitée. tokensAtStart = jetons du joueur
+   * au début de son prochain tour (null tant que ce tour n'a pas commencé).
+   * À la fin de ce tour : bilan > 0 → +2×stake ; sinon mise perdue.
+   */
+  pendingInvestment?: { stake: number; tokensAtStart: number | null };
 }
 
 interface GameStoreState {
@@ -100,8 +107,16 @@ interface GameStoreActions {
 
   // Effets spéciaux
   applyEffect: (playerId: string, effect: 'shield' | 'extraTurn' | 'skipTurn' | 'retreat' | 'returnBase', value?: number) => void;
-  clearEffect: (playerId: string, effect: keyof PlayerEffects) => void;
-  hasEffect: (playerId: string, effect: keyof PlayerEffects) => boolean;
+  clearEffect: (playerId: string, effect: 'shield' | 'skipNextTurn' | 'extraTurn') => void;
+  hasEffect: (playerId: string, effect: 'shield' | 'skipNextTurn' | 'extraTurn') => boolean;
+
+  // Joker « Investissement » (pari différé)
+  /** Pose le pari : la mise a déjà été débitée par l'appelant. */
+  startInvestment: (playerId: string, stake: number) => void;
+  /** Capture les jetons du joueur au début de son prochain tour (1× max). */
+  markInvestmentTurnStart: (playerId: string) => void;
+  /** Résout le pari à la fin du tour. Retourne le résultat, ou null si aucun pari. */
+  resolveInvestment: (playerId: string) => { stake: number; won: boolean; gain: number } | null;
 
   // Captures
   handleCapture: (capturedPlayerId: string, capturedPawnIndex: number) => void;
@@ -743,6 +758,52 @@ export const useGameStore = create<GameStore>()(
         return playerEffects[playerId]?.[effect] ?? false;
       },
 
+      // ===== JOKER INVESTISSEMENT (pari différé) =====
+
+      startInvestment: (playerId, stake) => {
+        set((state) => {
+          if (!state.playerEffects[playerId]) {
+            state.playerEffects[playerId] = createDefaultEffects();
+          }
+          // tokensAtStart = null : sera capturé au début du prochain tour du joueur.
+          state.playerEffects[playerId]!.pendingInvestment = { stake, tokensAtStart: null };
+        });
+      },
+
+      markInvestmentTurnStart: (playerId) => {
+        const { game, playerEffects } = get();
+        const inv = playerEffects[playerId]?.pendingInvestment;
+        if (!inv || inv.tokensAtStart !== null) return; // déjà capturé ou pas de pari
+        const player = game?.players.find((p) => p.id === playerId);
+        const tokens = player?.tokens ?? 0;
+        set((state) => {
+          const e = state.playerEffects[playerId]?.pendingInvestment;
+          if (e) e.tokensAtStart = tokens;
+        });
+      },
+
+      resolveInvestment: (playerId) => {
+        const { game, playerEffects } = get();
+        const inv = playerEffects[playerId]?.pendingInvestment;
+        if (!inv) return null;
+        // Si le tour n'a jamais démarré (tokensAtStart null), on prend les jetons actuels
+        // comme référence → bilan 0 → pari perdu (cas limite : partie finie avant de rejouer).
+        const start = inv.tokensAtStart ?? (game?.players.find((p) => p.id === playerId)?.tokens ?? 0);
+        const end = game?.players.find((p) => p.id === playerId)?.tokens ?? 0;
+        const won = end - start > 0;
+        const gain = won ? inv.stake * 2 : 0;
+
+        set((state) => {
+          const e = state.playerEffects[playerId];
+          if (e) e.pendingInvestment = undefined;
+        });
+
+        if (gain > 0) {
+          get().addTokens(playerId, gain);
+        }
+        return { stake: inv.stake, won, gain };
+      },
+
       // ===== CAPTURES =====
 
       handleCapture: (capturedPlayerId, capturedPawnIndex) => {
@@ -995,6 +1056,7 @@ export const useGameStore = create<GameStore>()(
               shieldTarget?: string;
               stealTarget?: string;
               stealAmount?: number;
+              stake?: number;
             };
             get().consumeJoker(data.pid, data.id);
 
@@ -1004,6 +1066,11 @@ export const useGameStore = create<GameStore>()(
             } else if (data.type === 'steal' && data.stealTarget && data.stealAmount && data.stealAmount > 0) {
               get().removeTokens(data.stealTarget, data.stealAmount);
               get().addTokens(data.pid, data.stealAmount);
+            } else if (data.type === 'investment' && data.stake && data.stake > 0) {
+              // Pose le pari sur les autres clients : débit + effet différé.
+              // La résolution se fera localement à la fin du tour du joueur concerné.
+              get().removeTokens(data.pid, data.stake);
+              get().startInvestment(data.pid, data.stake);
             }
             // 'dice_choice' et 'reroll' : la valeur sera broadcastée via 'r' au lancer
             break;

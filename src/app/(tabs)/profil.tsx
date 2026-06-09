@@ -15,6 +15,7 @@ import { RadialBackground, DynamicGradientBorder, Avatar } from '@/components/ui
 import { getRankFromXP, getRankProgress, getXPForNextRank } from '@/config/progression';
 import { useAvatarPicker } from '@/hooks/useAvatarPicker';
 import { AvatarPickerModal } from '@/components/profile/AvatarPickerModal';
+import { RankProgressionPopup } from '@/components/profile/RankProgressionPopup';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -107,6 +108,7 @@ export default function ProfilScreen() {
   const followCounts = useSocialStore((s) => s.followCounts);
   const { saveAvatar, isSaving } = useAvatarPicker();
   const [avatarModalVisible, setAvatarModalVisible] = useState(false);
+  const [showRankPopup, setShowRankPopup] = useState(false);
 
   const handleSelectAvatar = async (value: string) => {
     await saveAvatar(value);
@@ -211,7 +213,7 @@ export default function ProfilScreen() {
               fill="rgba(0, 0, 0, 0.35)"
               boxWidth={contentWidth}
             >
-              <View style={styles.cardContent}>
+              <Pressable style={styles.cardContent} onPress={() => setShowRankPopup(true)}>
                 <View style={styles.progressionHeader}>
                   <Text style={styles.progressionTitleInCard}>PROGRESSION</Text>
                   <Text style={styles.rankBadge}>{rankInfo.title}</Text>
@@ -228,7 +230,7 @@ export default function ProfilScreen() {
                     : <Text style={styles.xpText}>Rang maximum atteint 👑</Text>
                   }
                 </View>
-              </View>
+              </Pressable>
             </DynamicGradientBorder>
           </Animated.View>
 
@@ -267,6 +269,13 @@ export default function ProfilScreen() {
         isSaving={isSaving}
         onRequestClose={() => setAvatarModalVisible(false)}
         onSelect={handleSelectAvatar}
+      />
+
+      {/* Popup explicatif des rangs et de l'XP requis */}
+      <RankProgressionPopup
+        visible={showRankPopup}
+        totalXP={totalXP}
+        onClose={() => setShowRankPopup(false)}
       />
     </View>
   );

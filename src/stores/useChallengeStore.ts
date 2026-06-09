@@ -9,7 +9,7 @@
  * - Livrables (secteur, pitch, business plan)
  */
 
-import { setChallengeEnrollment } from '@/services/firebase/firestore';
+import { deleteChallengeEnrollment, setChallengeEnrollment } from '@/services/firebase/firestore';
 import { ALL_CHALLENGES } from '@/data/challenges';
 import type {
     Challenge,
@@ -38,6 +38,7 @@ interface ChallengeStoreActions {
   getChallengeById: (id: string) => Challenge | undefined;
   getActiveChallenge: () => Challenge | null;
   enrollInChallenge: (challengeId: string, userId: string, formData?: EnrollmentFormData) => ChallengeEnrollment;
+  unenrollFromChallenge: (enrollmentId: string) => void;
   submitEnrollmentForm: (enrollmentId: string, formData: EnrollmentFormData) => void;
   getEnrollmentForChallenge: (challengeId: string, userId?: string) => ChallengeEnrollment | undefined;
   getActiveEnrollment: () => ChallengeEnrollment | null;
@@ -121,6 +122,25 @@ export const useChallengeStore = create<ChallengeStoreState & ChallengeStoreActi
           });
         }
         return newEnrollment;
+      },
+
+      unenrollFromChallenge: (enrollmentId) => {
+        const enrollment = get().enrollments.find((e) => e.id === enrollmentId);
+        if (!enrollment) return;
+        const { challengeId, userId } = enrollment;
+        // Suppression locale : retire l'inscription et toute sa progression (XP, niveaux, livrables)
+        set((state) => {
+          state.enrollments = state.enrollments.filter((e) => e.id !== enrollmentId);
+          if (state.activeChallengeId === challengeId) {
+            state.activeChallengeId = null;
+          }
+        });
+        // Suppression côté Firestore (best-effort, comme l'inscription)
+        if (userId) {
+          deleteChallengeEnrollment(userId, challengeId).catch(() => {
+            get().setError('Impossible de synchroniser la désinscription.');
+          });
+        }
       },
 
       submitEnrollmentForm: (enrollmentId, formData) => {

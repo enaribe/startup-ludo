@@ -15,6 +15,7 @@ import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { StartupSelectionModal } from '@/components/game/StartupSelectionModal';
+import { VersusBoard, type VersusPlayer } from '@/components/game/VersusBoard';
 import { DynamicGradientBorder, GameButton, RadialBackground } from '@/components/ui';
 import { Avatar } from '@/components/ui/Avatar';
 import { getDefaultProjectsForEdition, getMatchingUserStartups } from '@/data/defaultProjects';
@@ -24,6 +25,13 @@ import { InviteContactModal } from '@/components/game/InviteContactModal';
 import { useAuthStore, useUserStore } from '@/stores';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
+import {
+  STAKE_OPTIONS_PTW,
+  stakePtwToFcfa,
+  getStakableBalanceFcfa,
+  canAffordStake,
+} from '@/services/game/stakeService';
+import { formatPtwRaw } from '@/utils/currency';
 
 const { width: screenWidth } = Dimensions.get('window');
 const contentWidth = screenWidth - SPACING[4] * 2;
@@ -71,7 +79,18 @@ export default function CreateRoomScreen() {
   const [roomName, setRoomName] = useState('');
   const [maxPlayers, setMaxPlayers] = useState<string>('4');
   const [selectedEdition] = useState(params.challenge || 'classic');
-  const [betAmount] = useState(250);
+  // Mise choisie, en Ptw (0 = sans mise). Convertie en FCFA pour la room.
+  const [stakePtw, setStakePtw] = useState<number>(0);
+
+  // Solde misable du joueur = somme des valorisations de ses startups (FCFA).
+  const stakableBalanceFcfa = useMemo(
+    () => getStakableBalanceFcfa(profile?.startups),
+    [profile?.startups]
+  );
+  const stakeFcfa = stakePtwToFcfa(stakePtw);
+  const canAfford = canAffordStake(profile?.startups, stakeFcfa);
+  const playersCountNum = parseInt(maxPlayers, 10);
+  const potFcfa = stakeFcfa > 0 && playersCountNum >= 2 ? stakeFcfa * playersCountNum : 0;
 
   // Waiting room states
   const [roomCode, setRoomCode] = useState(params.code ? formatRoomCode(params.code) : '');
@@ -83,6 +102,18 @@ export default function CreateRoomScreen() {
       playerId,
     }));
   }, [players]);
+
+  // Présentation « VS » des joueurs de la salle d'attente
+  const versusPlayers = useMemo<VersusPlayer[]>(
+    () =>
+      playersList.map((p) => ({
+        name: p.displayName ?? p.name ?? 'Joueur',
+        color: p.color,
+        isAI: false,
+        startupName: p.startupName ?? null,
+      })),
+    [playersList]
+  );
 
   const allReady = useMemo(() => {
     if (playersList.length < 2) return false;
@@ -206,6 +237,21 @@ export default function CreateRoomScreen() {
       return;
     }
 
+    // Vérifications liées à la mise
+    if (stakeFcfa > 0) {
+      if (isGuest) {
+        Alert.alert('Mise impossible', 'Les invités ne peuvent pas jouer avec une mise. Crée un compte pour miser.');
+        return;
+      }
+      if (!canAfford) {
+        Alert.alert(
+          'Solde insuffisant',
+          `Tu n'as que ${formatPtwRaw(stakableBalanceFcfa)} de valorisation. Choisis une mise plus petite ou développe tes entreprises.`
+        );
+        return;
+      }
+    }
+
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     const result = await createRoom({
@@ -213,7 +259,7 @@ export default function CreateRoomScreen() {
       maxPlayers: playersCount as 2 | 3 | 4,
       hostName: user.displayName ?? 'Hote',
       roomName: roomName.trim(),
-      betAmount,
+      betAmount: stakeFcfa,
     });
 
     if (result) {
@@ -221,7 +267,7 @@ export default function CreateRoomScreen() {
       setCurrentRoomId(result.roomId);
       setShowLobby(true);
     }
-  }, [user, selectedEdition, maxPlayers, roomName, betAmount, createRoom]);
+  }, [user, selectedEdition, maxPlayers, roomName, stakeFcfa, isGuest, canAfford, stakableBalanceFcfa, createRoom]);
 
   const handleCopyCode = useCallback(async () => {
     if (roomCode) {
@@ -337,6 +383,47 @@ export default function CreateRoomScreen() {
                     />
                   </View>
                 </View>
+
+                {/* Mise (Ptw) */}
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>Mise par joueur</Text>
+                  <View style={styles.stakeRow}>
+                    {STAKE_OPTIONS_PTW.map((opt) => {
+                      const optFcfa = stakePtwToFcfa(opt);
+                      const affordable = opt === 0 || canAffordStake(profile?.startups, optFcfa);
+                      const disabled = opt > 0 && (isGuest || !affordable);
+                      const selected = stakePtw === opt;
+                      return (
+                        <Pressable
+                          key={opt}
+                          onPress={() => !disabled && setStakePtw(opt)}
+                          disabled={disabled}
+                          style={[
+                            styles.stakeChip,
+                            selected && styles.stakeChipActive,
+                            disabled && styles.stakeChipDisabled,
+                          ]}
+                        >
+                          <Text style={[styles.stakeChipText, selected && styles.stakeChipTextActive]}>
+                            {opt === 0 ? 'Sans' : `${opt} Ptw`}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                  {isGuest ? (
+                    <Text style={styles.stakeHint}>Les invités jouent sans mise.</Text>
+                  ) : stakePtw > 0 ? (
+                    <Text style={styles.stakeHint}>
+                      Solde : {formatPtwRaw(stakableBalanceFcfa)}
+                      {potFcfa > 0 ? ` · Pot : ${formatPtwRaw(potFcfa)}` : ''}
+                    </Text>
+                  ) : (
+                    <Text style={styles.stakeHint}>
+                      Mise ta valorisation, le gagnant remporte le pot.
+                    </Text>
+                  )}
+                </View>
               </View>
             </DynamicGradientBorder>
           </View>
@@ -412,6 +499,20 @@ export default function CreateRoomScreen() {
           </DynamicGradientBorder>
         </Animated.View>
 
+        {/* Bandeau mise (si la room a une mise) */}
+        {room?.stake && room.stake > 0 ? (
+          <Animated.View entering={FadeInDown.delay(150).duration(500)} style={styles.stakeBannerWrapper}>
+            <DynamicGradientBorder borderRadius={16} fill="rgba(255,188,64,0.10)" boxWidth={contentWidth}>
+              <View style={styles.stakeBanner}>
+                <Ionicons name="cash-outline" size={20} color="#FFBC40" />
+                <Text style={styles.stakeBannerText}>
+                  Mise : {formatPtwRaw(room.stake)} / joueur · Pot : {formatPtwRaw(room.stake * playersList.length)}
+                </Text>
+              </View>
+            </DynamicGradientBorder>
+          </Animated.View>
+        ) : null}
+
         {/* Liste des joueurs — même design que local-setup (CONFIGURATION DES JOUEURS) */}
         <Animated.View entering={FadeInDown.delay(200).duration(500)} style={styles.lobbySectionWrapper}>
           <DynamicGradientBorder
@@ -423,12 +524,11 @@ export default function CreateRoomScreen() {
             <Text style={styles.lobbySectionTitle}>
               JOUEURS ({playersList.length}/{maxPlayers})
             </Text>
-            {playersList.length === 0 ? (
-              <View style={styles.emptyPlayers}>
-                <Ionicons name="hourglass-outline" size={24} color="rgba(255,255,255,0.3)" />
-                <Text style={styles.emptyText}>En attente de joueurs...</Text>
-              </View>
-            ) : (
+            {playersList.length >= 2 ? (
+              // Présentation VS dès qu'au moins 2 joueurs sont dans le salon
+              <VersusBoard players={versusPlayers} />
+            ) : playersList.length === 1 ? (
+              // Un seul joueur (hôte) : on l'affiche + on attend les adversaires
               <View style={styles.playersList}>
                 {playersList.map((player, index) => (
                   <Animated.View
@@ -478,6 +578,15 @@ export default function CreateRoomScreen() {
                     </DynamicGradientBorder>
                   </Animated.View>
                 ))}
+                <View style={styles.emptyPlayers}>
+                  <Ionicons name="hourglass-outline" size={20} color="rgba(255,255,255,0.3)" />
+                  <Text style={styles.emptyText}>En attente d'autres joueurs...</Text>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.emptyPlayers}>
+                <Ionicons name="hourglass-outline" size={24} color="rgba(255,255,255,0.3)" />
+                <Text style={styles.emptyText}>En attente de joueurs...</Text>
               </View>
             )}
           </DynamicGradientBorder>
@@ -611,6 +720,40 @@ const styles = StyleSheet.create({
     minHeight: Platform.OS === 'android' ? 28 : undefined,
     padding: 0,
   },
+  stakeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING[2],
+  },
+  stakeChip: {
+    paddingHorizontal: SPACING[3],
+    paddingVertical: SPACING[2],
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  stakeChipActive: {
+    borderColor: '#FFBC40',
+    backgroundColor: 'rgba(255,188,64,0.15)',
+  },
+  stakeChipDisabled: {
+    opacity: 0.35,
+  },
+  stakeChipText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.sm,
+    color: 'rgba(255,255,255,0.7)',
+  },
+  stakeChipTextActive: {
+    color: '#FFBC40',
+  },
+  stakeHint: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.xs,
+    color: 'rgba(255,255,255,0.5)',
+    marginTop: SPACING[1],
+  },
   label: {
     fontFamily: FONTS.title,
     fontSize: 14,
@@ -698,6 +841,22 @@ const styles = StyleSheet.create({
     gap: SPACING[1],
   },
   codeActionText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.sm,
+    color: '#FFBC40',
+  },
+  stakeBannerWrapper: {
+    marginTop: SPACING[4],
+  },
+  stakeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[2],
+    padding: SPACING[4],
+    width: '100%',
+  },
+  stakeBannerText: {
+    flex: 1,
     fontFamily: FONTS.bodySemiBold,
     fontSize: FONT_SIZES.sm,
     color: '#FFBC40',

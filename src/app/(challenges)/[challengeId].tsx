@@ -7,6 +7,7 @@ import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { memo, useCallback, useId, useMemo, useState } from 'react';
 import {
+  Alert,
   Dimensions,
   Pressable,
   ScrollView,
@@ -278,6 +279,7 @@ export default function ChallengeDetailScreen() {
   const challenges = useChallengeStore((state) => state.challenges);
   const enrollments = useChallengeStore((state) => state.enrollments);
   const enrollInChallenge = useChallengeStore((state) => state.enrollInChallenge);
+  const unenrollFromChallenge = useChallengeStore((state) => state.unenrollFromChallenge);
 
   const challenge = useMemo(() => {
     const storeChallenge = challenges.find((c) => c.id === params.challengeId);
@@ -320,6 +322,25 @@ export default function ChallengeDetailScreen() {
       params: { challengeId: challenge.id },
     });
   }, [challenge, user, enrollInChallenge, router]);
+
+  const handleUnenrollPress = useCallback(() => {
+    if (!challenge || !enrollment) return;
+    Alert.alert(
+      'Se désinscrire',
+      `Veux-tu vraiment quitter le programme « ${challenge.name} » ? Ta progression (XP, niveaux et livrables de ce programme) sera définitivement perdue.`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Se désinscrire',
+          style: 'destructive',
+          onPress: () => {
+            unenrollFromChallenge(enrollment.id);
+            router.back();
+          },
+        },
+      ]
+    );
+  }, [challenge, enrollment, unenrollFromChallenge, router]);
 
   if (!challenge) {
     return (
@@ -475,6 +496,16 @@ export default function ChallengeDetailScreen() {
           fullWidth
           onPress={handleEnrollPress}
         />
+        {isEnrolled && (
+          <Pressable
+            onPress={handleUnenrollPress}
+            style={styles.unenrollButton}
+            hitSlop={SPACING[2]}
+          >
+            <Ionicons name="exit-outline" size={16} color={COLORS.error} />
+            <Text style={styles.unenrollButtonText}>Se désinscrire</Text>
+          </Pressable>
+        )}
       </Animated.View>
 
       <EnrollmentFormModal
@@ -767,6 +798,19 @@ const styles = StyleSheet.create({
     right: 0,
     paddingHorizontal: SPACING[4],
     paddingTop: SPACING[3],
+  },
+  unenrollButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING[2],
+    paddingVertical: SPACING[3],
+    marginTop: SPACING[2],
+  },
+  unenrollButtonText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.error,
   },
 
   // Error

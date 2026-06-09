@@ -20,8 +20,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 
+import * as Haptics from 'expo-haptics';
+
 import { RadialBackground, DynamicGradientBorder, GameButton, Avatar } from '@/components/ui';
-import { useAuthStore, useUserStore } from '@/stores';
+import { PlayerProfilePopup } from '@/components/profile/PlayerProfilePopup';
+import { useAuthStore, useUserStore, useSettingsStore } from '@/stores';
 import { useSocialStore } from '@/stores/useSocialStore';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
@@ -41,10 +44,11 @@ interface UserCardProps {
   isGuest: boolean;
   currentUserId: string | undefined;
   onToggleFollow: (userId: string) => void;
+  onPress: (user: SocialUser) => void;
   index: number;
 }
 
-function UserCard({ user, isFollowed, isGuest, currentUserId, onToggleFollow, index }: UserCardProps) {
+function UserCard({ user, isFollowed, isGuest, currentUserId, onToggleFollow, onPress, index }: UserCardProps) {
   const isMe = user.id === currentUserId;
   const winRate = user.gamesPlayed > 0
     ? Math.round((user.gamesWon / user.gamesPlayed) * 100)
@@ -52,25 +56,27 @@ function UserCard({ user, isFollowed, isGuest, currentUserId, onToggleFollow, in
 
   return (
     <Animated.View entering={FadeInDown.delay(index * 60).duration(350)}>
-      <DynamicGradientBorder borderRadius={16} fill="rgba(0,0,0,0.35)" boxWidth={contentWidth}>
-        <View style={styles.userCard}>
-          <Avatar source={user.avatarUrl} name={user.displayName} size="lg" showBorder />
-          <View style={styles.userInfo}>
-            <Text style={styles.userName} numberOfLines={1}>{user.displayName}</Text>
-            <Text style={styles.userRank}>{user.rank} • {user.xp.toLocaleString()} XP</Text>
-            <Text style={styles.userStats}>{user.gamesPlayed} parties • {winRate}% victoires</Text>
+      <Pressable onPress={() => onPress(user)}>
+        <DynamicGradientBorder borderRadius={16} fill="rgba(0,0,0,0.35)" boxWidth={contentWidth}>
+          <View style={styles.userCard}>
+            <Avatar source={user.avatarUrl} name={user.displayName} size="lg" showBorder />
+            <View style={styles.userInfo}>
+              <Text style={styles.userName} numberOfLines={1}>{user.displayName}</Text>
+              <Text style={styles.userRank}>{user.rank} • {user.xp.toLocaleString()} XP</Text>
+              <Text style={styles.userStats}>{user.gamesPlayed} parties • {winRate}% victoires</Text>
+            </View>
+            {!isMe && (
+              <GameButton
+                title={isFollowed ? 'SUIVI' : 'SUIVRE'}
+                variant={isFollowed ? 'blue' : 'yellow'}
+                size="sm"
+                disabled={isGuest}
+                onPress={() => onToggleFollow(user.id)}
+              />
+            )}
           </View>
-          {!isMe && (
-            <GameButton
-              title={isFollowed ? 'SUIVI' : 'SUIVRE'}
-              variant={isFollowed ? 'blue' : 'yellow'}
-              size="sm"
-              disabled={isGuest}
-              onPress={() => onToggleFollow(user.id)}
-            />
-          )}
-        </View>
-      </DynamicGradientBorder>
+        </DynamicGradientBorder>
+      </Pressable>
     </Animated.View>
   );
 }
@@ -124,9 +130,19 @@ export default function NetworkScreen() {
     clearSearch,
   } = useSocialStore();
 
+  const hapticsEnabled = useSettingsStore((s) => s.hapticsEnabled);
+
   const [activeTab, setActiveTab] = useState<Tab>('following');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedUser, setSelectedUser] = useState<SocialUser | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleUserPress = useCallback((u: SocialUser) => {
+    if (hapticsEnabled) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    setSelectedUser(u);
+  }, [hapticsEnabled]);
 
   useEffect(() => {
     if (!userId) return;
@@ -310,11 +326,24 @@ export default function NetworkScreen() {
                 isGuest={isGuest}
                 currentUserId={userId}
                 onToggleFollow={handleToggleFollow}
+                onPress={handleUserPress}
               />
             ))}
           </View>
         )}
       </ScrollView>
+
+      {/* Fiche joueur (XP, niveau, stats) — même design que le classement */}
+      {selectedUser && (
+        <PlayerProfilePopup
+          user={selectedUser}
+          isFollowed={isFollowed(selectedUser.id)}
+          isGuest={isGuest}
+          hideFollow={selectedUser.id === userId}
+          onToggleFollow={() => handleToggleFollow(selectedUser.id)}
+          onClose={() => setSelectedUser(null)}
+        />
+      )}
     </View>
   );
 }

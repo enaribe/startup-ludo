@@ -166,6 +166,8 @@ export interface RealtimeRoom {
     maxTurns: number;
     tokenGoal: number;
   };
+  /** Mise par joueur en FCFA (1 Ptw = 1000 FCFA). 0 ou absent = partie sans mise. */
+  stake?: number;
 }
 
 export interface RealtimePlayer {
@@ -244,6 +246,8 @@ export interface MatchmakingTicket {
   status: MatchmakingStatus;
   /** Rempli quand le ticket est matché : ID de la room à rejoindre */
   roomId: string | null;
+  /** Mise par joueur en FCFA. Seuls les tickets de même mise sont appariés. */
+  stake?: number;
 }
 
 // ===== EMOJI REACTIONS =====

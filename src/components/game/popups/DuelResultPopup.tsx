@@ -207,7 +207,6 @@ export const DuelResultPopup = memo(function DuelResultPopup({
             <View style={[styles.feedbackDivider, { backgroundColor: feedbackDividerColor }]} />
             {/* Récompense */}
             <View style={styles.rewardRow}>
-              <Ionicons name="logo-bitcoin" size={16} color={feedbackRewardColor} />
               <Text style={[styles.rewardText, { color: feedbackRewardColor }]}>
                 {currentPlayerReward > 0 ? `+${currentPlayerReward} jetons gagnés` : 'Aucun jeton gagné'}
               </Text>

@@ -17,3 +17,5 @@ export { CaptureFailurePopup } from './CaptureFailurePopup';
 export { TokensStolenPopup } from './TokensStolenPopup';
 export { JokerAcquiredPopup } from './JokerAcquiredPopup';
 export { JokerInventoryPopup } from './JokerInventoryPopup';
+export { StealTargetSelectPopup, STEAL_AMOUNT } from './StealTargetSelectPopup';
+export { InvestmentStakePickerPopup, InvestmentResultPopup } from './InvestmentPopups';
