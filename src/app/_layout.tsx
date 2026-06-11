@@ -26,7 +26,6 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import { useInvitationStore } from '@/stores/useInvitationStore';
 import { refreshEditionsFromFirestore } from '@/data';
 import { refreshDefaultProjectsFromFirestore } from '@/data/defaultProjects';
-import { refreshChallengesFromFirestore } from '@/data/challenges';
 import { clearCache } from '@/services/firebase/cacheHelper';
 import {
   setPresenceAppActive,
@@ -141,7 +140,6 @@ export default function RootLayout() {
 
     // DEBUG: Clear caches to force fresh fetch (remove after debugging)
     if (__DEV__) {
-      clearCache('challenges').then(() => console.log('[App] Challenges cache cleared'));
       clearCache('editions').then(() => console.log('[App] Editions cache cleared'));
     }
 
@@ -156,9 +154,6 @@ export default function RootLayout() {
         editionsLoaded.current = true;
       });
     refreshDefaultProjectsFromFirestore();
-    refreshChallengesFromFirestore()
-      .then(() => console.log('[App] Challenges refresh completed'))
-      .catch((error) => console.error('[App] Challenges refresh failed:', error));
     refreshIdeationFromFirestore();
     return () => {
       clearTimeout(timeout);
@@ -222,7 +217,7 @@ export default function RootLayout() {
                 }}
               />
               <Stack.Screen
-                name="(challenges)"
+                name="(programs)"
                 options={{
                   animation: 'slide_from_right',
                 }}

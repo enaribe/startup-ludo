@@ -1,3 +1,5 @@
+import type { ProgramGameContext } from './program';
+
 // ===== PLAYER TYPES =====
 export type PlayerColor = 'yellow' | 'blue' | 'green' | 'red';
 
@@ -8,7 +10,7 @@ export type PawnState =
   | { status: 'final'; position: number }
   | { status: 'finished' };
 
-// Contexte partie Challenge (programme d'accompagnement)
+// Contexte partie Challenge legacy (programme d'accompagnement)
 export interface ChallengeContext {
   challengeId: string;
   enrollmentId: string;
@@ -88,6 +90,7 @@ export interface GameState {
   winner: string | null;
   ranking?: string[]; // Liste ordonnée des playerIds par rang final (index 0 = 1er, etc.)
   challengeContext?: ChallengeContext;
+  programContext?: ProgramGameContext;
   createdAt: number;
   updatedAt: number;
 }
@@ -367,13 +370,12 @@ export type RootStackParamList = {
   '(game)/mode-selection': undefined;
   '(game)/local-setup': undefined;
   '(game)/online-setup': undefined;
-  '(game)/challenge-game': { challengeId: string };
+  '(programs)/partner/[partnerId]': { partnerId: string };
+  '(programs)/[programId]': { programId: string };
+  '(programs)/play/[programId]': { programId: string };
   '(game)/lobby/[roomId]': { roomId: string };
   '(game)/play/[gameId]': { gameId: string };
   '(game)/results/[gameId]': { gameId: string };
-  '(challenges)/challenge-hub': undefined;
-  '(challenges)/[challengeId]': { challengeId: string };
-  '(challenges)/my-programs': undefined;
   '(startup)/inspiration-cards': undefined;
   '(startup)/creation': undefined;
   '(startup)/confirmation': undefined;
@@ -404,3 +406,16 @@ export {
   isLevelUnlocked,
   isSubLevelUnlocked,
 } from './challenge';
+
+export type {
+  ProgramPartner,
+  PartnerProgram,
+  ProgramAudience,
+  ProgramContentPack,
+  ProgramEnrollment,
+  ProgramEnrollmentFormData,
+  ProgramSession,
+  ProgramGameContext,
+  ProgramPlayAccess,
+  ProgramPlayAccessReason,
+} from './program';

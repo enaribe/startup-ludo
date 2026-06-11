@@ -27,6 +27,7 @@ import {
 } from '@/services/firebase';
 import { useUserStore } from './useUserStore';
 import { useSocialStore } from './useSocialStore';
+import { useProgramStore } from './useProgramStore';
 import { clearLeaderboardCache } from '@/hooks/useLeaderboardCache';
 
 interface AuthState {
@@ -146,9 +147,12 @@ export const useAuthStore = create<AuthStore>()(
 
             // Load user profile from Firestore
             // Load social data (non-bloquant)
-            if (!authUser.isGuest) {
+            if (!authUser.isAnonymous) {
               useSocialStore.getState().loadFollowing(authUser.id);
               useSocialStore.getState().loadFollowCounts(authUser.id);
+              useProgramStore.getState().loadUserProgramData(authUser.id).catch((err) => {
+                console.warn('[Auth] loadUserProgramData failed:', err);
+              });
 
               // Migration pseudo unique : pour les comptes existants sans pseudo
               // réservé, on tente une migration auto depuis leur displayName.

@@ -27,6 +27,20 @@ service firebase.storage {
       allow delete: if isAdmin();
     }
 
+    // Images partenaires (logo, bannière) — admin uniquement en écriture, lecture publique
+    match /partners/{partnerId}/{fileName} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidImage();
+      allow delete: if isAdmin();
+    }
+
+    // Images programmes (hero, bannière, logo) — admin uniquement en écriture, lecture publique
+    match /programs/{programId}/{fileName} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidImage();
+      allow delete: if isAdmin();
+    }
+
     // Avatars utilisateurs — lecture publique, écriture par le propriétaire uniquement
     match /avatars/{userId}/{fileName} {
       allow read: if true;

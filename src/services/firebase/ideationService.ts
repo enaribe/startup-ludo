@@ -4,9 +4,10 @@
  * Downloads target, mission, and sector cards to replace hardcoded data.
  */
 
-import { getFirestore, collection, getDocs } from '@react-native-firebase/firestore';
+import { getFirestore, collection, getDocs, type FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
 import { FIRESTORE_COLLECTIONS, firebaseLog } from './config';
 import type { TargetCard, MissionCard, SectorCard } from '@/types';
+type QDocSnap = FirebaseFirestoreTypes.QueryDocumentSnapshot;
 
 // ===== Firestore types (matches admin IdeationCard/IdeationDeck) =====
 
@@ -79,7 +80,7 @@ export async function fetchIdeationFromFirestore(): Promise<IdeationData> {
   try {
     const snapshot = await getDocs(collection(getFirestore(), FIRESTORE_COLLECTIONS.ideationCards));
 
-    const decks: FirestoreIdeationDeck[] = snapshot.docs.map((doc) => ({
+    const decks: FirestoreIdeationDeck[] = snapshot.docs.map((doc: QDocSnap) => ({
       id: doc.id,
       ...doc.data(),
     } as FirestoreIdeationDeck));

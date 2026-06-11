@@ -36,6 +36,12 @@ export {
   deleteAvatar,
 } from './storageService';
 export {
+  setProgramEnrollment,
+  getProgramEnrollmentsForUser,
+  setProgramSession,
+  getProgramSessionsForUser,
+} from './programService';
+export {
   startPresenceSession,
   stopPresenceSession,
   setPresenceAppActive,

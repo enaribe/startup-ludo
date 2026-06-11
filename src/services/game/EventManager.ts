@@ -17,15 +17,17 @@ import {
   type DifficultyLevel,
 } from '@/data';
 
-// ===== CONTENT PACK (sous-niveau challenge) =====
+// ===== CONTENT PACK (programme ou sous-niveau challenge legacy) =====
 
-export interface SubLevelContentPack {
+export interface GameContentPack {
   quizzes: Quiz[];
   duels: Duel[];
   fundings: Funding[];
   opportunities: Opportunity[];
   challengeEvents: ChallengeEventData[];
 }
+
+export type SubLevelContentPack = GameContentPack;
 
 // ===== TYPES =====
 
@@ -126,7 +128,7 @@ export class EventManager {
   private usedFundingIds: Set<string> = new Set();
   private usedOpportunityIds: Set<string> = new Set();
   private usedChallengeIds: Set<string> = new Set();
-  private subLevelContent: SubLevelContentPack | null = null;
+  private contentPack: GameContentPack | null = null;
 
   constructor(private editionId: EditionId = 'classic') {}
 
@@ -142,7 +144,14 @@ export class EventManager {
    * Définit le contenu d'un sous-niveau challenge (prioritaire sur l'édition)
    */
   setSubLevelContent(content: SubLevelContentPack): void {
-    this.subLevelContent = content;
+    this.setContentPack(content);
+  }
+
+  /**
+   * Définit le contenu prioritaire d'une partie programme.
+   */
+  setContentPack(content: GameContentPack): void {
+    this.contentPack = content;
     this.reset();
   }
 
@@ -150,7 +159,14 @@ export class EventManager {
    * Efface le contenu du sous-niveau (retour au mode édition)
    */
   clearSubLevelContent(): void {
-    this.subLevelContent = null;
+    this.clearContentPack();
+  }
+
+  /**
+   * Efface le contenu prioritaire (retour au mode édition).
+   */
+  clearContentPack(): void {
+    this.contentPack = null;
   }
 
   /**
@@ -263,8 +279,8 @@ export class EventManager {
    */
   generateQuizEvent(difficulty?: DifficultyLevel): GeneratedQuizEvent | null {
     // Source : sous-niveau challenge si défini, sinon édition
-    const pool = this.subLevelContent?.quizzes.length
-      ? this.subLevelContent.quizzes
+    const pool = this.contentPack?.quizzes.length
+      ? this.contentPack.quizzes
       : getEdition(this.editionId).quizzes;
 
     const filtered = difficulty ? pool.filter((q) => q.difficulty === difficulty) : pool;
@@ -303,8 +319,8 @@ export class EventManager {
    * Génère un financement aléatoire (évite les doublons)
    */
   generateFundingEvent(): GeneratedFundingEvent | null {
-    const pool = this.subLevelContent?.fundings.length
-      ? this.subLevelContent.fundings
+    const pool = this.contentPack?.fundings.length
+      ? this.contentPack.fundings
       : getEdition(this.editionId).fundings;
 
     const funding = this.pickRandomUnused(pool, this.usedFundingIds);
@@ -334,8 +350,8 @@ export class EventManager {
    * Génère un duel aléatoire (évite les doublons)
    */
   generateDuelEvent(): GeneratedDuelEvent | null {
-    const pool = this.subLevelContent?.duels.length
-      ? this.subLevelContent.duels
+    const pool = this.contentPack?.duels.length
+      ? this.contentPack.duels
       : getEdition(this.editionId).duels;
 
     const duel = this.pickRandomUnused(pool, this.usedDuelIds);
@@ -363,8 +379,8 @@ export class EventManager {
    * Génère une opportunité aléatoire (évite les doublons)
    */
   generateOpportunityEvent(): GeneratedOpportunityEvent | null {
-    const pool = this.subLevelContent?.opportunities.length
-      ? this.subLevelContent.opportunities
+    const pool = this.contentPack?.opportunities.length
+      ? this.contentPack.opportunities
       : getEdition(this.editionId).opportunities;
 
     const opportunity = this.pickRandomUnused(pool, this.usedOpportunityIds);
@@ -394,8 +410,8 @@ export class EventManager {
    * Génère un challenge aléatoire (évite les doublons)
    */
   generateChallengeEvent(): GeneratedChallengeEvent | null {
-    const pool = this.subLevelContent?.challengeEvents.length
-      ? this.subLevelContent.challengeEvents
+    const pool = this.contentPack?.challengeEvents.length
+      ? this.contentPack.challengeEvents
       : getEdition(this.editionId).challenges;
 
     const challenge = this.pickRandomUnused(pool, this.usedChallengeIds);
@@ -426,11 +442,11 @@ export class EventManager {
    */
   generateRandomEvent(): GeneratedOpportunityEvent | GeneratedChallengeEvent | null {
     // Source : sous-niveau si défini, sinon édition
-    const opportunities = this.subLevelContent?.opportunities.length
-      ? this.subLevelContent.opportunities
+    const opportunities = this.contentPack?.opportunities.length
+      ? this.contentPack.opportunities
       : getEdition(this.editionId).opportunities;
-    const challenges = this.subLevelContent?.challengeEvents.length
-      ? this.subLevelContent.challengeEvents
+    const challenges = this.contentPack?.challengeEvents.length
+      ? this.contentPack.challengeEvents
       : getEdition(this.editionId).challenges;
 
     const hasOpp = opportunities.length > 0;

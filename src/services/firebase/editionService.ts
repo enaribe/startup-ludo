@@ -4,11 +4,12 @@
  * Used to hot-swap local JSON data with remote Firestore data.
  */
 
-import { getFirestore, collection, getDocs } from '@react-native-firebase/firestore';
+import { getFirestore, collection, getDocs, type FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
 import { FIRESTORE_COLLECTIONS, firebaseLog } from './config';
 import type { Edition, EditionId } from '@/data/types';
 
 let cachedEditions: Record<EditionId, Edition> | null = null;
+type QDocSnap = FirebaseFirestoreTypes.QueryDocumentSnapshot;
 
 /**
  * Fetch all editions from Firestore.
@@ -20,7 +21,7 @@ export async function fetchEditionsFromFirestore(): Promise<Record<EditionId, Ed
 
     const editions: Record<string, Edition> = {};
 
-    snapshot.docs.forEach((doc) => {
+    snapshot.docs.forEach((doc: QDocSnap) => {
       const data = doc.data();
       editions[doc.id] = {
         id: doc.id as EditionId,

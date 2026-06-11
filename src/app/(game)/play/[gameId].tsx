@@ -56,45 +56,6 @@ import { rollRandomJoker } from '@/data/jokers';
 import { crashLog } from '@/utils/gameLog';
 import type { ChallengeEvent, FundingEvent, OpportunityEvent, Player, QuizEvent, DuelResult, DuelQuestion, Joker, JokerType } from '@/types';
 
-// Données de test pour afficher les popups rapidement
-const MOCK_QUIZ: QuizEvent = {
-  id: 'test-quiz',
-  category: 'business',
-  question: "Quel document décrit la stratégie et le modèle économique d'une entreprise ?",
-  options: ['Business Plan', 'Statut juridique', 'Contrat de travail'],
-  correctAnswer: 0,
-  difficulty: 'moyen',
-  reward: 2,
-  timeLimit: 30,
-};
-
-const MOCK_FUNDING: FundingEvent = {
-  id: 'test-funding',
-  name: 'Subvention BPI',
-  description: "Quel document décrit la stratégie et le modèle économique d'une entreprise ?",
-  type: 'subvention',
-  amount: 2,
-  rarity: 'common',
-};
-
-const MOCK_OPPORTUNITY: OpportunityEvent = {
-  id: 'test-opp',
-  title: 'Partenaire stratégique',
-  description: "Quel document décrit la stratégie et le modèle économique d'une entreprise ?",
-  effect: 'tokens',
-  value: 2,
-  rarity: 'common',
-};
-
-const MOCK_CHALLENGE: ChallengeEvent = {
-  id: 'test-challenge',
-  title: 'Imprévu fiscal',
-  description: "Quel document décrit la stratégie et le modèle économique d'une entreprise ?",
-  effect: 'loseTokens',
-  value: 2,
-  rarity: 'common',
-};
-
 export default function PlayScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -854,7 +815,6 @@ export default function PlayScreen() {
       // Capturer les IDs du duel en cours pour éviter d'effacer un nouveau duel
       // si un 2ème duel démarre pendant le délai (3-4 joueurs)
       const resolvedChallengerId = result.challengerId;
-      const resolvedOpponentId = result.opponentId;
       const timer = setTimeout(() => {
         setSpectatorDuelChallengerId((current) => {
           if (current === resolvedChallengerId) {

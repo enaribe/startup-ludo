@@ -38,8 +38,6 @@ interface PawnProps {
   onPress?: () => void;
 }
 
-const STEP_DURATION = 100; // ms par case (augmenté pour stabilité)
-
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export const Pawn = memo(function Pawn({

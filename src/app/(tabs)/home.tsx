@@ -14,34 +14,23 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
-import { ChallengeHomeCard, EnrollmentFormModal } from '@/components/challenges';
 import { CreateStartupPromptPopup, OnboardingModal, ReturnBonusPopup } from '@/components/game/popups';
 import { ProgramIcon } from '@/components/icons';
+import { PartnerHomeCard } from '@/components/programs';
 import { Avatar, DynamicGradientBorder, GameButton, GuestPromoBanner, InfoModal, ProgressionPopup, RadialBackground } from '@/components/ui';
 import type { InfoSection } from '@/components/ui';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { useReturnBonus } from '@/hooks/useReturnBonus';
 import { useStartupCreationPrompt } from '@/hooks/useStartupCreationPrompt';
-import { useChallengeEnroll } from '@/hooks/useChallengeEnroll';
 import { useGuestBannerDismiss } from '@/hooks/useGuestBannerDismiss';
 
 import { formatXP, getRankProgress, getXPForNextRank } from '@/config/progression';
-import { ALL_CHALLENGES, refreshChallengesFromFirestore } from '@/data/challenges';
-import { useAuthStore, useChallengeStore, useUserStore } from '@/stores';
+import { useAuthStore, useProgramStore, useUserStore } from '@/stores';
 import { FONTS } from '@/styles/typography';
-import type { Challenge } from '@/types/challenge';
+import type { ProgramPartner } from '@/types/program';
 import { formatFCFARaw } from '@/utils/currency';
 
 const { width } = Dimensions.get('window');
-
-/** Formate un nombre en version courte (k, M, B) pour gagner de l'espace */
-function formatShortValue(value: number): string {
-  const abs = Math.abs(value);
-  if (abs >= 1e9) return (value / 1e9).toFixed(1).replace(/\.0$/, '') + 'B';
-  if (abs >= 1e6) return (value / 1e6).toFixed(1).replace(/\.0$/, '') + 'M';
-  if (abs >= 1e3) return (value / 1e3).toFixed(1).replace(/\.0$/, '') + 'k';
-  return String(Math.round(value));
-}
 
 // Texte avec contour (stroke) simulé par empilement de Text décalés
 const OutlinedText = memo(function OutlinedText({
@@ -130,23 +119,14 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const user = useAuthStore((state) => state.user);
   const profile = useUserStore((state) => state.profile);
-  const userId = user?.id ?? '';
 
-  const {
-    showEnrollmentForm,
-    activeChallengeName,
-    handleEnroll,
-    handleContinue,
-    handleFormSubmit: handleEnrollmentFormSubmit,
-    handleFormClose,
-  } = useChallengeEnroll();
-  const getEnrollmentForChallenge = useChallengeStore((s) => s.getEnrollmentForChallenge);
+  const partners = useProgramStore((state) => state.partners);
+  const programs = useProgramStore((state) => state.programs);
 
   const [showInfo, setShowInfo] = useState(false);
   const { visible: showOnboarding, complete: completeOnboarding } = useOnboarding();
   const { visible: showStartupPrompt, dismiss: dismissStartupPrompt } = useStartupCreationPrompt();
   const { visible: showReturnBonus, claim: claimReturnBonus, dismiss: dismissReturnBonus } = useReturnBonus();
-  const [challengesLoaded, setChallengesLoaded] = useState(false);
   const [showProgression, setShowProgression] = useState(false);
 
   const { showProgression: showProgressionParam, xpGained: xpGainedParam, valorisationGain: valorisationGainParam } =
@@ -175,40 +155,21 @@ export default function HomeScreen() {
     });
   }, [showProgressionParam, xpGainedParam, valorisationGainParam, router]);
 
-  // Tous les challenges actifs : on affiche les challenges actifs globalement,
-  // en mettant en tête ceux où l'utilisateur est inscrit (le ChallengeHomeCard
-  // affichera "CONTINUER" pour les inscrits et "REJOINDRE" pour les autres).
-  const userEnrollments = useChallengeStore((state) => state.enrollments);
-  const enrolledChallenges = useMemo(() => {
-    const activeChallenges = ALL_CHALLENGES.filter((c) => c.isActive);
-    if (!userId) return activeChallenges;
-    const userChallengeIds = new Set(
-      userEnrollments.filter((e) => e.userId === userId).map((e) => e.challengeId),
-    );
-    // Trie : inscrits d'abord, puis les autres dans leur ordre d'origine
-    return [...activeChallenges].sort((a, b) => {
-      const aEnrolled = userChallengeIds.has(a.id) ? 0 : 1;
-      const bEnrolled = userChallengeIds.has(b.id) ? 0 : 1;
-      return aEnrolled - bEnrolled;
+  const featuredPartners = useMemo(() => {
+    return partners.filter((partner) => {
+      if (!partner.isActive) return false;
+      return programs.some(
+        (program) =>
+          program.isActive &&
+          (program.partnerId === partner.id || program.coPartnerIds?.includes(partner.id))
+      );
     });
-  }, [userEnrollments, userId, challengesLoaded]);
+  }, [partners, programs]);
 
-  // Refresh challenges when screen mounts or focuses
-  useEffect(() => {
-    const loadChallenges = async () => {
-      try {
-        await refreshChallengesFromFirestore();
-        setChallengesLoaded(true);
-      } catch (error) {
-        console.error('[Home] Failed to load challenges:', error);
-        setChallengesLoaded(true); // Still set true to show fallback
-      }
-    };
-    loadChallenges();
-  }, []);
+  const primaryPartnerId = featuredPartners[0]?.id ?? 'mastercard-foundation';
 
-  // Horizontal challenge carousel
-  const challengeListRef = useRef<FlatList<Challenge>>(null);
+  // Horizontal partner carousel
+  const partnerListRef = useRef<FlatList<ProgramPartner>>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const CARD_WIDTH = width - 36; // full width minus horizontal padding
 
@@ -220,13 +181,6 @@ export default function HomeScreen() {
       }
     }
   ).current;
-
-  const scrollToIndex = useCallback((index: number) => {
-    if (index >= 0 && index < enrolledChallenges.length) {
-      challengeListRef.current?.scrollToIndex({ index, animated: true });
-      setActiveIndex(index);
-    }
-  }, [enrolledChallenges.length]);
 
   // Calculs de progression (rang)
   const totalXP = profile?.xp ?? 0;
@@ -417,18 +371,23 @@ export default function HomeScreen() {
           </Pressable>
         </Animated.View>
 
-        {/* Challenge Section */}
+        {/* Partner Section */}
         <View style={styles.challengeHeader}>
-          <Text style={styles.challengeHeaderTitle}>CHALLENGE EN COURS</Text>
-          {!isGuest && (
-            <Pressable onPress={() => router.push('/(challenges)/challenge-explorer')}>
+          <Text style={styles.challengeHeaderTitle}>PARTENAIRES</Text>
+          {!isGuest && featuredPartners.length > 0 && (
+            <Pressable
+              onPress={() => router.push({
+                pathname: '/(programs)/partner/[partnerId]',
+                params: { partnerId: primaryPartnerId },
+              })}
+            >
               <Text style={styles.voirPlusText}>VOIR PLUS</Text>
             </Pressable>
           )}
         </View>
 
         {isGuest ? (
-          /* Teaser programmes pour les invités — même design que l'état "aucun programme" */
+          /* Teaser partenaires pour les invites — meme design que l'etat vide */
           <View style={styles.challengeCardWrapper}>
             <Animated.View entering={FadeInDown.delay(600).duration(500)}>
               <DynamicGradientBorder borderRadius={20} fill="rgba(0, 0, 0, 0.35)">
@@ -437,7 +396,7 @@ export default function HomeScreen() {
                   <View style={styles.emptyProgramTextWrap}>
                     <Text style={styles.emptyProgramTitle}>ACCÈS RESTREINT</Text>
                     <Text style={styles.emptyProgramSub}>
-                      Crée un compte pour accéder{'\n'}aux programmes et challenges{'\n'}d'entrepreneuriat
+                      Crée un compte pour accéder{'\n'}aux partenaires et programmes{'\n'}d'entrepreneuriat
                     </Text>
                   </View>
                   <View style={styles.emptyProgramButtonWrap}>
@@ -452,11 +411,12 @@ export default function HomeScreen() {
               </DynamicGradientBorder>
             </Animated.View>
           </View>
-        ) : enrolledChallenges.length > 0 ? (
+        ) : featuredPartners.length > 0 ? (
           <View style={styles.challengeCardWrapper}>
             <FlatList
-              ref={challengeListRef}
-              data={enrolledChallenges}
+              ref={partnerListRef}
+              data={featuredPartners}
+              extraData={programs}
               keyExtractor={(item) => item.id}
               horizontal
               pagingEnabled
@@ -470,24 +430,32 @@ export default function HomeScreen() {
                 offset: CARD_WIDTH * index,
                 index,
               })}
-              renderItem={({ item: challenge }) => {
-                const enrollment = getEnrollmentForChallenge(challenge.id, userId);
+              renderItem={({ item: partner }) => {
+                const partnerPrograms = programs.filter(
+                  (program) =>
+                    program.isActive &&
+                    (program.partnerId === partner.id || program.coPartnerIds?.includes(partner.id))
+                );
+                const playerCount = partnerPrograms.reduce((sum, program) => sum + program.playerCount, 0);
                 return (
                   <View style={{ width: CARD_WIDTH }}>
-                    <ChallengeHomeCard
-                      challenge={challenge}
-                      enrollment={enrollment ?? null}
-                      onEnroll={() => handleEnroll(challenge.id)}
-                      onContinue={() => handleContinue(challenge.id)}
+                    <PartnerHomeCard
+                      partner={partner}
+                      programCount={partnerPrograms.length}
+                      playerCount={playerCount}
+                      onPress={() => router.push({
+                        pathname: '/(programs)/partner/[partnerId]',
+                        params: { partnerId: partner.id },
+                      })}
                     />
                   </View>
                 );
               }}
             />
-            {enrolledChallenges.length > 1 && (
+            {featuredPartners.length > 1 && (
               <View style={styles.pagination}>
-                {enrolledChallenges.map((c, i) => (
-                  <View key={c.id} style={[styles.dot, i === activeIndex && styles.dotActive]} />
+                {featuredPartners.map((partner, i) => (
+                  <View key={partner.id} style={[styles.dot, i === activeIndex && styles.dotActive]} />
                 ))}
               </View>
             )}
@@ -499,18 +467,10 @@ export default function HomeScreen() {
                 <View style={styles.emptyProgramContent}>
                   <ProgramIcon size={48} color="#71808E" />
                   <View style={styles.emptyProgramTextWrap}>
-                    <Text style={styles.emptyProgramTitle}>AUCUN PROGRAMME</Text>
+                    <Text style={styles.emptyProgramTitle}>AUCUN PARTENAIRE</Text>
                     <Text style={styles.emptyProgramSub}>
-                      Aucun programme actif pour le moment.{'\n'}Reviens bientôt pour découvrir{'\n'}les prochains défis !
+                      Aucun partenaire actif pour le moment.{'\n'}Reviens bientôt pour découvrir{'\n'}les prochains programmes !
                     </Text>
-                  </View>
-                  <View style={styles.emptyProgramButtonWrap}>
-                    <GameButton
-                      variant="yellow"
-                      fullWidth
-                      title="EXPLORER LES PROGRAMMES"
-                      onPress={() => router.push('/(challenges)/challenge-explorer')}
-                    />
                   </View>
                 </View>
               </DynamicGradientBorder>
@@ -518,14 +478,6 @@ export default function HomeScreen() {
           </View>
         )}
       </ScrollView>
-
-      {/* Formulaire d'inscription au challenge */}
-      <EnrollmentFormModal
-        visible={showEnrollmentForm}
-        challengeName={activeChallengeName}
-        onSubmit={handleEnrollmentFormSubmit}
-        onClose={handleFormClose}
-      />
 
       {/* Onboarding (première connexion uniquement) */}
       <OnboardingModal

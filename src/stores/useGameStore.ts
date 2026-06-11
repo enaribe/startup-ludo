@@ -13,13 +13,14 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
-import type { GameState, GameMode, Player, GameEvent, PlayerColor, PawnState, EventType, ChallengeContext, JokerType } from '@/types';
+import type { GameState, GameMode, Player, GameEvent, PlayerColor, PawnState, EventType, ChallengeContext, ProgramGameContext, JokerType } from '@/types';
 import { newJokerId } from '@/data/jokers';
 import { GameEngine, type MoveResult, type ValidMove } from '@/services/game/GameEngine';
 import { eventManager, type GeneratedGameEvent } from '@/services/game/EventManager';
 import type { EditionId } from '@/data';
 import type { CheckpointData } from '@/utils/onlineCodec';
 import { useChallengeStore } from '@/stores/useChallengeStore';
+import { useProgramStore } from '@/stores/useProgramStore';
 import { MAX_TOKENS } from '@/config/boardConfig';
 import { gameLog } from '@/utils/gameLog';
 import { resetDuelQuestionPool } from '@/data/duelQuestions';
@@ -72,7 +73,7 @@ interface GameStoreState {
 
 interface GameStoreActions {
   // Cycle de vie du jeu
-  initGame: (mode: GameMode, edition: string, players: Omit<Player, 'tokens' | 'pawns'>[], challengeContext?: ChallengeContext) => void;
+  initGame: (mode: GameMode, edition: string, players: Omit<Player, 'tokens' | 'pawns'>[], gameContext?: ChallengeContext | ProgramGameContext) => void;
   resetGame: () => void;
   endGame: (winnerId: string) => void;
 
@@ -178,8 +179,13 @@ export const useGameStore = create<GameStore>()(
 
       // ===== CYCLE DE VIE =====
 
-      initGame: (mode, edition, players, challengeContext) => {
+      initGame: (mode, edition, players, gameContext) => {
         const gameId = `game_${Date.now()}`;
+        const programContext =
+          gameContext && 'origin' in gameContext && gameContext.origin === 'program'
+            ? gameContext
+            : undefined;
+        const challengeContext = programContext ? undefined : gameContext as ChallengeContext | undefined;
 
         // Configurer l'EventManager avec l'édition
         eventManager.setEdition(edition as EditionId);
@@ -190,8 +196,29 @@ export const useGameStore = create<GameStore>()(
         // Reset du pool de jokers (évite les doublons entre parties)
         resetJokerPool();
 
-        // Si mode challenge, charger le contenu du sous-niveau
-        eventManager.clearSubLevelContent();
+        // Si mode programme, charger le contenu du programme. Sinon garder le legacy challenge.
+        eventManager.clearContentPack();
+        if (programContext) {
+          const program = useProgramStore.getState().getProgramById(programContext.programId);
+          const contentPack =
+            programContext.contentPackId
+              ? program?.contentPacks.find((pack) => pack.id === programContext.contentPackId)
+              : program?.contentPacks[0];
+
+          if (contentPack) {
+            eventManager.setContentPack({
+              quizzes: contentPack.quizzes,
+              duels: contentPack.duels,
+              fundings: contentPack.fundings,
+              opportunities: contentPack.opportunities,
+              challengeEvents: contentPack.challengeEvents,
+            });
+            gameLog('store', '[GameStore] Program content loaded into EventManager:', programContext.programId);
+          } else {
+            gameLog('store', '[GameStore] Program content not found, using edition fallback:', programContext.programId);
+          }
+        }
+
         if (challengeContext) {
           const { challenges } = useChallengeStore.getState();
           gameLog('store', '[GameStore] Challenge mode, challenges in store:', challenges.length);
@@ -257,6 +284,7 @@ export const useGameStore = create<GameStore>()(
             winner: null,
             ranking: [],
             challengeContext,
+            programContext,
             createdAt: Date.now(),
             updatedAt: Date.now(),
           };

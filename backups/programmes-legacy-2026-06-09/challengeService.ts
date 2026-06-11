@@ -4,7 +4,7 @@
  * Maps admin-simplified data to the rich mobile Challenge type.
  */
 
-import { getFirestore, collection, getDocs, type FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
+import { getFirestore, collection, getDocs } from '@react-native-firebase/firestore';
 import { FIRESTORE_COLLECTIONS, firebaseLog } from './config';
 import type {
   Challenge,
@@ -17,7 +17,6 @@ import type {
 import type { Quiz, Duel, Funding, Opportunity, Challenge as ChallengeEventData } from '@/data/types';
 
 let cachedChallenges: Challenge[] | null = null;
-type QDocSnap = FirebaseFirestoreTypes.QueryDocumentSnapshot;
 
 /**
  * Fetch all challenge programs from Firestore.
@@ -32,7 +31,7 @@ export async function fetchChallengesFromFirestore(): Promise<Challenge[]> {
 
     console.log('[ChallengeService] Snapshot received, docs count:', snapshot.docs.length);
 
-    const challenges: Challenge[] = snapshot.docs.map((doc: QDocSnap) => {
+    const challenges: Challenge[] = snapshot.docs.map((doc) => {
       console.log('[ChallengeService] Processing doc:', doc.id);
       const d = doc.data();
       return mapFirestoreToChallenge(doc.id, d);

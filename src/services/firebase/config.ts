@@ -53,6 +53,10 @@ export const FIRESTORE_COLLECTIONS = {
   reports: 'reports',
   challenges: 'challenges',
   challengeEnrollments: 'challengeEnrollments',
+  partners: 'partners',
+  programs: 'programs',
+  programEnrollments: 'programEnrollments',
+  programSessions: 'programSessions',
   ideationCards: 'ideationCards',
 } as const;
 

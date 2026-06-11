@@ -9,7 +9,7 @@ import Animated, {
   FadeInDown,
   interpolateColor,
 } from 'react-native-reanimated';
-import { Path, LinearGradient, RadialGradient, Stop, G, Rect, Mask } from 'react-native-svg';
+import { Path, LinearGradient, Stop, Rect, Mask } from 'react-native-svg';
 import { PopupHeader } from './PopupHeader';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';

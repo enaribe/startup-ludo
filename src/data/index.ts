@@ -207,4 +207,18 @@ export const QUIZ_DEFAULTS = {
 
 // ===== EXPORTS DES TYPES =====
 
-export * from './types';
+export type {
+  Challenge,
+  DifficultyLevel,
+  Duel,
+  DuelOption,
+  Edition,
+  EditionId,
+  Funding,
+  GameEvent,
+  Opportunity,
+  Quiz,
+  QuizCategory,
+  StartupIdea,
+  DefaultProject,
+} from './types';

@@ -27,6 +27,7 @@ import Animated, {
 import Svg, { Defs, G, Path, RadialGradient, Rect, Stop, LinearGradient } from 'react-native-svg';
 
 import { GameButton } from '@/components/ui';
+import { ProgramEnrollmentModal } from '@/components/programs';
 import { AchievementUnlockedPopup } from '@/components/game/popups/AchievementUnlockedPopup';
 import { XP_REWARDS, getChallengeXPReward } from '@/config/progression';
 import type { Achievement } from '@/config/achievements';
@@ -34,12 +35,13 @@ import { isOwnStartup } from '@/data/defaultProjects';
 import { useSound } from '@/hooks/useSound';
 import { evaluateAchievements } from '@/services/game/achievementService';
 import { saveGameSession, updateChallengeEnrollment, updateStartupValorisation, updateUserStats, updateUserAchievements } from '@/services/firebase/firestore';
-import { useAuthStore, useChallengeStore, useGameStore, useUserStore } from '@/stores';
+import { useAuthStore, useChallengeStore, useGameStore, useProgramStore, useUserStore } from '@/stores';
 import { payoutForRankFcfa } from '@/services/game/stakeService';
 import { formatPtwRaw } from '@/utils/currency';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
+import type { ProgramEnrollmentFormData } from '@/types/program';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const POPUP_WIDTH = Math.min(screenWidth - SPACING[8], 340);
@@ -310,6 +312,8 @@ export default function ResultsScreen() {
     isOnline?: string;
     roomId?: string;
     stake?: string;
+    programId?: string;
+    programSessionId?: string;
   }>();
 
   const { game, resetGame, initGame } = useGameStore();
@@ -327,6 +331,9 @@ export default function ResultsScreen() {
   const checkAndUnlockNextLevel = useChallengeStore((s) => s.checkAndUnlockNextLevel);
   const challenges = useChallengeStore((s) => s.challenges);
   const enrollments = useChallengeStore((s) => s.enrollments);
+  const completeProgramSession = useProgramStore((s) => s.completeProgramSession);
+  const enrollInProgram = useProgramStore((s) => s.enrollInProgram);
+  const getProgramById = useProgramStore((s) => s.getProgramById);
 
   const isGuest = user?.isGuest ?? true;
   const isOnline = params.isOnline === 'true' || params.mode === 'online';
@@ -335,6 +342,7 @@ export default function ResultsScreen() {
   const { play: playEndGameSound } = useSound();
 
   const [showConvertPopup, setShowConvertPopup] = useState(false);
+  const [showProgramEnroll, setShowProgramEnroll] = useState(false);
   const [showXpNeededMessage, setShowXpNeededMessage] = useState(false);
   const [xpNeededAmount, setXpNeededAmount] = useState(0);
   // Succès débloqués par cette partie — affichés dans AchievementUnlockedPopup
@@ -413,9 +421,13 @@ export default function ResultsScreen() {
   }
 
   const isChallengeGame = !!game?.challengeContext;
+  const isProgramGame = !!game?.programContext;
+  const resultProgram = game?.programContext ? getProgramById(game.programContext.programId) : undefined;
 
   // Sous-titre header
-  const subtitleText = isChallengeGame
+  const subtitleText = isProgramGame
+    ? 'Partie Programme'
+    : isChallengeGame
     ? 'Partie Challenge'
     : isOnline
       ? 'Multijoueur en ligne'
@@ -497,6 +509,15 @@ export default function ResultsScreen() {
       }
     }
 
+    const programCtx = game.programContext;
+    if (programCtx?.sessionId) {
+      completeProgramSession(programCtx.sessionId, {
+        won: isWinner,
+        xpGained,
+        tokensEarned: myPlayer?.tokens ?? 0,
+      });
+    }
+
     if (userId && !isGuest) {
       updateUserStats(userId, {
         xpGained,
@@ -557,7 +578,7 @@ export default function ResultsScreen() {
     }
 
     if (game && userId && !isGuest) {
-      const gameMode = game.challengeContext ? 'solo' : (game.mode ?? 'solo');
+      const gameMode = game.challengeContext || game.programContext ? 'solo' : (game.mode ?? 'solo');
       const finalScores: Record<string, number> = {};
       for (const p of game.players) {
         finalScores[p.id] = p.tokens;
@@ -654,6 +675,23 @@ export default function ResultsScreen() {
     });
     const gameId = `challenge_${Date.now()}`;
     router.replace(`/(game)/play/${gameId}`);
+  };
+
+  const handleProgramReplay = () => {
+    const programId = game?.programContext?.programId ?? params.programId;
+    if (!programId) return;
+    resetGame();
+    router.replace({
+      pathname: '/(programs)/play/[programId]',
+      params: { programId },
+    });
+  };
+
+  const handleProgramEnrollSubmit = (formData: ProgramEnrollmentFormData) => {
+    const programId = game?.programContext?.programId ?? params.programId;
+    if (!programId || !userId) return;
+    enrollInProgram(programId, userId, formData);
+    setShowProgramEnroll(false);
   };
 
   const handleNextLevel = () => {
@@ -827,12 +865,30 @@ export default function ResultsScreen() {
           </Animated.View>
         )}
 
+        {isProgramGame && game?.programContext?.isTrial && (
+          <Animated.View entering={FadeInDown.duration(300)} style={styles.programTrialBanner}>
+            <Ionicons name="school-outline" size={16} color={COLORS.primary} />
+            <Text style={styles.programTrialText}>
+              Inscris-toi au programme pour continuer ce parcours.
+            </Text>
+          </Animated.View>
+        )}
+
         {/* Boutons */}
         <Animated.View
           entering={FadeInUp.delay(650).duration(400)}
           style={styles.actionsContainer}
         >
-          {isChallengeGame ? (
+          {isProgramGame ? (
+            <>
+              {game?.programContext?.isTrial ? (
+                <GameButton variant="yellow" fullWidth title="S'INSCRIRE" onPress={() => setShowProgramEnroll(true)} />
+              ) : (
+                <GameButton variant="yellow" fullWidth title="REJOUER" onPress={handleProgramReplay} />
+              )}
+              <GameButton variant="blue" fullWidth title="RETOUR À L'ACCUEIL" onPress={handleGoHome} />
+            </>
+          ) : isChallengeGame ? (
             <>
               <GameButton variant="yellow" fullWidth title="REJOUER" onPress={handleChallengeReplay} />
               <GameButton variant="blue" fullWidth title="NIVEAU SUIVANT" onPress={handleNextLevel} />
@@ -876,6 +932,17 @@ export default function ResultsScreen() {
         achievements={unlockedAchievements}
         onClose={() => setUnlockedAchievements([])}
       />
+
+      {resultProgram && (
+        <ProgramEnrollmentModal
+          visible={showProgramEnroll}
+          programName={resultProgram.name}
+          defaultFullName={user?.displayName}
+          defaultEmail={user?.email}
+          onSubmit={handleProgramEnrollSubmit}
+          onClose={() => setShowProgramEnroll(false)}
+        />
+      )}
     </View>
   );
 }
@@ -1034,6 +1101,23 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.bodySemiBold,
     fontSize: FONT_SIZES.xs,
     color: COLORS.primary,
+  },
+  programTrialBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[2],
+    backgroundColor: 'rgba(255, 188, 64, 0.10)',
+    paddingHorizontal: SPACING[3],
+    paddingVertical: SPACING[2],
+    borderRadius: 10,
+    marginBottom: SPACING[3],
+    width: '100%',
+  },
+  programTrialText: {
+    flex: 1,
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.textSecondary,
   },
 
   // Boutons
