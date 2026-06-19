@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LocalModeIcon, OnlineModeIcon } from '@/components/game/ModeSelectionIcons';
 import { RocketIcon } from '@/components/icons';
+import { useTranslation } from '@/i18n';
 import { DynamicGradientBorder, GameButton, GamePopup, OutlinedText, ProgressionPopup, RadialBackground } from '@/components/ui';
 import { useAuthStore, useSettingsStore, useUserStore } from '@/stores';
 import { COLORS } from '@/styles/colors';
@@ -27,6 +28,7 @@ const THEME = {
 export default function GameModeSelectionScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { challenge, showProgression: showProgressionParam, xpGained: xpGainedParam, valorisationGain: valorisationGainParam } =
     useLocalSearchParams<{ challenge?: string; showProgression?: string; xpGained?: string; valorisationGain?: string }>();
   const progressionXpGained = xpGainedParam ? parseInt(xpGainedParam, 10) : undefined;
@@ -129,7 +131,7 @@ export default function GameModeSelectionScreen() {
             <Ionicons name="chevron-back" size={26} color={THEME.text} />
           </Pressable>
           <View style={styles.headerTitleWrap} pointerEvents="none">
-            <Text style={styles.headerTitle}>NOUVELLE PARTIE</Text>
+            <Text style={styles.headerTitle}>{t('game.newGameTitle')}</Text>
           </View>
           <View style={styles.headerRightSpacer} />
         </View>
@@ -138,7 +140,7 @@ export default function GameModeSelectionScreen() {
       <View style={[styles.contentContainer, { paddingTop: headerBlockHeight + SPACING[5] }]}>
         <Animated.View entering={FadeInDown.delay(100).duration(500)} style={styles.subtitleWrap}>
           <OutlinedText
-            text="SÉLECTIONNER LE MODE DE JEU"
+            text={t('game.selectGameMode')}
             style={styles.subtitle}
             outlineColor="#0A1929"
             outlineWidth={2}
@@ -160,15 +162,15 @@ export default function GameModeSelectionScreen() {
                 </View>
 
                 <View style={styles.cardTextContainer}>
-                  <Text style={styles.cardTitle}>PARTIE LOCALE</Text>
+                  <Text style={styles.cardTitle}>{t('game.localGameTitle')}</Text>
                   <Text style={styles.cardDescription}>
-                    Joue avec tes amis sur le même appareil, chacun son tour.
+                    {t('game.localGameDesc')}
                   </Text>
 
                   <View style={styles.tagsRow}>
                     <View style={styles.tag}>
                       <Ionicons name="people-outline" size={12} color={THEME.textMuted} />
-                      <Text style={styles.tagText}>2-4 joueurs</Text>
+                      <Text style={styles.tagText}>{t('game.tag24Players')}</Text>
                     </View>
                   </View>
                 </View>
@@ -192,20 +194,20 @@ export default function GameModeSelectionScreen() {
                 </View>
 
                 <View style={styles.cardTextContainer}>
-                  <Text style={styles.cardTitle}>PARTIE EN LIGNE</Text>
+                  <Text style={styles.cardTitle}>{t('game.onlineGameTitle')}</Text>
                   <Text style={styles.cardDescription}>
-                    Affronte des joueurs du monde entier en temps réel.
+                    {t('game.onlineGameDesc')}
                   </Text>
 
                   <View style={styles.tagsRow}>
                     <View style={styles.tag}>
                       <Ionicons name="trophy-outline" size={12} color={THEME.textMuted} />
-                      <Text style={styles.tagText}>Classement</Text>
+                      <Text style={styles.tagText}>{t('game.tagRanking')}</Text>
                     </View>
                     {isGuest ? (
                       <View style={[styles.tag, styles.tagGuest]}>
                         <Ionicons name="lock-closed" size={12} color="#FF6B6B" />
-                        <Text style={[styles.tagText, styles.tagTextGuest]}>Compte requis</Text>
+                        <Text style={[styles.tagText, styles.tagTextGuest]}>{t('game.tagAccountRequired')}</Text>
                       </View>
                     ) : null}
                   </View>
@@ -220,29 +222,29 @@ export default function GameModeSelectionScreen() {
       <GamePopup
         visible={showNoProjectPopup}
         onRequestClose={handleCloseNoProjectPopup}
-        header="Nouveau projet requis"
+        header={t('game.noProjectHeader')}
         icon={<RocketIcon color="#1F91D0" size={72} withShadow={false} />}
-        title="AUCUN PROJET"
+        title={t('game.noProjectTitle')}
         footer={
           <>
             <GameButton
               variant="yellow"
               fullWidth
-              title="Créer mon entreprise"
+              title={t('game.createMyStartup')}
               onPress={handleCreateStartup}
               style={styles.popupPrimaryBtn}
             />
             <GameButton
               variant="blue"
               fullWidth
-              title="Annuler"
+              title={t('common.cancel')}
               onPress={handleCloseNoProjectPopup}
             />
           </>
         }
       >
         <Text style={styles.popupBodyText}>
-          Tu dois créer une entreprise avant de jouer en ligne. Les jetons gagnés seront investis dans ton projet !
+          {t('game.noProjectBody')}
         </Text>
       </GamePopup>
 
@@ -250,28 +252,28 @@ export default function GameModeSelectionScreen() {
       <GamePopup
         visible={showGuestPopup}
         onRequestClose={handleCloseGuestPopup}
-        header="Mode en ligne"
-        title="COMPTE REQUIS"
+        header={t('game.onlineModeHeader')}
+        title={t('game.accountRequiredTitle')}
         footer={
           <>
             <GameButton
               variant="yellow"
               fullWidth
-              title="Créer un compte"
+              title={t('game.createAccount')}
               onPress={handleCreateAccount}
               style={styles.popupPrimaryBtn}
             />
             <GameButton
               variant="blue"
               fullWidth
-              title="Annuler"
+              title={t('common.cancel')}
               onPress={handleCloseGuestPopup}
             />
           </>
         }
       >
         <Text style={styles.popupBodyText}>
-          Crée un compte pour jouer en ligne et sauvegarder ta progression !
+          {t('game.accountRequiredBody')}
         </Text>
       </GamePopup>
 

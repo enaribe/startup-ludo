@@ -21,12 +21,14 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { useTranslation } from '@/i18n';
 import { useMultiplayer } from '@/hooks/useMultiplayer';
 import { JoinRoomError, getJoinRoomErrorDisplay } from '@/services/multiplayer/JoinRoomError';
 
 export default function OnlineSetupScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
 
   const { user } = useAuthStore();
   const {
@@ -46,7 +48,7 @@ export default function OnlineSetupScreen() {
 
   const handleCreateRoom = useCallback(async () => {
     if (!user) {
-      Alert.alert('Erreur', 'Vous devez être connecté pour créer une partie');
+      Alert.alert(t('common.error'), t('game.mustBeLoggedInCreate'));
       return;
     }
 
@@ -68,12 +70,12 @@ export default function OnlineSetupScreen() {
 
   const handleJoinRoom = useCallback(async () => {
     if (!roomCode.trim()) {
-      Alert.alert('Code requis', 'Veuillez entrer le code de la salle');
+      Alert.alert(t('game.codeRequired'), t('game.enterRoomCode'));
       return;
     }
 
     if (!user) {
-      Alert.alert('Erreur', 'Vous devez être connecté pour rejoindre une partie');
+      Alert.alert(t('common.error'), t('game.mustBeLoggedInJoin'));
       return;
     }
 
@@ -100,7 +102,7 @@ export default function OnlineSetupScreen() {
 
   // Afficher l'erreur si présente
   if (error) {
-    Alert.alert('Erreur', error, [
+    Alert.alert(t('common.error'), error, [
       { text: 'OK', onPress: clearError },
     ]);
   }
@@ -142,7 +144,7 @@ export default function OnlineSetupScreen() {
                 marginLeft: SPACING[2],
               }}
             >
-              Retour
+              {t('common.back')}
             </Text>
           </Pressable>
 
@@ -153,7 +155,7 @@ export default function OnlineSetupScreen() {
               color: COLORS.text,
             }}
           >
-            Multijoueur Online
+            {t('home.onlineMode')}
           </Text>
         </Animated.View>
 
@@ -187,7 +189,7 @@ export default function OnlineSetupScreen() {
                 marginBottom: SPACING[2],
               }}
             >
-              Créer une partie
+              {t('game.createGame')}
             </Text>
 
             <Text
@@ -199,11 +201,11 @@ export default function OnlineSetupScreen() {
                 marginBottom: SPACING[4],
               }}
             >
-              Crée une nouvelle salle et invite tes amis avec un code
+              {t('game.createRoomLongDesc')}
             </Text>
 
             <Button
-              title="Créer une salle"
+              title={t('game.createRoomBtn')}
               variant="primary"
               fullWidth
               loading={isLoading}
@@ -236,7 +238,7 @@ export default function OnlineSetupScreen() {
               marginHorizontal: SPACING[4],
             }}
           >
-            ou
+            {t('common.or')}
           </Text>
           <View
             style={{
@@ -274,7 +276,7 @@ export default function OnlineSetupScreen() {
                 marginBottom: SPACING[2],
               }}
             >
-              Rejoindre une partie
+              {t('game.joinGame')}
             </Text>
 
             <Text
@@ -286,11 +288,11 @@ export default function OnlineSetupScreen() {
                 marginBottom: SPACING[4],
               }}
             >
-              Entre le code de la salle pour rejoindre tes amis
+              {t('game.joinRoomLongDesc')}
             </Text>
 
             <Input
-              placeholder="Ton pseudo"
+              placeholder={t('game.yourNickname')}
               value={playerName}
               onChangeText={setPlayerName}
               maxLength={20}
@@ -298,7 +300,7 @@ export default function OnlineSetupScreen() {
             />
 
             <Input
-              placeholder="CODE DE LA SALLE"
+              placeholder={t('game.roomCodePlaceholder')}
               value={roomCode}
               onChangeText={(text) => setRoomCode(text.toUpperCase())}
               autoCapitalize="characters"
@@ -307,7 +309,7 @@ export default function OnlineSetupScreen() {
             />
 
             <Button
-              title="Rejoindre"
+              title={t('game.joinBtn')}
               variant="outline"
               fullWidth
               loading={isLoading}

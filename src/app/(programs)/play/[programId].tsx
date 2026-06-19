@@ -1,20 +1,22 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ProgramEnrollmentModal } from '@/components/programs';
-import { DynamicGradientBorder, GameButton, GuestGate, RadialBackground } from '@/components/ui';
-import { useAuthStore, useGameStore, useProgramStore } from '@/stores';
+import { GameButton, GuestGate, OutlinedText, RadialBackground } from '@/components/ui';
+import { useAuthStore, useProgramStore } from '@/stores';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS } from '@/styles/typography';
+import { useTranslation } from '@/i18n';
 import type { ProgramEnrollmentFormData } from '@/types/program';
 
 export default function ProgramPlayScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const params = useLocalSearchParams<{ programId: string }>();
   const user = useAuthStore((state) => state.user);
   const userId = user?.id ?? '';
@@ -22,11 +24,10 @@ export default function ProgramPlayScreen() {
   const programs = useProgramStore((state) => state.programs);
   const partners = useProgramStore((state) => state.partners);
   const enrollments = useProgramStore((state) => state.enrollments);
-  const sessions = useProgramStore((state) => state.sessions);
   const enrollInProgram = useProgramStore((state) => state.enrollInProgram);
-  const createProgramSession = useProgramStore((state) => state.createProgramSession);
-  const initGame = useGameStore((state) => state.initGame);
+  const getProgramProgress = useProgramStore((state) => state.getProgramProgress);
   const [showEnroll, setShowEnroll] = useState(false);
+  const [playerName, setPlayerName] = useState(user?.displayName || '');
 
   const program = useMemo(
     () => programs.find((item) => item.id === params.programId),
@@ -36,31 +37,21 @@ export default function ProgramPlayScreen() {
     () => program ? partners.find((item) => item.id === program.partnerId) : undefined,
     [partners, program]
   );
-  const enrollment = useMemo(
-    () => enrollments.find((item) => item.programId === params.programId && item.userId === userId),
-    [enrollments, params.programId, userId]
+  const progress = useMemo(
+    () => getProgramProgress(params.programId, userId),
+    // enrollments/programs en déps pour recalculer la progression quand le store change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [getProgramProgress, params.programId, userId, enrollments, programs]
   );
-  const access = useMemo(() => {
-    if (!program || !program.isActive) {
-      return { canPlay: false, reason: 'program_not_found' as const, requiresEnrollment: false, isTrial: false };
-    }
-    if (!userId || isGuest) {
-      return { canPlay: false, reason: 'guest_blocked' as const, requiresEnrollment: true, isTrial: false };
-    }
-    if (enrollment?.formData) {
-      return { canPlay: true, reason: 'enrolled' as const, requiresEnrollment: false, isTrial: false };
-    }
-    const hasPlayed = sessions.some((session) => session.programId === params.programId && session.userId === userId);
-    return hasPlayed
-      ? { canPlay: false, reason: 'trial_used' as const, requiresEnrollment: true, isTrial: false }
-      : { canPlay: true, reason: 'trial_available' as const, requiresEnrollment: false, isTrial: true };
-  }, [program, userId, isGuest, enrollment, sessions, params.programId]);
+  // Niveau courant à jouer (clampé). Le pack correspondant alimente le contenu de la partie.
+  const levelIndex = Math.min(progress.currentLevel, Math.max(0, (program?.contentPacks?.length ?? 1) - 1));
+  const currentPack = program?.contentPacks?.[levelIndex];
 
   if (isGuest) {
     return (
       <GuestGate
-        featureName="Programmes"
-        description="Cree un compte pour jouer les programmes partenaires contre l'IA."
+        featureName={t('program.featureName')}
+        description={t('program.guestPlayDesc')}
       />
     );
   }
@@ -70,58 +61,23 @@ export default function ProgramPlayScreen() {
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <RadialBackground />
         <View style={styles.center}>
-          <Text style={styles.errorText}>Programme introuvable</Text>
-          <GameButton title="Retour" variant="blue" onPress={() => router.back()} />
+          <Text style={styles.errorText}>{t('program.notFound')}</Text>
+          <GameButton title={t('common.back')} variant="blue" onPress={() => router.back()} />
         </View>
       </View>
     );
   }
 
-  const startGame = () => {
-    if (!access.canPlay) {
+  const goToProfileChoice = () => {
+    // Parcours déjà terminé : on propose le formulaire (optionnel) plutôt que rejouer.
+    if (progress.isCompleted) {
       setShowEnroll(true);
       return;
     }
-
-    const gameId = `program_${program.id}_${Date.now()}`;
-    const session = createProgramSession(program.id, userId, access.isTrial, gameId);
-    if (!session) return;
-
-    initGame(
-      'solo',
-      'classic',
-      [
-        {
-          id: userId,
-          name: user?.displayName || 'Vous',
-          color: 'green',
-          isAI: false,
-          isHost: true,
-          isConnected: true,
-        },
-        {
-          id: `ai_${program.id}`,
-          name: 'IA Programme',
-          color: 'blue',
-          isAI: true,
-          isHost: false,
-          isConnected: true,
-        },
-      ],
-      {
-        origin: 'program',
-        partnerId: program.partnerId,
-        programId: program.id,
-        enrollmentId: enrollment?.id ?? null,
-        sessionId: session.id,
-        isTrial: access.isTrial,
-        contentPackId: program.contentPacks[0]?.id,
-      }
-    );
-
-    router.replace({
-      pathname: '/(game)/play/[gameId]',
-      params: { gameId, mode: 'solo', programId: program.id, programSessionId: session.id },
+    // Étape suivante : choix du profil à incarner, puis du mode de jeu.
+    router.push({
+      pathname: '/(programs)/play/profile/[programId]',
+      params: { programId: program.id, playerName: playerName.trim() },
     });
   };
 
@@ -130,50 +86,91 @@ export default function ProgramPlayScreen() {
     setShowEnroll(false);
   };
 
+  const playerLabel = playerName.trim() || user?.displayName || t('program.you');
+
   return (
     <View style={styles.container}>
       <RadialBackground />
+
       <View style={[styles.header, { paddingTop: insets.top + SPACING[2] }]}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={26} color={COLORS.white} />
+        <Pressable onPress={() => router.back()} style={styles.backButton} hitSlop={8}>
+          <Ionicons name="chevron-back" size={22} color={COLORS.white} />
         </Pressable>
-        <Text style={styles.headerTitle}>PARTIE PROGRAMME</Text>
-        <View style={styles.headerSpacer} />
+        <OutlinedText text={t('program.quickGame')} style={styles.headerTitle} outlineColor="#0E699C" outlineWidth={1.4} />
+        <Text style={styles.headerStep}>{t('program.levelProgress', { current: Math.min(levelIndex + 1, progress.totalLevels), total: progress.totalLevels })}</Text>
       </View>
 
-      <View style={[styles.content, { paddingTop: insets.top + 100, paddingBottom: insets.bottom + 24 }]}>
-        <DynamicGradientBorder borderRadius={24} fill="rgba(0,0,0,0.34)">
-          <View style={styles.card}>
-            <Text style={styles.partner}>{partner?.name ?? 'Partenaire'}</Text>
-            <Text style={styles.title}>{program.name}</Text>
-            <Text style={styles.subtitle}>
-              {access.isTrial ? 'Partie de decouverte' : 'Progression programme'}
-            </Text>
-          </View>
-        </DynamicGradientBorder>
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 110 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.intro}>
+          {currentPack?.name
+            ? t('program.playIntroLevel', { level: levelIndex + 1, name: currentPack.name })
+            : t('program.playIntroProfile', { count: progress.totalLevels })}
+        </Text>
 
-        <View style={styles.vsCard}>
-          <PlayerLine icon="person-outline" title={user?.displayName || 'Vous'} subtitle="Joueur" color={COLORS.players.green} />
-          <View style={styles.vsDivider}>
-            <View style={styles.vsLine} />
-            <Text style={styles.vsText}>VS</Text>
-            <View style={styles.vsLine} />
-          </View>
-          <PlayerLine icon="hardware-chip-outline" title="IA Programme" subtitle="Adversaire" color={COLORS.players.blue} />
+        <View style={styles.modePill}>
+          <Text style={styles.modePillText}>{t('program.modeSolo')}</Text>
         </View>
 
-        {!access.canPlay && (
-          <View style={styles.lockBox}>
-            <Ionicons name="lock-closed-outline" size={20} color={COLORS.primary} />
-            <Text style={styles.lockText}>Inscris-toi au programme pour continuer apres ta partie de decouverte.</Text>
-          </View>
-        )}
+        <Text style={styles.fieldLabel}>{t('program.playerNameLabel')}</Text>
+        <View style={styles.inputWrap}>
+          <TextInput
+            value={playerName}
+            onChangeText={setPlayerName}
+            placeholder={t('program.playerNamePlaceholder')}
+            placeholderTextColor="rgba(255,255,255,0.4)"
+            style={styles.input}
+            maxLength={24}
+          />
+        </View>
 
+        <View style={styles.vsCard}>
+          <View style={styles.vsPlayer}>
+            <View style={[styles.vsAvatar, { backgroundColor: COLORS.players.blue }]}>
+              <Ionicons name="person" size={30} color={COLORS.white} />
+            </View>
+            <OutlinedText text={playerLabel.toUpperCase()} style={styles.vsName} outlineColor="#0E699C" outlineWidth={1.2} />
+            <Text style={styles.vsRole}>{t('program.you')}</Text>
+          </View>
+
+          <View style={styles.vsMiddle}>
+            <Text style={styles.vsTextV}>V</Text>
+            <Ionicons name="flash" size={26} color={COLORS.primary} />
+            <Text style={styles.vsTextS}>S</Text>
+          </View>
+
+          <View style={styles.vsPlayer}>
+            <View style={[styles.vsAvatar, { backgroundColor: COLORS.players.green }]}>
+              <Ionicons name="sparkles" size={26} color={COLORS.white} />
+            </View>
+            <OutlinedText text="ADIA" style={styles.vsName} outlineColor="#2E7D32" outlineWidth={1.2} />
+            <Text style={styles.vsRole}>{t('program.ai')}</Text>
+          </View>
+        </View>
+
+        <View style={styles.infoBox}>
+          <Text style={styles.infoText}>
+            {t('program.adiaInfo')}
+          </Text>
+        </View>
+
+        {partner?.shortName ? (
+          <View style={styles.infoBox}>
+            <Text style={styles.infoText}>
+              {t('program.dataConsent', { partner: partner.shortName })}
+            </Text>
+          </View>
+        ) : null}
+      </ScrollView>
+
+      <View style={[styles.bottomBar, { paddingBottom: insets.bottom + SPACING[3] }]}>
         <GameButton
-          title={access.canPlay ? 'COMMENCER' : "S'INSCRIRE"}
+          title={progress.isCompleted ? t('program.fillForm') : t('program.chooseProfile')}
           variant="yellow"
           fullWidth
-          onPress={startGame}
+          onPress={goToProfileChoice}
         />
       </View>
 
@@ -182,6 +179,7 @@ export default function ProgramPlayScreen() {
         programName={program.name}
         defaultFullName={user?.displayName}
         defaultEmail={user?.email}
+        endForm={program.endForm}
         onSubmit={handleEnroll}
         onClose={() => setShowEnroll(false)}
       />
@@ -189,145 +187,151 @@ export default function ProgramPlayScreen() {
   );
 }
 
-function PlayerLine({
-  icon,
-  title,
-  subtitle,
-  color,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  title: string;
-  subtitle: string;
-  color: string;
-}) {
-  return (
-    <View style={styles.playerLine}>
-      <View style={[styles.playerIcon, { borderColor: color }]}>
-        <Ionicons name={icon} size={20} color={color} />
-      </View>
-      <View style={styles.playerInfo}>
-        <Text style={styles.playerTitle}>{title}</Text>
-        <Text style={styles.playerSubtitle}>{subtitle}</Text>
-      </View>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   header: {
-    position: 'absolute',
-    zIndex: 10,
-    left: 0,
-    right: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: SPACING[4],
     paddingBottom: SPACING[3],
-    backgroundColor: '#0A1929',
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
   },
   backButton: {
     width: 44,
     height: 44,
-    borderRadius: 16,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
   },
   headerTitle: {
     fontFamily: FONTS.title,
-    fontSize: 19,
+    fontSize: 20,
     color: COLORS.white,
   },
-  headerSpacer: { width: 44 },
+  headerStep: {
+    fontFamily: FONTS.body,
+    fontSize: 13,
+    color: COLORS.textMuted,
+    width: 60,
+    textAlign: 'right',
+  },
   content: {
-    flex: 1,
     paddingHorizontal: SPACING[4],
+    paddingTop: SPACING[2],
     gap: SPACING[4],
   },
-  card: {
-    padding: SPACING[5],
-    gap: SPACING[2],
+  intro: {
+    fontFamily: FONTS.body,
+    fontSize: 16,
+    lineHeight: 24,
+    color: COLORS.textSecondary,
   },
-  partner: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: 12,
-    color: COLORS.textMuted,
+  modePill: {
+    alignSelf: 'center',
+    paddingHorizontal: SPACING[5],
+    paddingVertical: SPACING[2],
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,188,64,0.08)',
+    borderWidth: 1.5,
+    borderColor: COLORS.primary,
   },
-  title: {
-    fontFamily: FONTS.title,
-    fontSize: 26,
-    color: COLORS.white,
-  },
-  subtitle: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: 14,
+  modePillText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 15,
     color: COLORS.primary,
   },
-  vsCard: {
-    padding: SPACING[4],
-    gap: SPACING[3],
-    borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.28)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-  },
-  playerLine: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING[3],
-  },
-  playerIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  playerInfo: { flex: 1 },
-  playerTitle: {
+  fieldLabel: {
     fontFamily: FONTS.bodyBold,
     fontSize: 15,
     color: COLORS.white,
+    marginBottom: -SPACING[2],
   },
-  playerSubtitle: {
+  inputWrap: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    paddingHorizontal: SPACING[4],
+  },
+  input: {
     fontFamily: FONTS.body,
-    fontSize: 12,
-    color: COLORS.textMuted,
+    fontSize: 16,
+    color: COLORS.white,
+    paddingVertical: SPACING[4],
   },
-  vsDivider: {
+  vsCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING[3],
+    justifyContent: 'space-between',
+    padding: SPACING[5],
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
-  vsLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-  },
-  vsText: {
-    fontFamily: FONTS.title,
-    fontSize: 18,
-    color: COLORS.primary,
-  },
-  lockBox: {
-    flexDirection: 'row',
+  vsPlayer: {
     alignItems: 'center',
     gap: SPACING[2],
+    flex: 1,
+  },
+  vsAvatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  vsName: {
+    fontFamily: FONTS.title,
+    fontSize: 16,
+    color: COLORS.white,
+  },
+  vsRole: {
+    fontFamily: FONTS.body,
+    fontSize: 13,
+    color: COLORS.textMuted,
+  },
+  vsMiddle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING[2],
+  },
+  vsTextV: {
+    fontFamily: FONTS.title,
+    fontSize: 22,
+    color: COLORS.primary,
+  },
+  vsTextS: {
+    fontFamily: FONTS.title,
+    fontSize: 22,
+    color: '#AC700C',
+  },
+  infoBox: {
     padding: SPACING[4],
     borderRadius: 16,
-    backgroundColor: 'rgba(255,188,64,0.1)',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
-  lockText: {
-    flex: 1,
-    fontFamily: FONTS.bodySemiBold,
+  infoText: {
+    fontFamily: FONTS.body,
     fontSize: 13,
-    lineHeight: 19,
+    lineHeight: 20,
     color: COLORS.textSecondary,
+  },
+  bottomBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: SPACING[4],
+    paddingTop: SPACING[3],
+    backgroundColor: '#0A1929',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
   },
   center: {
     flex: 1,

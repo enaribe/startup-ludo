@@ -26,6 +26,7 @@ import { useGuestBannerDismiss } from '@/hooks/useGuestBannerDismiss';
 
 import { formatXP, getRankProgress, getXPForNextRank } from '@/config/progression';
 import { useAuthStore, useProgramStore, useUserStore } from '@/stores';
+import { useTranslation } from '@/i18n';
 import { FONTS } from '@/styles/typography';
 import type { ProgramPartner } from '@/types/program';
 import { formatFCFARaw } from '@/utils/currency';
@@ -96,26 +97,27 @@ const SpinningRays = memo(function SpinningRays() {
   );
 });
 
-const HOME_INFO_SECTIONS: InfoSection[] = [
+const buildHomeInfoSections = (t: (key: string) => string): InfoSection[] => [
   {
     icon: 'star',
-    title: 'XP & NIVEAU',
-    body: "Gagne de l'XP en jouant des parties. Plus tu accumules d'XP, plus ton niveau monte et tu débloques de nouveaux rangs.",
+    title: t('home.infoXpTitle'),
+    body: t('home.infoXpBody'),
   },
   {
     icon: 'briefcase',
-    title: 'PORTFOLIO',
-    body: 'La valorisation totale de tes entreprises créées lors des parties. Chaque levée de fonds augmente la valeur de ton entreprise.',
+    title: t('home.infoPortfolioTitle'),
+    body: t('home.infoPortfolioBody'),
   },
   {
     icon: 'school',
-    title: 'PROGRAMMES',
-    body: 'Des défis thématiques pour progresser sur des compétences entrepreneuriales spécifiques. Rejoins un programme pour débloquer des niveaux spéciaux.',
+    title: t('home.infoProgramsTitle'),
+    body: t('home.infoProgramsBody'),
   },
 ];
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const user = useAuthStore((state) => state.user);
   const profile = useUserStore((state) => state.profile);
@@ -155,16 +157,12 @@ export default function HomeScreen() {
     });
   }, [showProgressionParam, xpGainedParam, valorisationGainParam, router]);
 
-  const featuredPartners = useMemo(() => {
-    return partners.filter((partner) => {
-      if (!partner.isActive) return false;
-      return programs.some(
-        (program) =>
-          program.isActive &&
-          (program.partnerId === partner.id || program.coPartnerIds?.includes(partner.id))
-      );
-    });
-  }, [partners, programs]);
+  // On affiche tous les partenaires actifs, même ceux sans programme encore publié
+  // (l'écran partenaire affichera un état « pas encore de programmes »).
+  const featuredPartners = useMemo(
+    () => partners.filter((partner) => partner.isActive),
+    [partners]
+  );
 
   const primaryPartnerId = featuredPartners[0]?.id ?? 'mastercard-foundation';
 
@@ -193,7 +191,7 @@ export default function HomeScreen() {
   const portfolioValue = profile?.startups?.reduce((sum, s) => sum + (s.valorisation ?? 0), 0) ?? 0;
 
   const isGuest = user?.isGuest ?? true;
-  const displayName = user?.displayName || profile?.displayName || 'Joueur';
+  const displayName = user?.displayName || profile?.displayName || t('home.playerFallback');
   const { isDismissed: isGuestBannerDismissed, isLoaded: isGuestBannerLoaded, dismiss: dismissGuestBanner } = useGuestBannerDismiss();
   const showGuestBanner = isGuest && isGuestBannerLoaded && !isGuestBannerDismissed;
 
@@ -284,7 +282,7 @@ export default function HomeScreen() {
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
             <Text style={styles.statValueLuckiest}>{startupsCount}</Text>
-            <Text style={styles.statLabel}>Entreprises</Text>
+            <Text style={styles.statLabel}>{t('home.statCompanies')}</Text>
           </View>
 
           <View style={styles.statDivider} />
@@ -293,7 +291,7 @@ export default function HomeScreen() {
             <Text style={styles.statValueLuckiest} numberOfLines={1} adjustsFontSizeToFit>
               {formatFCFARaw(portfolioValue)}
             </Text>
-            <Text style={styles.statLabel}>Valorisation</Text>
+            <Text style={styles.statLabel}>{t('home.statValuation')}</Text>
           </View>
 
           <View style={styles.statDivider} />
@@ -358,12 +356,12 @@ export default function HomeScreen() {
                   </View>
                   <View style={styles.playButtonTextWrapper}>
                     <OutlinedText
-                      text="NOUVELLE PARTIE"
+                      text={t('home.newGame')}
                       style={styles.playButtonTitle}
                       outlineColor="#172735"
                       outlineWidth={1.2}
                     />
-                    <Text style={styles.playButtonSubtitle}>Rejoins ou crée une partie avec tes amis</Text>
+                    <Text style={styles.playButtonSubtitle}>{t('home.newGameSubtitle')}</Text>
                   </View>
                 </View>
               </LinearGradient>
@@ -394,16 +392,16 @@ export default function HomeScreen() {
                 <View style={styles.emptyProgramContent}>
                   <Ionicons name="lock-closed-outline" size={44} color="#71808E" />
                   <View style={styles.emptyProgramTextWrap}>
-                    <Text style={styles.emptyProgramTitle}>ACCÈS RESTREINT</Text>
+                    <Text style={styles.emptyProgramTitle}>{t('home.restrictedAccess')}</Text>
                     <Text style={styles.emptyProgramSub}>
-                      Crée un compte pour accéder{'\n'}aux partenaires et programmes{'\n'}d'entrepreneuriat
+                      {t('home.restrictedAccessSub')}
                     </Text>
                   </View>
                   <View style={styles.emptyProgramButtonWrap}>
                     <GameButton
                       variant="yellow"
                       fullWidth
-                      title="CRÉER UN COMPTE"
+                      title={t('home.createAccount')}
                       onPress={() => router.push('/(auth)/register')}
                     />
                   </View>
@@ -467,9 +465,9 @@ export default function HomeScreen() {
                 <View style={styles.emptyProgramContent}>
                   <ProgramIcon size={48} color="#71808E" />
                   <View style={styles.emptyProgramTextWrap}>
-                    <Text style={styles.emptyProgramTitle}>AUCUN PARTENAIRE</Text>
+                    <Text style={styles.emptyProgramTitle}>{t('home.noPartnersTitle')}</Text>
                     <Text style={styles.emptyProgramSub}>
-                      Aucun partenaire actif pour le moment.{'\n'}Reviens bientôt pour découvrir{'\n'}les prochains programmes !
+                      {t('home.noPartners')}
                     </Text>
                   </View>
                 </View>
@@ -521,8 +519,8 @@ export default function HomeScreen() {
         visible={showInfo}
         onClose={() => setShowInfo(false)}
         variant="accueil"
-        description="Ton tableau de bord personnel. Suis ta progression et accède à tes programmes d'entraînement."
-        sections={HOME_INFO_SECTIONS}
+        description={t('home.gateDescription')}
+        sections={buildHomeInfoSections(t)}
       />
     </View>
   );

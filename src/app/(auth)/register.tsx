@@ -27,6 +27,7 @@ import { GameButton } from '@/components/ui/GameButton';
 import { RadialBackground } from '@/components/ui/RadialBackground';
 import { GradientBorder } from '@/components/ui/GradientBorder';
 import { AuthInput, AuthHeader, SocialAuthButtons } from '@/components/auth';
+import { useTranslation } from '@/i18n';
 import { useAuthStore } from '@/stores';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -35,6 +36,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const shapeImage = require('@/../assets/images/shape.png');
 
 export default function RegisterScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { register, loginWithGoogle, loginWithApple, isLoading, error, clearError, isAuthenticated, user, needsProfileCompletion } = useAuthStore();
 
@@ -121,7 +123,7 @@ export default function RegisterScreen() {
               </View>
             </GradientBorder>
             <Pressable style={styles.avatarButton}>
-              <Text style={styles.avatarButtonText}>Ajouter un avatar</Text>
+              <Text style={styles.avatarButtonText}>{t('auth.addAvatar')}</Text>
             </Pressable>
           </Animated.View>
 
@@ -131,8 +133,8 @@ export default function RegisterScreen() {
             style={styles.formSection}
           >
             <AuthInput
-              label="VOTRE NOM D'ENTREPRENEUR"
-              placeholder="Nom d'entrepreneur"
+              label={t('auth.entrepreneurNameLabel')}
+              placeholder={t('auth.entrepreneurNamePlaceholder')}
               value={displayName}
               onChangeText={setDisplayName}
               autoCapitalize="words"
@@ -141,8 +143,8 @@ export default function RegisterScreen() {
             />
 
             <AuthInput
-              label="E-MAIL"
-              placeholder="Votre adresse mail"
+              label={t('auth.emailLabel')}
+              placeholder={t('auth.emailPlaceholder')}
               value={email}
               onChangeText={setEmail}
               keyboardType="email-address"
@@ -152,14 +154,14 @@ export default function RegisterScreen() {
             />
 
             <AuthInput
-              label="MOT DE PASSE"
-              placeholder="Mot de passe"
+              label={t('auth.passwordLabel')}
+              placeholder={t('auth.passwordPlaceholder')}
               value={password}
               onChangeText={setPassword}
               secureTextEntry
               autoComplete="new-password"
               leftIcon="lock-closed-outline"
-              error={password.length > 0 && password.length < 6 ? 'Minimum 6 caractères' : undefined}
+              error={password.length > 0 && password.length < 6 ? t('auth.passwordMinError') : undefined}
             />
 
             {error && (
@@ -173,7 +175,7 @@ export default function RegisterScreen() {
             style={styles.submitSection}
           >
             <GameButton
-              title="COMMENCER"
+              title={t('auth.startCta')}
               variant="yellow"
               fullWidth
               loading={isLoading}
@@ -194,8 +196,8 @@ export default function RegisterScreen() {
               style={styles.loginLink}
             >
               <Text style={styles.loginLinkText}>
-                DÉJÀ UN COMPTE ?{' '}
-                <Text style={styles.loginLinkHighlight}>SE CONNECTER</Text>
+                {t('auth.hasAccountCta')}{' '}
+                <Text style={styles.loginLinkHighlight}>{t('auth.loginCta')}</Text>
               </Text>
             </Pressable>
           </Animated.View>

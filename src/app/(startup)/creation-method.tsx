@@ -34,6 +34,7 @@ import { OutlinedText } from '@/components/ui/OutlinedText';
 import { RocketIcon } from '@/components/icons';
 import { generateStartupIdeas } from '@/services/ai';
 import { useSettingsStore } from '@/stores';
+import { useTranslation } from '@/i18n';
 import { FONTS } from '@/styles/typography';
 import { COLORS } from '@/styles/colors';
 
@@ -160,6 +161,7 @@ const YELLOW_GRADIENT = [
 ];
 
 const IdeaCard = memo(function IdeaCard({ idea, index, isSelected, onSelect }: IdeaCardProps) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const scale = useSharedValue(1);
 
@@ -224,7 +226,7 @@ const IdeaCard = memo(function IdeaCard({ idea, index, isSelected, onSelect }: I
               <View style={ideaStyles.descHeader}>
                 <View style={ideaStyles.descLabelRow}>
                   <Ionicons name="document-text" size={12} color="rgba(255,255,255,0.45)" />
-                  <Text style={ideaStyles.descLabel}>Description</Text>
+                  <Text style={ideaStyles.descLabel}>{t('startup.description')}</Text>
                 </View>
                 {showExpandToggle ? (
                   <Pressable
@@ -235,7 +237,7 @@ const IdeaCard = memo(function IdeaCard({ idea, index, isSelected, onSelect }: I
                     ]}
                     hitSlop={10}
                     accessibilityRole="button"
-                    accessibilityLabel={expanded ? 'Réduire la description' : 'Afficher la description complète'}
+                    accessibilityLabel={expanded ? t('startup.collapseDescription') : t('startup.expandDescription')}
                   >
                     <Ionicons
                       name={expanded ? 'chevron-up' : 'chevron-down'}
@@ -360,6 +362,7 @@ const ideaStyles = StyleSheet.create({
 export default function CreationMethodScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
   const [showAIPopup, setShowAIPopup] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -546,7 +549,7 @@ export default function CreationMethodScreen() {
         <Pressable onPress={handleBack} style={styles.backButton}>
           <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
         </Pressable>
-        <Text style={styles.headerTitle}>CRÉATION</Text>
+        <Text style={styles.headerTitle}>{t('startup.creationHeader')}</Text>
         <View style={styles.backButton} />
       </View>
 
@@ -561,23 +564,23 @@ export default function CreationMethodScreen() {
         <Animated.View entering={FadeInDown.delay(100).duration(500)}>
           <DynamicGradientBorder borderRadius={20} fill="rgba(0, 0, 0, 0.35)">
             <View style={styles.summaryContent}>
-              <Text style={styles.summaryTitle}>Vos cartes d'inspiration</Text>
+              <Text style={styles.summaryTitle}>{t('startup.yourInspirationCards')}</Text>
 
               <View style={[styles.summaryChip, { backgroundColor: 'rgba(76, 175, 80, 0.15)' }]}>
                 <Text style={[styles.summaryChipText, { color: '#4CAF50' }]}>
-                  {params.targetCardTitle?.toUpperCase() || 'CIBLE'}
+                  {params.targetCardTitle?.toUpperCase() || t('startup.cardTarget')}
                 </Text>
               </View>
 
               <View style={[styles.summaryChip, { backgroundColor: 'rgba(255, 188, 64, 0.15)' }]}>
                 <Text style={[styles.summaryChipText, { color: '#FFBC40' }]}>
-                  {params.missionCardTitle?.toUpperCase() || 'MISSION'}
+                  {params.missionCardTitle?.toUpperCase() || t('startup.cardMission')}
                 </Text>
               </View>
 
               <View style={[styles.summaryChip, { backgroundColor: 'rgba(31, 145, 208, 0.15)' }]}>
                 <Text style={[styles.summaryChipText, { color: '#1F91D0' }]}>
-                  {params.sectorTitle?.toUpperCase() || 'SECTEUR'}
+                  {params.sectorTitle?.toUpperCase() || t('startup.cardSector')}
                 </Text>
               </View>
             </View>
@@ -586,7 +589,7 @@ export default function CreationMethodScreen() {
 
         {/* Titre question */}
         <Animated.View entering={FadeInDown.delay(200).duration(500)}>
-          <Text style={styles.questionTitle}>COMMENT SOUHAITEZ-VOUS PROCÉDER ?</Text>
+          <Text style={styles.questionTitle}>{t('startup.howToProceed')}</Text>
         </Animated.View>
 
         {/* Option 1 : Assistant IA Tambali */}
@@ -598,15 +601,15 @@ export default function CreationMethodScreen() {
                   <Ionicons name="diamond" size={20} color="#FFBC40" />
                 </View>
                 <View style={styles.optionTextCol}>
-                  <Text style={styles.optionTitle}>Assistant Tambali</Text>
-                  <Text style={styles.optionDesc}>Générer 3 idées d'entreprise avec l'IA</Text>
+                  <Text style={styles.optionTitle}>{t('startup.assistantTitle')}</Text>
+                  <Text style={styles.optionDesc}>{t('startup.assistantDesc')}</Text>
                 </View>
               </View>
 
               <GameButton
                 variant="blue"
                 fullWidth
-                title="GÉNÉRER AVEC L'IA"
+                title={t('startup.generateWithAI')}
                 onPress={handleAI}
               />
             </View>
@@ -622,15 +625,15 @@ export default function CreationMethodScreen() {
                   <Ionicons name="create" size={20} color="#1F91D0" />
                 </View>
                 <View style={styles.optionTextCol}>
-                  <Text style={styles.optionTitle}>Création manuelle</Text>
-                  <Text style={styles.optionDesc}>Décrivez votre idée vous-même</Text>
+                  <Text style={styles.optionTitle}>{t('startup.manualTitle')}</Text>
+                  <Text style={styles.optionDesc}>{t('startup.manualDesc')}</Text>
                 </View>
               </View>
 
               <GameButton
                 variant="blue"
                 fullWidth
-                title="CRÉER MANUELLEMENT"
+                title={t('startup.createManually')}
                 onPress={handleManual}
               />
             </View>
@@ -648,7 +651,7 @@ export default function CreationMethodScreen() {
         icon={<RocketIcon color="#1F91D0" size={72} withShadow={false} />}
         title={
           <OutlinedText
-            text={isGenerating ? 'GÉNÉRATION EN COURS' : 'CHOISISSEZ UNE IDÉE'}
+            text={isGenerating ? t('startup.generationInProgress') : t('startup.chooseAnIdea')}
             outlineColor="#1F91D0"
             outlineWidth={2}
             style={styles.popupTitleOutlined}
@@ -659,7 +662,7 @@ export default function CreationMethodScreen() {
             <GameButton
               variant="yellow"
               fullWidth
-              title="VALIDER CETTE IDÉE"
+              title={t('startup.validateIdea')}
               onPress={handleConfirmIdea}
               disabled={selectedIdeaIndex == null}
             />
@@ -669,14 +672,14 @@ export default function CreationMethodScreen() {
         {isGenerating ? (
           <Animated.View entering={FadeIn.duration(200)} style={styles.popupLoadingCenter}>
             <Text style={styles.popupLoadingSubtitle}>
-              L'IA analyse vos cartes d'inspiration et génère 3 idées de startup...
+              {t('startup.aiAnalyzing')}
             </Text>
             <LoadingDots />
           </Animated.View>
         ) : generatedIdeas.length > 0 ? (
           <View style={styles.popupBody}>
             <Text style={styles.popupSelectSubtitle}>
-              Sélectionnez celle qui vous inspire le plus
+              {t('startup.selectMostInspiring')}
             </Text>
             <ScrollView
               style={styles.popupIdeasScroll}
@@ -722,20 +725,20 @@ export default function CreationMethodScreen() {
                 <View style={styles.popupIconBadgeManual}>
                   <Ionicons name="create" size={32} color="#1F91D0" />
                 </View>
-                <Text style={styles.popupTitleCentered}>CRÉER UN PROJET</Text>
+                <Text style={styles.popupTitleCentered}>{t('startup.createProject')}</Text>
               </View>
 
               {/* Body */}
               <View style={styles.popupBody}>
                 <Text style={styles.manualSubtitle}>
-                  Décrivez votre idée de startup en quelques mots
+                  {t('startup.describeIdeaShort')}
                 </Text>
 
                 {/* Name input */}
                 <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.fieldGroup}>
                   <View style={styles.fieldLabelRow}>
                     <Ionicons name="business" size={14} color="#FFBC40" />
-                    <Text style={styles.fieldLabel}>Nom du projet</Text>
+                    <Text style={styles.fieldLabel}>{t('startup.projectName')}</Text>
                   </View>
                   <DynamicGradientBorder
                     borderRadius={14}
@@ -745,7 +748,7 @@ export default function CreationMethodScreen() {
                     <View style={styles.inputInner}>
                       <TextInput
                         style={styles.textInput}
-                        placeholder="Ex. Ma Super App"
+                        placeholder={t('startup.projectNamePlaceholder')}
                         placeholderTextColor="rgba(255,255,255,0.3)"
                         value={manualName}
                         onChangeText={setManualName}
@@ -765,7 +768,7 @@ export default function CreationMethodScreen() {
                 <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.fieldGroup}>
                   <View style={styles.fieldLabelRow}>
                     <Ionicons name="document-text" size={14} color="#FFBC40" />
-                    <Text style={styles.fieldLabel}>Description</Text>
+                    <Text style={styles.fieldLabel}>{t('startup.description')}</Text>
                   </View>
                   <DynamicGradientBorder
                     borderRadius={14}
@@ -776,7 +779,7 @@ export default function CreationMethodScreen() {
                       <TextInput
                         ref={descriptionInputRef}
                         style={[styles.textInput, styles.textInputMultiline]}
-                        placeholder="Décrivez votre idée en quelques mots..."
+                        placeholder={t('startup.describeIdeaPlaceholder')}
                         placeholderTextColor="rgba(255,255,255,0.3)"
                         value={manualDescription}
                         onChangeText={setManualDescription}
@@ -797,7 +800,7 @@ export default function CreationMethodScreen() {
                   <GameButton
                     variant="yellow"
                     fullWidth
-                    title="CONTINUER"
+                    title={t('startup.continue')}
                     onPress={handleConfirmManual}
                     disabled={!isManualValid}
                   />

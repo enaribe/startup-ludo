@@ -34,6 +34,7 @@ import { DynamicGradientBorder, GameButton, RadialBackground } from '@/component
 import { StartupSelectionModal } from '@/components/game/StartupSelectionModal';
 import { getDefaultProjectsForEdition, getMatchingUserStartups, getSectorEdition } from '@/data/defaultProjects';
 import { useQuickMatch } from '@/hooks/useQuickMatch';
+import { useTranslation } from '@/i18n';
 import { JoinRoomError, getJoinRoomErrorDisplay } from '@/services/multiplayer/JoinRoomError';
 import { useAuthStore, useUserStore } from '@/stores';
 import { SPACING } from '@/styles/spacing';
@@ -56,6 +57,7 @@ const PLAYER_COUNT_OPTIONS: Array<2 | 3 | 4> = [2, 3, 4];
 export default function QuickMatchScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { challenge } = useLocalSearchParams<{ challenge?: string }>();
   const user = useAuthStore((state) => state.user);
   const profile = useUserStore((state) => state.profile);
@@ -226,13 +228,13 @@ export default function QuickMatchScreen() {
 
     if (stakeFcfa > 0) {
       if (isGuest) {
-        Alert.alert('Mise impossible', 'Les invités ne peuvent pas jouer avec une mise. Crée un compte pour miser.');
+        Alert.alert(t('game.stakeImpossible'), t('game.guestCannotStake'));
         return;
       }
       if (!canAffordStake(profile?.startups, stakeFcfa)) {
         Alert.alert(
-          'Solde insuffisant',
-          `Tu n'as que ${formatPtwRaw(stakableBalanceFcfa)} de valorisation. Choisis une mise plus petite.`
+          t('game.insufficientBalance'),
+          t('game.insufficientBalanceDesc', { balance: formatPtwRaw(stakableBalanceFcfa) })
         );
         return;
       }
@@ -275,11 +277,11 @@ export default function QuickMatchScreen() {
   };
 
   const searchMessage = useMemo(() => {
-    if (elapsedSeconds < 10) return 'RECHERCHE D\'ADVERSAIRES...';
-    if (elapsedSeconds < 30) return 'RECHERCHE EN COURS...';
-    if (elapsedSeconds < 60) return 'QUELQUES JOUEURS EN APPROCHE...';
-    return 'PAS BEAUCOUP DE MONDE POUR LE MOMENT...';
-  }, [elapsedSeconds]);
+    if (elapsedSeconds < 10) return t('game.searchingOpponents');
+    if (elapsedSeconds < 30) return t('game.searchInProgress');
+    if (elapsedSeconds < 60) return t('game.fewPlayersApproaching');
+    return t('game.notManyPlayers');
+  }, [elapsedSeconds, t]);
 
   const playersInQueue = foundTickets.length;
 
@@ -292,7 +294,7 @@ export default function QuickMatchScreen() {
         <Pressable onPress={handleBack} hitSlop={8}>
           <Ionicons name="arrow-back" size={24} color="white" />
         </Pressable>
-        <Text style={styles.headerTitle}>MATCH RAPIDE</Text>
+        <Text style={styles.headerTitle}>{t('game.quickMatchTitle')}</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -315,15 +317,15 @@ export default function QuickMatchScreen() {
               >
                 <View style={styles.setupSection}>
                   <Ionicons name="flash" size={48} color="#FFBC40" />
-                  <Text style={styles.setupTitle}>PRÊT À JOUER ?</Text>
+                  <Text style={styles.setupTitle}>{t('game.readyToPlay')}</Text>
                   <Text style={styles.setupSubtitle}>
-                    Choisis le nombre de joueurs et ton entreprise
+                    {t('game.choosePlayersAndStartup')}
                   </Text>
                 </View>
               </DynamicGradientBorder>
 
               {/* maxPlayers */}
-              <Text style={styles.sectionLabel}>NOMBRE DE JOUEURS</Text>
+              <Text style={styles.sectionLabel}>{t('game.numberOfPlayers')}</Text>
               <View style={styles.playerCountRow}>
                 {PLAYER_COUNT_OPTIONS.map((n) => (
                   <Pressable
@@ -345,7 +347,7 @@ export default function QuickMatchScreen() {
                         >
                           {n}
                         </Text>
-                        <Text style={styles.playerCountLabel}>joueurs</Text>
+                        <Text style={styles.playerCountLabel}>{t('game.playersLower')}</Text>
                       </View>
                     </DynamicGradientBorder>
                   </Pressable>
@@ -353,7 +355,7 @@ export default function QuickMatchScreen() {
               </View>
 
               {/* Startup selection */}
-              <Text style={styles.sectionLabel}>TA STARTUP</Text>
+              <Text style={styles.sectionLabel}>{t('game.yourStartup')}</Text>
               <Pressable onPress={() => setShowStartupModal(true)}>
                 <DynamicGradientBorder
                   borderRadius={16}
@@ -370,7 +372,7 @@ export default function QuickMatchScreen() {
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.startupName}>
-                        {selectedStartupName || 'Choisir une entreprise'}
+                        {selectedStartupName || t('game.chooseStartup')}
                       </Text>
                       {selectedSector && (
                         <Text style={styles.startupSector}>{selectedSector}</Text>
@@ -382,7 +384,7 @@ export default function QuickMatchScreen() {
               </Pressable>
 
               {/* Mise */}
-              <Text style={styles.sectionLabel}>MISE PAR JOUEUR</Text>
+              <Text style={styles.sectionLabel}>{t('game.stakePerPlayer')}</Text>
               <View style={styles.stakeRow}>
                 {STAKE_OPTIONS_PTW.map((opt) => {
                   const optFcfa = stakePtwToFcfa(opt);
@@ -401,7 +403,7 @@ export default function QuickMatchScreen() {
                       ]}
                     >
                       <Text style={[styles.stakeChipText, selected && styles.stakeChipTextActive]}>
-                        {opt === 0 ? 'Sans' : `${opt}`}
+                        {opt === 0 ? t('game.stakeNone') : `${opt}`}
                       </Text>
                     </Pressable>
                   );
@@ -409,10 +411,10 @@ export default function QuickMatchScreen() {
               </View>
               <Text style={styles.stakeHint}>
                 {isGuest
-                  ? 'Les invités jouent sans mise.'
+                  ? t('game.guestsPlayNoStake')
                   : stakePtw > 0
-                    ? `Solde : ${formatPtwRaw(stakableBalanceFcfa)} · Pot : ${formatPtwRaw(stakeFcfa * maxPlayers)}`
-                    : 'Le gagnant remporte le pot des mises.'}
+                    ? t('game.balanceAndPot', { balance: formatPtwRaw(stakableBalanceFcfa), pot: formatPtwRaw(stakeFcfa * maxPlayers) })
+                    : t('game.winnerTakesPot')}
               </Text>
             </Animated.View>
           )}
@@ -431,15 +433,14 @@ export default function QuickMatchScreen() {
                   </Animated.View>
                   <Text style={styles.searchTitle}>{searchMessage}</Text>
                   <Text style={styles.searchSubtitle}>
-                    Temps : {formatTime(elapsedSeconds)}
+                    {t('game.searchTime', { time: formatTime(elapsedSeconds) })}
                   </Text>
                   <Text style={[styles.searchSubtitle, { marginTop: 4 }]}>
-                    {playersInQueue}/{maxPlayers} joueur{maxPlayers > 1 ? 's' : ''} trouvé
-                    {playersInQueue > 1 ? 's' : ''}
+                    {t('game.playersFound', { found: playersInQueue, max: maxPlayers })}
                   </Text>
 
                   <Pressable onPress={handleCancel} style={styles.cancelButton}>
-                    <Text style={styles.cancelButtonText}>Annuler</Text>
+                    <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
                   </Pressable>
                 </View>
               </DynamicGradientBorder>
@@ -465,7 +466,7 @@ export default function QuickMatchScreen() {
                           />
                           <View style={{ flex: 1, marginLeft: SPACING[3] }}>
                             <Text style={styles.ticketName}>
-                              {ticket.userId === user?.id ? 'Vous' : ticket.displayName}
+                              {ticket.userId === user?.id ? t('game.you') : ticket.displayName}
                             </Text>
                             <Text style={styles.ticketStartup}>{ticket.startupName}</Text>
                           </View>
@@ -488,11 +489,11 @@ export default function QuickMatchScreen() {
               >
                 <View style={styles.searchSection}>
                   <Ionicons name="checkmark-circle" size={64} color="#4CAF50" />
-                  <Text style={styles.searchTitle}>PARTIE TROUVÉE !</Text>
+                  <Text style={styles.searchTitle}>{t('game.matchFound')}</Text>
                   <Text style={styles.searchSubtitle}>
                     {phase === 'match-found'
-                      ? `Lancement dans ${matchFoundCountdown}...`
-                      : 'Connexion au salon...'}
+                      ? t('game.launchingIn', { seconds: matchFoundCountdown })
+                      : t('game.connectingToRoom')}
                   </Text>
                 </View>
               </DynamicGradientBorder>
@@ -514,7 +515,7 @@ export default function QuickMatchScreen() {
           <GameButton
             variant="yellow"
             fullWidth
-            title="LANCER LA RECHERCHE"
+            title={t('game.startSearch')}
             onPress={handleStartSearch}
             disabled={!selectedStartupId}
           />

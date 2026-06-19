@@ -1,19 +1,22 @@
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo } from 'react';
-import { Image, ImageBackground, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ProgramHomeCard } from '@/components/programs';
-import { RadialBackground } from '@/components/ui';
+import { OutlinedText, RadialBackground } from '@/components/ui';
 import { useAuthStore, useProgramStore } from '@/stores';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS } from '@/styles/typography';
+import { useTranslation } from '@/i18n';
 
 export default function PartnerProgramsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const params = useLocalSearchParams<{ partnerId: string }>();
   const user = useAuthStore((state) => state.user);
   const userId = user?.id ?? '';
@@ -39,50 +42,91 @@ export default function PartnerProgramsScreen() {
     [programs, params.partnerId]
   );
 
-  const heroContent = (
-    <>
-      <Text style={styles.partnerEyebrow}>En partenariat avec</Text>
-      {partner?.logoUrl ? (
-        <Image source={{ uri: partner.logoUrl }} style={styles.partnerLogo} resizeMode="contain" />
-      ) : null}
-      <Text style={styles.partnerName}>{partner?.name ?? 'Partenaire'}</Text>
-      <Text style={styles.partnerDescription}>{partner?.description ?? 'Programmes disponibles'}</Text>
-    </>
-  );
+  // Ratio réel du logo pour que sa box épouse exactement l'image (largeur calée sur la hauteur).
+  const [logoRatio, setLogoRatio] = useState<number | null>(null);
+  useEffect(() => {
+    if (!partner?.logoUrl) {
+      setLogoRatio(null);
+      return;
+    }
+    Image.getSize(
+      partner.logoUrl,
+      (w, h) => setLogoRatio(h > 0 ? w / h : null),
+      () => setLogoRatio(null)
+    );
+  }, [partner?.logoUrl]);
+
+  // Dégradé du header = couleurs du partenaire (même rendu que le bouton « NOUVELLE PARTIE » de l'accueil).
+  const gradientColors: [string, string] = [
+    partner?.primaryColor ?? COLORS.backgroundLight,
+    partner?.secondaryColor ?? COLORS.background,
+  ];
 
   return (
     <View style={styles.container}>
       <RadialBackground />
-      <View style={[styles.header, { paddingTop: insets.top + SPACING[2] }]}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={26} color={COLORS.white} />
-        </Pressable>
-        <Text style={styles.headerTitle}>PROGRAMMES</Text>
-        <View style={styles.headerSpacer} />
-      </View>
 
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingTop: insets.top + 92, paddingBottom: insets.bottom + 32 }]}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
         showsVerticalScrollIndicator={false}
       >
-        {partner?.bannerUrl ? (
-          <ImageBackground
-            source={{ uri: partner.bannerUrl }}
-            style={styles.partnerHero}
-            imageStyle={styles.partnerHeroImage}
-            resizeMode="cover"
-          >
-            <View style={styles.partnerHeroScrim} />
-            {heroContent}
-          </ImageBackground>
-        ) : (
-          <View style={[styles.partnerHero, { backgroundColor: partner?.primaryColor ?? COLORS.backgroundLight }]}>
-            {heroContent}
-          </View>
-        )}
+        <LinearGradient
+          colors={gradientColors}
+          style={[styles.partnerHero, { paddingTop: insets.top + SPACING[3] }]}
+        >
+          {/* PNG détouré du partenaire, posé à droite par-dessus le dégradé */}
+          {partner?.heroImageUrl ? (
+            <Image
+              source={{ uri: partner.heroImageUrl }}
+              style={styles.heroForeground}
+              resizeMode="contain"
+            />
+          ) : null}
 
-        <Text style={styles.sectionTitle}>{sortedPrograms.length} PARCOURS EN COURS</Text>
-        <View style={styles.list}>
+          {/* Haut : bouton retour, puis « En partenariat avec » + logo */}
+          <Pressable onPress={() => router.back()} style={styles.backButton} hitSlop={8}>
+            <Ionicons name="chevron-back" size={24} color="#0A1929" />
+          </Pressable>
+
+          <View style={styles.heroPartnership}>
+            {partner?.logoUrl ? (
+              <Image
+                source={{ uri: partner.logoUrl }}
+                style={[styles.partnerLogo, logoRatio ? { aspectRatio: logoRatio } : null]}
+                resizeMode="contain"
+              />
+            ) : null}
+          </View>
+
+          {/* Bas : titre du partenaire en gros */}
+          <View style={styles.heroTextBlock}>
+            <OutlinedText
+              text={partner?.name ?? t('program.partnerFallback')}
+              style={styles.partnerName}
+              outlineColor="#0E699C"
+              outlineWidth={1.6}
+            />
+          </View>
+        </LinearGradient>
+
+        <View style={styles.content}>
+          <Text style={styles.sectionTitle}>
+            {sortedPrograms.length > 0
+              ? t('program.programsInProgress', { count: sortedPrograms.length })
+              : t('program.programsTitle')}
+          </Text>
+
+          {sortedPrograms.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="rocket-outline" size={40} color={COLORS.textMuted} />
+              <Text style={styles.emptyTitle}>{t('program.emptyTitle')}</Text>
+              <Text style={styles.emptyText}>
+                {t('program.emptyDesc')}
+              </Text>
+            </View>
+          ) : null}
+
+          <View style={styles.list}>
           {sortedPrograms.map((program) => {
             const enrollment = getEnrollmentForProgram(program.id, userId);
             const access = getProgramPlayAccess(program.id, userId, isGuest);
@@ -103,6 +147,7 @@ export default function PartnerProgramsScreen() {
               />
             );
           })}
+          </View>
         </View>
       </ScrollView>
     </View>
@@ -114,78 +159,69 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  header: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  content: {
     paddingHorizontal: SPACING[4],
-    paddingBottom: SPACING[3],
-    backgroundColor: '#0A1929',
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    paddingTop: SPACING[4],
+    gap: SPACING[4],
+  },
+  partnerHero: {
+    width: '100%',
+    paddingHorizontal: SPACING[4],
+    paddingBottom: SPACING[4],
+    minHeight: 200,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    overflow: 'hidden',
+  },
+  heroForeground: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    width: '58%',
+    height: '92%',
+    // n'intercepte pas les touches (le bouton retour reste cliquable)
+    pointerEvents: 'none',
   },
   backButton: {
     width: 44,
     height: 44,
-    borderRadius: 16,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: COLORS.white,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
   },
-  headerTitle: {
-    fontFamily: FONTS.title,
-    fontSize: 22,
-    color: COLORS.white,
-  },
-  headerSpacer: {
-    width: 44,
-  },
-  content: {
-    paddingHorizontal: SPACING[4],
-    gap: SPACING[4],
-  },
-  partnerHero: {
-    borderRadius: 24,
-    padding: SPACING[5],
-    minHeight: 170,
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  partnerHeroImage: {
-    borderRadius: 24,
-  },
-  partnerHeroScrim: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(10, 25, 41, 0.35)',
-  },
-  partnerLogo: {
-    width: 92,
-    height: 48,
-    alignSelf: 'flex-start',
-    marginBottom: 8,
+  heroPartnership: {
+    marginTop: SPACING[3],
+    alignItems: 'flex-start',
   },
   partnerEyebrow: {
     fontFamily: FONTS.bodySemiBold,
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.75)',
-    marginBottom: 8,
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.85)',
+    marginBottom: 6,
+    textShadowColor: 'rgba(0,0,0,0.2)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  partnerLogo: {
+    height: 44,
+    alignSelf: 'flex-start',
+  },
+  heroTextBlock: {
+    marginTop: 'auto',
+    paddingTop: SPACING[4],
+    maxWidth: '60%',
   },
   partnerName: {
     fontFamily: FONTS.title,
-    fontSize: 30,
+    fontSize: 26,
+    lineHeight: 30,
     color: COLORS.white,
-  },
-  partnerDescription: {
-    fontFamily: FONTS.body,
-    fontSize: 14,
-    lineHeight: 20,
-    color: 'rgba(255,255,255,0.78)',
-    marginTop: 8,
   },
   sectionTitle: {
     fontFamily: FONTS.title,
@@ -194,5 +230,24 @@ const styles = StyleSheet.create({
   },
   list: {
     gap: SPACING[4],
+  },
+  emptyState: {
+    alignItems: 'center',
+    gap: SPACING[2],
+    paddingVertical: SPACING[6],
+    paddingHorizontal: SPACING[4],
+  },
+  emptyTitle: {
+    fontFamily: FONTS.title,
+    fontSize: 18,
+    color: COLORS.white,
+    marginTop: SPACING[2],
+  },
+  emptyText: {
+    fontFamily: FONTS.body,
+    fontSize: 14,
+    lineHeight: 20,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
   },
 });

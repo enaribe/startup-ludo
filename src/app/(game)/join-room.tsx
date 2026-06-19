@@ -16,6 +16,7 @@ import * as Haptics from 'expo-haptics';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { useAuthStore, useUserStore } from '@/stores';
+import { useTranslation } from '@/i18n';
 import { useMultiplayer } from '@/hooks/useMultiplayer';
 import { Avatar } from '@/components/ui/Avatar';
 import { RadialBackground, DynamicGradientBorder, GameButton } from '@/components/ui';
@@ -29,6 +30,7 @@ const contentWidth = screenWidth - SPACING[4] * 2;
 export default function JoinRoomScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { code: codeParam } = useLocalSearchParams<{ challenge?: string; code?: string }>();
 
   const user = useAuthStore((state) => state.user);
@@ -116,8 +118,8 @@ export default function JoinRoomScreen() {
   useEffect(() => {
     if (roomClosed) {
       Alert.alert(
-        'Salon fermé',
-        "L'hôte a quitté le salon.",
+        t('game.roomClosed'),
+        t('game.hostLeftRoom'),
         [{ text: 'OK', onPress: () => router.replace('/(game)/online-hub') }]
       );
     }
@@ -127,12 +129,12 @@ export default function JoinRoomScreen() {
     if (showLobby) {
       // In lobby: confirm leave
       Alert.alert(
-        'Quitter le salon',
-        'Es-tu sur de vouloir quitter ?',
+        t('game.leaveRoom'),
+        t('game.leaveRoomConfirm'),
         [
-          { text: 'Annuler', style: 'cancel' },
+          { text: t('common.cancel'), style: 'cancel' },
           {
-            text: 'Quitter',
+            text: t('game.leave'),
             style: 'destructive',
             onPress: async () => {
               await leaveRoom();
@@ -149,12 +151,12 @@ export default function JoinRoomScreen() {
   const handleJoinRoom = useCallback(async () => {
     const cleanCode = code.replace(/-/g, '').trim().toUpperCase();
     if (!cleanCode || cleanCode.length < 6) {
-      Alert.alert('Code invalide', 'Veuillez entrer un code valide');
+      Alert.alert(t('game.invalidCode'), t('game.enterValidCode'));
       return;
     }
 
     if (!user) {
-      Alert.alert('Erreur', 'Vous devez etre connecte');
+      Alert.alert(t('common.error'), t('game.mustBeLoggedIn'));
       return;
     }
 
@@ -217,7 +219,7 @@ export default function JoinRoomScreen() {
         >
           {/* Titre centré */}
           <Animated.View entering={FadeInDown.delay(100).duration(500)}>
-            <Text style={styles.configTitle}>REJOINDRE UN SALON</Text>
+            <Text style={styles.configTitle}>{t('game.joinRoomTitle')}</Text>
           </Animated.View>
 
           {/* Carte centrale — pas d'animation Reanimated ici : sur Android, le wrapper
@@ -233,7 +235,7 @@ export default function JoinRoomScreen() {
                 {/* Code du Salon — TextInput nu, bord en CSS natif (pas de SVG par-dessus
                     sinon Android n'attache pas l'EditText à l'InputMethodManager). */}
                 <View style={styles.fieldGroup}>
-                  <Text style={styles.fieldLabel}>Code du Salon</Text>
+                  <Text style={styles.fieldLabel}>{t('game.roomCodeLabel')}</Text>
                   <View style={styles.inputBorderShell}>
                     <TextInput
                       value={code}
@@ -261,7 +263,7 @@ export default function JoinRoomScreen() {
           <GameButton
             variant="yellow"
             fullWidth
-            title={joiningRoom ? 'CONNEXION...' : 'REJOINDRE'}
+            title={joiningRoom ? t('game.connecting') : t('game.joinCta')}
             loading={joiningRoom}
             disabled={!code.replace(/-/g, '').trim() || code.replace(/-/g, '').length < 6}
             onPress={handleJoinRoom}
@@ -281,7 +283,7 @@ export default function JoinRoomScreen() {
         <Pressable onPress={handleBack} hitSlop={8}>
           <Ionicons name="arrow-back" size={24} color="white" />
         </Pressable>
-        <Text style={styles.headerTitle}>SALLE D'ATTENTE</Text>
+        <Text style={styles.headerTitle}>{t('game.waitingRoom')}</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -301,12 +303,12 @@ export default function JoinRoomScreen() {
             boxWidth={contentWidth}
           >
             <View style={styles.codeSection}>
-              <Text style={styles.codeLabel}>CODE DU SALON</Text>
+              <Text style={styles.codeLabel}>{t('game.roomCode')}</Text>
               <Text style={styles.codeText}>
                 {room?.code ? formatRoomCode(room.code) : code}
               </Text>
               <Text style={styles.roomDetails}>
-                {room?.edition || 'Classic'} — {room?.maxPlayers || 4} joueurs max
+                {t('game.roomDetails', { edition: room?.edition || 'Classic', max: room?.maxPlayers || 4 })}
               </Text>
             </View>
           </DynamicGradientBorder>
@@ -321,12 +323,12 @@ export default function JoinRoomScreen() {
             style={styles.lobbyPlayersBlock}
           >
             <Text style={styles.lobbySectionTitle}>
-              JOUEURS ({playersList.length}/{room?.maxPlayers || 4})
+              {t('game.playersCount', { count: playersList.length, max: room?.maxPlayers || 4 })}
             </Text>
             {playersList.length === 0 ? (
               <View style={styles.emptyPlayers}>
                 <Ionicons name="hourglass-outline" size={24} color="rgba(255,255,255,0.3)" />
-                <Text style={styles.emptyText}>En attente de joueurs...</Text>
+                <Text style={styles.emptyText}>{t('game.waitingForPlayers')}</Text>
               </View>
             ) : (
               <View style={styles.playersList}>
@@ -360,7 +362,7 @@ export default function JoinRoomScreen() {
                             </Text>
                           ) : (
                             <Text style={styles.lobbyPlayerStatus}>
-                              {player.isHost ? 'Hôte' : player.isReady ? 'Prêt' : 'En attente'}
+                              {player.isHost ? t('game.host') : player.isReady ? t('game.ready') : t('game.waitingStatus')}
                             </Text>
                           )}
                         </View>
@@ -394,7 +396,7 @@ export default function JoinRoomScreen() {
               color={hasSelectedStartup ? '#4CAF50' : '#FFBC40'}
             />
             <Text style={[styles.startupSelectText, hasSelectedStartup && styles.startupSelectTextDone]}>
-              {hasSelectedStartup ? myPlayer?.startupName ?? 'Projet choisi' : 'Choisir mon projet'}
+              {hasSelectedStartup ? myPlayer?.startupName ?? t('game.projectChosen') : t('game.chooseMyProject')}
             </Text>
             {!hasSelectedStartup && (
               <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.4)" />
@@ -421,12 +423,12 @@ export default function JoinRoomScreen() {
         <GameButton
           variant={isReady ? 'blue' : 'green'}
           fullWidth
-          title={isReady ? 'ANNULER' : 'JE SUIS PRET !'}
+          title={isReady ? t('game.cancelCta') : t('game.imReady')}
           loading={isLoading}
           onPress={handleToggleReady}
         />
         <Text style={styles.waitingText}>
-          En attente que l'hote lance la partie...
+          {t('game.waitingHostStart')}
         </Text>
       </View>
     </View>

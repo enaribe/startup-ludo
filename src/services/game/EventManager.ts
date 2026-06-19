@@ -129,8 +129,37 @@ export class EventManager {
   private usedOpportunityIds: Set<string> = new Set();
   private usedChallengeIds: Set<string> = new Set();
   private contentPack: GameContentPack | null = null;
+  /** Langue d'affichage du contenu (préférence joueur). Applique translations[lang] partout. */
+  private lang: string = 'fr';
 
   constructor(private editionId: EditionId = 'classic') {}
+
+  /** Définit la langue d'affichage du contenu (éditions ET programmes). */
+  setLanguage(lang: string): void {
+    this.lang = lang || 'fr';
+  }
+
+  // ===== Résolution de traduction (sur la carte tirée) =====
+  private tQuiz(q: Quiz): Quiz {
+    const t = this.lang !== 'fr' ? q.translations?.[this.lang] : undefined;
+    return t ? { ...q, question: t.question, options: t.options, explanation: t.explanation ?? q.explanation } : q;
+  }
+  private tDuel(d: Duel): Duel {
+    const t = this.lang !== 'fr' ? d.translations?.[this.lang] : undefined;
+    return t ? { ...d, question: t.question, options: d.options.map((o, i) => ({ ...o, text: t.options[i] ?? o.text })) } : d;
+  }
+  private tFunding(f: Funding): Funding {
+    const t = this.lang !== 'fr' ? f.translations?.[this.lang] : undefined;
+    return t ? { ...f, title: t.title, description: t.description } : f;
+  }
+  private tOpportunity(o: Opportunity): Opportunity {
+    const t = this.lang !== 'fr' ? o.translations?.[this.lang] : undefined;
+    return t ? { ...o, title: t.title, description: t.description } : o;
+  }
+  private tChallenge(c: ChallengeEventData): ChallengeEventData {
+    const t = this.lang !== 'fr' ? c.translations?.[this.lang] : undefined;
+    return t ? { ...c, title: t.title, description: t.description } : c;
+  }
 
   /**
    * Change l'édition active
@@ -149,6 +178,7 @@ export class EventManager {
 
   /**
    * Définit le contenu prioritaire d'une partie programme.
+   * (La traduction est résolue au tirage de chaque carte via this.lang.)
    */
   setContentPack(content: GameContentPack): void {
     this.contentPack = content;
@@ -284,16 +314,17 @@ export class EventManager {
       : getEdition(this.editionId).quizzes;
 
     const filtered = difficulty ? pool.filter((q) => q.difficulty === difficulty) : pool;
-    const quiz = this.pickRandomUnused(filtered, this.usedQuizIds);
+    const picked = this.pickRandomUnused(filtered, this.usedQuizIds);
 
-    if (!quiz) {
+    if (!picked) {
       const fallback = this.getFallbackQuiz();
       this.usedQuizIds.add(fallback.data.id);
       return fallback;
     }
 
-    // Marquer comme utilisé
-    this.usedQuizIds.add(quiz.id);
+    // Marquer comme utilisé (sur l'id d'origine) puis localiser dans la langue du joueur
+    this.usedQuizIds.add(picked.id);
+    const quiz = this.tQuiz(picked);
 
     // Déterminer la difficulté
     const quizDifficulty = quiz.difficulty ?? this.inferDifficulty(quiz);
@@ -323,15 +354,16 @@ export class EventManager {
       ? this.contentPack.fundings
       : getEdition(this.editionId).fundings;
 
-    const funding = this.pickRandomUnused(pool, this.usedFundingIds);
+    const pickedFunding = this.pickRandomUnused(pool, this.usedFundingIds);
 
-    if (!funding) {
+    if (!pickedFunding) {
       const fallback = this.getFallbackFunding();
       this.usedFundingIds.add(fallback.data.id);
       return fallback;
     }
 
-    this.usedFundingIds.add(funding.id);
+    this.usedFundingIds.add(pickedFunding.id);
+    const funding = this.tFunding(pickedFunding);
 
     return {
       type: 'funding',
@@ -354,15 +386,16 @@ export class EventManager {
       ? this.contentPack.duels
       : getEdition(this.editionId).duels;
 
-    const duel = this.pickRandomUnused(pool, this.usedDuelIds);
+    const pickedDuel = this.pickRandomUnused(pool, this.usedDuelIds);
 
-    if (!duel) {
+    if (!pickedDuel) {
       const fallback = this.getFallbackDuel();
       this.usedDuelIds.add(fallback.data.id);
       return fallback;
     }
 
-    this.usedDuelIds.add(duel.id);
+    this.usedDuelIds.add(pickedDuel.id);
+    const duel = this.tDuel(pickedDuel);
 
     return {
       type: 'duel',
@@ -383,15 +416,16 @@ export class EventManager {
       ? this.contentPack.opportunities
       : getEdition(this.editionId).opportunities;
 
-    const opportunity = this.pickRandomUnused(pool, this.usedOpportunityIds);
+    const pickedOpportunity = this.pickRandomUnused(pool, this.usedOpportunityIds);
 
-    if (!opportunity) {
+    if (!pickedOpportunity) {
       const fallback = this.getFallbackOpportunity();
       this.usedOpportunityIds.add(fallback.data.id);
       return fallback;
     }
 
-    this.usedOpportunityIds.add(opportunity.id);
+    this.usedOpportunityIds.add(pickedOpportunity.id);
+    const opportunity = this.tOpportunity(pickedOpportunity);
 
     return {
       type: 'opportunity',
@@ -414,15 +448,16 @@ export class EventManager {
       ? this.contentPack.challengeEvents
       : getEdition(this.editionId).challenges;
 
-    const challenge = this.pickRandomUnused(pool, this.usedChallengeIds);
+    const pickedChallenge = this.pickRandomUnused(pool, this.usedChallengeIds);
 
-    if (!challenge) {
+    if (!pickedChallenge) {
       const fallback = this.getFallbackChallenge();
       this.usedChallengeIds.add(fallback.data.id);
       return fallback;
     }
 
-    this.usedChallengeIds.add(challenge.id);
+    this.usedChallengeIds.add(pickedChallenge.id);
+    const challenge = this.tChallenge(pickedChallenge);
 
     return {
       type: 'challenge',

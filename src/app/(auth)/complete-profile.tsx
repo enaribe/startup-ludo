@@ -27,6 +27,7 @@ import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { GameButton } from '@/components/ui/GameButton';
 import { RadialBackground } from '@/components/ui/RadialBackground';
 import { AuthInput, AuthHeader } from '@/components/auth';
+import { useTranslation } from '@/i18n';
 import { useAuthStore, useUserStore } from '@/stores';
 import { updateUserProfile } from '@/services/firebase/auth';
 import { createUserProfile, getUserProfile, updateFirestoreUserProfile } from '@/services/firebase';
@@ -47,6 +48,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const shapeImage = require('@/../assets/images/shape.png');
 
 export default function CompleteProfileScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const user = useAuthStore((state) => state.user);
@@ -130,10 +132,10 @@ export default function CompleteProfileScreen() {
       setAvailability('taken');
       setError(
         err instanceof Error && err.message.includes('déjà utilisé')
-          ? 'Ce pseudo vient d\'être pris. Choisis-en un autre.'
+          ? t('auth.usernameJustTaken')
           : err instanceof Error
             ? err.message
-            : 'Erreur lors de la mise à jour du profil'
+            : t('auth.profileUpdateError')
       );
     } finally {
       setIsLoading(false);
@@ -174,9 +176,9 @@ export default function CompleteProfileScreen() {
             entering={FadeInDown.delay(100).duration(400)}
             style={styles.titleSection}
           >
-            <Text style={styles.title}>BIENVENUE !</Text>
+            <Text style={styles.title}>{t('auth.completeProfileTitle')}</Text>
             <Text style={styles.subtitle}>
-              Comment veux-tu qu'on t'appelle{'\n'}dans le jeu ?
+              {t('auth.completeProfileSubtitle')}
             </Text>
           </Animated.View>
 
@@ -186,8 +188,8 @@ export default function CompleteProfileScreen() {
             style={styles.formSection}
           >
             <AuthInput
-              label="TON PSEUDO UNIQUE"
-              placeholder="Ex: moussa_ndiaye"
+              label={t('auth.uniqueUsernameLabel')}
+              placeholder={t('auth.uniqueUsernamePlaceholder')}
               value={displayName}
               onChangeText={setDisplayName}
               autoCapitalize="none"
@@ -199,19 +201,19 @@ export default function CompleteProfileScreen() {
             {availability === 'checking' && (
               <View style={styles.statusRow}>
                 <ActivityIndicator size="small" color="rgba(255,255,255,0.5)" />
-                <Text style={styles.statusChecking}>Vérification...</Text>
+                <Text style={styles.statusChecking}>{t('auth.checkingUsername')}</Text>
               </View>
             )}
             {availability === 'available' && (
               <View style={styles.statusRow}>
                 <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
-                <Text style={styles.statusOk}>Pseudo disponible</Text>
+                <Text style={styles.statusOk}>{t('auth.usernameAvailable')}</Text>
               </View>
             )}
             {availability === 'taken' && (
               <View style={styles.statusRow}>
                 <Ionicons name="close-circle" size={16} color="#E74C3C" />
-                <Text style={styles.statusError}>Ce pseudo est déjà pris</Text>
+                <Text style={styles.statusError}>{t('auth.usernameTaken')}</Text>
               </View>
             )}
             {availability === 'invalid' && formatError && (
@@ -226,8 +228,7 @@ export default function CompleteProfileScreen() {
             )}
 
             <Text style={styles.hint}>
-              3 à {USERNAME_MAX_LENGTH} caractères : lettres, chiffres et _.{'\n'}
-              Ce pseudo t'identifie de façon unique dans le jeu.
+              {t('auth.usernameHint', { max: USERNAME_MAX_LENGTH })}
             </Text>
           </Animated.View>
 
@@ -240,7 +241,7 @@ export default function CompleteProfileScreen() {
             style={styles.buttonsSection}
           >
             <GameButton
-              title="CONTINUER"
+              title={t('common.continue')}
               variant="yellow"
               fullWidth
               loading={isLoading}

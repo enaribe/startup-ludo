@@ -2,7 +2,7 @@
   "expo": {
     "name": "Startup Ludo",
     "slug": "startup-ludo",
-    "version": "2.0.9",
+    "version": "2.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/iconludo.png",
     "scheme": "startupludo",
@@ -11,7 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.startupludo.app",
-      "buildNumber": "38",
+      "buildNumber": "40",
       "googleServicesFile": "./GoogleService-Info.plist",
       "usesAppleSignIn": true,
       "infoPlist": {
@@ -21,7 +21,7 @@
     },
     "android": {
       "package": "com.startupludo.app",
-      "versionCode": 38,
+      "versionCode": 40,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#0C243E",
@@ -64,6 +64,7 @@
       ],
       "@react-native-firebase/app",
       "./plugins/withRNFirebasePodfile.js",
+      "./plugins/withTabletSupport.js",
       "@react-native-firebase/auth",
       "@react-native-google-signin/google-signin",
       [

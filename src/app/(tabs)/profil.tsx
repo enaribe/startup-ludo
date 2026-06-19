@@ -9,6 +9,7 @@ import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
+import { useTranslation } from '@/i18n';
 import { useAuthStore, useUserStore } from '@/stores';
 import { useSocialStore } from '@/stores/useSocialStore';
 import { RadialBackground, DynamicGradientBorder, Avatar } from '@/components/ui';
@@ -82,15 +83,16 @@ const AchievementIcon = memo(function AchievementIcon({ size = 28 }: IconProps) 
 
 /** Ordre grille comme maquette : stats | communauté | réseau | paramètres | aide | achievements */
 const MENU_ITEMS = [
-  { id: 'stats', title: 'STATISTIQUES DÉTAILLÉES', Icon: StatsDetailedIcon },
-  { id: 'community', title: 'REJOINDRE LA COMMUNAUTÉ', Icon: CommunityIcon },
-  { id: 'network', title: 'RÉSEAU & AMIS', Icon: NetworkIcon },
-  { id: 'settings', title: 'PARAMÈTRE', Icon: SettingsIcon },
-  { id: 'help', title: 'AIDE & SUPPORT', Icon: HelpIcon },
-  { id: 'achievements', title: 'ACHIEVEMENTS', Icon: AchievementIcon },
+  { id: 'stats', titleKey: 'profile.menuStats', Icon: StatsDetailedIcon },
+  { id: 'community', titleKey: 'profile.menuCommunity', Icon: CommunityIcon },
+  { id: 'network', titleKey: 'profile.menuNetwork', Icon: NetworkIcon },
+  { id: 'settings', titleKey: 'profile.menuSettings', Icon: SettingsIcon },
+  { id: 'help', titleKey: 'profile.menuHelp', Icon: HelpIcon },
+  { id: 'achievements', titleKey: 'profile.menuAchievements', Icon: AchievementIcon },
 ] as const;
 
 export default function ProfilScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
@@ -101,7 +103,7 @@ export default function ProfilScreen() {
   const nextRankInfo = getXPForNextRank(totalXP);
   const xpProgress = getRankProgress(totalXP);
 
-  const displayName = user?.displayName || profile?.displayName || 'Joueur';
+  const displayName = user?.displayName || profile?.displayName || t('profile.defaultPlayer');
   const avatarUrl = profile?.avatarUrl || user?.photoURL || null;
   const isGuest = user?.isGuest ?? false;
 
@@ -163,7 +165,7 @@ export default function ProfilScreen() {
             ) : (
               <View style={styles.backBtnPlaceholder} />
             )}
-            <Text style={styles.topBarTitle}>PROFIL</Text>
+            <Text style={styles.topBarTitle}>{t('profile.headerTitle')}</Text>
             <View style={styles.backBtnPlaceholder} />
           </View>
         </View>
@@ -202,7 +204,11 @@ export default function ProfilScreen() {
 
           <Pressable style={styles.followersPill} onPress={() => router.push('/network' as never)}>
             <Ionicons name="person" size={18} color={COLORS.primary} style={styles.followersPillIcon} />
-            <Text style={styles.followersPillText}>{followCounts.followersCount} SUIVEUR{followCounts.followersCount !== 1 ? 'S' : ''}</Text>
+            <Text style={styles.followersPillText}>
+              {followCounts.followersCount === 1
+                ? t('profile.followersOne', { count: followCounts.followersCount })
+                : t('profile.followersOther', { count: followCounts.followersCount })}
+            </Text>
           </Pressable>
         </Animated.View>
 
@@ -215,7 +221,7 @@ export default function ProfilScreen() {
             >
               <Pressable style={styles.cardContent} onPress={() => setShowRankPopup(true)}>
                 <View style={styles.progressionHeader}>
-                  <Text style={styles.progressionTitleInCard}>PROGRESSION</Text>
+                  <Text style={styles.progressionTitleInCard}>{t('profile.progression')}</Text>
                   <Text style={styles.rankBadge}>{rankInfo.title}</Text>
                 </View>
 
@@ -224,10 +230,10 @@ export default function ProfilScreen() {
                 </View>
 
                 <View style={styles.xpRow}>
-                  <Text style={styles.xpText}>{totalXP.toLocaleString()} XP total</Text>
+                  <Text style={styles.xpText}>{t('profile.xpTotal', { xp: totalXP.toLocaleString() })}</Text>
                   {nextRankInfo.nextRank
-                    ? <Text style={styles.xpText}>{nextRankInfo.xpNeeded.toLocaleString()} XP → {nextRankInfo.nextRank.title}</Text>
-                    : <Text style={styles.xpText}>Rang maximum atteint 👑</Text>
+                    ? <Text style={styles.xpText}>{t('profile.xpToNextRank', { xp: nextRankInfo.xpNeeded.toLocaleString(), rank: nextRankInfo.nextRank.title })}</Text>
+                    : <Text style={styles.xpText}>{t('profile.maxRankReached')}</Text>
                   }
                 </View>
               </Pressable>
@@ -252,7 +258,7 @@ export default function ProfilScreen() {
                       <View style={styles.menuGridIconWrap}>
                         <item.Icon size={36} />
                       </View>
-                      <Text style={styles.menuGridText}>{item.title}</Text>
+                      <Text style={styles.menuGridText}>{t(item.titleKey)}</Text>
                     </View>
                   </DynamicGradientBorder>
                 </Pressable>

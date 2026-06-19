@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { useUserStore } from '@/stores';
+import { useTranslation } from '@/i18n';
 import { RadialBackground, DynamicGradientBorder, GameButton } from '@/components/ui';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -24,29 +25,29 @@ const contentWidth = screenWidth - SPACING[4] * 2;
 const ONLINE_OPTIONS = [
   {
     id: 'quick-match' as const,
-    title: 'MATCH RAPIDE',
-    description: 'Trouve automatiquement des adversaires et lance une partie',
+    titleKey: 'game.quickMatchTitle',
+    descriptionKey: 'game.quickMatchDesc',
     icon: 'flash' as keyof typeof Ionicons.glyphMap,
     color: '#FFBC40',
   },
   {
     id: 'available-players' as const,
-    title: 'JOUEURS DISPONIBLES',
-    description: 'Vois qui est connecté et invite un joueur à une partie',
+    titleKey: 'game.availablePlayersTitle',
+    descriptionKey: 'game.availablePlayersDesc',
     icon: 'radio' as keyof typeof Ionicons.glyphMap,
     color: '#9B59B6',
   },
   {
     id: 'create-room' as const,
-    title: 'CREER UN SALON',
-    description: 'Cree ta partie et invite tes amis avec un code',
+    titleKey: 'game.createRoomTitle',
+    descriptionKey: 'game.createRoomDesc',
     icon: 'add-circle' as keyof typeof Ionicons.glyphMap,
     color: '#4CAF50',
   },
   {
     id: 'join-room' as const,
-    title: 'REJOINDRE UN SALON',
-    description: 'Entre un code pour rejoindre la partie d\'un ami',
+    titleKey: 'game.joinRoomTitle',
+    descriptionKey: 'game.joinRoomDesc',
     icon: 'people' as keyof typeof Ionicons.glyphMap,
     color: '#1F91D0',
   },
@@ -55,6 +56,7 @@ const ONLINE_OPTIONS = [
 export default function OnlineHubScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { challenge } = useLocalSearchParams<{ challenge?: string }>();
   const profile = useUserStore((state) => state.profile);
 
@@ -99,7 +101,7 @@ export default function OnlineHubScreen() {
         <Pressable onPress={handleBack} hitSlop={8}>
           <Ionicons name="arrow-back" size={24} color="white" />
         </Pressable>
-        <Text style={styles.headerTitle}>PARTIE EN LIGNE</Text>
+        <Text style={styles.headerTitle}>{t('game.onlineGameTitle')}</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -113,7 +115,7 @@ export default function OnlineHubScreen() {
       >
         {/* Section Title */}
         <Animated.View entering={FadeInDown.delay(100).duration(500)} style={{ marginBottom: SPACING[5] }}>
-          <Text style={styles.sectionTitle}>CHOISIS TON MODE EN LIGNE</Text>
+          <Text style={styles.sectionTitle}>{t('game.chooseOnlineMode')}</Text>
         </Animated.View>
 
         {/* Options */}
@@ -139,9 +141,9 @@ export default function OnlineHubScreen() {
                       {/* Text */}
                       <View style={{ flex: 1 }}>
                         <Text style={styles.optionTitle}>
-                          {option.title}
+                          {t(option.titleKey)}
                         </Text>
-                        <Text style={styles.optionDescription}>{option.description}</Text>
+                        <Text style={styles.optionDescription}>{t(option.descriptionKey)}</Text>
                       </View>
 
                       {/* Chevron */}
@@ -164,8 +166,8 @@ export default function OnlineHubScreen() {
             <View style={styles.statusContent}>
               <View style={styles.statusDot} />
               <View style={{ flex: 1 }}>
-                <Text style={styles.statusTitle}>STATUT DE CONNEXION</Text>
-                <Text style={styles.statusText}>Connecte - Pret a jouer</Text>
+                <Text style={styles.statusTitle}>{t('game.connectionStatus')}</Text>
+                <Text style={styles.statusText}>{t('game.connectedReady')}</Text>
               </View>
               <Ionicons name="wifi" size={20} color="#4CAF50" />
             </View>
@@ -186,21 +188,21 @@ export default function OnlineHubScreen() {
               <Ionicons name="business-outline" size={32} color="#FFBC40" />
             </View>
 
-            <Text style={styles.modalTitle}>Aucun projet</Text>
+            <Text style={styles.modalTitle}>{t('game.noProjectTitleCap')}</Text>
             <Text style={styles.modalDescription}>
-              Tu dois creer une entreprise avant de jouer en ligne. Les jetons gagnes seront investis dans ton projet !
+              {t('game.noProjectBody')}
             </Text>
 
             <GameButton
               variant="yellow"
               fullWidth
-              title="CREER MON ENTREPRISE"
+              title={t('game.createMyStartupCap')}
               onPress={handleCreateStartup}
               style={{ marginBottom: SPACING[3] }}
             />
 
             <Pressable onPress={() => setShowNoProjectPopup(false)}>
-              <Text style={styles.cancelText}>Annuler</Text>
+              <Text style={styles.cancelText}>{t('common.cancel')}</Text>
             </Pressable>
           </Animated.View>
         </View>

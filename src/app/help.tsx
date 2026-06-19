@@ -17,6 +17,7 @@ import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { RadialBackground, DynamicGradientBorder } from '@/components/ui';
 import { useSettingsStore } from '@/stores';
+import { useTranslation } from '@/i18n';
 
 const { width: screenWidth } = Dimensions.get('window');
 const contentWidth = screenWidth - SPACING[4] * 2;
@@ -33,140 +34,39 @@ interface FAQItem {
   category: FAQCategory;
 }
 
-const FAQ_ITEMS: FAQItem[] = [
+/** Métadonnées des FAQ — le texte (question/réponse) est résolu via i18n au rendu. */
+const FAQ_META: { id: string; category: FAQCategory }[] = [
   // ─── Gameplay ───
-  {
-    id: 'faq1',
-    category: 'gameplay',
-    question: 'Comment jouer à Startup Ludo ?',
-    answer:
-      "Startup Ludo est un jeu de plateau éducatif sur l'entrepreneuriat. Lance le dé pour avancer sur le plateau. Selon la case où tu tombes, tu peux répondre à un quiz, recevoir un financement, affronter un adversaire en duel ou faire face à un événement. Le but est d'accumuler le plus de jetons possible !",
-  },
-  {
-    id: 'faq2',
-    category: 'gameplay',
-    question: 'Comment gagner des jetons ?',
-    answer:
-      "Tu gagnes des jetons en répondant correctement aux quiz, en remportant des duels, en recevant des financements sur certaines cases et en capturant les pions adverses.",
-  },
-  {
-    id: 'faq3',
-    category: 'gameplay',
-    question: "Comment fonctionne la capture d'un pion ?",
-    answer:
-      "Si tu tombes sur une case occupée par un adversaire, tu le captures : son pion retourne à sa case de départ. Attention, cela peut aussi t'arriver !",
-  },
-  {
-    id: 'faq4',
-    category: 'gameplay',
-    question: "C'est quoi un duel ?",
-    answer:
-      "Lorsque deux joueurs se croisent sur certaines cases, un duel peut se déclencher : une série de questions départage les deux joueurs. Le gagnant remporte des jetons. Les autres joueurs assistent au duel en spectateurs.",
-  },
-  {
-    id: 'faq5',
-    category: 'gameplay',
-    question: 'Quelle est la condition de victoire ?',
-    answer:
-      "La partie se termine quand le nombre de tours défini est atteint ou qu'un joueur atteint le seuil de jetons configuré. Le joueur avec le plus de jetons gagne la partie.",
-  },
+  { id: 'faq1', category: 'gameplay' },
+  { id: 'faq2', category: 'gameplay' },
+  { id: 'faq3', category: 'gameplay' },
+  { id: 'faq4', category: 'gameplay' },
+  { id: 'faq5', category: 'gameplay' },
   // ─── Entreprises ───
-  {
-    id: 'faq6',
-    category: 'startup',
-    question: "À quoi servent les cartes d'inspiration ?",
-    answer:
-      "Les cartes d'inspiration t'aident à imaginer ton idée d'entreprise. La carte Cible définit ton marché (étudiants, agriculteurs…) et la carte Mission définit le problème que tu résous (éduquer, connecter…). Combine les deux pour créer ton concept !",
-  },
-  {
-    id: 'faq7',
-    category: 'startup',
-    question: 'Comment évolue la valorisation de mon entreprise ?',
-    answer:
-      "Une valorisation initiale est estimée à la création de ton entreprise. Ensuite, chaque partie jouée avec ce projet augmente sa valorisation en fonction des jetons gagnés. Suis sa progression dans ton portfolio.",
-  },
-  {
-    id: 'faq8',
-    category: 'startup',
-    question: 'Puis-je avoir plusieurs entreprises ?',
-    answer:
-      "Oui ! Tu peux créer plusieurs entreprises, chacune dans un secteur différent. Gère ton portfolio comme un véritable entrepreneur.",
-  },
+  { id: 'faq6', category: 'startup' },
+  { id: 'faq7', category: 'startup' },
+  { id: 'faq8', category: 'startup' },
   // ─── Multijoueur en ligne ───
-  {
-    id: 'faq9',
-    category: 'online',
-    question: 'Comment jouer avec mes amis en ligne ?',
-    answer:
-      "Depuis le mode en ligne, crée un salon : tu obtiens un code de partie à partager. Tes amis saisissent ce code (ou ouvrent ton lien d'invitation) pour rejoindre ton salon. Quand tout le monde est prêt, l'hôte lance la partie.",
-  },
-  {
-    id: 'faq10',
-    category: 'online',
-    question: "Comment inviter un joueur ?",
-    answer:
-      "Dans le salon, utilise « Inviter un contact » pour envoyer une invitation directe à un joueur que tu suis. Tu peux aussi partager le code ou le lien d'invitation du salon par n'importe quel moyen.",
-  },
-  {
-    id: 'faq11',
-    category: 'online',
-    question: "Que se passe-t-il si un joueur se déconnecte ?",
-    answer:
-      "Si l'hôte quitte le salon avant le début de la partie, le salon est fermé pour tout le monde. En cours de partie, un joueur déconnecté est déclaré forfait et la partie continue pour les autres. Si tu n'agis pas pendant 15 secondes à ton tour, le jeu joue automatiquement pour toi.",
-  },
+  { id: 'faq9', category: 'online' },
+  { id: 'faq10', category: 'online' },
+  { id: 'faq11', category: 'online' },
   // ─── Programmes & challenges ───
-  {
-    id: 'faq12',
-    category: 'challenges',
-    question: "C'est quoi les programmes / challenges ?",
-    answer:
-      "Les challenges sont des parcours thématiques composés de plusieurs niveaux. Tu progresses en jouant des parties liées au programme : chaque niveau réussi débloque le suivant et te rapporte de l'XP.",
-  },
-  {
-    id: 'faq13',
-    category: 'challenges',
-    question: "Comment m'inscrire à un programme ?",
-    answer:
-      "Depuis l'accueil ou la section challenges, choisis un programme et remplis le formulaire d'inscription. Une fois inscrit, le programme apparaît dans « Mes programmes ».",
-  },
+  { id: 'faq12', category: 'challenges' },
+  { id: 'faq13', category: 'challenges' },
   // ─── Compte ───
-  {
-    id: 'faq14',
-    category: 'account',
-    question: 'Comment fonctionne le système de rangs ?',
-    answer:
-      "Tu gagnes de l'XP en jouant et en débloquant des succès. Plus tu accumules d'XP, plus ton rang monte : Stagiaire, Aspirant, Entrepreneur Débutant, Entrepreneur Confirmé, Expert Business, Mogul, CEO, et enfin Légende.",
-  },
-  {
-    id: 'faq15',
-    category: 'account',
-    question: 'Comment débloquer des succès ?',
-    answer:
-      "Les succès se débloquent automatiquement en jouant : premières parties, victoires, jetons cumulés, entreprises créées… Ouvre l'écran Succès et appuie sur un succès pour voir comment l'obtenir et ta progression.",
-  },
-  {
-    id: 'faq16',
-    category: 'account',
-    question: 'Comment personnaliser mon profil ?',
-    answer:
-      "Dans ton profil, appuie sur ton avatar pour choisir une image parmi la galerie d'avatars. Ton pseudo unique t'identifie auprès des autres joueurs.",
-  },
-  {
-    id: 'faq17',
-    category: 'account',
-    question: 'Puis-je jouer sans compte ?',
-    answer:
-      "Oui, tu peux jouer en tant qu'invité. Mais ta progression n'est pas sauvegardée et le mode en ligne n'est pas accessible. Crée un compte pour conserver tes entreprises, ton XP et tes succès.",
-  },
+  { id: 'faq14', category: 'account' },
+  { id: 'faq15', category: 'account' },
+  { id: 'faq16', category: 'account' },
+  { id: 'faq17', category: 'account' },
 ];
 
-const CATEGORIES: { id: 'all' | FAQCategory; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { id: 'all', label: 'Tout', icon: 'apps' },
-  { id: 'gameplay', label: 'Gameplay', icon: 'game-controller' },
-  { id: 'startup', label: 'Entreprises', icon: 'rocket' },
-  { id: 'online', label: 'En ligne', icon: 'people' },
-  { id: 'challenges', label: 'Programmes', icon: 'trophy' },
-  { id: 'account', label: 'Compte', icon: 'person' },
+const CATEGORIES: { id: 'all' | FAQCategory; labelKey: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { id: 'all', labelKey: 'help.all', icon: 'apps' },
+  { id: 'gameplay', labelKey: 'help.gameplay', icon: 'game-controller' },
+  { id: 'startup', labelKey: 'help.startups', icon: 'rocket' },
+  { id: 'online', labelKey: 'help.online', icon: 'people' },
+  { id: 'challenges', labelKey: 'help.programs', icon: 'trophy' },
+  { id: 'account', labelKey: 'help.account', icon: 'person' },
 ];
 
 interface AccordionItemProps {
@@ -224,6 +124,7 @@ function AccordionItem({ item, isExpanded, onToggle, index }: AccordionItemProps
 export default function HelpScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
 
   const [selectedCategory, setSelectedCategory] = useState<'all' | FAQCategory>('all');
@@ -235,10 +136,17 @@ export default function HelpScreen() {
     setExpandedId(null);
   };
 
+  const faqItems: FAQItem[] = FAQ_META.map((meta) => ({
+    id: meta.id,
+    category: meta.category,
+    question: t(`help.${meta.id}.q`),
+    answer: t(`help.${meta.id}.a`),
+  }));
+
   const filteredFAQ =
     selectedCategory === 'all'
-      ? FAQ_ITEMS
-      : FAQ_ITEMS.filter((item) => item.category === selectedCategory);
+      ? faqItems
+      : faqItems.filter((item) => item.category === selectedCategory);
 
   return (
     <View style={styles.container}>
@@ -250,7 +158,7 @@ export default function HelpScreen() {
           <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={8}>
             <Ionicons name="chevron-back" size={22} color={COLORS.primary} />
           </Pressable>
-          <Text style={styles.headerTitle}>AIDE & SUPPORT</Text>
+          <Text style={styles.headerTitle}>{t('help.headerTitle')}</Text>
           <View style={styles.backBtnPlaceholder} />
         </View>
       </View>
@@ -264,7 +172,7 @@ export default function HelpScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Animated.View entering={FadeInDown.delay(60).duration(400)}>
-          <Text style={styles.intro}>Trouve des réponses à tes questions</Text>
+          <Text style={styles.intro}>{t('help.subtitle')}</Text>
         </Animated.View>
 
         {/* Filtres par catégorie */}
@@ -288,7 +196,7 @@ export default function HelpScreen() {
                     color={active ? '#0C243E' : 'rgba(255,255,255,0.6)'}
                   />
                   <Text style={[styles.categoryText, active && styles.categoryTextActive]}>
-                    {category.label}
+                    {t(category.labelKey)}
                   </Text>
                 </Pressable>
               );
@@ -315,17 +223,16 @@ export default function HelpScreen() {
           <DynamicGradientBorder borderRadius={16} fill="rgba(0,0,0,0.35)" boxWidth={contentWidth}>
             <View style={styles.contactCard}>
               <Ionicons name="chatbubbles" size={32} color={COLORS.primary} />
-              <Text style={styles.contactTitle}>Besoin d'aide supplémentaire ?</Text>
+              <Text style={styles.contactTitle}>{t('help.contact')}</Text>
               <Text style={styles.contactBody}>
-                Rejoins la communauté Startup Ludo pour poser tes questions et échanger avec
-                d'autres joueurs.
+                {t('help.contactBody')}
               </Text>
               <Pressable
                 style={styles.whatsappBtn}
                 onPress={() => Linking.openURL(WHATSAPP_GROUP_URL)}
               >
                 <Ionicons name="logo-whatsapp" size={18} color="#0C243E" />
-                <Text style={styles.whatsappBtnText}>REJOINDRE LA COMMUNAUTÉ</Text>
+                <Text style={styles.whatsappBtnText}>{t('help.joinCommunity')}</Text>
               </Pressable>
             </View>
           </DynamicGradientBorder>

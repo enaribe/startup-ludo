@@ -29,6 +29,7 @@ import { DynamicGradientBorder } from '@/components/ui/GradientBorder';
 import { GameButton } from '@/components/ui/GameButton';
 import { Avatar } from '@/components/ui/Avatar';
 import { useAuthStore, useSettingsStore, useUserStore, useTutorialStore } from '@/stores';
+import { useTranslation } from '@/i18n';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
@@ -151,16 +152,19 @@ const SettingSection = memo(function SettingSection({
 export default function SettingsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
 
   const {
     soundEnabled,
     musicEnabled,
     hapticsEnabled,
     notifications,
+    language,
     setSoundEnabled,
     setMusicEnabled,
     setHapticsEnabled,
     setNotifications,
+    setLanguage,
   } = useSettingsStore();
 
   const logout = useAuthStore((state) => state.logout);
@@ -169,7 +173,7 @@ export default function SettingsScreen() {
   const profile = useUserStore((state) => state.profile);
   const isGuest = user?.isGuest ?? true;
 
-  const displayName = isGuest ? 'Invité' : user?.displayName || profile?.displayName || 'Utilisateur';
+  const displayName = isGuest ? t('settings.guest') : user?.displayName || profile?.displayName || t('settings.user');
   const avatarUrl = profile?.avatarUrl || user?.photoURL || null;
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -185,17 +189,17 @@ export default function SettingsScreen() {
     // Réarme le tutoriel puis propose de lancer une partie pour le tester tout de suite
     resetTutorial();
     Alert.alert(
-      'Revoir le tutoriel',
-      'Le guide se relancera au début de ta prochaine partie. Lancer une partie maintenant ?',
+      t('settings.replayTutorial'),
+      t('settings.replayTutorialMessage'),
       [
-        { text: 'Plus tard', style: 'cancel' },
+        { text: t('settings.later'), style: 'cancel' },
         {
-          text: 'Lancer une partie',
+          text: t('settings.startGame'),
           onPress: () => router.push('/(game)/mode-selection'),
         },
       ]
     );
-  }, [resetTutorial, router]);
+  }, [resetTutorial, router, t]);
 
   const handleLogout = useCallback(async () => {
     await logout();
@@ -210,14 +214,14 @@ export default function SettingsScreen() {
       router.replace('/');
     } catch (error) {
       Alert.alert(
-        'Erreur',
-        error instanceof Error ? error.message : 'Impossible de supprimer le compte',
+        t('common.error'),
+        error instanceof Error ? error.message : t('settings.deleteAccountError'),
         [{ text: 'OK' }]
       );
     } finally {
       setIsDeleting(false);
     }
-  }, [deleteAccount, router]);
+  }, [deleteAccount, router, t]);
 
   return (
     <View style={styles.container}>
@@ -229,7 +233,7 @@ export default function SettingsScreen() {
           <Pressable onPress={handleBack} style={styles.backBtn} hitSlop={8}>
             <Ionicons name="chevron-back" size={22} color={COLORS.primary} />
           </Pressable>
-          <Text style={styles.headerTitle}>PARAMÈTRES</Text>
+          <Text style={styles.headerTitle}>{t('settings.title')}</Text>
           <View style={styles.backBtnPlaceholder} />
         </View>
       </View>
@@ -245,7 +249,7 @@ export default function SettingsScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Section Compte */}
-        <SettingSection title="COMPTE" delay={100}>
+        <SettingSection title={t('settings.account')} delay={100}>
           <View style={styles.accountRow}>
             {avatarUrl ? (
               <Avatar source={avatarUrl} name={displayName} size="lg" showBorder />
@@ -263,13 +267,13 @@ export default function SettingsScreen() {
                 </Text>
                 {isGuest && (
                   <View style={styles.guestBadge}>
-                    <Text style={styles.guestBadgeText}>INVITÉ</Text>
+                    <Text style={styles.guestBadgeText}>{t('settings.guestBadge')}</Text>
                   </View>
                 )}
               </View>
               <Text style={styles.accountEmail} numberOfLines={2}>
                 {isGuest
-                  ? 'Crée un compte pour sauvegarder ta progression'
+                  ? t('settings.guestAccountDesc')
                   : user?.email || ''}
               </Text>
             </View>
@@ -277,79 +281,108 @@ export default function SettingsScreen() {
         </SettingSection>
 
         {/* Section Audio & retours */}
-        <SettingSection title="AUDIO & RETOURS" delay={180}>
+        <SettingSection title={t('settings.audioFeedback')} delay={180}>
           <SettingRow
             icon="volume-high"
             iconColor="#3498DB"
-            title="Sons"
-            subtitle="Effets sonores du jeu"
+            title={t('settings.sounds')}
+            subtitle={t('settings.soundsDesc')}
             value={soundEnabled}
             onToggle={setSoundEnabled}
           />
           <SettingRow
             icon="musical-notes"
             iconColor={COLORS.primary}
-            title="Musique"
-            subtitle="Musique de fond"
+            title={t('settings.music')}
+            subtitle={t('settings.musicDesc')}
             value={musicEnabled}
             onToggle={setMusicEnabled}
           />
           <SettingRow
             icon="phone-portrait"
             iconColor="#9B59B6"
-            title="Vibrations"
-            subtitle="Retours haptiques"
+            title={t('settings.vibrations')}
+            subtitle={t('settings.vibrationsDesc')}
             value={hapticsEnabled}
             onToggle={setHapticsEnabled}
           />
           <SettingRow
             icon="notifications"
             iconColor="#E67E22"
-            title="Notifications"
-            subtitle="Alertes et rappels"
+            title={t('settings.notifications')}
+            subtitle={t('settings.notificationsDesc')}
             value={notifications}
             onToggle={setNotifications}
             isLast
           />
         </SettingSection>
 
+        {/* Section Langue */}
+        <SettingSection title={t('settings.language')} delay={220}>
+          <View style={styles.langRow}>
+            {([
+              { code: 'fr' as const, label: 'Français' },
+              { code: 'en' as const, label: 'English' },
+            ]).map((l) => {
+              const selected = language === l.code;
+              return (
+                <Pressable
+                  key={l.code}
+                  onPress={() => setLanguage(l.code)}
+                  style={[styles.langOption, selected && styles.langOptionSelected]}
+                >
+                  <Ionicons
+                    name={selected ? 'checkmark-circle' : 'ellipse-outline'}
+                    size={20}
+                    color={selected ? COLORS.primary : COLORS.textMuted}
+                  />
+                  <Text style={[styles.langLabel, selected && styles.langLabelSelected]}>{l.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <Text style={styles.langHint}>
+            {t('settings.languageHint')}
+          </Text>
+        </SettingSection>
+
         {/* Section À propos */}
-        <SettingSection title="À PROPOS" delay={260}>
+        <SettingSection title={t('settings.about')} delay={260}>
           <SettingRow
             icon="help-circle"
             iconColor="#1ABC9C"
-            title="Aide"
-            subtitle="FAQ et tutoriels"
+            title={t('settings.help')}
+            subtitle={t('settings.helpDesc')}
             onPress={() => router.push('/help')}
             showArrow
           />
           <SettingRow
             icon="school"
             iconColor="#3498DB"
-            title="Revoir le tutoriel"
-            subtitle="Relance le guide à ta prochaine partie"
+            title={t('settings.replayTutorial')}
+            subtitle={t('settings.replayTutorialDesc')}
             onPress={handleReplayTutorial}
             showArrow
           />
           <SettingRow
             icon="stats-chart"
             iconColor="#F39C12"
-            title="Statistiques"
-            subtitle="Voir tes parties passées"
+            title={t('settings.statistics')}
+            subtitle={t('settings.historyDesc')}
             onPress={() => router.push('/history')}
             showArrow
           />
           <SettingRow
             icon="document-text"
             iconColor="#95A5A6"
-            title="Conditions d'utilisation"
+            title={t('settings.terms')}
             onPress={() => {}}
             showArrow
           />
           <SettingRow
             icon="shield-checkmark"
             iconColor="#27AE60"
-            title="Politique de confidentialité"
+            title={t('settings.privacy')}
             onPress={() => {}}
             showArrow
             isLast
@@ -358,12 +391,12 @@ export default function SettingsScreen() {
 
         {/* Zone de danger — masquée pour les invités */}
         {!isGuest && (
-          <SettingSection title="ZONE DE DANGER" delay={340}>
+          <SettingSection title={t('settings.dangerZone')} delay={340}>
             <SettingRow
               icon="trash"
               iconColor="#E74C3C"
-              title="Supprimer mon compte"
-              subtitle="Cette action est irréversible"
+              title={t('settings.deleteAccount')}
+              subtitle={t('settings.deleteAccountDesc')}
               onPress={() => setShowDeleteModal(true)}
               showArrow
               isLast
@@ -379,13 +412,13 @@ export default function SettingsScreen() {
           {isGuest ? (
             <>
               <GameButton
-                title="CRÉER UN COMPTE"
+                title={t('settings.createAccount')}
                 variant="yellow"
                 fullWidth
                 onPress={() => router.push('/(auth)/register')}
               />
               <GameButton
-                title="SE CONNECTER"
+                title={t('settings.signIn')}
                 variant="blue"
                 fullWidth
                 onPress={() => router.push('/(auth)/login')}
@@ -394,7 +427,7 @@ export default function SettingsScreen() {
             </>
           ) : (
             <GameButton
-              title="SE DÉCONNECTER"
+              title={t('settings.signOut')}
               variant="red"
               fullWidth
               onPress={handleLogout}
@@ -427,18 +460,18 @@ export default function SettingsScreen() {
               </View>
             </View>
 
-            <Text style={styles.modalTitle}>Supprimer mon compte</Text>
+            <Text style={styles.modalTitle}>{t('settings.deleteAccount')}</Text>
             <Text style={styles.modalMessage}>
-              Êtes-vous sûr de vouloir supprimer votre compte ?{'\n\n'}
-              Cette action est <Text style={styles.modalWarning}>irréversible</Text> et entraînera la perte de :
+              {t('settings.deleteConfirmIntro')}{'\n\n'}
+              {t('settings.deleteConfirmBefore')} <Text style={styles.modalWarning}>{t('settings.deleteConfirmIrreversible')}</Text> {t('settings.deleteConfirmAfter')}
             </Text>
 
             <View style={styles.modalList}>
               {[
-                'Toutes vos parties et statistiques',
-                'Votre progression dans les challenges',
-                "Votre portfolio d'entreprises",
-                'Tous vos succès et récompenses',
+                t('settings.deleteLossGames'),
+                t('settings.deleteLossChallenges'),
+                t('settings.deleteLossPortfolio'),
+                t('settings.deleteLossAchievements'),
               ].map((item) => (
                 <View key={item} style={styles.modalListItem}>
                   <Ionicons name="close-circle" size={16} color="#E74C3C" />
@@ -453,7 +486,7 @@ export default function SettingsScreen() {
                 onPress={() => setShowDeleteModal(false)}
                 disabled={isDeleting}
               >
-                <Text style={styles.modalButtonTextCancel}>Annuler</Text>
+                <Text style={styles.modalButtonTextCancel}>{t('common.cancel')}</Text>
               </Pressable>
 
               <Pressable
@@ -462,7 +495,7 @@ export default function SettingsScreen() {
                 disabled={isDeleting}
               >
                 <Text style={styles.modalButtonTextDelete}>
-                  {isDeleting ? 'Suppression...' : 'Supprimer'}
+                  {isDeleting ? t('settings.deleting') : t('settings.delete')}
                 </Text>
               </Pressable>
             </View>
@@ -742,5 +775,43 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.title,
     fontSize: FONT_SIZES.base,
     color: '#FFFFFF',
+  },
+  langRow: {
+    flexDirection: 'row',
+    gap: SPACING[3],
+    paddingHorizontal: SPACING[4],
+    paddingVertical: SPACING[3],
+  },
+  langOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[2],
+    paddingVertical: SPACING[3],
+    paddingHorizontal: SPACING[3],
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  langOptionSelected: {
+    borderColor: COLORS.primary,
+    backgroundColor: 'rgba(255,188,64,0.12)',
+  },
+  langLabel: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.base,
+    color: COLORS.textSecondary,
+  },
+  langLabelSelected: {
+    color: COLORS.white,
+  },
+  langHint: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textMuted,
+    paddingHorizontal: SPACING[4],
+    paddingBottom: SPACING[3],
+    lineHeight: 18,
   },
 });

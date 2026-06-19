@@ -3,6 +3,7 @@ import { memo } from 'react';
 import { Image, ImageBackground, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
+import { AutoWidthLogo } from '@/components/programs/AutoWidthLogo';
 import { DynamicGradientBorder, GameButton } from '@/components/ui';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
@@ -34,35 +35,60 @@ export const ProgramHomeCard = memo(function ProgramHomeCard({
       ? "S'INSCRIRE"
       : 'JOUER';
 
-  const backgroundUrl = program.heroImageUrl || program.bannerUrl;
-  const allPartners = partner ? [partner, ...coPartners] : coPartners;
-  const partnerNames = allPartners.map((item) => item.name).join(' · ');
+  const backgroundUrl = program.heroImageUrl;
 
-  const bannerOverlay = (
-    <View style={styles.bannerOverlay}>
-      <View style={styles.bannerTopRow}>
-        <View style={styles.partnershipBlock}>
-          <Text style={styles.partnershipText}>En partenariat avec</Text>
-          <View style={styles.partnerLogosRow}>
-            {allPartners.map((item) =>
-              item.logoUrl ? (
-                <Image key={item.id} source={{ uri: item.logoUrl }} style={styles.partnerLogo} resizeMode="contain" />
-              ) : (
-                <Text key={item.id} style={styles.partnerShortName}>{item.shortName}</Text>
-              )
-            )}
+  // Logos co-partenaires « En partenariat avec » : d'abord celui uploadé sur le programme,
+  // puis les logos des partenaires cochés comme co-partenaires.
+  const coPartnerLogos = [
+    ...(program.bannerUrl ? [program.bannerUrl] : []),
+    ...coPartners.map((item) => item.logoUrl).filter((url): url is string => Boolean(url)),
+  ];
+
+  const cardInner = (
+    <View style={styles.overlay}>
+      {/* Haut : co-partenaire(s) à gauche, partenaire principal à droite, sur la même ligne */}
+      <View style={styles.topRow}>
+        {coPartnerLogos.length > 0 ? (
+          <View style={styles.coPartnerLogosRow}>
+            {coPartnerLogos.map((logo, i) => (
+              <AutoWidthLogo key={i} uri={logo} height={28} />
+            ))}
           </View>
-        </View>
-        {program.logoUrl ? (
-          <View style={styles.programLogoBadge}>
-            <Image source={{ uri: program.logoUrl }} style={styles.programLogo} resizeMode="contain" />
-          </View>
-        ) : null}
+        ) : (
+          <View />
+        )}
+
+        {partner?.logoUrl ? (
+          <AutoWidthLogo uri={partner.logoUrl} height={46} />
+        ) : partner ? (
+          <Text style={styles.partnerShortName}>{partner.shortName}</Text>
+        ) : (
+          <View />
+        )}
       </View>
 
-      <View style={styles.playerBadge}>
-        <Ionicons name="people" size={15} color={COLORS.info} />
-        <Text style={styles.playerBadgeText}>{program.playerCount.toLocaleString()} joueurs</Text>
+      {/* Milieu-gauche : logo du programme + badge joueurs, regroupés et proches */}
+      <View style={styles.middleRow}>
+        {program.logoUrl ? (
+          <Image source={{ uri: program.logoUrl }} style={styles.programLogo} resizeMode="contain" />
+        ) : (
+          <Text style={styles.programNameFallback} numberOfLines={2}>{program.name}</Text>
+        )}
+
+        <View style={styles.playerBadge}>
+          <Ionicons name="people" size={15} color={COLORS.info} />
+          <Text style={styles.playerBadgeText}>{program.playerCount.toLocaleString()} joueurs</Text>
+        </View>
+      </View>
+
+      {/* Bas : bouton JOUER */}
+      <View style={styles.bottomBlock}>
+        <GameButton
+          title={actionLabel}
+          variant="yellow"
+          fullWidth
+          onPress={onPlay ?? onPress}
+        />
       </View>
     </View>
   );
@@ -71,48 +97,21 @@ export const ProgramHomeCard = memo(function ProgramHomeCard({
     <Animated.View entering={FadeInDown.delay(500).duration(450)}>
       <Pressable onPress={onPress}>
         <DynamicGradientBorder borderRadius={24} fill="rgba(10, 25, 41, 0.65)">
-          <View style={styles.bannerWrap}>
-            {backgroundUrl ? (
-              <ImageBackground
-                source={{ uri: backgroundUrl }}
-                style={styles.banner}
-                imageStyle={styles.bannerImage}
-                resizeMode="cover"
-              >
-                <View style={styles.scrim} />
-                {bannerOverlay}
-              </ImageBackground>
-            ) : (
-              <View style={[styles.banner, { backgroundColor: program.primaryColor }]}>
-                {bannerOverlay}
-                <Text style={styles.bannerTitle}>{program.name}</Text>
-              </View>
-            )}
-          </View>
-
-          <View style={styles.content}>
-            <Text style={styles.partnerName}>{partnerNames || 'Partenaire'}</Text>
-            <Text style={styles.programName} numberOfLines={2}>{program.name}</Text>
-            <Text style={styles.description} numberOfLines={2}>{program.description}</Text>
-
-            <View style={styles.metaRow}>
-              <View style={styles.metaChip}>
-                <Ionicons name="game-controller-outline" size={13} color={COLORS.primary} />
-                <Text style={styles.metaText}>{program.sessionCount} parties</Text>
-              </View>
-              <View style={styles.metaChip}>
-                <Ionicons name="briefcase-outline" size={13} color={COLORS.primary} />
-                <Text style={styles.metaText}>{program.audience.sector}</Text>
-              </View>
+          {backgroundUrl ? (
+            <ImageBackground
+              source={{ uri: backgroundUrl }}
+              style={styles.card}
+              imageStyle={styles.cardImage}
+              resizeMode="cover"
+            >
+              <View style={styles.scrim} />
+              {cardInner}
+            </ImageBackground>
+          ) : (
+            <View style={[styles.card, { backgroundColor: program.primaryColor }]}>
+              {cardInner}
             </View>
-
-            <GameButton
-              title={actionLabel}
-              variant="yellow"
-              fullWidth
-              onPress={onPlay ?? onPress}
-            />
-          </View>
+          )}
         </DynamicGradientBorder>
       </Pressable>
     </Animated.View>
@@ -120,55 +119,33 @@ export const ProgramHomeCard = memo(function ProgramHomeCard({
 });
 
 const styles = StyleSheet.create({
-  bannerWrap: {
-    position: 'relative',
+  card: {
     width: '100%',
-  },
-  banner: {
-    width: '100%',
-    aspectRatio: 355 / 185,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    aspectRatio: 340 / 240,
+    borderRadius: 24,
     overflow: 'hidden',
   },
-  bannerImage: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+  cardImage: {
+    borderRadius: 24,
   },
   scrim: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(10, 25, 41, 0.22)',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
   },
-  bannerOverlay: {
+  overlay: {
     flex: 1,
     padding: SPACING[4],
     justifyContent: 'space-between',
   },
-  bannerTopRow: {
+  topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
   },
-  partnershipBlock: {
-    gap: 4,
-    flexShrink: 1,
-  },
-  partnershipText: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: 10,
-    color: COLORS.white,
-    textShadowColor: 'rgba(0,0,0,0.45)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
-  partnerLogosRow: {
+  coPartnerLogosRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-  },
-  partnerLogo: {
-    width: 62,
-    height: 36,
+    gap: 8,
   },
   partnerShortName: {
     fontFamily: FONTS.title,
@@ -178,80 +155,42 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
-  programLogoBadge: {
-    width: 52,
-    height: 52,
-    borderRadius: 14,
-    backgroundColor: COLORS.white,
-    alignItems: 'center',
+  middleRow: {
+    flex: 1,
     justifyContent: 'center',
+    alignItems: 'flex-start',
+    gap: SPACING[2],
   },
   programLogo: {
-    width: 40,
-    height: 40,
+    width: 160,
+    height: 70,
+    alignSelf: 'flex-start',
   },
-  bannerTitle: {
-    position: 'absolute',
-    left: SPACING[4],
-    bottom: SPACING[4],
-    maxWidth: '60%',
+  programNameFallback: {
     fontFamily: FONTS.title,
-    fontSize: 24,
+    fontSize: 28,
     color: COLORS.white,
+    maxWidth: '60%',
+    textShadowColor: 'rgba(0,0,0,0.4)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  bottomBlock: {
+    gap: SPACING[3],
   },
   playerBadge: {
-    alignSelf: 'flex-end',
+    alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     backgroundColor: COLORS.white,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
     borderRadius: 20,
   },
   playerBadgeText: {
     fontFamily: FONTS.bodyBold,
-    fontSize: 12,
-    color: '#132840',
-  },
-  content: {
-    padding: SPACING[4],
-    gap: SPACING[2],
-  },
-  partnerName: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: 12,
-    color: COLORS.textMuted,
-  },
-  programName: {
-    fontFamily: FONTS.title,
-    fontSize: 21,
-    color: COLORS.white,
-  },
-  description: {
-    fontFamily: FONTS.body,
     fontSize: 13,
-    lineHeight: 18,
-    color: COLORS.textSecondary,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 4,
-  },
-  metaChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
-  metaText: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: 11,
-    color: COLORS.white,
+    color: '#132840',
   },
 });

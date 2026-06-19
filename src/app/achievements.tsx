@@ -18,9 +18,9 @@ import { RadialBackground, DynamicGradientBorder } from '@/components/ui';
 import { AchievementDetailPopup } from '@/components/game/popups/AchievementDetailPopup';
 import { describeAchievementProgress } from '@/services/game/achievementService';
 import { useUserStore } from '@/stores';
+import { useTranslation } from '@/i18n';
 import {
   ACHIEVEMENTS_BY_CATEGORY,
-  CATEGORY_LABELS,
   RARITY_COLORS,
   getCompletionPercentage,
   getUnlockedCount,
@@ -34,9 +34,31 @@ const contentWidth = screenWidth - SPACING[4] * 2;
 const cardGap = SPACING[3];
 const cardWidth = (contentWidth - cardGap) / 2;
 
+type TFunction = ReturnType<typeof useTranslation>['t'];
+
+/** Libellé localisé d'une catégorie de succès. */
+function getCategoryLabel(t: TFunction, category: AchievementCategory): string {
+  return t(`achievements.category_${category}`);
+}
+
+/** Titre localisé d'un succès (fallback sur la valeur de la config). */
+function getAchievementTitle(t: TFunction, achievement: Achievement): string {
+  const key = `achievements.${achievement.id}_title`;
+  const value = t(key);
+  return value === key ? achievement.title : value;
+}
+
+/** Description localisée d'un succès (fallback sur la valeur de la config). */
+function getAchievementDescription(t: TFunction, achievement: Achievement): string {
+  const key = `achievements.${achievement.id}_desc`;
+  const value = t(key);
+  return value === key ? achievement.description : value;
+}
+
 export default function AchievementsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const profile = useUserStore((state) => state.profile);
   const unlockedAchievements = useMemo(
     () => profile?.achievements ?? [],
@@ -80,7 +102,7 @@ export default function AchievementsScreen() {
           <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={8}>
             <Ionicons name="chevron-back" size={22} color={COLORS.primary} />
           </Pressable>
-          <Text style={styles.headerTitle}>SUCCÈS</Text>
+          <Text style={styles.headerTitle}>{t('profile.achievements')}</Text>
           <View style={styles.backBtnPlaceholder} />
         </View>
       </View>
@@ -103,7 +125,7 @@ export default function AchievementsScreen() {
                   <Text style={styles.overviewCount}>
                     {unlockedCount} / {totalAchievements}
                   </Text>
-                  <Text style={styles.overviewLabel}>Succès débloqués</Text>
+                  <Text style={styles.overviewLabel}>{t('profile.achievementsUnlocked')}</Text>
                 </View>
                 <Text style={styles.overviewPercent}>{completionPercentage}%</Text>
               </View>
@@ -128,7 +150,7 @@ export default function AchievementsScreen() {
               style={styles.categoryBlock}
             >
               <View style={styles.categoryHeader}>
-                <Text style={styles.categoryTitle}>{CATEGORY_LABELS[category]}</Text>
+                <Text style={styles.categoryTitle}>{getCategoryLabel(t, category)}</Text>
                 <Text style={styles.categoryCount}>
                   {categoryUnlocked}/{categoryAchievements.length}
                 </Text>
@@ -167,6 +189,7 @@ interface AchievementCardProps {
 }
 
 function AchievementCard({ achievement, isUnlocked, onPress }: AchievementCardProps) {
+  const { t } = useTranslation();
   const isSecret = achievement.secret && !isUnlocked;
   const rarityColor = RARITY_COLORS[achievement.rarity];
 
@@ -194,11 +217,11 @@ function AchievementCard({ achievement, isUnlocked, onPress }: AchievementCardPr
             style={[styles.cardTitle, !isUnlocked && styles.cardTitleLocked]}
             numberOfLines={1}
           >
-            {isSecret ? '???' : achievement.title}
+            {isSecret ? '???' : getAchievementTitle(t, achievement)}
           </Text>
 
           <Text style={styles.cardDescription} numberOfLines={2}>
-            {isSecret ? 'Succès secret' : achievement.description}
+            {isSecret ? t('profile.secretAchievement') : getAchievementDescription(t, achievement)}
           </Text>
 
           <View style={styles.cardXpRow}>

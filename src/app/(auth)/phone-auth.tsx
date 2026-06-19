@@ -27,6 +27,7 @@ import { GameButton } from '@/components/ui/GameButton';
 import { RadialBackground } from '@/components/ui/RadialBackground';
 import { GradientBorder } from '@/components/ui/GradientBorder';
 import { AuthHeader } from '@/components/auth';
+import { useTranslation } from '@/i18n';
 import { useAuthStore } from '@/stores';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -35,6 +36,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const shapeImage = require('@/../assets/images/shape.png');
 
 export default function PhoneAuthScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
 
   const {
@@ -172,9 +174,9 @@ export default function PhoneAuthScreen() {
                 entering={FadeInDown.delay(100).duration(400)}
                 style={styles.titleSection}
               >
-                <Text style={styles.title}>CONNEXION PAR{'\n'}TÉLÉPHONE</Text>
+                <Text style={styles.title}>{t('auth.phoneTitle')}</Text>
                 <Text style={styles.subtitle}>
-                  Entre ton numéro de téléphone pour{'\n'}recevoir un code de vérification.
+                  {t('auth.phoneSubtitle')}
                 </Text>
               </Animated.View>
 
@@ -183,7 +185,7 @@ export default function PhoneAuthScreen() {
                 entering={FadeInDown.delay(200).duration(400)}
                 style={styles.formSection}
               >
-                <Text style={styles.inputLabel}>NUMÉRO DE TÉLÉPHONE</Text>
+                <Text style={styles.inputLabel}>{t('auth.phoneNumberLabel')}</Text>
                 <GradientBorder
                   boxHeight={56}
                   borderRadius={12}
@@ -219,7 +221,7 @@ export default function PhoneAuthScreen() {
                 style={styles.submitSection}
               >
                 <GameButton
-                  title="ENVOYER LE CODE"
+                  title={t('auth.sendCodeCta')}
                   variant="yellow"
                   fullWidth
                   loading={isLoading}
@@ -232,8 +234,8 @@ export default function PhoneAuthScreen() {
                   style={styles.loginLink}
                 >
                   <Text style={styles.loginLinkText}>
-                    UTILISER{' '}
-                    <Text style={styles.loginLinkHighlight}>EMAIL / MOT DE PASSE</Text>
+                    {t('auth.useCta')}{' '}
+                    <Text style={styles.loginLinkHighlight}>{t('auth.emailPasswordCta')}</Text>
                   </Text>
                 </Pressable>
               </Animated.View>
@@ -245,9 +247,9 @@ export default function PhoneAuthScreen() {
                 entering={FadeInDown.delay(100).duration(400)}
                 style={styles.titleSection}
               >
-                <Text style={styles.title}>VÉRIFICATION</Text>
+                <Text style={styles.title}>{t('auth.verificationTitle')}</Text>
                 <Text style={styles.subtitle}>
-                  Entre le code à 6 chiffres envoyé au{'\n'}
+                  {t('auth.verificationSubtitle')}{'\n'}
                   <Text style={styles.phoneHighlight}>{storedPhoneNumber || `${countryCode} ${phoneNumber}`}</Text>
                 </Text>
               </Animated.View>
@@ -288,7 +290,7 @@ export default function PhoneAuthScreen() {
 
                 <Pressable onPress={handleResendCode} disabled={isLoading} style={styles.resendLink}>
                   <Text style={styles.resendLinkText}>
-                    Pas reçu ? <Text style={styles.resendLinkHighlight}>Renvoyer le code</Text>
+                    {t('auth.notReceived')} <Text style={styles.resendLinkHighlight}>{t('auth.resendCode')}</Text>
                   </Text>
                 </Pressable>
               </Animated.View>
@@ -299,7 +301,7 @@ export default function PhoneAuthScreen() {
                 style={styles.submitSection}
               >
                 <GameButton
-                  title="VÉRIFIER"
+                  title={t('auth.verifyCta')}
                   variant="yellow"
                   fullWidth
                   loading={isLoading}

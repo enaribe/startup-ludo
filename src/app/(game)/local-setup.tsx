@@ -17,6 +17,7 @@ import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { useGameStore, useAuthStore, useUserStore } from '@/stores';
+import { useTranslation } from '@/i18n';
 import { EditionTileIcon } from '@/components/icons';
 import { RadialBackground, DynamicGradientBorder, GameButton } from '@/components/ui';
 import { StartupSelectionModal } from '@/components/game/StartupSelectionModal';
@@ -232,6 +233,7 @@ interface PlayerSetup {
 export default function LocalSetupScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const user = useAuthStore((state) => state.user);
   const profile = useUserStore((state) => state.profile);
   const initGame = useGameStore((state) => state.initGame);
@@ -241,8 +243,8 @@ export default function LocalSetupScreen() {
   const [gameMode, setGameMode] = useState<'solo' | 'local'>('solo');
   const [playerCount, setPlayerCount] = useState(2);
   const [players, setPlayers] = useState<PlayerSetup[]>([
-    { name: user?.displayName || 'Vous', color: 'green', isAI: false },
-    { name: 'IA', color: 'blue', isAI: true },
+    { name: user?.displayName || t('game.you'), color: 'green', isAI: false },
+    { name: t('game.ai'), color: 'blue', isAI: true },
   ]);
   const [selectedEdition, setSelectedEdition] = useState('classic');
 
@@ -267,14 +269,14 @@ export default function LocalSetupScreen() {
     if (mode === 'solo') {
       setPlayerCount(2);
       setPlayers([
-        { name: user?.displayName || 'Vous', color: colors[0]!, isAI: false },
-        { name: 'IA', color: colors[1]!, isAI: true },
+        { name: user?.displayName || t('game.you'), color: colors[0]!, isAI: false },
+        { name: t('game.ai'), color: colors[1]!, isAI: true },
       ]);
     } else {
       setPlayerCount(2);
       setPlayers([
-        { name: user?.displayName || 'Vous', color: colors[0]!, isAI: false },
-        { name: 'Joueur 2', color: colors[1]!, isAI: false },
+        { name: user?.displayName || t('game.you'), color: colors[0]!, isAI: false },
+        { name: t('game.player', { number: 2 }), color: colors[1]!, isAI: false },
       ]);
     }
   };
@@ -288,13 +290,13 @@ export default function LocalSetupScreen() {
       const playerColor = colors[i]!;
       if (gameMode === 'solo') {
         newPlayers.push({
-          name: i === 0 ? (user?.displayName || 'Vous') : 'IA',
+          name: i === 0 ? (user?.displayName || t('game.you')) : t('game.ai'),
           color: playerColor,
           isAI: i > 0,
         });
       } else {
         newPlayers.push({
-          name: existing?.name || `Joueur ${i + 1}`,
+          name: existing?.name || t('game.player', { number: i + 1 }),
           color: playerColor,
           isAI: false,
         });
@@ -414,7 +416,7 @@ export default function LocalSetupScreen() {
         : `player_${index}`;
       return {
         id: playerId,
-        name: p.name || `Joueur ${index + 1}`,
+        name: p.name || t('game.player', { number: index + 1 }),
         color: p.color,
         isAI: p.isAI,
         isHost: index === 0,
@@ -430,9 +432,9 @@ export default function LocalSetupScreen() {
   };
 
   const buttonText = useMemo(() => {
-    if (step < maxSteps) return 'Suivant';
-    return 'Démarrer la partie';
-  }, [step, maxSteps]);
+    if (step < maxSteps) return t('common.next');
+    return t('game.startGame');
+  }, [step, maxSteps, t]);
 
   const isNextDisabled = step === 3 && !allPlayersSelected;
 
@@ -455,7 +457,7 @@ export default function LocalSetupScreen() {
                 <Ionicons name="chevron-back" size={26} color="#FFBC40" />
               </Pressable>
               <View style={styles.editionHeaderTitleWrap} pointerEvents="none">
-                <Text style={styles.editionHeaderTitle}>NOUVELLE PARTIE</Text>
+                <Text style={styles.editionHeaderTitle}>{t('game.newGameTitle')}</Text>
               </View>
               <View style={styles.editionHeaderSpacer} />
             </View>
@@ -472,7 +474,7 @@ export default function LocalSetupScreen() {
                 ))}
               </View>
               <Text style={styles.editionStepLabel}>
-                Étape {step}/{maxSteps}
+                {t('game.stepLabel', { current: step, total: maxSteps })}
               </Text>
             </View>
           </>
@@ -482,7 +484,7 @@ export default function LocalSetupScreen() {
               <Pressable onPress={handleBack} style={styles.backButton}>
                 <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
               </Pressable>
-              <Text style={styles.headerTitle}>PARTIE LOCALE</Text>
+              <Text style={styles.headerTitle}>{t('game.localGameTitle')}</Text>
             </View>
 
             {maxSteps > 1 && (
@@ -498,7 +500,7 @@ export default function LocalSetupScreen() {
                   />
                 ))}
                 <Text style={styles.stepLabel}>
-                  Étape {step}/{maxSteps}
+                  {t('game.stepLabel', { current: step, total: maxSteps })}
                 </Text>
               </View>
             )}
@@ -520,7 +522,7 @@ export default function LocalSetupScreen() {
           <>
             {/* Section: Choisis ton Mode */}
             <Animated.View entering={FadeInDown.delay(100).duration(500)}>
-              <Text style={styles.choixModeTitle}>Choisis ton Mode</Text>
+              <Text style={styles.choixModeTitle}>{t('game.chooseYourMode')}</Text>
               <DynamicGradientBorder
                 borderRadius={20}
                 fill="rgba(0, 0, 0, 0.35)"
@@ -548,7 +550,7 @@ export default function LocalSetupScreen() {
                         />
                       </View>
                       <Text style={[styles.modePillText, gameMode === 'solo' && styles.modePillTextSelected]}>
-                        SOLO VS IA
+                        {t('game.soloVsAi')}
                       </Text>
                     </Pressable>
                   </DynamicGradientBorder>
@@ -572,7 +574,7 @@ export default function LocalSetupScreen() {
                         />
                       </View>
                       <Text style={[styles.modePillText, gameMode === 'local' && styles.modePillTextSelected]}>
-                        TOUR PAR TOUR
+                        {t('game.turnByTurn')}
                       </Text>
                     </Pressable>
                   </DynamicGradientBorder>
@@ -582,7 +584,7 @@ export default function LocalSetupScreen() {
 
             {/* Section: CONFIGURATION DES JOUEURS — un seul bloc (même style que Choisis ton Mode) */}
             <Animated.View entering={FadeInDown.delay(200).duration(500)} style={styles.configSectionWrapper}>
-              <Text style={styles.sectionTitle}>CONFIGURATION DES JOUEURS</Text>
+              <Text style={styles.sectionTitle}>{t('game.playersConfig')}</Text>
 
               <DynamicGradientBorder
                 borderRadius={20}
@@ -592,7 +594,7 @@ export default function LocalSetupScreen() {
               >
                 {/* Nombre de joueurs : label + [ < ] [ N ] [ > ] */}
                 <View style={styles.configPlayersContainer}>
-                  <Text style={styles.nombreJoueursLabel}>Nombre de joueurs</Text>
+                  <Text style={styles.nombreJoueursLabel}>{t('game.numberOfPlayers')}</Text>
                   <View style={styles.nombreJoueursControl}>
                     <Pressable
                       style={styles.nombreJoueursBtn}
@@ -649,18 +651,18 @@ export default function LocalSetupScreen() {
                           </View>
                           <View style={styles.playerInfo}>
                             {player.isAI ? (
-                              <Text style={styles.playerName}>IA - Bot</Text>
+                              <Text style={styles.playerName}>{t('game.aiBot')}</Text>
                             ) : (
                               <TextInput
                                 value={player.name}
                                 onChangeText={(text) => handlePlayerNameChange(index, text)}
-                                placeholder={index === 0 ? 'Vous' : `Joueur ${index + 1}`}
+                                placeholder={index === 0 ? t('game.you') : t('game.player', { number: index + 1 })}
                                 placeholderTextColor="rgba(255,255,255,0.4)"
                                 style={styles.playerNameInput}
                               />
                             )}
                             <Text style={styles.playerLevel}>
-                              {player.isAI ? 'IA' : 'Joueur Humain'}
+                              {player.isAI ? t('game.ai') : t('game.humanPlayer')}
                             </Text>
                           </View>
                           <View style={styles.colorSquaresRow}>
@@ -702,9 +704,9 @@ export default function LocalSetupScreen() {
         {/* STEP 2: Choix d'édition — grille 2 colonnes (maquette) */}
         {step === 2 && (
           <Animated.View entering={FadeInDown.delay(100).duration(500)}>
-            <Text style={styles.editionScreenTitle}>CHOIX DE L'ÉDITION</Text>
+            <Text style={styles.editionScreenTitle}>{t('game.editionChoice')}</Text>
             <Text style={styles.editionScreenSubtitle}>
-              Sélectionnez l'édition thématique pour votre partie
+              {t('game.editionChoiceSubtitle')}
             </Text>
 
             <View style={styles.editionGrid}>
@@ -754,7 +756,7 @@ export default function LocalSetupScreen() {
                             style={[styles.editionTileDesc, isSelected && styles.editionTileDescSelected]}
                             numberOfLines={3}
                           >
-                            {edition.description || 'Édition personnalisée'}
+                            {edition.description || t('game.customEdition')}
                           </Text>
                         </View>
                       </DynamicGradientBorder>
@@ -769,9 +771,9 @@ export default function LocalSetupScreen() {
         {/* STEP 3: Phase d'Ideation — grille avec badge VS central */}
         {step === 3 && (
           <Animated.View entering={FadeInDown.delay(100).duration(500)}>
-            <Text style={styles.sectionTitle}>PHASE D'IDÉATION</Text>
+            <Text style={styles.sectionTitle}>{t('game.ideationPhase')}</Text>
             <Text style={styles.sectionSubtitle}>
-              Chaque joueur choisit un projet avec lequel jouer
+              {t('game.ideationPhaseSubtitle')}
             </Text>
 
             <View style={styles.ideationGridWrap}>
@@ -870,7 +872,7 @@ export default function LocalSetupScreen() {
                                     style={[styles.ideationPlayerPillText, { color: themeHex }]}
                                     numberOfLines={1}
                                   >
-                                    {player.isAI ? 'IA - Bot' : player.name || `Joueur ${index + 1}`}
+                                    {player.isAI ? t('game.aiBot') : player.name || t('game.player', { number: index + 1 })}
                                   </Text>
                                 </View>
                               </DynamicGradientBorder>
@@ -881,7 +883,7 @@ export default function LocalSetupScreen() {
                               {selection ? (
                                 <IdeationStartupTitle text={selection.startupName} themeColor={themeHex} />
                               ) : isCurrent ? (
-                                <Text style={styles.ideationPlaceholder}>En attente...</Text>
+                                <Text style={styles.ideationPlaceholder}>{t('game.waiting')}</Text>
                               ) : (
                                 <Text style={styles.ideationPlaceholder}>—</Text>
                               )}
@@ -889,7 +891,7 @@ export default function LocalSetupScreen() {
 
                             {!player.isAI && isCurrent && !selection ? (
                               <View style={styles.ideationTapHint}>
-                                <Text style={styles.ideationTapHintText}>Appuyer pour choisir</Text>
+                                <Text style={styles.ideationTapHintText}>{t('game.tapToChoose')}</Text>
                               </View>
                             ) : null}
                           </View>

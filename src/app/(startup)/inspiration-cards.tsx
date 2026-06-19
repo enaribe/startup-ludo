@@ -25,6 +25,7 @@ import * as Haptics from 'expo-haptics';
 import { RadialBackground, DynamicGradientBorder, GameButton } from '@/components/ui';
 import { FONTS } from '@/styles/typography';
 import { useSettingsStore } from '@/stores';
+import { useTranslation } from '@/i18n';
 import { TARGET_CARDS, MISSION_CARDS, SECTOR_CARDS } from '@/constants';
 import type { TargetCard, MissionCard, SectorCard } from '@/types';
 
@@ -55,10 +56,10 @@ const RARITY_COLORS = {
   legendary: '#FF6B6B',
 } as const;
 
-const RARITY_LABELS = {
-  common: 'Commun',
-  rare: 'Rare',
-  legendary: 'Légendaire',
+const RARITY_LABEL_KEYS = {
+  common: 'startup.rarityCommon',
+  rare: 'startup.rarityRare',
+  legendary: 'startup.rarityLegendary',
 } as const;
 
 // Tirage pondéré par rareté
@@ -81,10 +82,12 @@ type PickerItem = { id: string; title: string; rarity: 'common' | 'rare' | 'lege
 const PickerListItem = memo(function PickerListItem({
   item,
   themeColor,
+  rarityLabel,
   onSelect,
 }: {
   item: PickerItem;
   themeColor: string;
+  rarityLabel: string;
   onSelect: (item: PickerItem) => void;
 }) {
   return (
@@ -94,7 +97,7 @@ const PickerListItem = memo(function PickerListItem({
         <View style={styles.pickerItemMeta}>
           <View style={[styles.rarityBadge, { backgroundColor: `${RARITY_COLORS[item.rarity]}20` }]}>
             <Text style={[styles.rarityBadgeText, { color: RARITY_COLORS[item.rarity] }]}>
-              {RARITY_LABELS[item.rarity]}
+              {rarityLabel}
             </Text>
           </View>
           {item.xpMultiplier != null && (
@@ -112,6 +115,7 @@ const PickerListItem = memo(function PickerListItem({
 export default function InspirationCardsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
 
   const [targetCard, setTargetCard] = useState<TargetCard | null>(null);
@@ -237,8 +241,8 @@ export default function InspirationCardsScreen() {
         : SECTOR_CARDS.map((c) => ({ id: c.id, title: c.title, rarity: c.rarity, xpMultiplier: c.xpMultiplier }));
 
   const pickerTitle =
-    pickerType === 'target' ? 'Choisir une Cible' :
-    pickerType === 'mission' ? 'Choisir une Mission' : 'Choisir un Secteur';
+    pickerType === 'target' ? t('startup.pickTarget') :
+    pickerType === 'mission' ? t('startup.pickMission') : t('startup.pickSector');
 
   const pickerColor =
     pickerType === 'target' ? CARD_THEMES.target.titleColor :
@@ -256,7 +260,7 @@ export default function InspirationCardsScreen() {
         <Pressable onPress={handleBack} style={styles.backButton}>
           <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
         </Pressable>
-        <Text style={styles.headerTitle}>CARTES D'INSPIRATION</Text>
+        <Text style={styles.headerTitle}>{t('startup.inspirationHeader')}</Text>
         <View style={styles.backButton} />
       </View>
 
@@ -273,7 +277,7 @@ export default function InspirationCardsScreen() {
             <View style={styles.cardInner}>
               <View style={styles.cardHeader}>
                 <Text style={[styles.cardTitle, { color: CARD_THEMES.target.titleColor }]}>
-                  CIBLE <Text style={styles.cardTitleSub}>(MARCHÉ)</Text>
+                  {t('startup.cardTarget')} <Text style={styles.cardTitleSub}>{t('startup.cardTargetSub')}</Text>
                 </Text>
                 <Pressable onPress={handleDrawTarget} style={styles.shuffleButton}>
                   <Ionicons name="sync" size={20} color={CARD_THEMES.target.titleColor} />
@@ -289,13 +293,13 @@ export default function InspirationCardsScreen() {
                       </Text>
                       <View style={[styles.rarityChip, { backgroundColor: `${RARITY_COLORS[targetCard.rarity]}20` }]}>
                         <Text style={[styles.rarityChipText, { color: RARITY_COLORS[targetCard.rarity] }]}>
-                          {RARITY_LABELS[targetCard.rarity]} · x{targetCard.xpMultiplier} XP
+                          {t(RARITY_LABEL_KEYS[targetCard.rarity])} · x{targetCard.xpMultiplier} XP
                         </Text>
                       </View>
                     </View>
                   ) : (
                     <Text style={[styles.cardPlaceholder, { color: CARD_THEMES.target.contentTextColor }]}>
-                      Appuyez pour choisir
+                      {t('startup.tapToChoose')}
                     </Text>
                   )}
                 </View>
@@ -310,7 +314,7 @@ export default function InspirationCardsScreen() {
             <View style={styles.cardInner}>
               <View style={styles.cardHeader}>
                 <Text style={[styles.cardTitle, { color: CARD_THEMES.mission.titleColor }]}>
-                  MISSION <Text style={styles.cardTitleSub}>(OBJECTIF)</Text>
+                  {t('startup.cardMission')} <Text style={styles.cardTitleSub}>{t('startup.cardMissionSub')}</Text>
                 </Text>
                 <Pressable onPress={handleDrawMission} style={styles.shuffleButton}>
                   <Ionicons name="sync" size={20} color={CARD_THEMES.mission.titleColor} />
@@ -326,13 +330,13 @@ export default function InspirationCardsScreen() {
                       </Text>
                       <View style={[styles.rarityChip, { backgroundColor: `${RARITY_COLORS[missionCard.rarity]}20` }]}>
                         <Text style={[styles.rarityChipText, { color: RARITY_COLORS[missionCard.rarity] }]}>
-                          {RARITY_LABELS[missionCard.rarity]} · x{missionCard.xpMultiplier} XP
+                          {t(RARITY_LABEL_KEYS[missionCard.rarity])} · x{missionCard.xpMultiplier} XP
                         </Text>
                       </View>
                     </View>
                   ) : (
                     <Text style={[styles.cardPlaceholder, { color: CARD_THEMES.mission.contentTextColor }]}>
-                      Appuyez pour choisir
+                      {t('startup.tapToChoose')}
                     </Text>
                   )}
                 </View>
@@ -347,7 +351,7 @@ export default function InspirationCardsScreen() {
             <View style={styles.cardInner}>
               <View style={styles.cardHeader}>
                 <Text style={[styles.cardTitle, { color: CARD_THEMES.sector.titleColor }]}>
-                  SECTEUR <Text style={styles.cardTitleSub}>(DOMAINE)</Text>
+                  {t('startup.cardSector')} <Text style={styles.cardTitleSub}>{t('startup.cardSectorSub')}</Text>
                 </Text>
                 <Pressable onPress={handleDrawSector} style={styles.shuffleButton}>
                   <Ionicons name="sync" size={20} color={CARD_THEMES.sector.titleColor} />
@@ -363,13 +367,13 @@ export default function InspirationCardsScreen() {
                       </Text>
                       <View style={[styles.rarityChip, { backgroundColor: `${RARITY_COLORS[sectorCard.rarity]}20` }]}>
                         <Text style={[styles.rarityChipText, { color: RARITY_COLORS[sectorCard.rarity] }]}>
-                          {RARITY_LABELS[sectorCard.rarity]} · x{sectorCard.xpMultiplier} XP
+                          {t(RARITY_LABEL_KEYS[sectorCard.rarity])} · x{sectorCard.xpMultiplier} XP
                         </Text>
                       </View>
                     </View>
                   ) : (
                     <Text style={[styles.cardPlaceholder, { color: CARD_THEMES.sector.contentTextColor }]}>
-                      Appuyez pour choisir
+                      {t('startup.tapToChoose')}
                     </Text>
                   )}
                 </View>
@@ -387,7 +391,7 @@ export default function InspirationCardsScreen() {
         <GameButton
           variant="yellow"
           fullWidth
-          title="CONTINUER"
+          title={t('startup.continue')}
           onPress={handleContinue}
           disabled={!canContinue}
         />
@@ -416,7 +420,9 @@ export default function InspirationCardsScreen() {
 
             {/* Nombre d'items */}
             <Text style={styles.pickerCount}>
-              {pickerData.length} option{pickerData.length > 1 ? 's' : ''} disponible{pickerData.length > 1 ? 's' : ''}
+              {pickerData.length > 1
+                ? t('startup.optionsAvailablePlural', { count: pickerData.length })
+                : t('startup.optionsAvailable', { count: pickerData.length })}
             </Text>
 
             {/* Liste */}
@@ -427,6 +433,7 @@ export default function InspirationCardsScreen() {
                 <PickerListItem
                   item={item}
                   themeColor={pickerColor}
+                  rarityLabel={t(RARITY_LABEL_KEYS[item.rarity])}
                   onSelect={handlePickerSelect}
                 />
               )}

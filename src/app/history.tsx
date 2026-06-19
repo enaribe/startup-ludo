@@ -9,6 +9,7 @@ import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { RadialBackground, DynamicGradientBorder } from '@/components/ui';
 import { useUserStore } from '@/stores';
+import { useTranslation } from '@/i18n';
 
 const { width: screenWidth } = Dimensions.get('window');
 const contentWidth = screenWidth - SPACING[4] * 2;
@@ -16,6 +17,7 @@ const contentWidth = screenWidth - SPACING[4] * 2;
 export default function HistoryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const profile = useUserStore((state) => state.profile);
 
   const totalGames = profile?.gamesPlayed ?? 0;
@@ -33,7 +35,7 @@ export default function HistoryScreen() {
         <Pressable onPress={() => router.back()} hitSlop={8}>
           <Ionicons name="arrow-back" size={24} color="white" />
         </Pressable>
-        <Text style={styles.headerTitle}>STATISTIQUES</Text>
+        <Text style={styles.headerTitle}>{t('history.statsTitle')}</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -58,7 +60,7 @@ export default function HistoryScreen() {
                   <Ionicons name="game-controller" size={20} color={COLORS.primary} />
                 </View>
                 <Text style={[styles.statValue, { color: COLORS.primary }]}>{totalGames}</Text>
-                <Text style={styles.statLabel}>Parties</Text>
+                <Text style={styles.statLabel}>{t('history.games')}</Text>
               </View>
 
               <View style={styles.statItem}>
@@ -66,7 +68,7 @@ export default function HistoryScreen() {
                   <Ionicons name="trophy" size={20} color={COLORS.success} />
                 </View>
                 <Text style={[styles.statValue, { color: COLORS.success }]}>{winRate}%</Text>
-                <Text style={styles.statLabel}>Victoires</Text>
+                <Text style={styles.statLabel}>{t('history.wins')}</Text>
               </View>
 
               <View style={styles.statItem}>
@@ -74,7 +76,7 @@ export default function HistoryScreen() {
                   <Ionicons name="star" size={20} color={COLORS.info} />
                 </View>
                 <Text style={[styles.statValue, { color: COLORS.info }]}>{totalXP}</Text>
-                <Text style={styles.statLabel}>XP Total</Text>
+                <Text style={styles.statLabel}>{t('history.totalXp')}</Text>
               </View>
             </View>
           </DynamicGradientBorder>
@@ -90,13 +92,13 @@ export default function HistoryScreen() {
             <View style={styles.detailRow}>
               <View style={styles.detailItem}>
                 <Ionicons name="trophy" size={18} color={COLORS.success} />
-                <Text style={styles.detailLabel}>Victoires</Text>
+                <Text style={styles.detailLabel}>{t('history.wins')}</Text>
                 <Text style={[styles.detailValue, { color: COLORS.success }]}>{totalWins}</Text>
               </View>
               <View style={styles.detailDivider} />
               <View style={styles.detailItem}>
                 <Ionicons name="close-circle" size={18} color={COLORS.error} />
-                <Text style={styles.detailLabel}>Défaites</Text>
+                <Text style={styles.detailLabel}>{t('history.losses')}</Text>
                 <Text style={[styles.detailValue, { color: COLORS.error }]}>{totalLosses}</Text>
               </View>
             </View>

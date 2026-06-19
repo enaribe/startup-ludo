@@ -13,6 +13,7 @@ import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { useUserStore, useSettingsStore, useAuthStore } from '@/stores';
+import { useTranslation } from '@/i18n';
 import { addStartup as firestoreAddStartup, updateUserStats } from '@/services/firebase/firestore';
 import { generateValuation, type ValuationFactor } from '@/services/ai';
 import { formatFCFARaw } from '@/utils/currency';
@@ -65,6 +66,7 @@ function formatValorisation(val: number): string {
 export default function StartupConfirmationScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
   const addStartup = useUserStore((state) => state.addStartup);
   const addXP = useUserStore((state) => state.addXP);
@@ -90,7 +92,7 @@ export default function StartupConfirmationScreen() {
     missionCardDesc?: string;
   }>();
 
-  const startupName = params.startupName || 'Nouvelle Entreprise';
+  const startupName = params.startupName || t('startup.defaultName');
   const startupDescription = params.startupDescription || '';
   const sectorId = params.startupSector || 'fintech';
   const sectorInfo = SECTOR_INFO[sectorId] ?? { name: 'Fintech', icon: 'cash' };
@@ -236,7 +238,7 @@ export default function StartupConfirmationScreen() {
       {/* Header fixe */}
       <View style={[styles.fixedHeader, { paddingTop: headerTopPadding }]}>
         <View style={styles.headerSpacer} />
-        <Text style={styles.headerTitle}>STARTUP CRÉÉE</Text>
+        <Text style={styles.headerTitle}>{t('startup.createdHeader')}</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -275,7 +277,7 @@ export default function StartupConfirmationScreen() {
                 <View style={styles.infoRow}>
                   <View style={styles.infoLabel}>
                     <Ionicons name="people" size={14} color={COLORS.textSecondary} />
-                    <Text style={styles.infoLabelText}>Cible</Text>
+                    <Text style={styles.infoLabelText}>{t('startup.labelTarget')}</Text>
                   </View>
                   <Text style={styles.infoValue}>{targetCard.title}</Text>
                 </View>
@@ -287,7 +289,7 @@ export default function StartupConfirmationScreen() {
                   <View style={styles.infoRow}>
                     <View style={styles.infoLabel}>
                       <Ionicons name="flag" size={14} color={COLORS.textSecondary} />
-                      <Text style={styles.infoLabelText}>Mission</Text>
+                      <Text style={styles.infoLabelText}>{t('startup.labelMission')}</Text>
                     </View>
                     <Text style={styles.infoValue}>{missionCard.title}</Text>
                   </View>
@@ -302,7 +304,7 @@ export default function StartupConfirmationScreen() {
                     size={14}
                     color={COLORS.textSecondary}
                   />
-                  <Text style={styles.infoLabelText}>Secteur</Text>
+                  <Text style={styles.infoLabelText}>{t('startup.labelSector')}</Text>
                 </View>
                 <Text style={styles.infoValue}>{sectorInfo.name}</Text>
               </View>
@@ -316,7 +318,7 @@ export default function StartupConfirmationScreen() {
                   disabled={isLoadingValuation}
                 >
                   <Ionicons name="diamond" size={14} color={COLORS.textSecondary} />
-                  <Text style={styles.infoLabelText}>Valorisation initiale</Text>
+                  <Text style={styles.infoLabelText}>{t('startup.initialValuation')}</Text>
                   {!isLoadingValuation && (
                     <Ionicons
                       name="information-circle-outline"
@@ -327,7 +329,7 @@ export default function StartupConfirmationScreen() {
                   )}
                 </Pressable>
                 {isLoadingValuation ? (
-                  <Text style={styles.valuationLoading}>Estimation…</Text>
+                  <Text style={styles.valuationLoading}>{t('startup.estimating')}</Text>
                 ) : (
                   <Text style={styles.infoValueHighlight}>{formatValorisation(valorisation)}</Text>
                 )}
@@ -337,7 +339,7 @@ export default function StartupConfirmationScreen() {
               <View style={styles.infoRow}>
                 <View style={styles.infoLabel}>
                   <Ionicons name="calendar" size={14} color={COLORS.textSecondary} />
-                  <Text style={styles.infoLabelText}>Créée le</Text>
+                  <Text style={styles.infoLabelText}>{t('startup.createdOn')}</Text>
                 </View>
                 <Text style={styles.infoValue}>{formatDate(createdAt)}</Text>
               </View>
@@ -347,7 +349,7 @@ export default function StartupConfirmationScreen() {
 
         {/* Rewards section */}
         <Animated.View entering={FadeInDown.delay(450).duration(500)}>
-          <Text style={styles.rewardsTitle}>Récompenses obtenues</Text>
+          <Text style={styles.rewardsTitle}>{t('startup.rewardsObtained')}</Text>
 
           <View style={styles.rewardsRow}>
             <DynamicGradientBorder
@@ -358,7 +360,7 @@ export default function StartupConfirmationScreen() {
             >
               <View style={styles.rewardContent}>
                 <Text style={styles.rewardIcon}>⭐</Text>
-                <Text style={styles.rewardValue}>+{xpReward} PX</Text>
+                <Text style={styles.rewardValue}>{t('startup.rewardXp', { amount: xpReward })}</Text>
               </View>
             </DynamicGradientBorder>
 
@@ -370,7 +372,7 @@ export default function StartupConfirmationScreen() {
             >
               <View style={styles.rewardContent}>
                 <PortfolioIcon color="#FFBC40" size={22} />
-                <Text style={styles.rewardValue}>PORTFOLIO</Text>
+                <Text style={styles.rewardValue}>{t('startup.rewardPortfolio')}</Text>
                 <Text style={styles.rewardSub}>+1</Text>
               </View>
             </DynamicGradientBorder>
@@ -383,7 +385,7 @@ export default function StartupConfirmationScreen() {
             >
               <View style={styles.rewardContent}>
                 <Text style={styles.rewardIcon}>🏆</Text>
-                <Text style={styles.rewardValue}>RANG</Text>
+                <Text style={styles.rewardValue}>{t('startup.rewardRank')}</Text>
                 <Text style={styles.rewardSub}>+2</Text>
               </View>
             </DynamicGradientBorder>
@@ -396,13 +398,13 @@ export default function StartupConfirmationScreen() {
         {/* Action buttons */}
         <Animated.View entering={FadeInDown.delay(600).duration(500)} style={styles.buttonsContainer}>
           <GameButton
-            title="JOUER MAINTENANT"
+            title={t('startup.playNow')}
             variant="yellow"
             fullWidth
             onPress={handlePlay}
           />
           <GameButton
-            title="RETOUR A L'ACCUEIL"
+            title={t('startup.backToHome')}
             variant="blue"
             fullWidth
             onPress={handleGoHome}
@@ -414,14 +416,14 @@ export default function StartupConfirmationScreen() {
       <GamePopup
         visible={showValuationInfo}
         onRequestClose={() => setShowValuationInfo(false)}
-        header="Comment c'est calculé ?"
+        header={t('startup.howCalculated')}
         icon={<Ionicons name="diamond" size={56} color="#FFBC40" />}
-        title="VALORISATION INITIALE"
+        title={t('startup.initialValuationUpper')}
         footer={
           <GameButton
             variant="yellow"
             fullWidth
-            title="J'ai compris"
+            title={t('startup.gotIt')}
             onPress={() => setShowValuationInfo(false)}
           />
         }
@@ -430,7 +432,7 @@ export default function StartupConfirmationScreen() {
           {aiFactors && aiFactors.length > 0 ? (
             <>
               <Text style={styles.valuationIntro}>
-                {aiExplanation ?? "Analyse de ton projet par notre IA."}
+                {aiExplanation ?? t('startup.aiProjectAnalysis')}
               </Text>
               <View style={styles.valuationFormulaCard}>
                 {aiFactors.map((factor, idx) => (
@@ -444,7 +446,7 @@ export default function StartupConfirmationScreen() {
                 ))}
                 <View style={styles.valuationFormulaSep} />
                 <View style={styles.valuationFormulaRow}>
-                  <Text style={styles.valuationFormulaTotal}>= Total</Text>
+                  <Text style={styles.valuationFormulaTotal}>{t('startup.formulaTotal')}</Text>
                   <Text style={styles.valuationFormulaTotalValue}>{formatValorisation(valorisation)}</Text>
                 </View>
               </View>
@@ -452,31 +454,31 @@ export default function StartupConfirmationScreen() {
           ) : (
             <>
               <Text style={styles.valuationIntro}>
-                Ta valorisation initiale dépend de 3 multiplicateurs liés à tes cartes d'inspiration.
+                {t('startup.valuationIntro')}
               </Text>
               <View style={styles.valuationFormulaCard}>
                 <View style={styles.valuationFormulaRow}>
-                  <Text style={styles.valuationFormulaLabel}>Base</Text>
+                  <Text style={styles.valuationFormulaLabel}>{t('startup.formulaBase')}</Text>
                   <Text style={styles.valuationFormulaValue}>{formatValorisation(BASE_VALUATION)}</Text>
                 </View>
                 <View style={styles.valuationFormulaSep} />
                 <View style={styles.valuationFormulaRow}>
-                  <Text style={styles.valuationFormulaLabel}>× Cible</Text>
+                  <Text style={styles.valuationFormulaLabel}>{t('startup.formulaTarget')}</Text>
                   <Text style={styles.valuationFormulaMultiplier}>×{targetMultiplier.toFixed(2)}</Text>
                 </View>
                 <View style={styles.valuationFormulaSep} />
                 <View style={styles.valuationFormulaRow}>
-                  <Text style={styles.valuationFormulaLabel}>× Mission</Text>
+                  <Text style={styles.valuationFormulaLabel}>{t('startup.formulaMission')}</Text>
                   <Text style={styles.valuationFormulaMultiplier}>×{missionMultiplier.toFixed(2)}</Text>
                 </View>
                 <View style={styles.valuationFormulaSep} />
                 <View style={styles.valuationFormulaRow}>
-                  <Text style={styles.valuationFormulaLabel}>× Secteur</Text>
+                  <Text style={styles.valuationFormulaLabel}>{t('startup.formulaSector')}</Text>
                   <Text style={styles.valuationFormulaMultiplier}>×{sectorMultiplier.toFixed(2)}</Text>
                 </View>
                 <View style={styles.valuationFormulaSep} />
                 <View style={styles.valuationFormulaRow}>
-                  <Text style={styles.valuationFormulaTotal}>= Total</Text>
+                  <Text style={styles.valuationFormulaTotal}>{t('startup.formulaTotal')}</Text>
                   <Text style={styles.valuationFormulaTotalValue}>{formatValorisation(valorisation)}</Text>
                 </View>
               </View>
@@ -484,7 +486,7 @@ export default function StartupConfirmationScreen() {
           )}
 
           <Text style={styles.valuationNote}>
-            C'est une estimation de départ. Elle évoluera selon tes performances en partie : levées de fonds, événements, croissance de ton entreprise.
+            {t('startup.valuationNote')}
           </Text>
         </View>
       </GamePopup>

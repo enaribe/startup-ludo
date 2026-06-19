@@ -26,6 +26,7 @@ import { RadialBackground, DynamicGradientBorder, GameButton, Avatar } from '@/c
 import { PlayerProfilePopup } from '@/components/profile/PlayerProfilePopup';
 import { useAuthStore, useUserStore, useSettingsStore } from '@/stores';
 import { useSocialStore } from '@/stores/useSocialStore';
+import { useTranslation } from '@/i18n';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
@@ -49,6 +50,7 @@ interface UserCardProps {
 }
 
 function UserCard({ user, isFollowed, isGuest, currentUserId, onToggleFollow, onPress, index }: UserCardProps) {
+  const { t } = useTranslation();
   const isMe = user.id === currentUserId;
   const winRate = user.gamesPlayed > 0
     ? Math.round((user.gamesWon / user.gamesPlayed) * 100)
@@ -63,11 +65,11 @@ function UserCard({ user, isFollowed, isGuest, currentUserId, onToggleFollow, on
             <View style={styles.userInfo}>
               <Text style={styles.userName} numberOfLines={1}>{user.displayName}</Text>
               <Text style={styles.userRank}>{user.rank} • {user.xp.toLocaleString()} XP</Text>
-              <Text style={styles.userStats}>{user.gamesPlayed} parties • {winRate}% victoires</Text>
+              <Text style={styles.userStats}>{t('network.userStats', { games: user.gamesPlayed, winRate })}</Text>
             </View>
             {!isMe && (
               <GameButton
-                title={isFollowed ? 'SUIVI' : 'SUIVRE'}
+                title={isFollowed ? t('network.followed') : t('network.follow')}
                 variant={isFollowed ? 'blue' : 'yellow'}
                 size="sm"
                 disabled={isGuest}
@@ -84,10 +86,11 @@ function UserCard({ user, isFollowed, isGuest, currentUserId, onToggleFollow, on
 // ===== EMPTY STATE =====
 
 function EmptyState({ tab }: { tab: Tab }) {
+  const { t } = useTranslation();
   const messages: Record<Tab, { icon: keyof typeof Ionicons.glyphMap; text: string }> = {
-    following: { icon: 'person-add-outline', text: "Tu ne suis personne pour l'instant.\nRecherche des joueurs pour les suivre !" },
-    followers: { icon: 'people-outline', text: "Personne ne te suit encore.\nJoue et améliore ton rang pour attirer des abonnés !" },
-    search: { icon: 'search-outline', text: 'Tape un pseudo pour rechercher un joueur.' },
+    following: { icon: 'person-add-outline', text: t('network.emptyFollowing') },
+    followers: { icon: 'people-outline', text: t('network.emptyFollowers') },
+    search: { icon: 'search-outline', text: t('network.emptySearch') },
   };
   const msg = messages[tab];
   return (
@@ -109,6 +112,7 @@ function EmptyState({ tab }: { tab: Tab }) {
 export default function NetworkScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const profile = useUserStore((s) => s.profile);
   const userId = user?.id ?? profile?.userId;
@@ -192,7 +196,7 @@ export default function NetworkScreen() {
           <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={8}>
             <Ionicons name="chevron-back" size={22} color={COLORS.primary} />
           </Pressable>
-          <Text style={styles.headerTitle}>RÉSEAU & AMIS</Text>
+          <Text style={styles.headerTitle}>{t('network.title')}</Text>
           <View style={styles.backBtnPlaceholder} />
         </View>
       </View>
@@ -216,7 +220,7 @@ export default function NetworkScreen() {
                 <Text style={[styles.counterValue, { color: COLORS.primary }]}>
                   {followCounts.followingCount}
                 </Text>
-                <Text style={styles.counterLabel}>Abonnements</Text>
+                <Text style={styles.counterLabel}>{t('network.subscriptions')}</Text>
               </View>
 
               <View style={styles.counterDivider} />
@@ -228,7 +232,7 @@ export default function NetworkScreen() {
                 <Text style={[styles.counterValue, { color: COLORS.info }]}>
                   {followCounts.followersCount}
                 </Text>
-                <Text style={styles.counterLabel}>Abonnés</Text>
+                <Text style={styles.counterLabel}>{t('network.subscribers')}</Text>
               </View>
             </View>
           </DynamicGradientBorder>
@@ -244,7 +248,7 @@ export default function NetworkScreen() {
               <Ionicons name="search" size={18} color={COLORS.textMuted} />
               <TextInput
                 style={styles.searchInput}
-                placeholder="Rechercher un joueur..."
+                placeholder={t('network.searchPlaceholder')}
                 placeholderTextColor={COLORS.textMuted}
                 value={searchQuery}
                 onChangeText={handleSearch}
@@ -270,7 +274,7 @@ export default function NetworkScreen() {
                   onPress={() => setActiveTab('following')}
                 >
                   <Text style={[styles.switchText, activeTab === 'following' && styles.switchTextActive]}>
-                    Abonnements
+                    {t('network.subscriptions')}
                   </Text>
                   {following.length > 0 && (
                     <View style={[styles.switchBadge, activeTab === 'following' && styles.switchBadgeActive]}>
@@ -283,7 +287,7 @@ export default function NetworkScreen() {
                   onPress={() => setActiveTab('followers')}
                 >
                   <Text style={[styles.switchText, activeTab === 'followers' && styles.switchTextActive]}>
-                    Abonnés
+                    {t('network.subscribers')}
                   </Text>
                   {followers.length > 0 && (
                     <View style={[styles.switchBadge, activeTab === 'followers' && styles.switchBadgeActive]}>
@@ -303,7 +307,7 @@ export default function NetworkScreen() {
               <View style={styles.guestBanner}>
                 <Ionicons name="lock-closed" size={16} color={COLORS.primary} />
                 <Text style={styles.guestText}>
-                  Crée un compte pour suivre des joueurs et construire ton réseau !
+                  {t('network.guestBanner')}
                 </Text>
               </View>
             </DynamicGradientBorder>

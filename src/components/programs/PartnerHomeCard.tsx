@@ -86,7 +86,7 @@ export const PartnerHomeCard = memo(function PartnerHomeCard({
 const styles = StyleSheet.create({
   bannerWrap: {
     width: '100%',
-    minHeight: 360,
+    minHeight: 300,
     borderRadius: 24,
     overflow: 'hidden',
   },

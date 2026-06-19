@@ -25,6 +25,7 @@ import { AuthHeader, AuthInput } from '@/components/auth';
 import { GameButton } from '@/components/ui/GameButton';
 import { DynamicGradientBorder } from '@/components/ui/GradientBorder';
 import { RadialBackground } from '@/components/ui/RadialBackground';
+import { useTranslation } from '@/i18n';
 import { useAuthStore } from '@/stores';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
@@ -35,6 +36,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const shapeImage = require('@/../assets/images/shape.png');
 
 export default function ForgotPasswordScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { resetPassword, isLoading, error, clearError } = useAuthStore();
 
@@ -86,16 +88,16 @@ export default function ForgotPasswordScreen() {
                   <Ionicons name="mail" size={40} color="#FFFFFF" />
                 </View>
 
-                <Text style={styles.successTitle}>Email envoyé !</Text>
+                <Text style={styles.successTitle}>{t('auth.emailSentTitle')}</Text>
 
                 <Text style={styles.successDescription}>
-                  Si un compte existe avec l'adresse{'\n'}
+                  {t('auth.emailSentBefore')}{'\n'}
                   <Text style={styles.successEmail}>{email}</Text>
-                  {'\n'}tu recevras un email pour réinitialiser ton mot de passe.
+                  {'\n'}{t('auth.emailSentAfter')}
                 </Text>
 
                 <GameButton
-                  title="RETOUR À LA CONNEXION"
+                  title={t('auth.backToLoginCta')}
                   variant="yellow"
                   fullWidth
                   onPress={() => router.replace('/(auth)/login')}
@@ -140,9 +142,9 @@ export default function ForgotPasswordScreen() {
             entering={FadeInDown.delay(100).duration(400)}
             style={styles.titleSection}
           >
-            <Text style={styles.title}>MOT DE PASSE{'\n'}OUBLIÉ</Text>
+            <Text style={styles.title}>{t('auth.forgotTitle')}</Text>
             <Text style={styles.subtitle}>
-              Entre ton adresse email pour recevoir{'\n'}un lien de réinitialisation.
+              {t('auth.forgotSubtitle')}
             </Text>
           </Animated.View>
 
@@ -152,8 +154,8 @@ export default function ForgotPasswordScreen() {
             style={styles.formSection}
           >
             <AuthInput
-              label="E-MAIL"
-              placeholder="Votre adresse mail"
+              label={t('auth.emailLabel')}
+              placeholder={t('auth.emailPlaceholder')}
               value={email}
               onChangeText={setEmail}
               keyboardType="email-address"
@@ -173,7 +175,7 @@ export default function ForgotPasswordScreen() {
             style={styles.submitSection}
           >
             <GameButton
-              title="ENVOYER LE LIEN"
+              title={t('auth.sendLinkCta')}
               variant="yellow"
               fullWidth
               loading={isLoading}
@@ -186,8 +188,8 @@ export default function ForgotPasswordScreen() {
               style={styles.loginLink}
             >
               <Text style={styles.loginLinkText}>
-                RETOUR À LA{' '}
-                <Text style={styles.loginLinkHighlight}>CONNEXION</Text>
+                {t('auth.backToCta')}{' '}
+                <Text style={styles.loginLinkHighlight}>{t('auth.connectionCta')}</Text>
               </Text>
             </Pressable>
           </Animated.View>

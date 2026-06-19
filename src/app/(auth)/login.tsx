@@ -25,6 +25,7 @@ import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { GameButton } from '@/components/ui/GameButton';
 import { RadialBackground } from '@/components/ui/RadialBackground';
 import { AuthInput, AuthHeader, SocialAuthButtons } from '@/components/auth';
+import { useTranslation } from '@/i18n';
 import { useAuthStore } from '@/stores';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -33,6 +34,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const shapeImage = require('@/../assets/images/shape.png');
 
 export default function LoginScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { login, loginWithGoogle, loginWithApple, isLoading, error, clearError, isAuthenticated, user, needsProfileCompletion } = useAuthStore();
 
@@ -113,9 +115,9 @@ export default function LoginScreen() {
             entering={FadeInDown.delay(100).duration(400)}
             style={styles.titleSection}
           >
-            <Text style={styles.title}>CONNEXION</Text>
+            <Text style={styles.title}>{t('auth.loginTitle')}</Text>
             <Text style={styles.subtitle}>
-              Content de te revoir !
+              {t('auth.loginSubtitle')}
             </Text>
           </Animated.View>
 
@@ -125,8 +127,8 @@ export default function LoginScreen() {
             style={styles.formSection}
           >
             <AuthInput
-              label="E-MAIL"
-              placeholder="Votre adresse mail"
+              label={t('auth.emailLabel')}
+              placeholder={t('auth.emailPlaceholder')}
               value={email}
               onChangeText={setEmail}
               keyboardType="email-address"
@@ -136,8 +138,8 @@ export default function LoginScreen() {
             />
 
             <AuthInput
-              label="MOT DE PASSE"
-              placeholder="Mot de passe"
+              label={t('auth.passwordLabel')}
+              placeholder={t('auth.passwordPlaceholder')}
               value={password}
               onChangeText={setPassword}
               secureTextEntry
@@ -147,7 +149,7 @@ export default function LoginScreen() {
 
             {/* Forgot Password Link */}
             <Pressable onPress={handleForgotPassword} style={styles.forgotPassword}>
-              <Text style={styles.forgotPasswordText}>Mot de passe oublié ?</Text>
+              <Text style={styles.forgotPasswordText}>{t('auth.forgotPassword')}</Text>
             </Pressable>
 
             {error && (
@@ -161,7 +163,7 @@ export default function LoginScreen() {
             style={styles.submitSection}
           >
             <GameButton
-              title="SE CONNECTER"
+              title={t('auth.login')}
               variant="yellow"
               fullWidth
               loading={isLoading}
@@ -182,8 +184,8 @@ export default function LoginScreen() {
               style={styles.registerLink}
             >
               <Text style={styles.registerLinkText}>
-                PAS ENCORE DE COMPTE ?{' '}
-                <Text style={styles.registerLinkHighlight}>S'INSCRIRE</Text>
+                {t('auth.noAccountCta')}{' '}
+                <Text style={styles.registerLinkHighlight}>{t('auth.registerCta')}</Text>
               </Text>
             </Pressable>
           </Animated.View>

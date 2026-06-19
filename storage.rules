@@ -34,8 +34,9 @@ service firebase.storage {
       allow delete: if isAdmin();
     }
 
-    // Images programmes (hero, bannière, logo) — admin uniquement en écriture, lecture publique
-    match /programs/{programId}/{fileName} {
+    // Images programmes (hero, bannière, logo, profils) — admin uniquement en écriture, lecture publique.
+    // Wildcard récursif pour couvrir les sous-dossiers (ex: programs/<id>/profiles/<profileId>).
+    match /programs/{programId}/{path=**} {
       allow read: if true;
       allow write: if isAdmin() && isValidImage();
       allow delete: if isAdmin();

@@ -27,6 +27,7 @@ import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { RadialBackground, DynamicGradientBorder } from '@/components/ui';
+import { useTranslation } from '@/i18n';
 import { multiplayerSync } from '@/services/multiplayer';
 import { useGameStore, useAuthStore, useUserStore } from '@/stores';
 import database from '@react-native-firebase/database';
@@ -71,11 +72,11 @@ interface StepConfig {
 }
 
 const STEPS: { key: PreparationState; config: StepConfig }[] = [
-  { key: 'connecting', config: { label: 'Connexion', icon: 'wifi', progress: 10 } },
-  { key: 'syncing', config: { label: 'Joueurs', icon: 'people', progress: 30 } },
-  { key: 'loading', config: { label: 'Donnees', icon: 'download', progress: 60 } },
-  { key: 'finalizing', config: { label: 'Finalisation', icon: 'construct', progress: 85 } },
-  { key: 'starting', config: { label: 'C\'est parti !', icon: 'rocket', progress: 100 } },
+  { key: 'connecting', config: { label: 'game.prepConnecting', icon: 'wifi', progress: 10 } },
+  { key: 'syncing', config: { label: 'game.prepPlayers', icon: 'people', progress: 30 } },
+  { key: 'loading', config: { label: 'game.prepData', icon: 'download', progress: 60 } },
+  { key: 'finalizing', config: { label: 'game.prepFinalizing', icon: 'construct', progress: 85 } },
+  { key: 'starting', config: { label: 'game.prepStarting', icon: 'rocket', progress: 100 } },
 ];
 
 const STEP_INDEX: Record<PreparationState, number> = {
@@ -90,6 +91,7 @@ const STEP_INDEX: Record<PreparationState, number> = {
 export default function GamePreparationScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const params = useLocalSearchParams<{
     gameId: string;
     roomId?: string;
@@ -297,12 +299,12 @@ export default function GamePreparationScreen() {
       >
         {/* Title */}
         <Animated.Text entering={FadeInDown.delay(100).duration(400)} style={styles.title}>
-          {state === 'error' ? 'Erreur' : 'Preparation'}
+          {state === 'error' ? t('common.error') : t('game.preparation')}
         </Animated.Text>
         <Animated.Text entering={FadeInDown.delay(200).duration(400)} style={styles.subtitle}>
           {state === 'error'
-            ? 'Une erreur est survenue'
-            : currentStep?.label ?? ''}
+            ? t('error.generic')
+            : currentStep?.label ? t(currentStep.label) : ''}
         </Animated.Text>
 
         {/* Central icon */}
@@ -378,7 +380,7 @@ export default function GamePreparationScreen() {
                         ]}
                         numberOfLines={1}
                       >
-                        {step.config.label}
+                        {t(step.config.label)}
                       </Text>
                     </View>
                   );
@@ -423,7 +425,7 @@ export default function GamePreparationScreen() {
             entering={FadeInDown.delay(500).duration(400)}
             style={styles.errorHint}
           >
-            Retour automatique dans 3 secondes...
+            {t('game.autoReturnHint')}
           </Animated.Text>
         )}
       </View>

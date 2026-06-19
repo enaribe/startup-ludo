@@ -24,6 +24,7 @@ import {
 } from '@/components/ui';
 import { GamePopup, GamePopupGradientBorder } from '@/components/ui/GamePopup';
 import type { InfoSection } from '@/components/ui';
+import { useTranslation } from '@/i18n';
 import { deleteStartup, updateStartupName } from '@/services/firebase/firestore';
 import { useAuthStore, useUserStore } from '@/stores';
 import { COLORS } from '@/styles/colors';
@@ -111,6 +112,7 @@ function StartupDetailPopup({
   onDelete?: () => void;
   onRename?: (newName: string) => void;
 }) {
+  const { t } = useTranslation();
   const [detailPageIndex, setDetailPageIndex] = useState(0);
   const [detailCardH, setDetailCardH] = useState(0);
   const [detailCardW, setDetailCardW] = useState(0);
@@ -119,7 +121,7 @@ function StartupDetailPopup({
   const valorisationStr = formatValorisationPopup(startup.valorisation ?? 0);
   const createdAtStr = formatDateDDMMYYYY(startup.createdAt);
   const descriptionRaw = startup.description?.trim() ?? '';
-  const descriptionDisplay = descriptionRaw.length > 0 ? descriptionRaw : 'Aucune description pour le moment.';
+  const descriptionDisplay = descriptionRaw.length > 0 ? descriptionRaw : t('portfolio.noDescription');
 
   const startEditName = useCallback(() => {
     setNameDraft(startup.name);
@@ -134,14 +136,14 @@ function StartupDetailPopup({
   const confirmEditName = useCallback(() => {
     const trimmed = nameDraft.trim();
     if (trimmed.length < 2) {
-      Alert.alert('Nom invalide', 'Le nom doit contenir au moins 2 caractères.');
+      Alert.alert(t('portfolio.invalidName'), t('portfolio.invalidNameDesc'));
       return;
     }
     setIsEditingName(false);
     if (trimmed !== startup.name) {
       onRename?.(trimmed);
     }
-  }, [nameDraft, startup.name, onRename]);
+  }, [nameDraft, startup.name, onRename, t]);
 
   const titleNode = isEditingName ? (
     <View style={popupStyles.renameRow}>
@@ -149,7 +151,7 @@ function StartupDetailPopup({
         style={popupStyles.renameInput}
         value={nameDraft}
         onChangeText={setNameDraft}
-        placeholder="Nom du projet"
+        placeholder={t('portfolio.projectNamePlaceholder')}
         placeholderTextColor="rgba(255,255,255,0.3)"
         autoFocus
         maxLength={30}
@@ -192,7 +194,7 @@ function StartupDetailPopup({
             </Pressable>
           )}
           <View style={{ flex: 1 }}>
-            <GameButton title="FERMER" variant="blue" fullWidth onPress={onClose} />
+            <GameButton title={t('common.close')} variant="blue" fullWidth onPress={onClose} />
           </View>
         </View>
       }
@@ -215,12 +217,12 @@ function StartupDetailPopup({
             <Text style={popupStyles.statValue} numberOfLines={1} ellipsizeMode="tail">
               {valorisationStr}
             </Text>
-            <Text style={popupStyles.statLabel}>Valorisation</Text>
+            <Text style={popupStyles.statLabel}>{t('portfolio.valuation')}</Text>
           </View>
           <View style={popupStyles.statSeparator} />
           <View style={popupStyles.statCol}>
-            <Text style={popupStyles.statValue} numberOfLines={1}>NIV. {startup.level}</Text>
-            <Text style={popupStyles.statLabel}>Niveau</Text>
+            <Text style={popupStyles.statValue} numberOfLines={1}>{t('portfolio.levelShort', { level: startup.level })}</Text>
+            <Text style={popupStyles.statLabel}>{t('portfolio.levelLabel')}</Text>
           </View>
         </View>
       </View>
@@ -255,7 +257,7 @@ function StartupDetailPopup({
         >
           {/* Page 1 — Description */}
           <View style={[popupStyles.detailPage, detailCardW > 0 && { width: detailCardW }]}>
-            <Text style={popupStyles.detailPageTitle}>Description</Text>
+            <Text style={popupStyles.detailPageTitle}>{t('portfolio.description')}</Text>
             <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false} style={popupStyles.detailScroll}>
               <Text style={popupStyles.detailDescText}>{descriptionDisplay}</Text>
             </ScrollView>
@@ -263,16 +265,16 @@ function StartupDetailPopup({
 
           {/* Page 2 — Informations */}
           <View style={[popupStyles.detailPage, detailCardW > 0 && { width: detailCardW }]}>
-            <Text style={popupStyles.detailPageTitle}>Informations</Text>
+            <Text style={popupStyles.detailPageTitle}>{t('portfolio.information')}</Text>
             <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false} style={popupStyles.detailScroll}>
               <View style={popupStyles.infoList}>
                 {[
-                  { icon: 'people', label: 'Cible', value: startup.targetCard?.title ?? 'Non définie' },
-                  { icon: 'flag', label: 'Mission', value: startup.missionCard?.title ?? 'Non définie' },
-                  { icon: 'business', label: 'Secteur', value: startup.sector },
-                  { icon: 'calendar', label: 'Créée le', value: createdAtStr },
-                  { icon: 'diamond', label: 'Tokens investis', value: startup.tokensInvested.toLocaleString() },
-                  ...(startup.creatorName ? [{ icon: 'person', label: 'Créateur', value: startup.creatorName }] : []),
+                  { icon: 'people', label: t('portfolio.target'), value: startup.targetCard?.title ?? t('portfolio.notDefined') },
+                  { icon: 'flag', label: t('portfolio.mission'), value: startup.missionCard?.title ?? t('portfolio.notDefined') },
+                  { icon: 'business', label: t('portfolio.sector'), value: startup.sector },
+                  { icon: 'calendar', label: t('portfolio.createdOn'), value: createdAtStr },
+                  { icon: 'diamond', label: t('portfolio.tokensInvested'), value: startup.tokensInvested.toLocaleString() },
+                  ...(startup.creatorName ? [{ icon: 'person', label: t('portfolio.creator'), value: startup.creatorName }] : []),
                 ].map((row) => (
                   <View key={row.label} style={popupStyles.infoRow}>
                     <View style={popupStyles.infoLeft}>
@@ -491,28 +493,31 @@ const popupStyles = StyleSheet.create({
 
 const MAX_STARTUPS = 3;
 
-const PORTFOLIO_INFO_SECTIONS: InfoSection[] = [
-  {
-    icon: 'rocket',
-    title: 'ENTREPRISES',
-    body: `Tu peux créer jusqu'à ${MAX_STARTUPS} entreprises. Chaque entreprise est définie par un secteur, une cible et une mission.`,
-  },
-  {
-    icon: 'trending-up',
-    title: 'VALORISATION',
-    body: "La valorisation augmente chaque fois que ton entreprise lève des fonds lors d'une partie. Elle représente la valeur totale de ton entreprise.",
-  },
-  {
-    icon: 'bar-chart',
-    title: 'NIVEAU',
-    body: "Le niveau de ton entreprise progresse avec les levées de fonds. Un niveau élevé reflète une entreprise mature et bien financée.",
-  },
-];
+function getPortfolioInfoSections(t: (key: string, params?: Record<string, string | number>) => string): InfoSection[] {
+  return [
+    {
+      icon: 'rocket',
+      title: t('portfolio.infoCompaniesTitle'),
+      body: t('portfolio.infoCompaniesBody', { max: MAX_STARTUPS }),
+    },
+    {
+      icon: 'trending-up',
+      title: t('portfolio.infoValuationTitle'),
+      body: t('portfolio.infoValuationBody'),
+    },
+    {
+      icon: 'bar-chart',
+      title: t('portfolio.infoLevelTitle'),
+      body: t('portfolio.infoLevelBody'),
+    },
+  ];
+}
 
 // Header height: safeArea + title + stats + padding (version compacte)
 const HEADER_CONTENT_HEIGHT = 132;
 
 export default function PortfolioScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const profile = useUserStore((state) => state.profile);
@@ -547,7 +552,7 @@ export default function PortfolioScreen() {
       {/* Fixed Header with background */}
       <View style={[styles.fixedHeader, { paddingTop: headerTopPadding }]}>
         <Animated.View entering={FadeInDown.duration(500)} style={styles.headerTopRow}>
-          <Text style={styles.headerTitle}>mon PORTFOLIO</Text>
+          <Text style={styles.headerTitle}>{t('portfolio.headerTitle')}</Text>
           <Pressable style={styles.settingsBtn} onPress={() => setShowInfo(true)}>
             <Ionicons name="information-circle-outline" size={24} color="#FFBC40" />
           </Pressable>
@@ -563,14 +568,14 @@ export default function PortfolioScreen() {
               >
                 {formatValorisation(totalValorisation)}
               </Text>
-              <Text style={styles.statLabel}>Valorisations</Text>
+              <Text style={styles.statLabel}>{t('portfolio.valuations')}</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statColHeader}>
               <Text style={styles.statValue} numberOfLines={1}>
                 {startups.length}/{MAX_STARTUPS}
               </Text>
-              <Text style={styles.statLabel}>Entreprises</Text>
+              <Text style={styles.statLabel}>{t('portfolio.companies')}</Text>
             </View>
           </View>
         </Animated.View>
@@ -593,14 +598,14 @@ export default function PortfolioScreen() {
       >
         {/* Liste des Startups */}
         <Animated.View entering={FadeInDown.delay(200).duration(500)}>
-          <Text style={styles.sectionTitle}>{startups.length} ENTREPRISES CRÉÉ</Text>
+          <Text style={styles.sectionTitle}>{t('portfolio.companiesCreated', { count: startups.length })}</Text>
         </Animated.View>
         {startups.length === 0 ? (
           <Animated.View entering={FadeInDown.delay(300).duration(500)} style={styles.emptyContainer}>
             <PortfolioIcon color="rgba(255,255,255,0.2)" size={64} />
-            <Text style={styles.emptyTitle}>Aucune entreprise</Text>
+            <Text style={styles.emptyTitle}>{t('portfolio.empty')}</Text>
             <Text style={styles.emptyDesc}>
-              Crée ta première entreprise en jouant et en gagnant des jetons !
+              {t('portfolio.emptyPlayDesc')}
             </Text>
           </Animated.View>
         ) : (
@@ -623,7 +628,7 @@ export default function PortfolioScreen() {
                         <View style={styles.startupInfo}>
                           <Text style={styles.startupName}>{startup.name}</Text>
                           <Text style={styles.startupDesc} numberOfLines={2}>
-                            {startup.description || `Entreprise innovante dans le secteur ${startup.sector}`}
+                            {startup.description || t('portfolio.defaultDescription', { sector: startup.sector })}
                           </Text>
                         </View>
                       </View>
@@ -632,7 +637,12 @@ export default function PortfolioScreen() {
                       <View style={styles.tagsRow}>
                         <StartupSectorPill label={startup.sector} />
                         <Text style={styles.dateText}>
-                          Crée il y'a {Math.floor((Date.now() - startup.createdAt) / (1000 * 60 * 60 * 24 * 7))} semaine{Math.floor((Date.now() - startup.createdAt) / (1000 * 60 * 60 * 24 * 7)) !== 1 ? 's' : ''}
+                          {(() => {
+                            const weeks = Math.floor((Date.now() - startup.createdAt) / (1000 * 60 * 60 * 24 * 7));
+                            return weeks === 1
+                              ? t('portfolio.createdWeeksAgoOne', { count: weeks })
+                              : t('portfolio.createdWeeksAgoOther', { count: weeks });
+                          })()}
                         </Text>
                       </View>
 
@@ -646,14 +656,14 @@ export default function PortfolioScreen() {
                           >
                             {formatValorisation(startup.valorisation ?? 0)}
                           </Text>
-                          <Text style={styles.footerStatLabel}>Valorisation</Text>
+                          <Text style={styles.footerStatLabel}>{t('portfolio.valuation')}</Text>
                         </View>
                         <View style={styles.footerDivider} />
                         <View style={styles.footerStatNiveau}>
                           <Text style={styles.footerStatValueGreen} numberOfLines={1}>
-                            NIV. {startup.level}
+                            {t('portfolio.levelShort', { level: startup.level })}
                           </Text>
-                          <Text style={styles.footerStatLabel}>Niveau</Text>
+                          <Text style={styles.footerStatLabel}>{t('portfolio.levelLabel')}</Text>
                         </View>
                       </View>
                     </View>
@@ -684,18 +694,18 @@ export default function PortfolioScreen() {
             const userId = useAuthStore.getState().user?.id;
             if (userId) {
               updateStartupName(userId, startupId, newName).catch(() => {
-                Alert.alert('Erreur', "Le nom n'a pas pu être synchronisé. Réessaie plus tard.");
+                Alert.alert(t('common.error'), t('portfolio.syncNameError'));
               });
             }
           }}
           onDelete={() => {
             Alert.alert(
-              "Supprimer l'entreprise",
-              `Es-tu sûr de vouloir supprimer "${selectedStartup.name}" ? Cette action est irréversible.`,
+              t('portfolio.deleteTitle'),
+              t('portfolio.deleteConfirm', { name: selectedStartup.name }),
               [
-                { text: 'Annuler', style: 'cancel' },
+                { text: t('common.cancel'), style: 'cancel' },
                 {
-                  text: 'Supprimer',
+                  text: t('portfolio.delete'),
                   style: 'destructive',
                   onPress: async () => {
                     const userId = useAuthStore.getState().user?.id;
@@ -706,8 +716,8 @@ export default function PortfolioScreen() {
                       setSelectedStartup(null);
                     } catch (e) {
                       Alert.alert(
-                        'Erreur',
-                        "Impossible de supprimer l'entreprise. Réessaie plus tard."
+                        t('common.error'),
+                        t('portfolio.deleteError')
                       );
                     }
                   },
@@ -723,8 +733,8 @@ export default function PortfolioScreen() {
         visible={showInfo}
         onClose={() => setShowInfo(false)}
         variant="portfolio"
-        description="Ton portfolio regroupe toutes les entreprises que tu as créées et développées en jouant."
-        sections={PORTFOLIO_INFO_SECTIONS}
+        description={t('portfolio.infoModalDescription')}
+        sections={getPortfolioInfoSections(t)}
       />
     </View>
   );

@@ -334,6 +334,9 @@ export default function ResultsScreen() {
   const completeProgramSession = useProgramStore((s) => s.completeProgramSession);
   const enrollInProgram = useProgramStore((s) => s.enrollInProgram);
   const getProgramById = useProgramStore((s) => s.getProgramById);
+  const getProgramProgress = useProgramStore((s) => s.getProgramProgress);
+  // S'abonner aux enrollments pour recalculer la progression après completeProgramSession.
+  const programEnrollments = useProgramStore((s) => s.enrollments);
 
   const isGuest = user?.isGuest ?? true;
   const isOnline = params.isOnline === 'true' || params.mode === 'online';
@@ -423,6 +426,18 @@ export default function ResultsScreen() {
   const isChallengeGame = !!game?.challengeContext;
   const isProgramGame = !!game?.programContext;
   const resultProgram = game?.programContext ? getProgramById(game.programContext.programId) : undefined;
+
+  // Progression du parcours après cette partie (le store a déjà été mis à jour dans l'effet de fin).
+  const programProgress = isProgramGame && game?.programContext
+    ? getProgramProgress(game.programContext.programId, userId ?? undefined)
+    : null;
+  // On a gagné CE niveau si le niveau courant a avancé au-delà de celui qu'on jouait.
+  const playedLevelIndex = game?.programContext?.levelIndex ?? 0;
+  const programLevelCleared =
+    isProgramGame && isWinner && !!programProgress && programProgress.currentLevel > playedLevelIndex;
+  const programJustCompleted = isProgramGame && !!programProgress?.isCompleted;
+  // référence programEnrollments pour que ce calcul se réévalue après mise à jour du store.
+  void programEnrollments;
 
   // Sous-titre header
   const subtitleText = isProgramGame
@@ -690,7 +705,10 @@ export default function ResultsScreen() {
   const handleProgramEnrollSubmit = (formData: ProgramEnrollmentFormData) => {
     const programId = game?.programContext?.programId ?? params.programId;
     if (!programId || !userId) return;
-    enrollInProgram(programId, userId, formData);
+    enrollInProgram(programId, userId, formData, {
+      profileId: game?.programContext?.profileId ?? null,
+      profileName: game?.programContext?.profileName ?? null,
+    });
     setShowProgramEnroll(false);
   };
 
@@ -865,11 +883,19 @@ export default function ResultsScreen() {
           </Animated.View>
         )}
 
-        {isProgramGame && game?.programContext?.isTrial && (
+        {isProgramGame && programProgress && (
           <Animated.View entering={FadeInDown.duration(300)} style={styles.programTrialBanner}>
-            <Ionicons name="school-outline" size={16} color={COLORS.primary} />
+            <Ionicons
+              name={programJustCompleted ? 'trophy-outline' : programLevelCleared ? 'arrow-up-circle-outline' : 'refresh-outline'}
+              size={16}
+              color={COLORS.primary}
+            />
             <Text style={styles.programTrialText}>
-              Inscris-toi au programme pour continuer ce parcours.
+              {programJustCompleted
+                ? 'Parcours terminé ! Vous pouvez remplir le formulaire de candidature.'
+                : programLevelCleared
+                  ? `Niveau réussi ! Niveau ${Math.min(programProgress.currentLevel + 1, programProgress.totalLevels)}/${programProgress.totalLevels} débloqué.`
+                  : `Niveau non validé. Rejouez le niveau ${playedLevelIndex + 1}/${programProgress.totalLevels} pour avancer.`}
             </Text>
           </Animated.View>
         )}
@@ -881,12 +907,22 @@ export default function ResultsScreen() {
         >
           {isProgramGame ? (
             <>
-              {game?.programContext?.isTrial ? (
-                <GameButton variant="yellow" fullWidth title="S'INSCRIRE" onPress={() => setShowProgramEnroll(true)} />
+              {programJustCompleted ? (
+                <>
+                  <GameButton variant="yellow" fullWidth title="REMPLIR LE FORMULAIRE" onPress={() => setShowProgramEnroll(true)} />
+                  <GameButton variant="blue" fullWidth title="RETOUR À L'ACCUEIL" onPress={handleGoHome} />
+                </>
+              ) : programLevelCleared ? (
+                <>
+                  <GameButton variant="yellow" fullWidth title="NIVEAU SUIVANT" onPress={handleProgramReplay} />
+                  <GameButton variant="blue" fullWidth title="RETOUR À L'ACCUEIL" onPress={handleGoHome} />
+                </>
               ) : (
-                <GameButton variant="yellow" fullWidth title="REJOUER" onPress={handleProgramReplay} />
+                <>
+                  <GameButton variant="yellow" fullWidth title="REJOUER CE NIVEAU" onPress={handleProgramReplay} />
+                  <GameButton variant="blue" fullWidth title="RETOUR À L'ACCUEIL" onPress={handleGoHome} />
+                </>
               )}
-              <GameButton variant="blue" fullWidth title="RETOUR À L'ACCUEIL" onPress={handleGoHome} />
             </>
           ) : isChallengeGame ? (
             <>
@@ -939,6 +975,7 @@ export default function ResultsScreen() {
           programName={resultProgram.name}
           defaultFullName={user?.displayName}
           defaultEmail={user?.email}
+          endForm={resultProgram.endForm}
           onSubmit={handleProgramEnrollSubmit}
           onClose={() => setShowProgramEnroll(false)}
         />

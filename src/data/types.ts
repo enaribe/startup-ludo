@@ -31,6 +31,13 @@ export type QuizCategory =
 // ===== QUIZ =====
 // Case Quiz : Question à choix multiple avec timer
 
+/** Traductions d'un quiz (par code langue, ex: 'en'). Seuls les champs textuels sont traduits. */
+export interface QuizTranslation {
+  question: string;
+  options: string[];
+  explanation?: string;
+}
+
 export interface Quiz {
   id: string;
   question: string;
@@ -43,6 +50,8 @@ export interface Quiz {
   penaltyTokens?: number;  // Jetons perdus si mauvaise réponse (défaut: 0)
   timeLimit?: number;      // Secondes (défaut: 30)
   sectorId?: string;       // Secteur associé (si absent = générique, montré à tous)
+  /** Traductions (clé = code langue). La bonne réponse/jetons restent inchangés. */
+  translations?: Record<string, QuizTranslation>;
 }
 
 // ===== DUEL =====
@@ -54,16 +63,29 @@ export interface DuelOption {
   points: number; // 30 (meilleure), 20 (bonne), 10 (acceptable)
 }
 
+/** Traduction d'un duel : question + textes des options (les points restent identiques). */
+export interface DuelTranslation {
+  question: string;
+  options: string[]; // textes traduits, dans le même ordre que options[]
+}
+
 export interface Duel {
   id: string;
   question: string;
   options: DuelOption[];
   category: string;
   sectorId?: string;       // Secteur associé (si absent = générique, montré à tous)
+  translations?: Record<string, DuelTranslation>;
 }
 
 // ===== FINANCEMENT =====
 // Case Financement : Gain de jetons
+
+/** Traduction d'un contenu titre + description (Funding / Opportunity / Challenge). */
+export interface TitleDescTranslation {
+  title: string;
+  description: string;
+}
 
 export interface Funding {
   id: string;
@@ -72,6 +94,7 @@ export interface Funding {
   tokens: number;
   source?: string; // Ex: "Tontine", "Microcrédit", "Investisseur"
   sectorId?: string;       // Secteur associé (si absent = générique, montré à tous)
+  translations?: Record<string, TitleDescTranslation>;
 }
 
 // ===== ÉVÉNEMENTS : OPPORTUNITÉS =====
@@ -83,6 +106,7 @@ export interface Opportunity {
   description: string;
   tokens: number; // Toujours positif
   sectorId?: string;       // Secteur associé (si absent = générique, montré à tous)
+  translations?: Record<string, TitleDescTranslation>;
 }
 
 // ===== ÉVÉNEMENTS : CHALLENGES =====
@@ -94,6 +118,7 @@ export interface Challenge {
   description: string;
   tokens: number; // Toujours négatif (ex: -2, -3)
   sectorId?: string;       // Secteur associé (si absent = générique, montré à tous)
+  translations?: Record<string, TitleDescTranslation>;
 }
 
 // ===== TYPE UNION POUR ÉVÉNEMENT =====

@@ -20,6 +20,7 @@ import { DynamicGradientBorder, GameButton, RadialBackground } from '@/component
 import { Avatar } from '@/components/ui/Avatar';
 import { getDefaultProjectsForEdition, getMatchingUserStartups } from '@/data/defaultProjects';
 import { useMultiplayer } from '@/hooks/useMultiplayer';
+import { useTranslation } from '@/i18n';
 import { buildShareMessage } from '@/services/multiplayer/inviteLink';
 import { InviteContactModal } from '@/components/game/InviteContactModal';
 import { useAuthStore, useUserStore } from '@/stores';
@@ -39,6 +40,7 @@ const contentWidth = screenWidth - SPACING[4] * 2;
 export default function CreateRoomScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const params = useLocalSearchParams<{
     challenge?: string;
     roomId?: string;
@@ -167,8 +169,8 @@ export default function CreateRoomScreen() {
   useEffect(() => {
     if (roomClosed && params.isHost !== 'true') {
       Alert.alert(
-        'Salon fermé',
-        "L'hôte a quitté le salon.",
+        t('game.roomClosed'),
+        t('game.hostLeftRoom'),
         [{ text: 'OK', onPress: () => router.replace('/(game)/online-hub') }]
       );
     }
@@ -201,12 +203,12 @@ export default function CreateRoomScreen() {
     if (showLobby) {
       // In lobby: confirm leave
       Alert.alert(
-        'Quitter le salon',
-        'Es-tu sur de vouloir quitter ?',
+        t('game.leaveRoom'),
+        t('game.leaveRoomConfirm'),
         [
-          { text: 'Annuler', style: 'cancel' },
+          { text: t('common.cancel'), style: 'cancel' },
           {
-            text: 'Quitter',
+            text: t('game.leave'),
             style: 'destructive',
             onPress: async () => {
               await leaveRoom();
@@ -222,31 +224,31 @@ export default function CreateRoomScreen() {
 
   const handleCreateRoom = useCallback(async () => {
     if (!user) {
-      Alert.alert('Erreur', 'Vous devez etre connecte');
+      Alert.alert(t('common.error'), t('game.mustBeLoggedIn'));
       return;
     }
 
     const playersCount = parseInt(maxPlayers, 10);
     if (isNaN(playersCount) || playersCount < 2 || playersCount > 4) {
-      Alert.alert('Erreur', 'Le nombre de joueurs doit être entre 2 et 4');
+      Alert.alert(t('common.error'), t('game.playersCountRange'));
       return;
     }
 
     if (!roomName.trim()) {
-      Alert.alert('Erreur', 'Veuillez entrer un nom de salon');
+      Alert.alert(t('common.error'), t('game.enterRoomName'));
       return;
     }
 
     // Vérifications liées à la mise
     if (stakeFcfa > 0) {
       if (isGuest) {
-        Alert.alert('Mise impossible', 'Les invités ne peuvent pas jouer avec une mise. Crée un compte pour miser.');
+        Alert.alert(t('game.stakeImpossible'), t('game.guestCannotStake'));
         return;
       }
       if (!canAfford) {
         Alert.alert(
-          'Solde insuffisant',
-          `Tu n'as que ${formatPtwRaw(stakableBalanceFcfa)} de valorisation. Choisis une mise plus petite ou développe tes entreprises.`
+          t('game.insufficientBalance'),
+          t('game.insufficientBalanceDescDev', { balance: formatPtwRaw(stakableBalanceFcfa) })
         );
         return;
       }
@@ -274,7 +276,7 @@ export default function CreateRoomScreen() {
       const codeWithoutDash = roomCode.replace('-', '');
       await Clipboard.setStringAsync(codeWithoutDash);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('Copie !', 'Le code a ete copie');
+      Alert.alert(t('game.copied'), t('game.codeCopied'));
     }
   }, [roomCode]);
 
@@ -293,12 +295,12 @@ export default function CreateRoomScreen() {
 
   const handleStartGame = useCallback(async () => {
     if (!allReady && playersList.length >= 2) {
-      Alert.alert('Attention', 'Tous les joueurs doivent etre prets');
+      Alert.alert(t('game.warning'), t('game.allPlayersMustBeReady'));
       return;
     }
 
     if (playersList.length < 2) {
-      Alert.alert('Attention', 'Il faut au moins 2 joueurs');
+      Alert.alert(t('game.warning'), t('game.minTwoPlayers'));
       return;
     }
 
@@ -338,7 +340,7 @@ export default function CreateRoomScreen() {
         >
           {/* Titre centré */}
           <Animated.View entering={FadeInDown.delay(100).duration(500)}>
-            <Text style={styles.configTitle}>CONFIGURATION DU SALON</Text>
+            <Text style={styles.configTitle}>{t('game.roomConfig')}</Text>
           </Animated.View>
 
           {/* Carte centrale avec configuration — pas d'animation Reanimated ici :
@@ -355,12 +357,12 @@ export default function CreateRoomScreen() {
                 {/* Nom du Salon — TextInput nu, bord en CSS natif (pas de SVG par-dessus
                     sinon Android n'attache pas l'EditText à l'InputMethodManager). */}
                 <View style={styles.fieldGroup}>
-                  <Text style={styles.fieldLabel}>Nom du Salon</Text>
+                  <Text style={styles.fieldLabel}>{t('game.roomName')}</Text>
                   <View style={styles.inputBorderShell}>
                     <TextInput
                       value={roomName}
                       onChangeText={setRoomName}
-                      placeholder="Ex. Salon de Abdoulaye"
+                      placeholder={t('game.roomNamePlaceholder')}
                       placeholderTextColor="rgba(255,255,255,0.3)"
                       style={styles.configInput}
                       autoCapitalize="words"
@@ -370,7 +372,7 @@ export default function CreateRoomScreen() {
 
                 {/* Nombre de joueur */}
                 <View style={styles.fieldGroup}>
-                  <Text style={styles.fieldLabel}>Nombre de joueur</Text>
+                  <Text style={styles.fieldLabel}>{t('game.numberOfPlayersSingular')}</Text>
                   <View style={styles.inputBorderShell}>
                     <TextInput
                       value={maxPlayers}
@@ -386,7 +388,7 @@ export default function CreateRoomScreen() {
 
                 {/* Mise (Ptw) */}
                 <View style={styles.fieldGroup}>
-                  <Text style={styles.fieldLabel}>Mise par joueur</Text>
+                  <Text style={styles.fieldLabel}>{t('game.stakePerPlayer')}</Text>
                   <View style={styles.stakeRow}>
                     {STAKE_OPTIONS_PTW.map((opt) => {
                       const optFcfa = stakePtwToFcfa(opt);
@@ -405,22 +407,23 @@ export default function CreateRoomScreen() {
                           ]}
                         >
                           <Text style={[styles.stakeChipText, selected && styles.stakeChipTextActive]}>
-                            {opt === 0 ? 'Sans' : `${opt} Ptw`}
+                            {opt === 0 ? t('game.stakeNone') : `${opt} Ptw`}
                           </Text>
                         </Pressable>
                       );
                     })}
                   </View>
                   {isGuest ? (
-                    <Text style={styles.stakeHint}>Les invités jouent sans mise.</Text>
+                    <Text style={styles.stakeHint}>{t('game.guestsPlayNoStake')}</Text>
                   ) : stakePtw > 0 ? (
                     <Text style={styles.stakeHint}>
-                      Solde : {formatPtwRaw(stakableBalanceFcfa)}
-                      {potFcfa > 0 ? ` · Pot : ${formatPtwRaw(potFcfa)}` : ''}
+                      {potFcfa > 0
+                        ? t('game.balanceAndPot', { balance: formatPtwRaw(stakableBalanceFcfa), pot: formatPtwRaw(potFcfa) })
+                        : t('game.balanceOnly', { balance: formatPtwRaw(stakableBalanceFcfa) })}
                     </Text>
                   ) : (
                     <Text style={styles.stakeHint}>
-                      Mise ta valorisation, le gagnant remporte le pot.
+                      {t('game.stakeValorisationHint')}
                     </Text>
                   )}
                 </View>
@@ -434,7 +437,7 @@ export default function CreateRoomScreen() {
           <GameButton
             variant="yellow"
             fullWidth
-            title={isLoading ? 'CREATION...' : 'CREER LE SALON'}
+            title={isLoading ? t('game.creating') : t('game.createRoomCta')}
             loading={isLoading}
             onPress={handleCreateRoom}
             disabled={!roomName.trim() || !maxPlayers}
@@ -454,7 +457,7 @@ export default function CreateRoomScreen() {
         <Pressable onPress={handleBack} hitSlop={8}>
           <Ionicons name="arrow-back" size={24} color="white" />
         </Pressable>
-        <Text style={styles.headerTitle}>{roomName || 'SALON'}</Text>
+        <Text style={styles.headerTitle}>{roomName || t('game.room')}</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -474,16 +477,16 @@ export default function CreateRoomScreen() {
             boxWidth={contentWidth}
           >
             <View style={styles.codeSection}>
-              <Text style={styles.codeLabel}>CODE DU SALON</Text>
+              <Text style={styles.codeLabel}>{t('game.roomCode')}</Text>
               <Text style={styles.codeText}>{roomCode}</Text>
               <View style={styles.codeActions}>
                 <Pressable onPress={handleCopyCode} style={styles.codeAction}>
                   <Ionicons name="copy-outline" size={18} color="#FFBC40" />
-                  <Text style={styles.codeActionText}>Copier</Text>
+                  <Text style={styles.codeActionText}>{t('game.copy')}</Text>
                 </Pressable>
                 <Pressable onPress={handleShareCode} style={styles.codeAction}>
                   <Ionicons name="share-outline" size={18} color="#FFBC40" />
-                  <Text style={styles.codeActionText}>Partager</Text>
+                  <Text style={styles.codeActionText}>{t('game.share')}</Text>
                 </Pressable>
                 {!isGuest && (
                   <Pressable
@@ -491,7 +494,7 @@ export default function CreateRoomScreen() {
                     style={styles.codeAction}
                   >
                     <Ionicons name="person-add-outline" size={18} color="#FFBC40" />
-                    <Text style={styles.codeActionText}>Inviter</Text>
+                    <Text style={styles.codeActionText}>{t('game.invite')}</Text>
                   </Pressable>
                 )}
               </View>
@@ -506,7 +509,7 @@ export default function CreateRoomScreen() {
               <View style={styles.stakeBanner}>
                 <Ionicons name="cash-outline" size={20} color="#FFBC40" />
                 <Text style={styles.stakeBannerText}>
-                  Mise : {formatPtwRaw(room.stake)} / joueur · Pot : {formatPtwRaw(room.stake * playersList.length)}
+                  {t('game.stakeBanner', { stake: formatPtwRaw(room.stake), pot: formatPtwRaw(room.stake * playersList.length) })}
                 </Text>
               </View>
             </DynamicGradientBorder>
@@ -522,7 +525,7 @@ export default function CreateRoomScreen() {
             style={styles.lobbyPlayersBlock}
           >
             <Text style={styles.lobbySectionTitle}>
-              JOUEURS ({playersList.length}/{maxPlayers})
+              {t('game.playersCount', { count: playersList.length, max: maxPlayers })}
             </Text>
             {playersList.length >= 2 ? (
               // Présentation VS dès qu'au moins 2 joueurs sont dans le salon
@@ -560,7 +563,7 @@ export default function CreateRoomScreen() {
                             </Text>
                           ) : (
                             <Text style={styles.lobbyPlayerStatus}>
-                              {player.isHost ? 'Hôte' : player.isReady ? 'Prêt' : 'En attente'}
+                              {player.isHost ? t('game.host') : player.isReady ? t('game.ready') : t('game.waitingStatus')}
                             </Text>
                           )}
                         </View>
@@ -580,13 +583,13 @@ export default function CreateRoomScreen() {
                 ))}
                 <View style={styles.emptyPlayers}>
                   <Ionicons name="hourglass-outline" size={20} color="rgba(255,255,255,0.3)" />
-                  <Text style={styles.emptyText}>En attente d'autres joueurs...</Text>
+                  <Text style={styles.emptyText}>{t('game.waitingOtherPlayers')}</Text>
                 </View>
               </View>
             ) : (
               <View style={styles.emptyPlayers}>
                 <Ionicons name="hourglass-outline" size={24} color="rgba(255,255,255,0.3)" />
-                <Text style={styles.emptyText}>En attente de joueurs...</Text>
+                <Text style={styles.emptyText}>{t('game.waitingForPlayers')}</Text>
               </View>
             )}
           </DynamicGradientBorder>
@@ -604,7 +607,7 @@ export default function CreateRoomScreen() {
               color={hasSelectedStartup ? '#4CAF50' : '#FFBC40'}
             />
             <Text style={[styles.startupSelectText, hasSelectedStartup && styles.startupSelectTextDone]}>
-              {hasSelectedStartup ? myPlayer?.startupName ?? 'Projet choisi' : 'Choisir mon projet'}
+              {hasSelectedStartup ? myPlayer?.startupName ?? t('game.projectChosen') : t('game.chooseMyProject')}
             </Text>
             {!hasSelectedStartup && (
               <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.4)" />
@@ -638,19 +641,19 @@ export default function CreateRoomScreen() {
         <GameButton
           variant="yellow"
           fullWidth
-          title={isLoading ? 'CHARGEMENT...' : 'DEMARRER LA PARTIE'}
+          title={isLoading ? t('common.loading') : t('game.startGameCta')}
           loading={isLoading}
           disabled={playersList.length < 2 || !hasSelectedStartup}
           onPress={handleStartGame}
         />
         {!hasSelectedStartup && (
-          <Text style={styles.waitingText}>Choisis un projet avant de demarrer</Text>
+          <Text style={styles.waitingText}>{t('game.chooseProjectBeforeStart')}</Text>
         )}
         {playersList.length < 2 && (
-          <Text style={styles.waitingText}>Minimum 2 joueurs requis</Text>
+          <Text style={styles.waitingText}>{t('game.minTwoPlayersRequired')}</Text>
         )}
         {playersList.length >= 2 && !allReady && hasSelectedStartup && (
-          <Text style={styles.waitingText}>En attente que tous soient prets...</Text>
+          <Text style={styles.waitingText}>{t('game.waitingAllReady')}</Text>
         )}
       </View>
     </View>

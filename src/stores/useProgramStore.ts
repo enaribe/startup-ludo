@@ -23,6 +23,7 @@ import type {
   ProgramEnrollmentFormData,
   ProgramPartner,
   ProgramPlayAccess,
+  ProgramProgress,
   ProgramSession,
 } from '@/types/program';
 import { createProgramSessionId } from '@/types/program';
@@ -48,10 +49,11 @@ interface ProgramStoreActions {
   getActivePrograms: () => PartnerProgram[];
   setActiveProgram: (programId: string | null) => void;
   getEnrollmentForProgram: (programId: string, userId?: string) => ProgramEnrollment | undefined;
-  enrollInProgram: (programId: string, userId: string, formData?: ProgramEnrollmentFormData) => ProgramEnrollment | null;
+  enrollInProgram: (programId: string, userId: string, formData?: ProgramEnrollmentFormData, persona?: { profileId?: string | null; profileName?: string | null }) => ProgramEnrollment | null;
   getProgramSessions: (programId: string, userId?: string) => ProgramSession[];
+  getProgramProgress: (programId: string, userId?: string) => ProgramProgress;
   getProgramPlayAccess: (programId: string, userId?: string, isGuest?: boolean) => ProgramPlayAccess;
-  createProgramSession: (programId: string, userId: string, isTrial: boolean, gameId: string) => ProgramSession | null;
+  createProgramSession: (programId: string, userId: string, isTrial: boolean, gameId: string, levelIndex: number) => ProgramSession | null;
   completeProgramSession: (sessionId: string, result: { won: boolean | null; xpGained: number; tokensEarned: number }) => void;
   setError: (error: string | null) => void;
   reset: () => void;
@@ -93,8 +95,9 @@ export const useProgramStore = create<ProgramStoreState & ProgramStoreActions>()
             if (remotePartners.length > 0) state.partners = remotePartners;
             if (remotePrograms.length > 0) state.programs = remotePrograms;
           });
-        } catch {
+        } catch (error) {
           // Hors-ligne ou erreur réseau : on garde le catalogue local/persisté.
+          console.warn('[Programs] loadCatalog failed:', error);
         }
       },
 
@@ -157,7 +160,7 @@ export const useProgramStore = create<ProgramStoreState & ProgramStoreActions>()
         return enrollments.find((enrollment) => enrollment.programId === programId);
       },
 
-      enrollInProgram: (programId, userId, formData) => {
+      enrollInProgram: (programId, userId, formData, persona) => {
         const program = get().getProgramById(programId);
         if (!program || !userId) return null;
 
@@ -168,6 +171,10 @@ export const useProgramStore = create<ProgramStoreState & ProgramStoreActions>()
             const enrollment = state.enrollments.find((item) => item.id === existing.id);
             if (enrollment && formData) {
               enrollment.formData = formData;
+              // Marque la candidature comme nouveau lead à traiter dès qu'un formulaire est soumis.
+              if (!enrollment.leadStatus) enrollment.leadStatus = 'new';
+              if (persona?.profileId) enrollment.profileId = persona.profileId;
+              if (persona?.profileName) enrollment.profileName = persona.profileName;
               updatedEnrollment = { ...enrollment };
             }
           });
@@ -190,6 +197,11 @@ export const useProgramStore = create<ProgramStoreState & ProgramStoreActions>()
           totalSessions: 0,
           totalWins: 0,
           totalXp: 0,
+          currentLevel: 0,
+          completedLevels: 0,
+          profileId: persona?.profileId ?? null,
+          profileName: persona?.profileName ?? null,
+          leadStatus: formData ? 'new' : undefined,
           enrolledAt: now,
           lastPlayedAt: null,
           completedAt: null,
@@ -212,6 +224,18 @@ export const useProgramStore = create<ProgramStoreState & ProgramStoreActions>()
         return userId ? sessions.filter((session) => session.userId === userId) : sessions;
       },
 
+      getProgramProgress: (programId, userId) => {
+        const program = get().getProgramById(programId);
+        const totalLevels = Math.max(1, program?.contentPacks?.length ?? 1);
+        const enrollment = userId ? get().getEnrollmentForProgram(programId, userId) : undefined;
+        const currentLevel = Math.min(enrollment?.currentLevel ?? 0, totalLevels);
+        return {
+          currentLevel,
+          totalLevels,
+          isCompleted: currentLevel >= totalLevels,
+        };
+      },
+
       getProgramPlayAccess: (programId, userId, isGuest = false) => {
         const program = get().getProgramById(programId);
         if (!program || !program.isActive) {
@@ -222,20 +246,17 @@ export const useProgramStore = create<ProgramStoreState & ProgramStoreActions>()
           return { canPlay: false, reason: 'guest_blocked', requiresEnrollment: true, isTrial: false };
         }
 
-        const enrollment = get().getEnrollmentForProgram(programId, userId);
-        if (enrollment?.formData) {
-          return { canPlay: true, reason: 'enrolled', requiresEnrollment: false, isTrial: false };
+        // Système de niveaux : tout est jouable librement. Le parcours est terminé
+        // une fois tous les niveaux gagnés ; le formulaire est alors proposé (optionnel).
+        const progress = get().getProgramProgress(programId, userId);
+        if (progress.isCompleted) {
+          return { canPlay: false, reason: 'program_completed', requiresEnrollment: false, isTrial: false };
         }
 
-        const hasPlayed = get().sessions.some((session) => session.programId === programId && session.userId === userId);
-        if (!hasPlayed) {
-          return { canPlay: true, reason: 'trial_available', requiresEnrollment: false, isTrial: true };
-        }
-
-        return { canPlay: false, reason: 'trial_used', requiresEnrollment: true, isTrial: false };
+        return { canPlay: true, reason: 'enrolled', requiresEnrollment: false, isTrial: false };
       },
 
-      createProgramSession: (programId, userId, isTrial, gameId) => {
+      createProgramSession: (programId, userId, isTrial, gameId, levelIndex) => {
         const program = get().getProgramById(programId);
         if (!program || !userId) return null;
 
@@ -246,6 +267,7 @@ export const useProgramStore = create<ProgramStoreState & ProgramStoreActions>()
           programId,
           gameId,
           isTrial,
+          levelIndex,
           won: null,
           xpGained: 0,
           tokensEarned: 0,
@@ -267,6 +289,7 @@ export const useProgramStore = create<ProgramStoreState & ProgramStoreActions>()
 
       completeProgramSession: (sessionId, result) => {
         let updatedSession: ProgramSession | null = null;
+        let updatedEnrollment: ProgramEnrollment | null = null;
         set((state) => {
           const session = state.sessions.find((item) => item.id === sessionId);
           if (!session || session.completedAt) return;
@@ -277,19 +300,59 @@ export const useProgramStore = create<ProgramStoreState & ProgramStoreActions>()
           session.completedAt = Date.now();
           updatedSession = { ...session };
 
-          const enrollment = state.enrollments.find(
+          const program = state.programs.find((item) => item.id === session.programId);
+          const totalLevels = Math.max(1, program?.contentPacks?.length ?? 1);
+
+          // Enrollment auto-créé au premier passage (pas besoin de formulaire pour jouer).
+          let enrollment = state.enrollments.find(
             (item) => item.programId === session.programId && item.userId === session.userId
           );
-          if (enrollment) {
-            enrollment.totalSessions += 1;
-            enrollment.totalWins += result.won ? 1 : 0;
-            enrollment.totalXp += result.xpGained;
-            enrollment.lastPlayedAt = Date.now();
+          if (!enrollment) {
+            const now = Date.now();
+            enrollment = {
+              id: `program_enrollment_${now}_${Math.random().toString(36).slice(2, 9)}`,
+              userId: session.userId,
+              partnerId: session.partnerId,
+              programId: session.programId,
+              status: 'active',
+              formData: null,
+              totalSessions: 0,
+              totalWins: 0,
+              totalXp: 0,
+              currentLevel: 0,
+              completedLevels: 0,
+              enrolledAt: now,
+              lastPlayedAt: null,
+              completedAt: null,
+            };
+            state.enrollments.push(enrollment);
           }
+
+          enrollment.totalSessions += 1;
+          enrollment.totalWins += result.won ? 1 : 0;
+          enrollment.totalXp += result.xpGained;
+          enrollment.lastPlayedAt = Date.now();
+
+          // On ne monte de niveau que si on GAGNE le niveau courant (pas un ancien rejoué).
+          if (result.won && session.levelIndex === enrollment.currentLevel) {
+            enrollment.currentLevel = Math.min(enrollment.currentLevel + 1, totalLevels);
+            enrollment.completedLevels = Math.max(enrollment.completedLevels, enrollment.currentLevel);
+            if (enrollment.currentLevel >= totalLevels) {
+              enrollment.status = 'completed';
+              enrollment.completedAt = Date.now();
+            }
+          }
+
+          updatedEnrollment = { ...enrollment };
         });
         if (updatedSession) {
           setProgramSession(updatedSession).catch(() => {
             get().setError('Impossible de synchroniser le résultat du programme.');
+          });
+        }
+        if (updatedEnrollment) {
+          setProgramEnrollment(updatedEnrollment).catch(() => {
+            get().setError('Impossible de synchroniser la progression du programme.');
           });
         }
       },

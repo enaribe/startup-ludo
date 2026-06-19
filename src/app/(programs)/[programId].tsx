@@ -4,17 +4,19 @@ import { useMemo, useState } from 'react';
 import { Image, ImageBackground, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ProgramEnrollmentModal } from '@/components/programs';
-import { DynamicGradientBorder, GameButton, GuestGate, RadialBackground } from '@/components/ui';
+import { AutoWidthLogo, ProgramEnrollmentModal } from '@/components/programs';
+import { GameButton, GuestGate, OutlinedText, RadialBackground } from '@/components/ui';
 import { useAuthStore, useProgramStore } from '@/stores';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS } from '@/styles/typography';
+import { useTranslation } from '@/i18n';
 import type { ProgramEnrollmentFormData } from '@/types/program';
 
 export default function ProgramDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const params = useLocalSearchParams<{ programId: string }>();
   const user = useAuthStore((state) => state.user);
   const userId = user?.id ?? '';
@@ -23,8 +25,8 @@ export default function ProgramDetailScreen() {
   const programs = useProgramStore((state) => state.programs);
   const partners = useProgramStore((state) => state.partners);
   const enrollments = useProgramStore((state) => state.enrollments);
-  const sessions = useProgramStore((state) => state.sessions);
   const enrollInProgram = useProgramStore((state) => state.enrollInProgram);
+  const getProgramProgress = useProgramStore((state) => state.getProgramProgress);
   const [showEnroll, setShowEnroll] = useState(false);
 
   const program = useMemo(
@@ -42,31 +44,20 @@ export default function ProgramDetailScreen() {
         .filter((item): item is NonNullable<typeof item> => Boolean(item)),
     [partners, program]
   );
-  const enrollment = useMemo(
-    () => enrollments.find((item) => item.programId === params.programId && item.userId === userId),
-    [enrollments, params.programId, userId]
+  const progress = useMemo(
+    () => getProgramProgress(params.programId, userId),
+    // enrollments/programs en déps pour recalculer la progression quand le store change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [getProgramProgress, params.programId, userId, enrollments, programs]
   );
-  const access = useMemo(() => {
-    if (!program || !program.isActive) {
-      return { canPlay: false, reason: 'program_not_found' as const, requiresEnrollment: false, isTrial: false };
-    }
-    if (!userId || isGuest) {
-      return { canPlay: false, reason: 'guest_blocked' as const, requiresEnrollment: true, isTrial: false };
-    }
-    if (enrollment?.formData) {
-      return { canPlay: true, reason: 'enrolled' as const, requiresEnrollment: false, isTrial: false };
-    }
-    const hasPlayed = sessions.some((session) => session.programId === params.programId && session.userId === userId);
-    return hasPlayed
-      ? { canPlay: false, reason: 'trial_used' as const, requiresEnrollment: true, isTrial: false }
-      : { canPlay: true, reason: 'trial_available' as const, requiresEnrollment: false, isTrial: true };
-  }, [program, userId, isGuest, enrollment, sessions, params.programId]);
+  // A déjà commencé le parcours (au moins 1 niveau validé) → "CONTINUER", sinon "JOUER".
+  const hasStarted = progress.currentLevel > 0;
 
   if (isGuest) {
     return (
       <GuestGate
-        featureName="Programmes"
-        description="Cree un compte pour tester les programmes partenaires et sauvegarder ta progression."
+        featureName={t('program.featureName')}
+        description={t('program.guestDetailDesc')}
       />
     );
   }
@@ -76,8 +67,8 @@ export default function ProgramDetailScreen() {
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <RadialBackground />
         <View style={styles.center}>
-          <Text style={styles.errorText}>Programme introuvable</Text>
-          <GameButton title="Retour" variant="blue" onPress={() => router.back()} />
+          <Text style={styles.errorText}>{t('program.notFound')}</Text>
+          <GameButton title={t('common.back')} variant="blue" onPress={() => router.back()} />
         </View>
       </View>
     );
@@ -89,11 +80,13 @@ export default function ProgramDetailScreen() {
   };
 
   const handleMainAction = () => {
-    if (access.canPlay) {
-      router.push({ pathname: '/(programs)/play/[programId]', params: { programId: program.id } });
+    // Parcours terminé → proposer le formulaire. Sinon → aller jouer le niveau courant.
+    if (progress.isCompleted) {
+      setShowEnroll(true);
       return;
     }
-    setShowEnroll(true);
+    router.push({ pathname: '/(programs)/play/[programId]', params: { programId: program.id } });
+    return;
   };
 
   return (
@@ -110,38 +103,45 @@ export default function ProgramDetailScreen() {
         showsVerticalScrollIndicator={false}
       >
         {(() => {
-          const allPartners = partner ? [partner, ...coPartners] : coPartners;
-          // Image de fond propre au programme (heroImageUrl) en priorité, bannière en repli.
-          const heroBackground = program.heroImageUrl || program.bannerUrl;
+          // Logos co-partenaires : d'abord celui uploadé sur le programme, puis les co-partenaires cochés.
+          const coPartnerLogos = [
+            ...(program.bannerUrl ? [program.bannerUrl] : []),
+            ...coPartners.map((item) => item.logoUrl).filter((url): url is string => Boolean(url)),
+          ];
+          const heroBackground = program.heroImageUrl;
           const heroInner = (
             <>
+              {/* Haut : co-partenaire(s) à gauche, partenaire principal à droite */}
               <View style={styles.heroTopRow}>
-                <View style={styles.heroPartnership}>
-                  <Text style={styles.heroPartner}>En partenariat avec</Text>
-                  <View style={styles.heroPartnerLogos}>
-                    {allPartners.length > 0 ? (
-                      allPartners.map((item) =>
-                        item.logoUrl ? (
-                          <Image key={item.id} source={{ uri: item.logoUrl }} style={styles.heroPartnerLogo} resizeMode="contain" />
-                        ) : (
-                          <Text key={item.id} style={styles.heroPartnerName}>{item.shortName}</Text>
-                        )
-                      )
-                    ) : (
-                      <Text style={styles.heroPartnerName}>Partenaire</Text>
-                    )}
+                {coPartnerLogos.length > 0 ? (
+                  <View style={styles.heroCoPartnerRow}>
+                    {coPartnerLogos.map((logo, i) => (
+                      <AutoWidthLogo key={i} uri={logo} height={28} />
+                    ))}
                   </View>
-                </View>
-                {program.logoUrl ? (
-                  <View style={styles.heroProgramLogoBadge}>
-                    <Image source={{ uri: program.logoUrl }} style={styles.heroProgramLogo} resizeMode="contain" />
-                  </View>
-                ) : null}
+                ) : (
+                  <View />
+                )}
+                {partner?.logoUrl ? (
+                  <AutoWidthLogo uri={partner.logoUrl} height={46} />
+                ) : partner ? (
+                  <Text style={styles.heroPartnerName}>{partner.shortName}</Text>
+                ) : (
+                  <View />
+                )}
               </View>
-              <Text style={styles.heroTitle}>{program.name}</Text>
-              <View style={styles.playerBadge}>
-                <Ionicons name="people" size={15} color={COLORS.info} />
-                <Text style={styles.playerBadgeText}>{program.playerCount.toLocaleString()} joueurs</Text>
+
+              {/* Centre : logo du programme + badge joueurs, centrés */}
+              <View style={styles.heroCenter}>
+                {program.logoUrl ? (
+                  <Image source={{ uri: program.logoUrl }} style={styles.heroProgramLogo} resizeMode="contain" />
+                ) : (
+                  <Text style={styles.heroTitle}>{program.name}</Text>
+                )}
+                <View style={styles.playerBadge}>
+                  <Ionicons name="people" size={15} color={COLORS.info} />
+                  <Text style={styles.playerBadgeText}>{t('program.playersCount', { count: program.playerCount.toLocaleString() })}</Text>
+                </View>
               </View>
             </>
           );
@@ -165,7 +165,7 @@ export default function ProgramDetailScreen() {
         <Text style={styles.title}>{program.name}</Text>
         <Text style={styles.description}>{program.description}</Text>
 
-        <Text style={styles.sectionTitle}>A QUI S'ADRESSE CE PARCOURS</Text>
+        <Text style={styles.sectionTitle}>{t('program.audienceTitle')}</Text>
         <View style={styles.chipWrap}>
           {program.audience.ageRange && <InfoChip icon="people-outline" label={program.audience.ageRange} />}
           <InfoChip icon="location-outline" label={program.audience.locations.join(' - ')} />
@@ -173,19 +173,17 @@ export default function ProgramDetailScreen() {
           <InfoChip icon="ribbon-outline" label={program.audience.profile} />
         </View>
 
-        <Text style={styles.sectionTitle}>CE QUI VOUS ATTEND</Text>
-        <DynamicGradientBorder borderRadius={20} fill="rgba(0,0,0,0.32)">
-          <View style={styles.expectations}>
-            <InfoRow icon="game-controller-outline" label={`${program.sessionCount} parties contre l'IA`} />
-            <InfoRow icon="help-circle-outline" label="Quiz, opportunites, challenges et financements dedies" />
-            <InfoRow icon="school-outline" label={enrollment?.formData ? 'Inscription active' : 'Premiere partie de decouverte disponible'} />
-          </View>
-        </DynamicGradientBorder>
+        <Text style={styles.sectionTitle}>{t('program.whatAwaitsTitle')}</Text>
+        <View style={styles.expectGrid}>
+          <ExpectCard icon="layers-outline" title={t('program.expectLevels', { count: progress.totalLevels })} subtitle={t('program.expectLevelsSub')} />
+          <ExpectCard icon="person-outline" title={t('program.expectProfile')} subtitle={t('program.expectProfileSub')} />
+          <ExpectCard icon="document-text-outline" title={t('program.expectForm')} subtitle={t('program.expectFormSub')} />
+        </View>
       </ScrollView>
 
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + SPACING[3] }]}>
         <GameButton
-          title={access.canPlay ? 'JOUER' : "S'INSCRIRE"}
+          title={progress.isCompleted ? t('program.fillForm') : hasStarted ? t('program.continueLevel', { level: Math.min(progress.currentLevel + 1, progress.totalLevels) }) : t('program.start')}
           variant="yellow"
           fullWidth
           onPress={handleMainAction}
@@ -197,6 +195,7 @@ export default function ProgramDetailScreen() {
         programName={program.name}
         defaultFullName={user?.displayName}
         defaultEmail={user?.email}
+        endForm={program.endForm}
         onSubmit={handleEnroll}
         onClose={() => setShowEnroll(false)}
       />
@@ -213,11 +212,12 @@ function InfoChip({ icon, label }: { icon: keyof typeof Ionicons.glyphMap; label
   );
 }
 
-function InfoRow({ icon, label }: { icon: keyof typeof Ionicons.glyphMap; label: string }) {
+function ExpectCard({ icon, title, subtitle }: { icon: keyof typeof Ionicons.glyphMap; title: string; subtitle: string }) {
   return (
-    <View style={styles.infoRow}>
-      <Ionicons name={icon} size={18} color={COLORS.primary} />
-      <Text style={styles.infoRowText}>{label}</Text>
+    <View style={styles.expectCard}>
+      <Ionicons name={icon} size={34} color={COLORS.info} style={styles.expectIcon} />
+      <OutlinedText text={title} style={styles.expectTitle} outlineColor="#0E699C" outlineWidth={1.2} />
+      <Text style={styles.expectSubtitle}>{subtitle}</Text>
     </View>
   );
 }
@@ -245,10 +245,9 @@ const styles = StyleSheet.create({
     gap: SPACING[4],
   },
   hero: {
-    minHeight: 240,
+    aspectRatio: 340 / 195,
     borderRadius: 24,
-    padding: SPACING[5],
-    justifyContent: 'center',
+    padding: SPACING[4],
     overflow: 'hidden',
   },
   heroImage: {
@@ -256,26 +255,17 @@ const styles = StyleSheet.create({
   },
   heroScrim: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(10, 25, 41, 0.35)',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
   },
   heroTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: SPACING[3],
+    alignItems: 'center',
   },
-  heroPartnership: {
-    gap: 6,
-    flexShrink: 1,
-  },
-  heroPartnerLogos: {
+  heroCoPartnerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-  },
-  heroPartnerLogo: {
-    width: 72,
-    height: 42,
+    gap: 8,
   },
   heroPartnerName: {
     fontFamily: FONTS.title,
@@ -285,38 +275,30 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
-  heroProgramLogoBadge: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: COLORS.white,
+  heroCenter: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: SPACING[3],
   },
   heroProgramLogo: {
-    width: 44,
-    height: 44,
-  },
-  heroPartner: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.85)',
-    textShadowColor: 'rgba(0,0,0,0.45)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+    width: 150,
+    height: 62,
   },
   heroTitle: {
     fontFamily: FONTS.title,
-    fontSize: 30,
+    fontSize: 28,
     color: COLORS.white,
-    maxWidth: '82%',
+    textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.4)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
   playerBadge: {
-    marginTop: SPACING[5],
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    alignSelf: 'flex-start',
+    alignSelf: 'center',
     backgroundColor: COLORS.white,
     paddingHorizontal: 16,
     paddingVertical: 9,
@@ -366,20 +348,38 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.white,
   },
-  expectations: {
-    padding: SPACING[4],
+  expectGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: SPACING[3],
   },
-  infoRow: {
-    flexDirection: 'row',
+  expectCard: {
+    width: '47%',
+    aspectRatio: 1,
     alignItems: 'center',
-    gap: 10,
+    justifyContent: 'center',
+    gap: SPACING[2],
+    paddingHorizontal: SPACING[3],
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
-  infoRowText: {
-    flex: 1,
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: 14,
+  expectIcon: {
+    marginBottom: SPACING[1],
+  },
+  expectTitle: {
+    fontFamily: FONTS.title,
+    fontSize: 17,
+    color: COLORS.white,
+    textAlign: 'center',
+  },
+  expectSubtitle: {
+    fontFamily: FONTS.body,
+    fontSize: 13,
+    lineHeight: 18,
     color: COLORS.textSecondary,
+    textAlign: 'center',
   },
   bottomBar: {
     position: 'absolute',

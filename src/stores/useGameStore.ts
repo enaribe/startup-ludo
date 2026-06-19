@@ -21,6 +21,7 @@ import type { EditionId } from '@/data';
 import type { CheckpointData } from '@/utils/onlineCodec';
 import { useChallengeStore } from '@/stores/useChallengeStore';
 import { useProgramStore } from '@/stores/useProgramStore';
+import { useSettingsStore } from '@/stores/useSettingsStore';
 import { MAX_TOKENS } from '@/config/boardConfig';
 import { gameLog } from '@/utils/gameLog';
 import { resetDuelQuestionPool } from '@/data/duelQuestions';
@@ -190,6 +191,10 @@ export const useGameStore = create<GameStore>()(
         // Configurer l'EventManager avec l'édition
         eventManager.setEdition(edition as EditionId);
 
+        // Langue d'affichage du contenu = préférence du joueur (réglages app).
+        // S'applique à TOUT le contenu : éditions (local/online/quick match) ET programmes.
+        eventManager.setLanguage(useSettingsStore.getState().language);
+
         // Reset du pool de questions de duel (évite les doublons entre parties)
         resetDuelQuestionPool();
 
@@ -206,6 +211,7 @@ export const useGameStore = create<GameStore>()(
               : program?.contentPacks[0];
 
           if (contentPack) {
+            // La langue est déjà appliquée globalement via eventManager.setLanguage ci-dessus.
             eventManager.setContentPack({
               quizzes: contentPack.quizzes,
               duels: contentPack.duels,

@@ -26,6 +26,7 @@ import {
 } from '@/components/ui';
 import { GamePopup, GamePopupGradientBorder } from '@/components/ui/GamePopup';
 import type { InfoSection } from '@/components/ui';
+import { useTranslation } from '@/i18n';
 import { useAuthStore, useSettingsStore, useUserStore } from '@/stores';
 import { useSocialStore } from '@/stores/useSocialStore';
 import { useLeaderboardCache } from '@/hooks/useLeaderboardCache';
@@ -40,8 +41,8 @@ const { width: screenWidth } = Dimensions.get('window');
 
 
 const FILTERS = [
-  { id: 'joueurs', label: 'JOUEURS', icon: 'people' as const },
-  { id: 'entreprises', label: 'ENTREPRISES', icon: 'rocket' as const },
+  { id: 'joueurs', labelKey: 'ranking.players', icon: 'people' as const },
+  { id: 'entreprises', labelKey: 'ranking.companies', icon: 'rocket' as const },
 ];
 
 // Unified ranked item for both tabs
@@ -73,30 +74,33 @@ function formatScore(item: RankedItem): string {
   return `${item.score.toLocaleString()} xp`;
 }
 
-const CLASSEMENT_INFO_SECTIONS: InfoSection[] = [
-  {
-    icon: 'people',
-    title: 'JOUEURS',
-    body: "Les joueurs sont classés par XP accumulés en jouant des parties. Plus tu joues et gagnes, plus tu montes dans le classement.",
-  },
-  {
-    icon: 'rocket',
-    title: 'ENTREPRISES',
-    body: "Les entreprises sont classées par valorisation. Elle augmente chaque fois que ton entreprise lève des fonds lors d'une partie.",
-  },
-  {
-    icon: 'refresh-circle',
-    title: 'MISE À JOUR',
-    body: "Le classement est mis en cache pendant 5 minutes. Tire vers le bas pour forcer une actualisation.",
-  },
-  {
-    icon: 'eye',
-    title: 'TOP 20',
-    body: "Seul le top 20 est affiché. Si tu es plus loin, on te montre ta position et les rangs voisins.",
-  },
-];
+function getClassementInfoSections(t: (key: string, params?: Record<string, string | number>) => string): InfoSection[] {
+  return [
+    {
+      icon: 'people',
+      title: t('ranking.infoPlayersTitle'),
+      body: t('ranking.infoPlayersBody'),
+    },
+    {
+      icon: 'rocket',
+      title: t('ranking.infoCompaniesTitle'),
+      body: t('ranking.infoCompaniesBody'),
+    },
+    {
+      icon: 'refresh-circle',
+      title: t('ranking.infoUpdateTitle'),
+      body: t('ranking.infoUpdateBody'),
+    },
+    {
+      icon: 'eye',
+      title: t('ranking.infoTop20Title'),
+      body: t('ranking.infoTop20Body'),
+    },
+  ];
+}
 
 export default function ClassementScreen() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
   const currentUserId = useAuthStore((state) => state.user?.id);
@@ -143,7 +147,7 @@ export default function ClassementScreen() {
     () =>
       remotePlayers.map((e) => ({
         id: e.id,
-        name: (e.displayName ?? 'Joueur').toUpperCase(),
+        name: (e.displayName ?? t('ranking.defaultPlayer')).toUpperCase(),
         score: e.xp,
         subtitle: `${e.xp.toLocaleString()} xp`,
         type: 'user' as const,
@@ -154,7 +158,7 @@ export default function ClassementScreen() {
         gamesWon: e.gamesWon,
         startupCount: 0,
       })),
-    [remotePlayers, currentUserId],
+    [remotePlayers, currentUserId, t],
   );
 
   // === JOUEURS DATA: merge remote users with local profile ===
@@ -166,7 +170,7 @@ export default function ClassementScreen() {
       if (!alreadyPresent) {
         list.push({
           id: currentUserId,
-          name: (currentUserName ?? localProfile.displayName ?? 'Moi').toUpperCase(),
+          name: (currentUserName ?? localProfile.displayName ?? t('ranking.defaultMe')).toUpperCase(),
           score: localProfile.xp,
           subtitle: `${localProfile.xp.toLocaleString()} xp`,
           type: 'user',
@@ -197,7 +201,7 @@ export default function ClassementScreen() {
 
     list.sort((a, b) => b.score - a.score);
     return list;
-  }, [remoteUsers, localProfile, currentUserId, currentUserName]);
+  }, [remoteUsers, localProfile, currentUserId, currentUserName, t]);
 
   // === ENTREPRISES DATA: merge remote startups with local startups ===
   const entrepriseData: RankedItem[] = useMemo(() => {
@@ -300,7 +304,7 @@ export default function ClassementScreen() {
       <View style={[styles.fixedHeader, { paddingTop: headerTopPadding }]}>
         <Animated.View entering={FadeInDown.duration(500)}>
           <ScreenHeader
-            title="CLASSEMENT GLOBAL"
+            title={t('ranking.headerTitle')}
             rightElement={
               <Pressable style={styles.infoBtn} onPress={() => setShowInfo(true)}>
                 <Ionicons name="information-circle-outline" size={24} color="#FFBC40" />
@@ -361,7 +365,7 @@ export default function ClassementScreen() {
                     textTransform: 'uppercase',
                   }}
                 >
-                  {filter.label}
+                  {t(filter.labelKey)}
                 </Text>
               </Pressable>
             );
@@ -372,11 +376,11 @@ export default function ClassementScreen() {
           <View style={{ paddingVertical: SPACING[8] }}>
             <EmptyState
               icon="trophy-outline"
-              title={isJoueurs ? 'Aucun joueur' : 'Aucune entreprise'}
+              title={isJoueurs ? t('ranking.emptyPlayers') : t('ranking.emptyCompanies')}
               description={
                 isJoueurs
-                  ? 'Le classement sera disponible quand des joueurs auront joue !'
-                  : 'Creez votre premiere entreprise pour apparaitre ici !'
+                  ? t('ranking.emptyPlayersDesc')
+                  : t('ranking.emptyCompaniesDesc')
               }
             />
           </View>
@@ -412,7 +416,7 @@ export default function ClassementScreen() {
                 textTransform: 'uppercase',
               }}
             >
-              TOP 3 {isJoueurs ? 'JOUEURS' : 'ENTREPRISES'}
+              {isJoueurs ? t('ranking.top3Players') : t('ranking.top3Companies')}
             </Text>
 
             {/* Podium Section */}
@@ -478,8 +482,8 @@ export default function ClassementScreen() {
                   <View style={{ padding: SPACING[4] }}>
                     <EmptyState
                       icon="trophy-outline"
-                      title="Aucun autre classement"
-                      description="Jouez pour apparaitre ici !"
+                      title={t('ranking.emptyOthers')}
+                      description={t('ranking.emptyOthersDesc')}
                     />
                   </View>
                 ) : (
@@ -506,7 +510,7 @@ export default function ClassementScreen() {
                           <View style={styles.gapDot} />
                           <View style={styles.gapDot} />
                           <Text style={styles.gapInlineText}>
-                            {`Votre position #${ownerRank} sur ${userTotalCount}`}
+                            {t('ranking.yourPosition', { rank: ownerRank, total: userTotalCount })}
                           </Text>
                         </View>
                         <RankingItem
@@ -542,8 +546,8 @@ export default function ClassementScreen() {
         visible={showInfo}
         onClose={() => setShowInfo(false)}
         variant="classement"
-        description="Le classement regroupe tous les joueurs et entreprises de la plateforme."
-        sections={CLASSEMENT_INFO_SECTIONS}
+        description={t('ranking.infoModalDescription')}
+        sections={getClassementInfoSections(t)}
       />
     </View>
   );
@@ -567,6 +571,7 @@ interface ProfilePopupProps {
 }
 
 function ProfilePopup({ item, rank, isFollowed, isGuest, onToggleFollow, onClose }: ProfilePopupProps) {
+  const { t } = useTranslation();
   const [detailPageIndex, setDetailPageIndex] = useState(0);
   const [cardW, setCardW] = useState(0);
   const [cardH, setCardH] = useState(0);
@@ -586,29 +591,29 @@ function ProfilePopup({ item, rank, isFollowed, isGuest, onToggleFollow, onClose
   const pages: { title: string; content: React.ReactNode }[] = isUser
     ? [
         {
-          title: 'Synthèse',
+          title: t('ranking.synthesis'),
           content: (
             <View style={ppStyles.statsList}>
-              <ProfileLinearStat label="XP" value={item.score.toLocaleString()} />
+              <ProfileLinearStat label={t('ranking.xp')} value={item.score.toLocaleString()} />
               <View style={ppStyles.statSep} />
-              <ProfileLinearStat label="Niveau" value={`NIV. ${item.level || 1}`} />
+              <ProfileLinearStat label={t('ranking.level')} value={t('ranking.levelShort', { level: item.level || 1 })} />
               <View style={ppStyles.statSep} />
-              <ProfileLinearStat label="Entreprises" value={String(item.startupCount ?? 0)} />
+              <ProfileLinearStat label={t('ranking.companies')} value={String(item.startupCount ?? 0)} />
               <View style={ppStyles.statSep} />
-              <ProfileLinearStat label="Rang" value={`#${rank}`} />
+              <ProfileLinearStat label={t('ranking.rank')} value={`#${rank}`} />
             </View>
           ),
         },
         {
-          title: 'Performance',
+          title: t('ranking.performance'),
           content: (
             <View style={ppStyles.infoList}>
-              <ProfilePortfolioDetailRow icon="medal-outline" label="Ligue" value={item.rank?.trim() || '—'} />
-              <ProfilePortfolioDetailRow icon="game-controller" label="Parties jouées" value={String(item.gamesPlayed || 0)} />
-              <ProfilePortfolioDetailRow icon="trophy" label="Victoires" value={String(item.gamesWon || 0)} />
+              <ProfilePortfolioDetailRow icon="medal-outline" label={t('ranking.league')} value={item.rank?.trim() || '—'} />
+              <ProfilePortfolioDetailRow icon="game-controller" label={t('ranking.gamesPlayed')} value={String(item.gamesPlayed || 0)} />
+              <ProfilePortfolioDetailRow icon="trophy" label={t('ranking.wins')} value={String(item.gamesWon || 0)} />
               <ProfilePortfolioDetailRow
                 icon="star"
-                label="Taux de victoire"
+                label={t('ranking.winRate')}
                 value={`${item.gamesPlayed ? Math.round(((item.gamesWon || 0) / item.gamesPlayed) * 100) : 0}%`}
                 highlight
               />
@@ -618,20 +623,20 @@ function ProfilePopup({ item, rank, isFollowed, isGuest, onToggleFollow, onClose
       ]
     : [
         {
-          title: 'À propos',
+          title: t('ranking.about'),
           content: (
             <View style={ppStyles.infoList}>
-              <ProfileLinearStat label="Valorisation" value={formatScore(item)} />
+              <ProfileLinearStat label={t('ranking.valuation')} value={formatScore(item)} />
               <View style={ppStyles.statSep} />
-              <ProfileLinearStat label="Secteur" value={item.sector || '—'} multiline />
+              <ProfileLinearStat label={t('ranking.sector')} value={item.sector || '—'} multiline />
             </View>
           ),
         },
         {
-          title: 'Créateur',
+          title: t('ranking.creator'),
           content: (
             <View style={ppStyles.infoList}>
-              <ProfilePortfolioDetailRow icon="person" label="Nom" value={item.creatorName?.trim() || '—'} />
+              <ProfilePortfolioDetailRow icon="person" label={t('ranking.name')} value={item.creatorName?.trim() || '—'} />
             </View>
           ),
         },
@@ -648,14 +653,14 @@ function ProfilePopup({ item, rank, isFollowed, isGuest, onToggleFollow, onClose
         <View style={ppStyles.actionsColumn}>
           {showFollowCta && (
             <GameButton
-              title={isFollowed ? 'NE PLUS SUIVRE' : 'SUIVRE'}
+              title={isFollowed ? t('ranking.unfollow') : t('ranking.follow')}
               variant={isFollowed ? 'blue' : 'yellow'}
               fullWidth
               disabled={isGuest}
               onPress={onToggleFollow}
             />
           )}
-          <GameButton title="FERMER" variant="blue" fullWidth onPress={onClose} />
+          <GameButton title={t('common.close')} variant="blue" fullWidth onPress={onClose} />
         </View>
       }
     >

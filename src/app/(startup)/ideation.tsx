@@ -9,12 +9,13 @@ import * as Haptics from 'expo-haptics';
 import { RadialBackground, DynamicGradientBorder, GameButton } from '@/components/ui';
 import { FONTS } from '@/styles/typography';
 import { useSettingsStore } from '@/stores';
+import { useTranslation } from '@/i18n';
 
-const STEPS = [
-  { number: 1, text: "Tirage de 3 cartes d'inspiration" },
-  { number: 2, text: 'Réflexion guidée (5 minutes)' },
-  { number: 3, text: "Création avec l'assistant Tambali" },
-  { number: 4, text: 'Finalisation et ajout au portfolio' },
+const STEP_KEYS = [
+  { number: 1, key: 'startup.ideationStep1' },
+  { number: 2, key: 'startup.ideationStep2' },
+  { number: 3, key: 'startup.ideationStep3' },
+  { number: 4, key: 'startup.ideationStep4' },
 ] as const;
 
 const StepItem = memo(function StepItem({
@@ -39,6 +40,7 @@ const StepItem = memo(function StepItem({
 export default function IdeationScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
 
   const handleBack = useCallback(() => {
@@ -63,7 +65,7 @@ export default function IdeationScreen() {
         <Pressable onPress={handleBack} style={styles.backButton}>
           <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
         </Pressable>
-        <Text style={styles.headerTitle}>NOUVELLE STARTUP</Text>
+        <Text style={styles.headerTitle}>{t('startup.ideationHeader')}</Text>
         <View style={styles.backButton} />
       </View>
 
@@ -81,24 +83,23 @@ export default function IdeationScreen() {
 
               {/* Titre */}
               <Animated.View entering={FadeInDown.delay(200).duration(500)}>
-                <Text style={styles.title}>IDÉATION CRÉATIVE</Text>
+                <Text style={styles.title}>{t('startup.ideationTitle')}</Text>
               </Animated.View>
 
               {/* Description */}
               <Animated.View entering={FadeInDown.delay(300).duration(500)}>
                 <Text style={styles.description}>
-                  Transformez une idée en entreprise ! Nous allons vous guider à travers un processus
-                  d'idéation structuré pour créer votre prochaine startup.
+                  {t('startup.ideationDescription')}
                 </Text>
               </Animated.View>
 
               {/* Étapes */}
               <View style={styles.stepsContainer}>
-                {STEPS.map((step) => (
+                {STEP_KEYS.map((step) => (
                   <StepItem
                     key={step.number}
                     number={step.number}
-                    text={step.text}
+                    text={t(step.key)}
                     delay={350 + step.number * 100}
                   />
                 ))}
@@ -109,7 +110,7 @@ export default function IdeationScreen() {
                 <GameButton
                   variant="yellow"
                   fullWidth
-                  title="COMMENCER"
+                  title={t('startup.ideationStart')}
                   onPress={handleStart}
                 />
               </Animated.View>

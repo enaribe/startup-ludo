@@ -23,6 +23,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { DynamicGradientBorder, GameButton, RadialBackground } from '@/components/ui';
 import { GamePopup } from '@/components/ui/GamePopup';
 import { useMultiplayer } from '@/hooks/useMultiplayer';
+import { useTranslation } from '@/i18n';
 import { usePresenceMap } from '@/hooks/usePresence';
 import { sendGameInvitation } from '@/services/firebase/gameInvitationService';
 import {
@@ -63,6 +64,7 @@ function mergeUsers(users: SocialUser[], currentUserId: string | undefined): Soc
 export default function AvailablePlayersScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { challenge } = useLocalSearchParams<{ challenge?: string }>();
 
   const user = useAuthStore((state) => state.user);
@@ -132,7 +134,7 @@ export default function AvailablePlayersScreen() {
       if (state !== 'online') return;
 
       if (!hasProject) {
-        Alert.alert('Aucun projet', 'Tu dois créer une entreprise avant de jouer en ligne.');
+        Alert.alert(t('game.noProjectTitleCap'), t('game.noProjectShort'));
         return;
       }
 
@@ -151,8 +153,8 @@ export default function AvailablePlayersScreen() {
     const stakeFcfa = stakePtwToFcfa(stakePtw);
     if (stakeFcfa > 0 && !canAffordStake(profile?.startups, stakeFcfa)) {
       Alert.alert(
-        'Solde insuffisant',
-        `Tu n'as que ${formatPtwRaw(stakableBalanceFcfa)} de valorisation. Choisis une mise plus petite.`
+        t('game.insufficientBalance'),
+        t('game.insufficientBalanceDesc', { balance: formatPtwRaw(stakableBalanceFcfa) })
       );
       return;
     }
@@ -166,12 +168,12 @@ export default function AvailablePlayersScreen() {
         edition: challenge ?? 'classic',
         maxPlayers: 2,
         hostName: user.displayName ?? 'Joueur',
-        roomName: `Salon de ${user.displayName ?? 'Joueur'}`,
+        roomName: t('game.roomOf', { name: user.displayName ?? t('game.playerFallback') }),
         betAmount: stakeFcfa,
       });
 
       if (!result) {
-        Alert.alert('Invitation impossible', 'Le salon n’a pas pu être créé.');
+        Alert.alert(t('game.invitationImpossible'), t('game.roomCreationFailed'));
         return;
       }
 
@@ -185,8 +187,8 @@ export default function AvailablePlayersScreen() {
         });
       } catch {
         Alert.alert(
-          'Salon créé',
-          "Le salon est prêt, mais l'invitation n'a pas pu être envoyée. Tu peux partager le code depuis le salon."
+          t('game.roomCreated'),
+          t('game.invitationNotSent')
         );
       }
 
@@ -246,7 +248,7 @@ export default function AvailablePlayersScreen() {
                 <ActivityIndicator size="small" color="#0A1929" />
               ) : (
                 <Text style={[styles.inviteButtonText, !isOnline && styles.inviteButtonTextDisabled]}>
-                  {isOnline ? 'INVITER' : state === 'in_game' ? 'EN PARTIE' : 'HORS LIGNE'}
+                  {isOnline ? t('game.inviteCta') : state === 'in_game' ? t('game.inGame') : t('game.offline')}
                 </Text>
               )}
             </Pressable>
@@ -264,7 +266,7 @@ export default function AvailablePlayersScreen() {
         <Pressable onPress={() => router.back()} hitSlop={8} style={styles.headerButton}>
           <Ionicons name="chevron-back" size={24} color="white" />
         </Pressable>
-        <Text style={styles.headerTitle}>JOUEURS DISPONIBLES</Text>
+        <Text style={styles.headerTitle}>{t('game.availablePlayersTitle')}</Text>
         <View style={styles.headerButton} />
       </View>
 
@@ -285,9 +287,9 @@ export default function AvailablePlayersScreen() {
                 <Ionicons name="radio-outline" size={22} color={COLORS.primary} />
               </View>
               <View style={styles.summaryTextBlock}>
-                <Text style={styles.summaryTitle}>STATUTS EN TEMPS RÉEL</Text>
+                <Text style={styles.summaryTitle}>{t('game.realtimeStatuses')}</Text>
                 <Text style={styles.summaryText}>
-                  Invite un joueur connecté de ton réseau.
+                  {t('game.inviteConnectedPlayer')}
                 </Text>
               </View>
             </View>
@@ -303,9 +305,9 @@ export default function AvailablePlayersScreen() {
             <DynamicGradientBorder borderRadius={20} fill="rgba(0,0,0,0.35)" boxWidth={contentWidth}>
               <View style={styles.emptyState}>
                 <Ionicons name="people-outline" size={36} color="rgba(255,255,255,0.25)" />
-                <Text style={styles.emptyTitle}>Aucun joueur dans ton réseau</Text>
+                <Text style={styles.emptyTitle}>{t('game.noPlayersInNetwork')}</Text>
                 <Text style={styles.emptyText}>
-                  Suis des joueurs depuis Réseau & Amis pour les voir ici.
+                  {t('game.followPlayersHint')}
                 </Text>
               </View>
             </DynamicGradientBorder>
@@ -320,21 +322,21 @@ export default function AvailablePlayersScreen() {
         <GamePopup
           visible
           onRequestClose={() => setPendingInvite(null)}
-          header="PARTIE EN LIGNE"
-          title={`Inviter ${pendingInvite.displayName}`}
+          header={t('game.onlineGameTitle')}
+          title={t('game.invitePlayer', { name: pendingInvite.displayName })}
           footer={
             <View style={{ gap: SPACING[3] }}>
               <GameButton
-                title={stakePtw > 0 ? `INVITER · MISE ${stakePtw} Ptw` : 'INVITER SANS MISE'}
+                title={stakePtw > 0 ? t('game.inviteWithStake', { stake: stakePtw }) : t('game.inviteNoStake')}
                 variant="yellow"
                 fullWidth
                 onPress={confirmInvite}
               />
-              <GameButton title="ANNULER" variant="blue" fullWidth onPress={() => setPendingInvite(null)} />
+              <GameButton title={t('game.cancelCta')} variant="blue" fullWidth onPress={() => setPendingInvite(null)} />
             </View>
           }
         >
-          <Text style={styles.stakeModalLabel}>Mise par joueur</Text>
+          <Text style={styles.stakeModalLabel}>{t('game.stakePerPlayer')}</Text>
           <View style={styles.stakeRow}>
             {STAKE_OPTIONS_PTW.map((opt) => {
               const optFcfa = stakePtwToFcfa(opt);
@@ -353,7 +355,7 @@ export default function AvailablePlayersScreen() {
                   ]}
                 >
                   <Text style={[styles.stakeChipText, selected && styles.stakeChipTextActive]}>
-                    {opt === 0 ? 'Sans' : `${opt} Ptw`}
+                    {opt === 0 ? t('game.stakeNone') : `${opt} Ptw`}
                   </Text>
                 </Pressable>
               );
@@ -361,10 +363,10 @@ export default function AvailablePlayersScreen() {
           </View>
           <Text style={styles.stakeModalHint}>
             {isGuest
-              ? 'Les invités jouent sans mise.'
+              ? t('game.guestsPlayNoStake')
               : stakePtw > 0
-                ? `Solde : ${formatPtwRaw(stakableBalanceFcfa)} · Pot : ${formatPtwRaw(stakePtwToFcfa(stakePtw) * 2)}`
-                : 'Le gagnant remporte le pot des mises.'}
+                ? t('game.balanceAndPot', { balance: formatPtwRaw(stakableBalanceFcfa), pot: formatPtwRaw(stakePtwToFcfa(stakePtw) * 2) })
+                : t('game.winnerTakesPot')}
           </Text>
         </GamePopup>
       )}
