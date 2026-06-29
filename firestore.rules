@@ -38,6 +38,17 @@ service cloud.firestore {
       return isAdmin() && resource.data.ownerId == request.auth.uid;
     }
 
+    // Admin de partenaire : gère tous les programmes dont partnerId == son partnerId (claim).
+    function isPartnerAdmin() {
+      return isAuthenticated() && request.auth.token.partner_admin == true;
+    }
+    function ownsViaPartnerAfter() {
+      return isPartnerAdmin() && request.resource.data.partnerId == request.auth.token.partnerId;
+    }
+    function ownsViaPartnerBefore() {
+      return isPartnerAdmin() && resource.data.partnerId == request.auth.token.partnerId;
+    }
+
     function isValidUser() {
       return isAuthenticated() &&
              request.resource.data.keys().hasAll(['email', 'displayName', 'createdAt']) &&
@@ -97,9 +108,13 @@ service cloud.firestore {
     //    et il ne peut pas se déposséder (ownerId reste le sien après écriture).
     match /programs/{programId} {
       allow read: if true;
-      allow create: if isSuperAdmin() || ownsProgramAfter();
-      allow update: if isSuperAdmin() || (ownsProgramBefore() && ownsProgramAfter());
-      allow delete: if isSuperAdmin();
+      // super admin : tout · admin programme : ses programmes (ownerId) ·
+      // admin partenaire : tous les programmes de son partenaire (partnerId).
+      allow create: if isSuperAdmin() || ownsProgramAfter() || ownsViaPartnerAfter();
+      allow update: if isSuperAdmin()
+                    || (ownsProgramBefore() && ownsProgramAfter())
+                    || (ownsViaPartnerBefore() && ownsViaPartnerAfter());
+      allow delete: if isSuperAdmin() || ownsViaPartnerBefore();
     }
 
     // Ideation cards/decks (PUBLIC read - game content, write for admins)

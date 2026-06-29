@@ -495,9 +495,10 @@ export class EventManager {
     const pickOpp = hasOpp && (!hasChal || Math.random() < 0.5);
 
     if (pickOpp) {
-      const opp = this.pickRandomUnused(opportunities, this.usedOpportunityIds);
-      if (opp) {
-        this.usedOpportunityIds.add(opp.id);
+      const picked = this.pickRandomUnused(opportunities, this.usedOpportunityIds);
+      if (picked) {
+        this.usedOpportunityIds.add(picked.id);
+        const opp = this.tOpportunity(picked);
         return {
           type: 'opportunity',
           data: {
@@ -512,9 +513,10 @@ export class EventManager {
       }
     }
 
-    const chal = this.pickRandomUnused(challenges, this.usedChallengeIds);
-    if (chal) {
-      this.usedChallengeIds.add(chal.id);
+    const pickedChal = this.pickRandomUnused(challenges, this.usedChallengeIds);
+    if (pickedChal) {
+      this.usedChallengeIds.add(pickedChal.id);
+      const chal = this.tChallenge(pickedChal);
       return {
         type: 'challenge',
         data: {

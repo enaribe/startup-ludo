@@ -1,4 +1,4 @@
-import { memo, useState, useEffect, useCallback } from 'react';
+import { memo, useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import Animated, {
   cancelAnimation,
@@ -22,6 +22,26 @@ import { useSettingsStore } from '@/stores';
 import { useSound, usePlaySoundOnOpen } from '@/hooks/useSound';
 import type { QuizEvent } from '@/types';
 import { crashLog } from '@/utils/gameLog';
+
+// ─── Mélange des options ─────────────────────────────────────────────────────
+// On mélange les réponses pour éviter que la bonne soit toujours en position A
+// (dans les données, correctAnswer est souvent l'index 0/1). Chaque entrée garde
+// son index ORIGINAL afin que la comparaison avec quiz.correctAnswer et le
+// callback onAnswer continuent de raisonner sur l'ordre d'origine du moteur.
+interface ShuffledOption {
+  label: string;
+  /** Index de cette option dans le tableau quiz.options d'origine. */
+  originalIndex: number;
+}
+
+function shuffleOptions(options: string[]): ShuffledOption[] {
+  const arr: ShuffledOption[] = options.map((label, originalIndex) => ({ label, originalIndex }));
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j]!, arr[i]!];
+  }
+  return arr;
+}
 
 // ─── Defs propres à l'icône Quiz ────────────────────────────────────────────
 
@@ -114,6 +134,12 @@ export const QuizPopup = memo(function QuizPopup({
   const [hasAnswered, setHasAnswered] = useState(false);
   const [showCorrectHighlight, setShowCorrectHighlight] = useState(false);
   const [, setTimeRemaining] = useState(30);
+
+  // Ordre d'affichage mélangé, recalculé uniquement quand on change de question.
+  const displayOptions = useMemo(
+    () => (quiz ? shuffleOptions(quiz.options) : []),
+    [quiz?.id]
+  );
 
   const timerProgress = useSharedValue(1);
   const resultScale = useSharedValue(0);
@@ -277,9 +303,9 @@ export const QuizPopup = memo(function QuizPopup({
             </View>
           )}
 
-          {/* Options de réponse - structure unique */}
+          {/* Options de réponse - structure unique (ordre mélangé) */}
           <View style={styles.options}>
-            {quiz.options.map((option, index) => {
+            {displayOptions.map(({ label: option, originalIndex: index }, displayIndex) => {
               const isCorrectOption = index === quiz.correctAnswer;
               const isSelected = selectedAnswer === index;
               const isSelectedWrong = isSelected && !isCorrectOption;
@@ -309,6 +335,7 @@ export const QuizPopup = memo(function QuizPopup({
                 <Pressable
                   key={index}
                   onPress={() => handleSelectAnswer(index)}
+                  disabled={hasAnswered || isSpectator}
                 >
                   {({ pressed }) => (
                     <View
@@ -328,7 +355,7 @@ export const QuizPopup = memo(function QuizPopup({
                             styles.optionPrefixText,
                             (showAsCorrect || isSelectedWrong) && styles.optionPrefixTextLight
                           ]}>
-                            {String.fromCharCode(65 + index)}
+                            {String.fromCharCode(65 + displayIndex)}
                           </Text>
                         )}
                       </View>

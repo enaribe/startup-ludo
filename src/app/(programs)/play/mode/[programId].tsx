@@ -90,7 +90,7 @@ export default function ProgramModeScreen() {
         {
           id: userId,
           name: playerLabel,
-          color: 'blue',
+          color: 'green',
           isAI: false,
           isHost: true,
           isConnected: true,
@@ -98,7 +98,7 @@ export default function ProgramModeScreen() {
         {
           id: `ai_${program.id}`,
           name: 'ADIA',
-          color: 'green',
+          color: 'blue',
           isAI: true,
           isHost: false,
           isConnected: true,
@@ -228,13 +228,12 @@ const styles = StyleSheet.create({
     gap: SPACING[4],
     padding: SPACING[4],
     borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderWidth: 1.5,
+    backgroundColor: 'rgba(0,0,0,0.15)',
+    borderWidth: 0.75,
     borderColor: 'rgba(255,255,255,0.1)',
   },
   modeCardSelected: {
     borderColor: COLORS.primary,
-    backgroundColor: 'rgba(255,188,64,0.08)',
   },
   modeCardDisabled: {
     opacity: 0.55,
