@@ -60,7 +60,8 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { Dimensions, Image, KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, Image, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import Animated, {
   Easing,
   FadeIn,
@@ -194,6 +195,10 @@ interface GamePopupProps {
   children?: React.ReactNode;
   /** Bouton(s) en bas du popup */
   footer?: React.ReactNode;
+  /** Affiche un bouton « X » en haut à droite pour fermer (défaut: false). */
+  showCloseButton?: boolean;
+  /** Ferme le popup au tap en dehors du contenu (défaut: false). */
+  closeOnBackdrop?: boolean;
 }
 
 export function GamePopup({
@@ -206,6 +211,8 @@ export function GamePopup({
   spinningShapeSize = 240,
   children,
   footer,
+  showCloseButton = false,
+  closeOnBackdrop = false,
 }: GamePopupProps) {
   const popupScale = useSharedValue(0.85);
   const popupOpacity = useSharedValue(0);
@@ -232,12 +239,31 @@ export function GamePopup({
         style={styles.backdrop}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
+        {/* Couche de fermeture au tap extérieur (n'intercepte rien si désactivée) */}
+        {closeOnBackdrop && (
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={onRequestClose}
+            accessibilityLabel="Fermer"
+          />
+        )}
         <Animated.View style={popupStyle}>
           <OuterBorderWrapper height={popupHeight}>
             <View
               style={styles.popup}
               onLayout={(e) => setPopupHeight(e.nativeEvent.layout.height)}
             >
+              {/* Bouton X de fermeture */}
+              {showCloseButton && (
+                <Pressable
+                  onPress={onRequestClose}
+                  style={styles.closeButton}
+                  hitSlop={10}
+                  accessibilityLabel="Fermer"
+                >
+                  <Ionicons name="close" size={20} color={COLORS.white} />
+                </Pressable>
+              )}
               {/* Background radial gradient */}
               <Svg style={StyleSheet.absoluteFill} width={svgNum(GAME_POPUP_WIDTH)} height={svgNum(popupHeight || 1)}>
                 <Defs>
@@ -316,6 +342,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     overflow: 'hidden',
     maxHeight: screenHeight * 0.85,
+  },
+  closeButton: {
+    position: 'absolute',
+    top: SPACING[3],
+    right: SPACING[3],
+    zIndex: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
   header: {
     fontFamily: FONTS.body,

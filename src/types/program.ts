@@ -79,14 +79,24 @@ export type FormFieldType =
   | 'file';
 
 /** Un champ configurable du formulaire de fin de parcours. */
+/** Groupe d'options pour les champs liste : un titre (grande liste) + ses sous-items. */
+export interface ProgramFormOptionGroup {
+  /** Titre du groupe (grand titre). Vide/absent = items sans en-tête. */
+  title?: string;
+  /** Sous-items sélectionnables de ce groupe. */
+  items: string[];
+}
+
 export interface ProgramFormField {
   id: string;
   type: FormFieldType;
   label: string;
   placeholder?: string;
   required: boolean;
-  /** Options pour select / multi_select / radio. */
+  /** Liste PLATE de tous les items sélectionnables (select / multi_select / radio). */
   options?: string[];
+  /** Structure hiérarchique (titres + sous-items) pour l'affichage. Dérivée d'options. */
+  optionGroups?: ProgramFormOptionGroup[];
   /** Bornes pour slider. */
   min?: number;
   max?: number;
@@ -131,6 +141,12 @@ export interface ProgramProfile {
   enabled?: boolean;
   /** Brouillon non encore publié (n'apparaît pas côté joueur). */
   isDraft?: boolean;
+  /**
+   * Contenu de jeu propre à ce persona, par niveau (même structure que program.contentPacks).
+   * S'il existe un pack pour le niveau joué, il REMPLACE le contenu commun ; sinon on
+   * retombe sur program.contentPacks[niveau] (remplace + fallback).
+   */
+  contentPacks?: ProgramContentPack[];
 }
 
 export interface PartnerProgram {

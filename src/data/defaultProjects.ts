@@ -147,6 +147,10 @@ export function getDefaultProjectsForEdition(editionId: string): DefaultProject[
   // Import dynamique pour éviter la dépendance circulaire
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const { getEdition } = require('./index');
+  // Langue courante : applique translations[lang] si dispo (fr = texte original).
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { useSettingsStore } = require('@/stores');
+  const lang: string = useSettingsStore.getState?.().language ?? 'fr';
 
   // Récupérer l'édition depuis la fonction getEdition
   const editionData = getEdition(editionId);
@@ -157,16 +161,19 @@ export function getDefaultProjectsForEdition(editionId: string): DefaultProject[
   // Si l'édition a des defaultProjects générés, les utiliser
   if (editionData?.defaultProjects && editionData.defaultProjects.length > 0) {
     console.log(`[DefaultProjects] Using ${editionData.defaultProjects.length} projects from edition ${editionId}`);
-    // Mapper vers le format DefaultProject local si nécessaire
-    return editionData.defaultProjects.map((p: DefaultProject) => ({
-      id: p.id,
-      name: p.name,
-      sector: p.sector,
-      description: p.description,
-      target: p.target || '',
-      mission: p.mission || '',
-      initialBudget: p.initialBudget,
-    }));
+    // Mapper vers le format DefaultProject local + appliquer la traduction de langue.
+    return editionData.defaultProjects.map((p: DefaultProject) => {
+      const tr = lang !== 'fr' ? p.translations?.[lang] : undefined;
+      return {
+        id: p.id,
+        name: tr?.name || p.name,
+        sector: p.sector,
+        description: tr?.description || p.description,
+        target: tr?.target || p.target || '',
+        mission: tr?.mission || p.mission || '',
+        initialBudget: p.initialBudget,
+      };
+    });
   }
 
   // Sinon fallback : projets Firestore ou locaux

@@ -164,7 +164,6 @@ export default function HomeScreen() {
     [partners]
   );
 
-  const primaryPartnerId = featuredPartners[0]?.id ?? 'mastercard-foundation';
 
   // Horizontal partner carousel
   const partnerListRef = useRef<FlatList<ProgramPartner>>(null);
@@ -373,12 +372,7 @@ export default function HomeScreen() {
         <View style={styles.challengeHeader}>
           <Text style={styles.challengeHeaderTitle}>PARTENAIRES</Text>
           {!isGuest && featuredPartners.length > 0 && (
-            <Pressable
-              onPress={() => router.push({
-                pathname: '/(programs)/partner/[partnerId]',
-                params: { partnerId: primaryPartnerId },
-              })}
-            >
+            <Pressable onPress={() => router.push('/(programs)/partners')}>
               <Text style={styles.voirPlusText}>VOIR PLUS</Text>
             </Pressable>
           )}

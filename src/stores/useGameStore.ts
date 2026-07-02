@@ -205,10 +205,37 @@ export const useGameStore = create<GameStore>()(
         eventManager.clearContentPack();
         if (programContext) {
           const program = useProgramStore.getState().getProgramById(programContext.programId);
-          const contentPack =
-            programContext.contentPackId
+
+          // Contenu commun (par id de pack, sinon par index du niveau joué).
+          const commonPack =
+            (programContext.contentPackId
               ? program?.contentPacks.find((pack) => pack.id === programContext.contentPackId)
-              : program?.contentPacks[0];
+              : undefined)
+            ?? program?.contentPacks[programContext.levelIndex]
+            ?? program?.contentPacks[0];
+
+          // Contenu propre au persona : on cible le MÊME niveau que le pack commun joué.
+          // On matche par levelTier (fiable) ; à défaut de levelTier, on retombe sur l'index.
+          const profile = programContext.profileId
+            ? program?.profiles?.find((pr) => pr.id === programContext.profileId)
+            : undefined;
+          const personaPack = profile?.contentPacks
+            ? (commonPack?.levelTier
+                ? profile.contentPacks.find((p) => p.levelTier === commonPack.levelTier)
+                : profile.contentPacks[programContext.levelIndex])
+            : undefined;
+          const personaHasContent =
+            !!personaPack &&
+            (personaPack.quizzes.length +
+              personaPack.duels.length +
+              personaPack.fundings.length +
+              personaPack.opportunities.length +
+              personaPack.challengeEvents.length) > 0;
+
+          const contentPack = personaHasContent ? personaPack : commonPack;
+          if (personaHasContent) {
+            gameLog('store', '[GameStore] Using persona-specific content pack:', programContext.profileId);
+          }
 
           if (contentPack) {
             // La langue est déjà appliquée globalement via eventManager.setLanguage ci-dessus.

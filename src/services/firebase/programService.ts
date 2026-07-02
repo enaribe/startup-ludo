@@ -118,3 +118,43 @@ export async function getProgramSessionsForUser(userId: string): Promise<Program
   }
 }
 
+// ===== Candidatures partenaires (« Devenir partenaire ») =====
+// Formulaire soumis depuis le mobile, reçu et traité côté Concree (back-office).
+
+export interface PartnershipApplicationData {
+  /** Nom de l'organisation candidate. */
+  organizationName: string;
+  /** Nom de la personne de contact. */
+  contactName: string;
+  email: string;
+  phone: string;
+  /** Secteur / domaine d'activité (optionnel). */
+  sector?: string;
+  /** Site web (optionnel). */
+  website?: string;
+  /** Message / présentation du projet de partenariat. */
+  message: string;
+}
+
+/** Soumet une candidature de partenariat dans la collection `partnershipApplications`. */
+export async function submitPartnershipApplication(
+  data: PartnershipApplicationData,
+  meta: { userId?: string | null } = {}
+): Promise<void> {
+  try {
+    const ref = doc(collection(getFirestore(), FIRESTORE_COLLECTIONS.partnershipApplications));
+    firebaseLog('Submitting partnership application', { id: ref.id });
+    await setDoc(ref, {
+      id: ref.id,
+      ...data,
+      userId: meta.userId ?? null,
+      status: 'new',
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    firebaseLog('Failed to submit partnership application', error);
+    throw new Error(getFirebaseErrorMessage(error));
+  }
+}
+

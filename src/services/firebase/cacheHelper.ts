@@ -15,6 +15,14 @@ import { firebaseLog } from './config';
 
 const CACHE_PREFIX = '@firestore_cache_';
 
+/**
+ * Mode test : en développement, on ignore le cache au démarrage et on attend
+ * toujours la donnée fraîche de Firestore (utile pour voir immédiatement les
+ * modifs faites côté admin). N'a aucun effet en production (build release).
+ */
+const BYPASS_CACHE_IN_DEV = true;
+const shouldBypassCache = __DEV__ && BYPASS_CACHE_IN_DEV;
+
 interface CacheEntry<T> {
   data: T;
   fetchedAt: number;
@@ -64,14 +72,16 @@ export async function cachedFetch<T>(
   fetcher: () => Promise<T>,
   onUpdate: (data: T) => void,
 ): Promise<void> {
-  const cached = await loadFromCache<T>(key);
+  // En mode test (dev), on n'applique pas le cache : on attend la donnée fraîche
+  // de Firestore pour refléter immédiatement les changements côté admin.
+  const cached = shouldBypassCache ? null : await loadFromCache<T>(key);
 
   if (cached) {
     // Apply cached data immediately for instant display
     onUpdate(cached.data);
     firebaseLog(`[Cache] ${key}: loaded from AsyncStorage`);
   } else {
-    firebaseLog(`[Cache] ${key}: no cache`);
+    firebaseLog(shouldBypassCache ? `[Cache] ${key}: bypass (dev)` : `[Cache] ${key}: no cache`);
   }
 
   // Always fetch Firestore to detect changes (additions + deletions)

@@ -20,6 +20,18 @@ service firebase.storage {
         && request.resource.size < 5 * 1024 * 1024; // max 5 Mo
     }
 
+    // Documents sources (base de contenu) : PDF, DOCX, MD/TXT, PPTX. Max 25 Mo.
+    function isValidDoc() {
+      return request.resource.size < 25 * 1024 * 1024 && (
+        request.resource.contentType == 'application/pdf'
+        || request.resource.contentType == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        || request.resource.contentType == 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+        || request.resource.contentType == 'application/msword'
+        || request.resource.contentType.matches('text/.*')
+        || request.resource.contentType == 'application/octet-stream'
+      );
+    }
+
     // Challenge images (bannières, logos) — admin uniquement en écriture, lecture publique
     match /challenges/{programId}/{fileName} {
       allow read: if true;
@@ -31,6 +43,14 @@ service firebase.storage {
     match /partners/{partnerId}/{fileName} {
       allow read: if true;
       allow write: if isAdmin() && isValidImage();
+      allow delete: if isAdmin();
+    }
+
+    // Documents sources d'un programme (base de contenu pour la génération) — admin uniquement,
+    // documents (PDF/DOCX/MD/TXT/PPTX) jusqu'à 25 Mo. Règle plus spécifique que le wildcard ci-dessous.
+    match /programs/{programId}/sources/{fileName} {
+      allow read: if isAdmin();
+      allow write: if isAdmin() && isValidDoc();
       allow delete: if isAdmin();
     }
 

@@ -813,6 +813,11 @@ const en: Record<string, string> = {
   'achievements.comeback_king_desc': 'Win after being in last place',
   'achievements.speed_demon_title': 'Lightning',
   'achievements.speed_demon_desc': 'Win a game in under 15 turns',
+
+  // Company selection popup
+  'startupSelect.title': 'CHOOSE YOUR COMPANY',
+  'startupSelect.confirm': 'CONFIRM',
+  'startupSelect.defaultCompany': 'Default company',
 };
 
 export default en;

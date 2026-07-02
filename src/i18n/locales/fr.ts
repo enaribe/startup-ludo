@@ -813,6 +813,11 @@ const fr = {
   'achievements.comeback_king_desc': 'Gagne après avoir été dernier',
   'achievements.speed_demon_title': 'Éclair',
   'achievements.speed_demon_desc': 'Gagne une partie en moins de 15 tours',
+
+  // Popup de sélection d'entreprise
+  'startupSelect.title': 'CHOISISSEZ VOTRE ENTREPRISE',
+  'startupSelect.confirm': 'CONFIRMER',
+  'startupSelect.defaultCompany': 'Entreprise par défaut',
 } as const;
 
 export default fr;

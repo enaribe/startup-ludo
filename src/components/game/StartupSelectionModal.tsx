@@ -8,6 +8,7 @@ import { RocketIcon } from '@/components/icons';
 import { COLORS } from '@/styles/colors';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { SPACING, BORDER_RADIUS } from '@/styles/spacing';
+import { useTranslation } from '@/i18n';
 import type { Startup } from '@/types';
 import type { DefaultProject } from '@/data/defaultProjects';
 
@@ -46,6 +47,7 @@ export const StartupSelectionModal = memo(function StartupSelectionModal({
   onSelect,
   onClose,
 }: StartupSelectionModalProps) {
+  const { t } = useTranslation();
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const handleConfirm = () => {
@@ -74,11 +76,13 @@ export const StartupSelectionModal = memo(function StartupSelectionModal({
     <GamePopup
       visible={visible}
       onRequestClose={handleClose}
+      showCloseButton
+      closeOnBackdrop
       header={playerName ?? undefined}
-      title="CHOISISSEZ VOTRE ENTREPRISE"
+      title={t('startupSelect.title')}
       footer={
         <GameButton
-          title="CONFIRMER"
+          title={t('startupSelect.confirm')}
           onPress={handleConfirm}
           variant="yellow"
           fullWidth
@@ -141,7 +145,7 @@ export const StartupSelectionModal = memo(function StartupSelectionModal({
         {/* Projets par défaut */}
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionLabel}>Entreprise par défaut</Text>
+            <Text style={styles.sectionLabel}>{t('startupSelect.defaultCompany')}</Text>
             <View style={styles.sectionLabelLine} />
           </View>
           {defaultProjects.map((project, index) => (

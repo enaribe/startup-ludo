@@ -233,7 +233,7 @@ interface PlayerSetup {
 export default function LocalSetupScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const user = useAuthStore((state) => state.user);
   const profile = useUserStore((state) => state.profile);
   const initGame = useGameStore((state) => state.initGame);
@@ -324,7 +324,8 @@ export default function LocalSetupScreen() {
   // Projets par defaut et startups du joueur 1 filtrees par edition
   const defaultProjects = useMemo(
     () => getDefaultProjectsForEdition(selectedEdition),
-    [selectedEdition]
+    // `language` en dépendance : recalcule les projets (et leur traduction) si la langue change.
+    [selectedEdition, language]
   );
   const userStartups = useMemo(
     () => getMatchingUserStartups(profile?.startups ?? [], selectedEdition),

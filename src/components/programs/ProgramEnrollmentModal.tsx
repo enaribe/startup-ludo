@@ -343,6 +343,52 @@ export const ProgramEnrollmentModal = memo(function ProgramEnrollmentModal({
   );
 });
 
+/**
+ * Rendu des options d'un champ liste, avec support des groupes (titres + sous-items).
+ * - Si le champ a des `optionGroups` avec titres → grands titres + petites pilules.
+ * - Sinon → liste plate classique (rétrocompatible).
+ */
+function OptionGroups({
+  field,
+  isSelected,
+  onToggle,
+}: {
+  field: ProgramFormField;
+  isSelected: (opt: string) => boolean;
+  onToggle: (opt: string) => void;
+}) {
+  const groups = field.optionGroups?.length
+    ? field.optionGroups
+    : [{ items: field.options ?? [] }];
+  const hasTitles = groups.some((g) => g.title);
+
+  const renderPills = (items: string[]) => (
+    <View style={styles.choicesWrap}>
+      {items.map((opt) => {
+        const selected = isSelected(opt);
+        return (
+          <Pressable key={opt} onPress={() => onToggle(opt)} style={[styles.choicePill, selected && styles.choiceSelected]}>
+            <Text style={[styles.choiceText, selected && styles.choiceTextSelected]}>{opt}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+
+  if (!hasTitles) return renderPills(groups[0]?.items ?? field.options ?? []);
+
+  return (
+    <View style={styles.optionGroupsWrap}>
+      {groups.map((g, i) => (
+        <View key={g.title ?? `grp_${i}`} style={styles.optionGroup}>
+          {g.title ? <Text style={styles.optionGroupTitle}>{g.title}</Text> : null}
+          {renderPills(g.items)}
+        </View>
+      ))}
+    </View>
+  );
+}
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <View style={styles.fieldGroup}>
@@ -383,36 +429,22 @@ function DynamicField({
     case 'radio':
       return (
         <Field label={label}>
-          <View style={styles.choicesWrap}>
-            {(field.options ?? []).map((opt) => {
-              const selected = value === opt;
-              return (
-                <Pressable key={opt} onPress={() => onChange(opt)} style={[styles.choicePill, selected && styles.choiceSelected]}>
-                  <Text style={[styles.choiceText, selected && styles.choiceTextSelected]}>{opt}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          <OptionGroups
+            field={field}
+            isSelected={(opt) => value === opt}
+            onToggle={(opt) => onChange(opt)}
+          />
         </Field>
       );
     case 'multi_select': {
       const arr = Array.isArray(value) ? value : [];
       return (
         <Field label={label}>
-          <View style={styles.choicesWrap}>
-            {(field.options ?? []).map((opt) => {
-              const selected = arr.includes(opt);
-              return (
-                <Pressable
-                  key={opt}
-                  onPress={() => onChange(selected ? arr.filter((o) => o !== opt) : [...arr, opt])}
-                  style={[styles.choicePill, selected && styles.choiceSelected]}
-                >
-                  <Text style={[styles.choiceText, selected && styles.choiceTextSelected]}>{opt}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          <OptionGroups
+            field={field}
+            isSelected={(opt) => arr.includes(opt)}
+            onToggle={(opt) => onChange(arr.includes(opt) ? arr.filter((o) => o !== opt) : [...arr, opt])}
+          />
         </Field>
       );
     }
@@ -594,6 +626,18 @@ const styles = StyleSheet.create({
   choicesRow: {
     flexDirection: 'row',
     gap: SPACING[2],
+  },
+  optionGroupsWrap: {
+    gap: SPACING[3],
+  },
+  optionGroup: {
+    gap: SPACING[2],
+  },
+  optionGroupTitle: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 15,
+    color: COLORS.white,
+    marginTop: SPACING[1],
   },
   choicesWrap: {
     flexDirection: 'row',
