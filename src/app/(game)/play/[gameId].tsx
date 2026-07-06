@@ -1701,9 +1701,13 @@ export default function PlayScreen() {
         </View>
       </GamePopup>
 
-      {/* Avertissement préventif "approche du couloir final" */}
+      {/* Avertissement préventif "approche du couloir final".
+          IMPORTANT (iOS) : deux <Modal> React Native ne peuvent PAS s'afficher
+          simultanément. Le choix de capture est PRIORITAIRE (il bloque le tour) :
+          on masque cet avertissement tant qu'un choix de capture est en attente,
+          sinon le CaptureChoicePopup ne s'affiche jamais. */}
       <MissedFinalEntryPopup
-        visible={missedFinalEntry !== null}
+        visible={missedFinalEntry !== null && captureChoice === null}
         onContinue={() => {
           setMissedFinalEntry(null);
           resolveMissedFinalEntry();
@@ -1713,7 +1717,7 @@ export default function PlayScreen() {
         allPlayers={game?.players ?? []}
       />
 
-      {/* Capture Choice Popup (captureur) */}
+      {/* Capture Choice Popup (captureur) — prioritaire sur l'avertissement */}
       <CaptureChoicePopup
         visible={captureChoice !== null}
         capturer={currentPlayer}

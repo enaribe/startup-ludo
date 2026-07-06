@@ -1,17 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Image, ImageBackground, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AutoWidthLogo, ProgramEnrollmentModal } from '@/components/programs';
+import { AutoWidthLogo } from '@/components/programs';
 import { GameButton, GuestGate, OutlinedText, RadialBackground } from '@/components/ui';
 import { useAuthStore, useProgramStore } from '@/stores';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS } from '@/styles/typography';
 import { useTranslation } from '@/i18n';
-import type { ProgramEnrollmentFormData } from '@/types/program';
 
 export default function ProgramDetailScreen() {
   const router = useRouter();
@@ -25,9 +24,7 @@ export default function ProgramDetailScreen() {
   const programs = useProgramStore((state) => state.programs);
   const partners = useProgramStore((state) => state.partners);
   const enrollments = useProgramStore((state) => state.enrollments);
-  const enrollInProgram = useProgramStore((state) => state.enrollInProgram);
   const getProgramProgress = useProgramStore((state) => state.getProgramProgress);
-  const [showEnroll, setShowEnroll] = useState(false);
 
   const program = useMemo(
     () => programs.find((item) => item.id === params.programId),
@@ -74,19 +71,39 @@ export default function ProgramDetailScreen() {
     );
   }
 
-  const handleEnroll = (formData: ProgramEnrollmentFormData) => {
-    enrollInProgram(program.id, userId, formData);
-    setShowEnroll(false);
-  };
+  // « À qui s'adresse ce parcours » : priorité à eligibility (rempli dans l'admin),
+  // repli sur audience (ancien champ, encore utilisé par certains programmes).
+  const audienceChips = (() => {
+    const chips: { icon: keyof typeof Ionicons.glyphMap; label: string }[] = [];
+    const elig = program.eligibility;
+    const aud = program.audience;
+
+    // Âge : eligibility (min-max) sinon audience.ageRange.
+    const ageLabel =
+      elig && (elig.ageMin != null || elig.ageMax != null)
+        ? `${elig.ageMin ?? ''}${elig.ageMin != null && elig.ageMax != null ? '-' : ''}${elig.ageMax ?? ''} ${t('program.years')}`.trim()
+        : aud?.ageRange || '';
+    if (ageLabel) chips.push({ icon: 'people-outline', label: ageLabel });
+
+    // Régions / lieux.
+    const regions = (elig?.regions?.length ? elig.regions : aud?.locations ?? []).filter(Boolean);
+    if (regions.length) chips.push({ icon: 'location-outline', label: regions.join(' - ') });
+
+    // Secteurs.
+    const sectors = (elig?.sectors?.length ? elig.sectors : (aud?.sector ? [aud.sector] : [])).filter(Boolean);
+    if (sectors.length) chips.push({ icon: 'leaf-outline', label: sectors.join(' - ') });
+
+    // Profils.
+    const profiles = (elig?.audienceProfiles?.length ? elig.audienceProfiles : (aud?.profile ? [aud.profile] : [])).filter(Boolean);
+    if (profiles.length) chips.push({ icon: 'ribbon-outline', label: profiles.join(' - ') });
+
+    return chips;
+  })();
 
   const handleMainAction = () => {
-    // Parcours terminé → proposer le formulaire. Sinon → aller jouer le niveau courant.
-    if (progress.isCompleted) {
-      setShowEnroll(true);
-      return;
-    }
+    // On peut TOUJOURS jouer (même parcours terminé). Le formulaire de candidature
+    // n'est proposé qu'en fin de partie (écran de résultats), pas ici.
     router.push({ pathname: '/(programs)/play/[programId]', params: { programId: program.id } });
-    return;
   };
 
   return (
@@ -165,13 +182,16 @@ export default function ProgramDetailScreen() {
         <Text style={styles.title}>{program.name}</Text>
         <Text style={styles.description}>{program.description}</Text>
 
-        <Text style={styles.sectionTitle}>{t('program.audienceTitle')}</Text>
-        <View style={styles.chipWrap}>
-          {program.audience.ageRange && <InfoChip icon="people-outline" label={program.audience.ageRange} />}
-          <InfoChip icon="location-outline" label={program.audience.locations.join(' - ')} />
-          <InfoChip icon="leaf-outline" label={program.audience.sector} />
-          <InfoChip icon="ribbon-outline" label={program.audience.profile} />
-        </View>
+        {audienceChips.length > 0 && (
+          <>
+            <Text style={styles.sectionTitle}>{t('program.audienceTitle')}</Text>
+            <View style={styles.chipWrap}>
+              {audienceChips.map((c, i) => (
+                <InfoChip key={`${c.icon}_${i}`} icon={c.icon} label={c.label} />
+              ))}
+            </View>
+          </>
+        )}
 
         <Text style={styles.sectionTitle}>{t('program.whatAwaitsTitle')}</Text>
         <View style={styles.expectGrid}>
@@ -183,22 +203,12 @@ export default function ProgramDetailScreen() {
 
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + SPACING[3] }]}>
         <GameButton
-          title={progress.isCompleted ? t('program.fillForm') : hasStarted ? t('program.continueLevel', { level: Math.min(progress.currentLevel + 1, progress.totalLevels) }) : t('program.start')}
+          title={progress.isCompleted ? t('program.replayProgram') : hasStarted ? t('program.continueLevel', { level: Math.min(progress.currentLevel + 1, progress.totalLevels) }) : t('program.start')}
           variant="yellow"
           fullWidth
           onPress={handleMainAction}
         />
       </View>
-
-      <ProgramEnrollmentModal
-        visible={showEnroll}
-        programName={program.name}
-        defaultFullName={user?.displayName}
-        defaultEmail={user?.email}
-        endForm={program.endForm}
-        onSubmit={handleEnroll}
-        onClose={() => setShowEnroll(false)}
-      />
     </View>
   );
 }

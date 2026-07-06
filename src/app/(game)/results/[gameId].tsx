@@ -27,7 +27,6 @@ import Animated, {
 import Svg, { Defs, G, Path, RadialGradient, Rect, Stop, LinearGradient } from 'react-native-svg';
 
 import { GameButton } from '@/components/ui';
-import { ProgramEnrollmentModal } from '@/components/programs';
 import { AchievementUnlockedPopup } from '@/components/game/popups/AchievementUnlockedPopup';
 import { XP_REWARDS, getChallengeXPReward } from '@/config/progression';
 import type { Achievement } from '@/config/achievements';
@@ -41,7 +40,6 @@ import { formatPtwRaw } from '@/utils/currency';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
-import type { ProgramEnrollmentFormData } from '@/types/program';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const POPUP_WIDTH = Math.min(screenWidth - SPACING[8], 340);
@@ -317,6 +315,16 @@ export default function ResultsScreen() {
   }>();
 
   const { game, resetGame, initGame } = useGameStore();
+  // [DIAG] à retirer : trace l'état du contexte programme à l'affichage des résultats.
+  console.log('[RESULTS-DIAG]', {
+    paramGameId: params.gameId,
+    storeGameId: game?.id,
+    mode: game?.mode,
+    hasProgramContext: !!game?.programContext,
+    programId: game?.programContext?.programId,
+    profileName: game?.programContext?.profileName,
+    players: game?.players?.map((p) => p.name),
+  });
   const user = useAuthStore((state) => state.user);
   const profile = useUserStore((state) => state.profile);
   const addXP = useUserStore((s) => s.addXP);
@@ -332,8 +340,6 @@ export default function ResultsScreen() {
   const challenges = useChallengeStore((s) => s.challenges);
   const enrollments = useChallengeStore((s) => s.enrollments);
   const completeProgramSession = useProgramStore((s) => s.completeProgramSession);
-  const enrollInProgram = useProgramStore((s) => s.enrollInProgram);
-  const getProgramById = useProgramStore((s) => s.getProgramById);
   const getProgramProgress = useProgramStore((s) => s.getProgramProgress);
   // S'abonner aux enrollments pour recalculer la progression après completeProgramSession.
   const programEnrollments = useProgramStore((s) => s.enrollments);
@@ -345,7 +351,6 @@ export default function ResultsScreen() {
   const { play: playEndGameSound } = useSound();
 
   const [showConvertPopup, setShowConvertPopup] = useState(false);
-  const [showProgramEnroll, setShowProgramEnroll] = useState(false);
   const [showXpNeededMessage, setShowXpNeededMessage] = useState(false);
   const [xpNeededAmount, setXpNeededAmount] = useState(0);
   // Succès débloqués par cette partie — affichés dans AchievementUnlockedPopup
@@ -425,7 +430,6 @@ export default function ResultsScreen() {
 
   const isChallengeGame = !!game?.challengeContext;
   const isProgramGame = !!game?.programContext;
-  const resultProgram = game?.programContext ? getProgramById(game.programContext.programId) : undefined;
 
   // Progression du parcours après cette partie (le store a déjà été mis à jour dans l'effet de fin).
   const programProgress = isProgramGame && game?.programContext
@@ -436,8 +440,15 @@ export default function ResultsScreen() {
   const programLevelCleared =
     isProgramGame && isWinner && !!programProgress && programProgress.currentLevel > playedLevelIndex;
   const programJustCompleted = isProgramGame && !!programProgress?.isCompleted;
-  // référence programEnrollments pour que ce calcul se réévalue après mise à jour du store.
-  void programEnrollments;
+  // Le joueur a-t-il déjà rempli le formulaire de candidature pour ce programme ?
+  // (programEnrollments en dépendance implicite : recalcul après mise à jour du store.)
+  const programFormFilled = isProgramGame
+    ? !!programEnrollments.find(
+        (e) => e.programId === game?.programContext?.programId && e.userId === userId
+      )?.formData
+    : false;
+  // On ne propose la candidature qu'à la fin du parcours ET si pas encore remplie.
+  const canEnroll = programJustCompleted && !programFormFilled;
 
   // Sous-titre header
   const subtitleText = isProgramGame
@@ -615,6 +626,29 @@ export default function ResultsScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game?.status]);
 
+  // ===== REDIRECTION PROGRAMME =====
+  // Les parties de programme ont leur PROPRE écran de récapitulation. Une fois les
+  // récompenses appliquées, on redirige vers cet écran en transmettant le contexte
+  // via params (fiable, contrairement au store qui peut se réinitialiser).
+  const programRedirectDone = useRef(false);
+  useEffect(() => {
+    if (programRedirectDone.current) return;
+    if (!game || game.status !== 'finished') return;
+    const ctx = game.programContext;
+    if (!ctx) return;
+    programRedirectDone.current = true;
+    router.replace({
+      pathname: '/(programs)/results/[gameId]',
+      params: {
+        gameId: game.id,
+        programId: ctx.programId,
+        profileId: ctx.profileId ?? '',
+        profileName: ctx.profileName ?? '',
+        won: userId != null && game.winner === userId ? '1' : '0',
+      },
+    });
+  }, [game, userId, router]);
+
   // ===== ANIMATIONS =====
   useEffect(() => {
     // Popup apparait
@@ -702,14 +736,18 @@ export default function ResultsScreen() {
     });
   };
 
-  const handleProgramEnrollSubmit = (formData: ProgramEnrollmentFormData) => {
+  // Navigue vers l'écran 2 « Candidatez » (flow plein écran).
+  const handleGoToEnroll = () => {
     const programId = game?.programContext?.programId ?? params.programId;
-    if (!programId || !userId) return;
-    enrollInProgram(programId, userId, formData, {
-      profileId: game?.programContext?.profileId ?? null,
-      profileName: game?.programContext?.profileName ?? null,
+    if (!programId) return;
+    router.push({
+      pathname: '/(programs)/enroll/[programId]',
+      params: {
+        programId,
+        profileId: game?.programContext?.profileId ?? '',
+        profileName: game?.programContext?.profileName ?? '',
+      },
     });
-    setShowProgramEnroll(false);
   };
 
   const handleNextLevel = () => {
@@ -770,6 +808,12 @@ export default function ResultsScreen() {
     { top: 90, left: 50, color: '#FF6B6B', size: 6, rotate: '10deg' },
     { top: 100, right: 50, color: '#4ECDC4', size: 5, rotate: '-20deg' },
   ];
+
+  // Partie de programme : on ne rend PAS l'écran générique (redirection en cours
+  // vers l'écran de récap dédié). Évite le flash « Partie solo ».
+  if (isProgramGame) {
+    return <View style={styles.backdrop} />;
+  }
 
   return (
     <View style={styles.backdrop}>
@@ -892,7 +936,9 @@ export default function ResultsScreen() {
             />
             <Text style={styles.programTrialText}>
               {programJustCompleted
-                ? 'Parcours terminé ! Vous pouvez remplir le formulaire de candidature.'
+                ? (canEnroll
+                    ? 'Parcours terminé ! Vous pouvez remplir le formulaire de candidature.'
+                    : 'Parcours terminé ! Vous pouvez rejouer autant que vous voulez.')
                 : programLevelCleared
                   ? `Niveau réussi ! Niveau ${Math.min(programProgress.currentLevel + 1, programProgress.totalLevels)}/${programProgress.totalLevels} débloqué.`
                   : `Niveau non validé. Rejouez le niveau ${playedLevelIndex + 1}/${programProgress.totalLevels} pour avancer.`}
@@ -907,9 +953,16 @@ export default function ResultsScreen() {
         >
           {isProgramGame ? (
             <>
-              {programJustCompleted ? (
+              {canEnroll ? (
                 <>
-                  <GameButton variant="yellow" fullWidth title="REMPLIR LE FORMULAIRE" onPress={() => setShowProgramEnroll(true)} />
+                  <GameButton variant="yellow" fullWidth title="S'INSCRIRE AU PROGRAMME" onPress={handleGoToEnroll} />
+                  <GameButton variant="blue" fullWidth title="REJOUER" onPress={handleProgramReplay} />
+                  <GameButton variant="blue" fullWidth title="RETOUR À L'ACCUEIL" onPress={handleGoHome} />
+                </>
+              ) : programJustCompleted ? (
+                <>
+                  {/* Parcours terminé + formulaire déjà rempli : on ne propose plus la candidature. */}
+                  <GameButton variant="yellow" fullWidth title="REJOUER" onPress={handleProgramReplay} />
                   <GameButton variant="blue" fullWidth title="RETOUR À L'ACCUEIL" onPress={handleGoHome} />
                 </>
               ) : programLevelCleared ? (
@@ -968,18 +1021,6 @@ export default function ResultsScreen() {
         achievements={unlockedAchievements}
         onClose={() => setUnlockedAchievements([])}
       />
-
-      {resultProgram && (
-        <ProgramEnrollmentModal
-          visible={showProgramEnroll}
-          programName={resultProgram.name}
-          defaultFullName={user?.displayName}
-          defaultEmail={user?.email}
-          endForm={resultProgram.endForm}
-          onSubmit={handleProgramEnrollSubmit}
-          onClose={() => setShowProgramEnroll(false)}
-        />
-      )}
     </View>
   );
 }

@@ -4,14 +4,12 @@ import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ProgramEnrollmentModal } from '@/components/programs';
 import { GameButton, GuestGate, OutlinedText, RadialBackground } from '@/components/ui';
 import { useAuthStore, useProgramStore } from '@/stores';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS } from '@/styles/typography';
 import { useTranslation } from '@/i18n';
-import type { ProgramEnrollmentFormData } from '@/types/program';
 
 export default function ProgramPlayScreen() {
   const router = useRouter();
@@ -24,9 +22,8 @@ export default function ProgramPlayScreen() {
   const programs = useProgramStore((state) => state.programs);
   const partners = useProgramStore((state) => state.partners);
   const enrollments = useProgramStore((state) => state.enrollments);
-  const enrollInProgram = useProgramStore((state) => state.enrollInProgram);
   const getProgramProgress = useProgramStore((state) => state.getProgramProgress);
-  const [showEnroll, setShowEnroll] = useState(false);
+  const getEnrollmentForProgram = useProgramStore((state) => state.getEnrollmentForProgram);
   const [playerName, setPlayerName] = useState(user?.displayName || '');
 
   const program = useMemo(
@@ -69,21 +66,46 @@ export default function ProgramPlayScreen() {
   }
 
   const goToProfileChoice = () => {
-    // Parcours déjà terminé : on propose le formulaire (optionnel) plutôt que rejouer.
-    if (progress.isCompleted) {
-      setShowEnroll(true);
+    // On peut TOUJOURS jouer (même parcours terminé). Le formulaire n'est proposé
+    // qu'en fin de partie (écran de résultats).
+    // Persona déjà choisi (mémorisé sur l'inscription) → on va DIRECT au mode de jeu.
+    // Sinon → écran de choix du profil.
+    const enrollment = getEnrollmentForProgram(program.id, userId);
+    const chosen = program.profiles?.find(
+      (p) => p.id === enrollment?.profileId && p.enabled !== false && !p.isDraft
+    );
+    if (chosen) {
+      router.push({
+        pathname: '/(programs)/play/mode/[programId]',
+        params: {
+          programId: program.id,
+          playerName: playerName.trim(),
+          profileId: chosen.id,
+          profileName: chosen.name,
+        },
+      });
       return;
     }
-    // Étape suivante : choix du profil à incarner, puis du mode de jeu.
     router.push({
       pathname: '/(programs)/play/profile/[programId]',
       params: { programId: program.id, playerName: playerName.trim() },
     });
   };
 
-  const handleEnroll = (formData: ProgramEnrollmentFormData) => {
-    enrollInProgram(program.id, userId, formData);
-    setShowEnroll(false);
+  // Persona déjà mémorisé pour ce programme (s'il existe et est encore jouable).
+  const chosenProfile = useMemo(() => {
+    const enrollment = getEnrollmentForProgram(program?.id ?? '', userId);
+    return program?.profiles?.find(
+      (p) => p.id === enrollment?.profileId && p.enabled !== false && !p.isDraft
+    ) ?? null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [program, userId, enrollments]);
+
+  const goToChangeProfile = () => {
+    router.push({
+      pathname: '/(programs)/play/profile/[programId]',
+      params: { programId: program.id, playerName: playerName.trim() },
+    });
   };
 
   const playerLabel = playerName.trim() || user?.displayName || t('program.you');
@@ -167,22 +189,20 @@ export default function ProgramPlayScreen() {
 
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + SPACING[3] }]}>
         <GameButton
-          title={progress.isCompleted ? t('program.fillForm') : t('program.chooseProfile')}
+          title={chosenProfile ? t('program.playNow') : t('program.chooseProfile')}
           variant="yellow"
           fullWidth
           onPress={goToProfileChoice}
         />
+        {chosenProfile && (
+          <Pressable onPress={goToChangeProfile} hitSlop={8} style={styles.changeProfileBtn}>
+            <Ionicons name="swap-horizontal" size={15} color={COLORS.textSecondary} />
+            <Text style={styles.changeProfileText}>
+              {t('program.changeProfile')} · {chosenProfile.name}
+            </Text>
+          </Pressable>
+        )}
       </View>
-
-      <ProgramEnrollmentModal
-        visible={showEnroll}
-        programName={program.name}
-        defaultFullName={user?.displayName}
-        defaultEmail={user?.email}
-        endForm={program.endForm}
-        onSubmit={handleEnroll}
-        onClose={() => setShowEnroll(false)}
-      />
     </View>
   );
 }
@@ -332,6 +352,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#0A1929',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
+  },
+  changeProfileBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: SPACING[2],
+    marginTop: SPACING[1],
+  },
+  changeProfileText: {
+    fontFamily: FONTS.bodyMedium,
+    fontSize: 13,
+    color: COLORS.textSecondary,
   },
   center: {
     flex: 1,

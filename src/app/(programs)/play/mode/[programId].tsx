@@ -166,7 +166,7 @@ export default function ProgramModeScreen() {
               </View>
               <View style={styles.modeTextWrap}>
                 <View style={styles.modeTitleRow}>
-                  <OutlinedText text={t(mode.titleKey)} style={styles.modeTitle} outlineColor="#0E699C" outlineWidth={1} />
+                  <Text style={styles.modeTitle}>{t(mode.titleKey)}</Text>
                   {!mode.available && <Text style={styles.soonBadge}>{t('program.soon')}</Text>}
                 </View>
                 <Text style={styles.modeSubtitle}>{t(mode.subtitleKey)}</Text>
@@ -253,12 +253,18 @@ const styles = StyleSheet.create({
   modeTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: SPACING[2],
+    marginBottom: 2,
   },
   modeTitle: {
     fontFamily: FONTS.title,
     fontSize: 18,
     color: COLORS.white,
+    letterSpacing: 0.5,
+    textShadowColor: '#0E699C',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   soonBadge: {
     fontFamily: FONTS.bodyBold,

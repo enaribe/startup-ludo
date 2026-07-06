@@ -50,6 +50,8 @@ interface ProgramStoreActions {
   setActiveProgram: (programId: string | null) => void;
   getEnrollmentForProgram: (programId: string, userId?: string) => ProgramEnrollment | undefined;
   enrollInProgram: (programId: string, userId: string, formData?: ProgramEnrollmentFormData, persona?: { profileId?: string | null; profileName?: string | null }) => ProgramEnrollment | null;
+  /** Mémorise le persona choisi (sans formulaire). Crée l'inscription si absente. */
+  setEnrollmentProfile: (programId: string, userId: string, persona: { profileId: string; profileName: string }) => void;
   getProgramSessions: (programId: string, userId?: string) => ProgramSession[];
   getProgramProgress: (programId: string, userId?: string) => ProgramProgress;
   getProgramPlayAccess: (programId: string, userId?: string, isGuest?: boolean) => ProgramPlayAccess;
@@ -217,6 +219,56 @@ export const useProgramStore = create<ProgramStoreState & ProgramStoreActions>()
         });
 
         return enrollment;
+      },
+
+      setEnrollmentProfile: (programId, userId, persona) => {
+        const program = get().getProgramById(programId);
+        if (!program || !userId) return;
+
+        const existing = get().getEnrollmentForProgram(programId, userId);
+        if (existing) {
+          let updated: ProgramEnrollment | null = null;
+          set((state) => {
+            const enrollment = state.enrollments.find((item) => item.id === existing.id);
+            if (enrollment) {
+              enrollment.profileId = persona.profileId;
+              enrollment.profileName = persona.profileName;
+              updated = { ...enrollment };
+            }
+          });
+          if (updated) {
+            setProgramEnrollment(updated).catch(() => {
+              get().setError("Impossible de synchroniser le profil du programme.");
+            });
+          }
+          return;
+        }
+
+        // Pas encore d'inscription : on en crée une "légère" (sans formulaire).
+        const now = Date.now();
+        const enrollment: ProgramEnrollment = {
+          id: `program_enrollment_${now}_${Math.random().toString(36).slice(2, 9)}`,
+          userId,
+          partnerId: program.partnerId,
+          programId,
+          status: 'active',
+          formData: null,
+          totalSessions: 0,
+          totalWins: 0,
+          totalXp: 0,
+          currentLevel: 0,
+          completedLevels: 0,
+          profileId: persona.profileId,
+          profileName: persona.profileName,
+          leadStatus: undefined,
+          enrolledAt: now,
+          lastPlayedAt: null,
+          completedAt: null,
+        };
+        set((state) => { state.enrollments.push(enrollment); });
+        setProgramEnrollment(enrollment).catch(() => {
+          get().setError("Impossible de synchroniser le profil du programme.");
+        });
       },
 
       getProgramSessions: (programId, userId) => {

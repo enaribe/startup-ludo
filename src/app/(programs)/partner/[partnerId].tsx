@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ProgramHomeCard } from '@/components/programs';
 import { OutlinedText, RadialBackground } from '@/components/ui';
-import { useAuthStore, useProgramStore } from '@/stores';
+import { useProgramStore } from '@/stores';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS } from '@/styles/typography';
@@ -18,14 +18,9 @@ export default function PartnerProgramsScreen() {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const params = useLocalSearchParams<{ partnerId: string }>();
-  const user = useAuthStore((state) => state.user);
-  const userId = user?.id ?? '';
-  const isGuest = user?.isGuest ?? true;
 
   const partners = useProgramStore((state) => state.partners);
   const programs = useProgramStore((state) => state.programs);
-  const getEnrollmentForProgram = useProgramStore((state) => state.getEnrollmentForProgram);
-  const getProgramPlayAccess = useProgramStore((state) => state.getProgramPlayAccess);
 
   const partner = useMemo(
     () => partners.find((item) => item.id === params.partnerId),
@@ -128,8 +123,6 @@ export default function PartnerProgramsScreen() {
 
           <View style={styles.list}>
           {sortedPrograms.map((program) => {
-            const enrollment = getEnrollmentForProgram(program.id, userId);
-            const access = getProgramPlayAccess(program.id, userId, isGuest);
             const mainPartner = partners.find((item) => item.id === program.partnerId) ?? partner;
             const coPartners = (program.coPartnerIds ?? [])
               .map((id) => partners.find((item) => item.id === id))
@@ -140,10 +133,7 @@ export default function PartnerProgramsScreen() {
                 program={program}
                 partner={mainPartner}
                 coPartners={coPartners}
-                enrollment={enrollment ?? null}
-                access={access}
                 onPress={() => router.push({ pathname: '/(programs)/[programId]', params: { programId: program.id } })}
-                onPlay={() => router.push({ pathname: '/(programs)/play/[programId]', params: { programId: program.id } })}
               />
             );
           })}

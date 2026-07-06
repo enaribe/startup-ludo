@@ -5,6 +5,7 @@ import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GameButton, GuestGate, OutlinedText, RadialBackground } from '@/components/ui';
+import { GamePopup, GamePopupGradientBorder } from '@/components/ui/GamePopup';
 import { useAuthStore, useProgramStore } from '@/stores';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
@@ -18,6 +19,8 @@ export default function ProgramProfileScreen() {
   const { t } = useTranslation();
   const params = useLocalSearchParams<{ programId: string; playerName?: string }>();
   const user = useAuthStore((state) => state.user);
+  const userId = user?.id ?? '';
+  const setEnrollmentProfile = useProgramStore((state) => state.setEnrollmentProfile);
   const isGuest = user?.isGuest ?? true;
   const programs = useProgramStore((state) => state.programs);
   const getProgramProgress = useProgramStore((state) => state.getProgramProgress);
@@ -30,7 +33,8 @@ export default function ProgramProfileScreen() {
   const profiles = (program?.profiles ?? []).filter((p) => p.enabled !== false && !p.isDraft);
   const progress = getProgramProgress(params.programId, user?.id);
 
-  const [selectedId, setSelectedId] = useState<string | null>(profiles[0]?.id ?? null);
+  // Persona dont on consulte le détail dans le popup (null = popup fermé).
+  const [previewProfile, setPreviewProfile] = useState<ProgramProfile | null>(null);
 
   if (isGuest) {
     return (
@@ -53,15 +57,20 @@ export default function ProgramProfileScreen() {
     );
   }
 
-  const goToMode = () => {
-    const profile = profiles.find((p) => p.id === selectedId);
+  const chooseProfile = (profile: ProgramProfile) => {
+    setPreviewProfile(null);
+    // Mémorise le persona choisi sur l'inscription : les prochaines parties
+    // iront directement au jeu sans repasser par cet écran.
+    if (userId) {
+      setEnrollmentProfile(program.id, userId, { profileId: profile.id, profileName: profile.name });
+    }
     router.push({
       pathname: '/(programs)/play/mode/[programId]',
       params: {
         programId: program.id,
         playerName: params.playerName ?? '',
-        profileId: profile?.id ?? '',
-        profileName: profile?.name ?? '',
+        profileId: profile.id,
+        profileName: profile.name,
       },
     });
   };
@@ -79,7 +88,7 @@ export default function ProgramProfileScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 110 }]}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + SPACING[6] }]}
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.intro}>
@@ -99,46 +108,33 @@ export default function ProgramProfileScreen() {
               <ProfileCard
                 key={profile.id}
                 profile={profile}
-                selected={selectedId === profile.id}
-                color={program.primaryColor}
-                onPress={() => setSelectedId(profile.id)}
+                onPress={() => setPreviewProfile(profile)}
               />
             ))}
           </View>
         )}
       </ScrollView>
 
-      <View style={[styles.bottomBar, { paddingBottom: insets.bottom + SPACING[3] }]}>
-        <GameButton
-          title={t('program.continueWithProfile')}
-          variant="yellow"
-          fullWidth
-          disabled={profiles.length > 0 && !selectedId}
-          onPress={goToMode}
+      {previewProfile && (
+        <ProfileDetailPopup
+          profile={previewProfile}
+          onChoose={() => chooseProfile(previewProfile)}
+          onClose={() => setPreviewProfile(null)}
         />
-      </View>
+      )}
     </View>
   );
 }
 
 function ProfileCard({
   profile,
-  selected,
-  color,
   onPress,
 }: {
   profile: ProgramProfile;
-  selected: boolean;
-  color: string;
   onPress: () => void;
 }) {
   return (
-    <Pressable onPress={onPress} style={[styles.card, selected && { borderColor: COLORS.primary }]}>
-      {selected && (
-        <View style={styles.checkBadge}>
-          <Ionicons name="checkmark" size={15} color="#0A1929" />
-        </View>
-      )}
+    <Pressable onPress={onPress} style={styles.card}>
       <View style={styles.avatarWrap}>
         {profile.avatarUrl ? (
           <Image source={{ uri: profile.avatarUrl }} style={styles.avatar} resizeMode="cover" />
@@ -152,23 +148,91 @@ function ProfileCard({
       <OutlinedText
         text={`${profile.name}, ${profile.age}`}
         style={styles.cardName}
-        outlineColor={selected ? '#2E7D32' : '#0E699C'}
+        outlineColor="#0E699C"
         outlineWidth={1.1}
       />
       <Text style={styles.cardDesc} numberOfLines={3}>{profile.description}</Text>
 
       {!!profile.location && (
         <View style={styles.chip}>
-          <Ionicons name="location" size={12} color={color} />
+          <Ionicons name="location" size={12} color={COLORS.primary} />
           <Text style={styles.chipText}>{profile.location}</Text>
         </View>
       )}
       {!!profile.sector && (
         <View style={styles.chip}>
-          <Text style={[styles.chipText, { color }]}>{profile.sector}</Text>
+          <Text style={styles.chipText}>{profile.sector}</Text>
         </View>
       )}
     </Pressable>
+  );
+}
+
+/** Popup détail d'un persona — même design que le popup projet du portfolio (GamePopup). */
+function ProfileDetailPopup({
+  profile,
+  onChoose,
+  onClose,
+}: {
+  profile: ProgramProfile;
+  onChoose: () => void;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const [descSize, setDescSize] = useState({ w: 0, h: 0 });
+
+  const avatarNode = profile.avatarUrl ? (
+    <Image source={{ uri: profile.avatarUrl }} style={popupStyles.avatar} resizeMode="cover" />
+  ) : (
+    <View style={[popupStyles.avatar, popupStyles.avatarFallback]}>
+      <Ionicons name="person" size={40} color={COLORS.white} />
+    </View>
+  );
+
+  return (
+    <GamePopup
+      visible
+      onRequestClose={onClose}
+      showCloseButton
+      closeOnBackdrop
+      icon={avatarNode}
+      spinningShape
+      title={<Text style={popupStyles.titleText} numberOfLines={2}>{`${profile.name}, ${profile.age}`}</Text>}
+      footer={
+        <GameButton title={t('program.chooseThisProfile')} variant="yellow" fullWidth onPress={onChoose} />
+      }
+    >
+      {/* Chips lieu / secteur / statut */}
+      <View style={popupStyles.chipsRow}>
+        {!!profile.location && (
+          <View style={popupStyles.chip}>
+            <Ionicons name="location" size={12} color={COLORS.primary} />
+            <Text style={popupStyles.chipText}>{profile.location}</Text>
+          </View>
+        )}
+        {!!profile.sector && (
+          <View style={popupStyles.chip}>
+            <Text style={popupStyles.chipText}>{profile.sector}</Text>
+          </View>
+        )}
+        {!!profile.status && (
+          <View style={popupStyles.chip}>
+            <Text style={popupStyles.chipText}>{profile.status}</Text>
+          </View>
+        )}
+      </View>
+
+      {/* Description complète */}
+      <View
+        style={popupStyles.descBlock}
+        onLayout={(e) => setDescSize({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}
+      >
+        {descSize.w > 0 && descSize.h > 0 && (
+          <GamePopupGradientBorder width={descSize.w} height={descSize.h} borderRadius={14} gradientId="persona_desc_border" />
+        )}
+        <Text style={popupStyles.descText}>{profile.description || '—'}</Text>
+      </View>
+    </GamePopup>
   );
 }
 
@@ -228,18 +292,6 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.1)',
     gap: SPACING[2],
   },
-  checkBadge: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: COLORS.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 2,
-  },
   avatarWrap: {
     marginBottom: SPACING[1],
   },
@@ -292,17 +344,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: SPACING[4],
   },
-  bottomBar: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: SPACING[4],
-    paddingTop: SPACING[3],
-    backgroundColor: '#0A1929',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-  },
   center: {
     flex: 1,
     justifyContent: 'center',
@@ -313,5 +354,63 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.title,
     color: COLORS.white,
     fontSize: 20,
+  },
+});
+
+const popupStyles = StyleSheet.create({
+  avatar: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+  },
+  avatarFallback: {
+    backgroundColor: '#1F91D0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  titleText: {
+    fontFamily: FONTS.title,
+    fontSize: 22,
+    color: COLORS.white,
+    textAlign: 'center',
+  },
+  chipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: SPACING[2],
+    marginBottom: SPACING[3],
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+  chipText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 12,
+    color: COLORS.white,
+  },
+  descBlock: {
+    width: '100%',
+    borderRadius: 14,
+    paddingVertical: SPACING[3],
+    paddingHorizontal: SPACING[4],
+  },
+  descText: {
+    fontFamily: FONTS.body,
+    fontSize: 14,
+    lineHeight: 21,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    gap: SPACING[2],
+    width: '100%',
   },
 });

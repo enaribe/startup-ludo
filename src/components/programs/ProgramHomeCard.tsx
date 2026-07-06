@@ -24,16 +24,10 @@ export const ProgramHomeCard = memo(function ProgramHomeCard({
   program,
   partner,
   coPartners = [],
-  enrollment,
-  access,
   onPress,
-  onPlay,
 }: ProgramHomeCardProps) {
-  const actionLabel = enrollment?.formData
-    ? 'CONTINUER'
-    : access?.reason === 'trial_used'
-      ? "S'INSCRIRE"
-      : 'JOUER';
+  // Le bouton mène à l'écran de détail du programme (comme le clic sur la carte).
+  const actionLabel = 'EXPLORER';
 
   const backgroundUrl = program.heroImageUrl;
 
@@ -87,7 +81,7 @@ export const ProgramHomeCard = memo(function ProgramHomeCard({
           title={actionLabel}
           variant="yellow"
           fullWidth
-          onPress={onPlay ?? onPress}
+          onPress={onPress}
         />
       </View>
     </View>

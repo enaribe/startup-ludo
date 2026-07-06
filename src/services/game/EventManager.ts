@@ -128,6 +128,11 @@ export class EventManager {
   private usedFundingIds: Set<string> = new Set();
   private usedOpportunityIds: Set<string> = new Set();
   private usedChallengeIds: Set<string> = new Set();
+  // Mémoire des DERNIERS ids montrés par Set (partagée par référence du Set).
+  // Sert à éviter qu'un contenu juste vu ressorte immédiatement après un
+  // recyclage (pool épuisé — cas fréquent quand le pion refait un tour de plateau).
+  private recentIds: WeakMap<Set<string>, string[]> = new WeakMap();
+  private static readonly RECENT_WINDOW = 4;
   private contentPack: GameContentPack | null = null;
   /** Langue d'affichage du contenu (préférence joueur). Applique translations[lang] partout. */
   private lang: string = 'fr';
@@ -208,6 +213,8 @@ export class EventManager {
     this.usedFundingIds.clear();
     this.usedOpportunityIds.clear();
     this.usedChallengeIds.clear();
+    // Repart d'une mémoire « récents » vierge pour la nouvelle partie/niveau.
+    this.recentIds = new WeakMap();
   }
 
   /**
@@ -293,15 +300,33 @@ export class EventManager {
   private pickRandomUnused<T extends { id: string }>(items: T[], usedIds: Set<string>): T | null {
     if (items.length === 0) return null;
 
-    const available = items.filter((item) => !usedIds.has(item.id));
+    let available = items.filter((item) => !usedIds.has(item.id));
 
-    // Pool épuisé : on recycle en resettant le Set
+    // Pool épuisé : on recycle en resettant le Set. Mais on EXCLUT les derniers
+    // contenus montrés pour éviter qu'un item juste vu ressorte immédiatement
+    // (ex. le pion refait un tour de plateau et retombe sur une case du même type).
     if (available.length === 0) {
       usedIds.clear();
-      return items[Math.floor(Math.random() * items.length)] ?? null;
+      const recent = this.recentIds.get(usedIds) ?? [];
+      // On garde au moins 1 candidat : la fenêtre d'exclusion ne dépasse jamais
+      // la taille du pool - 1.
+      const windowSize = Math.min(recent.length, Math.max(0, items.length - 1));
+      const excluded = new Set(recent.slice(-windowSize));
+      available = items.filter((item) => !excluded.has(item.id));
+      if (available.length === 0) available = items; // filet de sécurité
     }
 
-    return available[Math.floor(Math.random() * available.length)] ?? null;
+    const chosen = available[Math.floor(Math.random() * available.length)] ?? null;
+
+    // Mémorise l'id choisi dans la fenêtre récente (borne à RECENT_WINDOW).
+    if (chosen) {
+      const recent = this.recentIds.get(usedIds) ?? [];
+      recent.push(chosen.id);
+      while (recent.length > EventManager.RECENT_WINDOW) recent.shift();
+      this.recentIds.set(usedIds, recent);
+    }
+
+    return chosen;
   }
 
   /**
