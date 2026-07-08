@@ -1,22 +1,40 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useMemo } from 'react';
+import { Dimensions, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { GameButton, GuestGate, OutlinedText, RadialBackground } from '@/components/ui';
-import { useAuthStore, useGameStore, useProgramStore } from '@/stores';
+import { LocalModeIcon, OnlineModeIcon } from '@/components/game/ModeSelectionIcons';
+import { DynamicGradientBorder, GameButton, GuestGate, OutlinedText, RadialBackground } from '@/components/ui';
+import { useAuthStore, useProgramStore } from '@/stores';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
-import { FONTS } from '@/styles/typography';
+import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { useTranslation } from '@/i18n';
 
-type ModeKey = 'solo' | 'duel' | 'tournament';
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-const MODES: { key: ModeKey; titleKey: string; subtitleKey: string; icon: keyof typeof Ionicons.glyphMap; available: boolean }[] = [
-  { key: 'solo', titleKey: 'program.modeSoloTitle', subtitleKey: 'program.modeSoloSub', icon: 'phone-portrait-outline', available: true },
-  { key: 'duel', titleKey: 'program.modeDuelTitle', subtitleKey: 'program.modeDuelSub', icon: 'people-outline', available: false },
-  { key: 'tournament', titleKey: 'program.modeTournamentTitle', subtitleKey: 'program.modeTournamentSub', icon: 'trophy-outline', available: false },
+const THEME = {
+  accent: '#FFBC40',
+  cardFill: 'rgba(0, 0, 0, 0.35)',
+  text: '#FFFFFF',
+  textSecondary: 'rgba(255, 255, 255, 0.65)',
+  textMuted: 'rgba(127, 142, 158, 0.95)',
+};
+
+type ModeKey = 'local' | 'online';
+
+const MODES: {
+  key: ModeKey;
+  titleKey: string;
+  subtitleKey: string;
+  tagIcon: keyof typeof Ionicons.glyphMap;
+  tagKey: string;
+  available: boolean;
+}[] = [
+  { key: 'local', titleKey: 'program.modeLocalTitle', subtitleKey: 'program.modeLocalSub', tagIcon: 'sparkles-outline', tagKey: 'program.modeLocalTag', available: true },
+  { key: 'online', titleKey: 'program.modeOnlineTitle', subtitleKey: 'program.modeOnlineSub', tagIcon: 'trophy-outline', tagKey: 'program.modeOnlineTag', available: false },
 ];
 
 export default function ProgramModeScreen() {
@@ -30,22 +48,13 @@ export default function ProgramModeScreen() {
     profileName?: string;
   }>();
   const user = useAuthStore((state) => state.user);
-  const userId = user?.id ?? '';
   const isGuest = user?.isGuest ?? true;
   const programs = useProgramStore((state) => state.programs);
-  const enrollments = useProgramStore((state) => state.enrollments);
-  const createProgramSession = useProgramStore((state) => state.createProgramSession);
-  const getProgramProgress = useProgramStore((state) => state.getProgramProgress);
-  const initGame = useGameStore((state) => state.initGame);
 
   const program = useMemo(
     () => programs.find((item) => item.id === params.programId),
     [programs, params.programId]
   );
-  const enrollment = enrollments.find((item) => item.programId === params.programId && item.userId === userId);
-  const progress = getProgramProgress(params.programId, userId);
-
-  const [selectedMode, setSelectedMode] = useState<ModeKey>('solo');
 
   if (isGuest) {
     return (
@@ -68,230 +77,234 @@ export default function ProgramModeScreen() {
     );
   }
 
-  // Le joueur prend le nom du profil choisi, sinon son pseudo saisi, sinon son displayName.
-  const playerLabel =
-    params.profileName?.trim() ||
-    params.playerName?.trim() ||
-    user?.displayName ||
-    t('program.you');
-
-  const levelIndex = Math.min(progress.currentLevel, Math.max(0, (program.contentPacks?.length ?? 1) - 1));
-  const currentPack = program.contentPacks?.[levelIndex];
-
-  const startSoloGame = () => {
-    const gameId = `program_${program.id}_${Date.now()}`;
-    const session = createProgramSession(program.id, userId, false, gameId, levelIndex);
-    if (!session) return;
-
-    initGame(
-      'solo',
-      'classic',
-      [
-        {
-          id: userId,
-          name: playerLabel,
-          color: 'green',
-          isAI: false,
-          isHost: true,
-          isConnected: true,
+  const handleMode = (mode: ModeKey, available: boolean) => {
+    if (!available) return;
+    if (mode === 'local') {
+      // Écran suivant : configuration de la partie locale (solo vs IA / tour par tour).
+      router.push({
+        pathname: '/(programs)/play/mode/local/[programId]',
+        params: {
+          programId: program.id,
+          playerName: params.playerName ?? '',
+          profileId: params.profileId ?? '',
+          profileName: params.profileName ?? '',
         },
-        {
-          id: `ai_${program.id}`,
-          name: 'ADIA',
-          color: 'blue',
-          isAI: true,
-          isHost: false,
-          isConnected: true,
-        },
-      ],
-      {
-        origin: 'program',
-        partnerId: program.partnerId,
-        programId: program.id,
-        enrollmentId: enrollment?.id ?? null,
-        sessionId: session.id,
-        isTrial: false,
-        contentPackId: currentPack?.id,
-        levelIndex,
-        profileId: params.profileId || null,
-        profileName: params.profileName || null,
-      }
-    );
-
-    router.replace({
-      pathname: '/(game)/play/[gameId]',
-      params: { gameId, mode: 'solo', programId: program.id, programSessionId: session.id },
-    });
+      });
+    }
   };
 
-  const handleContinue = () => {
-    // Seul le mode Solo est actif pour l'instant.
-    if (selectedMode === 'solo') startSoloGame();
-  };
+  const contentWidth = SCREEN_WIDTH - SPACING[4] * 2;
+  const headerBlockHeight = insets.top + 72;
 
   return (
     <View style={styles.container}>
       <RadialBackground />
 
-      <View style={[styles.header, { paddingTop: insets.top + SPACING[2] }]}>
-        <Pressable onPress={() => router.back()} style={styles.backButton} hitSlop={8}>
-          <Ionicons name="chevron-back" size={22} color={COLORS.white} />
-        </Pressable>
-        <OutlinedText text={t('program.gameMode')} style={styles.headerTitle} outlineColor="#0E699C" outlineWidth={1.4} />
-        <View style={styles.headerSpacer} />
+      {/* Header — titre centré, style identique à « Nouvelle partie » */}
+      <View
+        style={[
+          styles.headerContainer,
+          {
+            paddingTop: insets.top + SPACING[2],
+            backgroundColor: '#0A1929',
+            borderBottomLeftRadius: 24,
+            borderBottomRightRadius: 24,
+          },
+        ]}
+      >
+        <View style={styles.headerRow}>
+          <Pressable onPress={() => router.back()} style={styles.backButton} hitSlop={8}>
+            <Ionicons name="chevron-back" size={26} color={THEME.text} />
+          </Pressable>
+          <View style={styles.headerTitleWrap} pointerEvents="none">
+            <Text style={styles.headerTitle}>{t('program.gameMode')}</Text>
+          </View>
+          <View style={styles.headerRightSpacer} />
+        </View>
       </View>
 
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 110 }]}
+        contentContainerStyle={[
+          styles.contentContainer,
+          { paddingTop: headerBlockHeight + SPACING[5], paddingBottom: insets.bottom + SPACING[6] },
+        ]}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.intro}>
-          {t('program.modeIntro', { count: progress.totalLevels })}
-        </Text>
+        <Animated.View entering={FadeInDown.delay(100).duration(500)} style={styles.subtitleWrap}>
+          <OutlinedText
+            text={t('program.modeIntro', { count: program.contentPacks?.length ?? 1 })}
+            style={styles.subtitle}
+            outlineColor="#0A1929"
+            outlineWidth={2}
+          />
+        </Animated.View>
 
-        {MODES.map((mode) => {
-          const selected = selectedMode === mode.key;
-          return (
-            <Pressable
-              key={mode.key}
-              onPress={() => mode.available && setSelectedMode(mode.key)}
-              style={[
-                styles.modeCard,
-                selected && mode.available && styles.modeCardSelected,
-                !mode.available && styles.modeCardDisabled,
-              ]}
-            >
-              <View style={styles.modeIcon}>
-                <Ionicons name={mode.icon} size={26} color={mode.available ? COLORS.info : COLORS.textMuted} />
-              </View>
-              <View style={styles.modeTextWrap}>
-                <View style={styles.modeTitleRow}>
-                  <Text style={styles.modeTitle}>{t(mode.titleKey)}</Text>
-                  {!mode.available && <Text style={styles.soonBadge}>{t('program.soon')}</Text>}
+        {MODES.map((mode, index) => (
+          <Animated.View key={mode.key} entering={FadeInDown.delay(200 + index * 100).duration(500)}>
+            <Pressable onPress={() => handleMode(mode.key, mode.available)} disabled={!mode.available}>
+              <DynamicGradientBorder
+                borderRadius={24}
+                fill={THEME.cardFill}
+                boxWidth={contentWidth}
+                style={{ marginBottom: SPACING[4], opacity: mode.available ? 1 : 0.85 }}
+              >
+                <View style={styles.cardContent}>
+                  <View style={styles.iconColumn}>
+                    {mode.key === 'local' ? (
+                      <LocalModeIcon size={40} />
+                    ) : (
+                      <OnlineModeIcon size={52} />
+                    )}
+                  </View>
+
+                  <View style={styles.cardTextContainer}>
+                    <Text style={styles.cardTitle}>{t(mode.titleKey)}</Text>
+                    <Text style={styles.cardDescription}>{t(mode.subtitleKey)}</Text>
+
+                    <View style={styles.tagsRow}>
+                      <View style={styles.tag}>
+                        <Ionicons name={mode.tagIcon} size={12} color={THEME.textMuted} />
+                        <Text style={styles.tagText}>{t(mode.tagKey)}</Text>
+                      </View>
+                      {!mode.available && (
+                        <View style={[styles.tag, styles.tagSoon]}>
+                          <Ionicons name="time-outline" size={12} color={THEME.accent} />
+                          <Text style={[styles.tagText, styles.tagTextSoon]}>{t('program.soon')}</Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
                 </View>
-                <Text style={styles.modeSubtitle}>{t(mode.subtitleKey)}</Text>
-              </View>
-              {selected && mode.available && (
-                <Ionicons name="checkmark-circle" size={22} color={COLORS.primary} />
-              )}
+              </DynamicGradientBorder>
             </Pressable>
-          );
-        })}
+          </Animated.View>
+        ))}
       </ScrollView>
-
-      <View style={[styles.bottomBar, { paddingBottom: insets.bottom + SPACING[3] }]}>
-        <GameButton title={t('program.continue')} variant="yellow" fullWidth onPress={handleContinue} />
-      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  header: {
+  container: {
+    flex: 1,
+    backgroundColor: '#0C243E',
+  },
+  headerContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    paddingBottom: SPACING[4],
+    paddingHorizontal: SPACING[4],
+  },
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SPACING[4],
-    paddingBottom: SPACING[3],
+    minHeight: 44,
   },
   backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    alignItems: 'center',
+    width: 40,
+    height: 40,
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
+    borderRadius: 20,
+    backgroundColor: 'rgba(5, 25, 50, 0.75)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  headerTitleWrap: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 48,
+  },
+  headerRightSpacer: {
+    width: 40,
+    height: 40,
   },
   headerTitle: {
     fontFamily: FONTS.title,
-    fontSize: 20,
-    color: COLORS.white,
+    fontSize: 22,
+    color: THEME.text,
+    textAlign: 'center',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
-  headerSpacer: { width: 44 },
-  content: {
+  contentContainer: {
     paddingHorizontal: SPACING[4],
-    paddingTop: SPACING[2],
-    gap: SPACING[4],
   },
-  intro: {
-    fontFamily: FONTS.body,
-    fontSize: 16,
-    lineHeight: 24,
-    color: COLORS.textSecondary,
+  subtitleWrap: {
+    marginBottom: SPACING[6],
+    alignItems: 'center',
   },
-  modeCard: {
+  subtitle: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES.lg,
+    textAlign: 'center',
+    letterSpacing: 0.5,
+  },
+  cardContent: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: SPACING[5],
+    paddingHorizontal: SPACING[4],
     gap: SPACING[4],
-    padding: SPACING[4],
-    borderRadius: 18,
-    backgroundColor: 'rgba(0,0,0,0.15)',
-    borderWidth: 0.75,
-    borderColor: 'rgba(255,255,255,0.1)',
   },
-  modeCardSelected: {
-    borderColor: COLORS.primary,
-  },
-  modeCardDisabled: {
-    opacity: 0.55,
-  },
-  modeIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+  iconColumn: {
+    width: 56,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  modeTextWrap: {
+  cardTextContainer: {
     flex: 1,
-    gap: 4,
+    minWidth: 0,
   },
-  modeTitleRow: {
+  cardTitle: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES.xl,
+    marginBottom: SPACING[2],
+    color: THEME.text,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  cardDescription: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.sm,
+    marginBottom: SPACING[3],
+    lineHeight: 20,
+    color: THEME.textSecondary,
+  },
+  tagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  tag: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: SPACING[2],
-    marginBottom: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    gap: 5,
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
-  modeTitle: {
-    fontFamily: FONTS.title,
-    fontSize: 18,
-    color: COLORS.white,
-    letterSpacing: 0.5,
-    textShadowColor: '#0E699C',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+  tagSoon: {
+    backgroundColor: 'rgba(255, 188, 64, 0.14)',
+    borderColor: 'rgba(255, 188, 64, 0.25)',
   },
-  soonBadge: {
-    fontFamily: FONTS.bodyBold,
+  tagText: {
+    fontFamily: FONTS.bodySemiBold,
     fontSize: 10,
-    color: COLORS.primary,
-    backgroundColor: 'rgba(255,188,64,0.14)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-    overflow: 'hidden',
+    color: THEME.textMuted,
+    textTransform: 'capitalize',
   },
-  modeSubtitle: {
-    fontFamily: FONTS.body,
-    fontSize: 13,
-    lineHeight: 18,
-    color: COLORS.textSecondary,
-  },
-  bottomBar: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: SPACING[4],
-    paddingTop: SPACING[3],
-    backgroundColor: '#0A1929',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+  tagTextSoon: {
+    color: THEME.accent,
+    textTransform: 'none',
   },
   center: {
     flex: 1,

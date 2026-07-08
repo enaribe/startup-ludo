@@ -15,6 +15,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "767192713144-psph87iv8mumpcaa9dbn00rnpj6vdjm0.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.startupludo.app",
+            "certificate_hash": "04e67ba8aa210ee2771aaf2e807935ef0ec99778"
+          }
+        },
+        {
           "client_id": "767192713144-pvimhe0rof56hjpc89b25jfmct2q2kh8.apps.googleusercontent.com",
           "client_type": 3
         }

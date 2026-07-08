@@ -45,7 +45,9 @@ export default function ProgramResultsScreen() {
     [enrollments, params.programId, userId]
   );
 
-  const canEnroll = progress.isCompleted && !formFilled;
+  // Le formulaire est proposé à CHAQUE fin de partie (pas besoin de finir tous les
+  // niveaux) — tant que le joueur ne l'a pas déjà rempli.
+  const canEnroll = !formFilled;
 
   const goHome = () => { resetGame(); router.replace('/(tabs)/home'); };
 
@@ -71,9 +73,7 @@ export default function ProgramResultsScreen() {
 
   // Message de statut selon l'avancement.
   const statusMessage = progress.isCompleted
-    ? (canEnroll
-        ? 'Parcours terminé ! Vous pouvez remplir le formulaire de candidature.'
-        : 'Parcours terminé ! Vous pouvez rejouer autant que vous voulez.')
+    ? 'Parcours terminé ! Vous pouvez rejouer autant que vous voulez.'
     : isWinner
       ? `Niveau réussi ! Niveau ${Math.min(progress.currentLevel + 1, progress.totalLevels)}/${progress.totalLevels} débloqué.`
       : `Niveau non validé. Rejouez pour avancer.`;
@@ -114,7 +114,7 @@ export default function ProgramResultsScreen() {
 
         <View style={styles.actions}>
           {canEnroll && (
-            <GameButton title="S'INSCRIRE AU PROGRAMME" variant="yellow" fullWidth onPress={goToEnroll} />
+            <GameButton title="REMPLIR LE FORMULAIRE" variant="yellow" fullWidth onPress={goToEnroll} />
           )}
           <GameButton title="REJOUER" variant={canEnroll ? 'blue' : 'yellow'} fullWidth onPress={replay} />
           <GameButton title="RETOUR À L'ACCUEIL" variant="blue" fullWidth onPress={goHome} />

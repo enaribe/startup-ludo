@@ -270,7 +270,8 @@ export interface ProgramGameContext {
   partnerId: string;
   programId: string;
   enrollmentId?: string | null;
-  sessionId: string;
+  // null = partie « pour le fun » (ex. tour par tour) sans progression enregistrée.
+  sessionId: string | null;
   isTrial: boolean;
   contentPackId?: string;
   /** Index du niveau joué (0-based), pour faire progresser la barre de niveaux à la fin. */

@@ -536,27 +536,24 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
             if (hapticsEnabled) {
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             }
-            // Si le captureur est un humain ET qu'un callback pending est fourni,
-            // déléguer au PlayScreen pour afficher le popup de choix.
-            // Sinon (IA), appliquer directement le renvoi à la base + déclencher
-            // onAICapture pour que PlayScreen affiche le popup d'échec.
-            const capturer = currentPlayerRef.current;
-            if (onCapturePendingRef.current && capturer && !capturer.isAI) {
-              // Bloquer le passage de tour tant que le choix n'est pas fait
-              waitingForCaptureChoiceRef.current = true;
+            // RÈGLE : c'est le joueur ATTRAPÉ (capturedPawn.playerId) qui décide
+            // s'il cède ses jetons ou rentre à la base.
+            //  - Attrapé HUMAIN → popup de choix (onCapturePending).
+            //  - Attrapé IA     → décision automatique côté PlayScreen (onAICapture).
+            // Dans les deux cas on bloque le passage de tour tant que le choix
+            // n'est pas résolu (évite qu'un event de case s'ouvre en parallèle).
+            const capturedId = result!.capturedPawn!.playerId;
+            const capturedPlayer = gameRef.current?.players.find((p) => p.id === capturedId);
+            const capturedIsHuman = !!capturedPlayer && !capturedPlayer.isAI;
+            waitingForCaptureChoiceRef.current = true;
+            if (onCapturePendingRef.current && capturedIsHuman) {
               onCapturePendingRef.current(
-                result!.capturedPawn!.playerId,
+                capturedId,
                 result!.capturedPawn!.pawnIndex,
               );
             } else {
-              // IA capture : on bloque aussi pour empêcher l'event de la case
-              // (quiz, duel, ...) de s'ouvrir en parallèle du popup capturé.
-              // C'est PlayScreen (onAICapture) qui décide automatiquement de
-              // l'issue (voler les jetons si l'adversaire en a, sinon renvoi base)
-              // et applique l'effet + le bon popup. On NE renvoie PAS d'office ici.
-              waitingForCaptureChoiceRef.current = true;
               onAICaptureRef.current?.(
-                result!.capturedPawn!.playerId,
+                capturedId,
                 result!.capturedPawn!.pawnIndex,
               );
             }

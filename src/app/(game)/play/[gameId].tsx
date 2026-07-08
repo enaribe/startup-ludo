@@ -563,25 +563,29 @@ export default function PlayScreen() {
       setCaptureChoice({ capturedPlayerId, capturedPawnIndex });
     },
     onAICapture: (capturedPlayerId, capturedPawnIndex) => {
-      // L'IA capture → choix AUTOMATIQUE : voler les jetons si l'adversaire en a,
-      // sinon le renvoyer à la base. Le tour est bloqué jusqu'à resolveCaptureChoice().
+      // L'ATTRAPÉ est une IA → elle décide elle-même (règle : c'est l'attrapé qui
+      // choisit). Décision ALÉATOIRE entre céder ses jetons et rentrer à la maison.
+      // Le captureur = le joueur courant. Le tour reste bloqué jusqu'à resolveCaptureChoice().
       const g = useGameStore.getState().game;
       const captured = g?.players.find((p) => p.id === capturedPlayerId);
-      const aiCapturer = g?.players[g.currentPlayerIndex];
+      const capturer = g?.players[g?.currentPlayerIndex ?? 0];
       const amount = captured?.tokens ?? 0;
 
-      if (amount > 0) {
-        // Vol des jetons : le pion reste en jeu
+      // Choix aléatoire ; « céder les jetons » n'a de sens que s'il en reste.
+      const wantsSteal = Math.floor(Math.random() * 2) === 0;
+      const giveTokens = wantsSteal && amount > 0;
+
+      if (giveTokens) {
+        // L'IA cède ses jetons au captureur ; son pion reste en jeu.
         if (isOnline) {
           onlineGame.broadcastCaptureSteal(capturedPlayerId, amount);
         } else {
           removeTokens(capturedPlayerId, amount);
-          if (aiCapturer) addTokens(aiCapturer.id, amount);
-          // En local/solo, on montre le popup "jetons cédés" au capturé
+          if (capturer) addTokens(capturer.id, amount);
           setTokensStolen({ amount });
         }
       } else {
-        // Aucun jeton → renvoi à la base
+        // L'IA rentre à la maison (renvoi de son pion à la base).
         const seed = Math.floor(Math.random() * 10000);
         if (isOnline) {
           onlineGame.broadcastCapture(capturedPlayerId, capturedPawnIndex);
@@ -965,6 +969,13 @@ export default function PlayScreen() {
       const { capturedPlayerId, capturedPawnIndex } = captureChoice;
       const capturedPlayer = game.players.find((p) => p.id === capturedPlayerId);
 
+      // Un popup capture-résultat (jetons cédés / renvoi base) va-t-il s'afficher ?
+      // Si oui, c'est SA fermeture (onContinue) qui appellera resolveCaptureChoice()
+      // — sinon on résout tout de suite. Éviter le double appel est crucial : sinon
+      // l'event de case reporté (ex. duel) démarre EN MÊME TEMPS que le popup, et sur
+      // iOS deux <Modal> simultanés se bloquent → jeu figé.
+      let resultPopupShown = false;
+
       if (choice === 'steal_tokens') {
         const amount = capturedPlayer?.tokens ?? 0;
         if (amount > 0) {
@@ -975,6 +986,7 @@ export default function PlayScreen() {
             addTokens(currentPlayer.id, amount);
             // En local, affiche le popup "jetons cédés" (partage du device)
             setTokensStolen({ amount });
+            resultPopupShown = true;
           }
         }
       } else {
@@ -988,10 +1000,15 @@ export default function PlayScreen() {
           storeHandleCapture(capturedPlayerId, capturedPawnIndex);
           // En local, tout le monde voit le popup échec
           setCaptureFailure({ seed });
+          resultPopupShown = true;
         }
       }
       setCaptureChoice(null);
-      resolveCaptureChoice();
+      // On ne débloque QUE si aucun popup résultat n'est montré. Sinon c'est le
+      // onContinue du popup (TokensStolen / CaptureFailure) qui s'en charge.
+      if (!resultPopupShown) {
+        resolveCaptureChoice();
+      }
     },
     [captureChoice, game, isOnline, onlineGame, currentPlayer, addTokens, removeTokens, storeHandleCapture, resolveCaptureChoice],
   );

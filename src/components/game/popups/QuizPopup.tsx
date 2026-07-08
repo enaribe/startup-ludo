@@ -365,7 +365,6 @@ export const QuizPopup = memo(function QuizPopup({
                           showAsCorrect && styles.optionLabelCorrect,
                           isSelectedWrong && styles.optionLabelWrong,
                         ]}
-                        numberOfLines={2}
                       >
                         {option}
                       </Text>

@@ -130,8 +130,7 @@ export const CaptureChoicePopup = memo(function CaptureChoicePopup({
   onChoice,
 }: CaptureChoicePopupProps) {
   const tokensAvailable = captured?.tokens ?? 0;
-  const capturedName = captured?.name ?? 'Un adversaire';
-  void capturer;
+  const capturerName = capturer?.name ?? 'Un adversaire';
 
   const [selected, setSelected] = useState<'send_home' | 'steal_tokens'>('send_home');
 
@@ -150,19 +149,19 @@ export const CaptureChoicePopup = memo(function CaptureChoicePopup({
         <AttrapeHeader />
 
         <View style={styles.body}>
-          {/* Message principal en rouge */}
+          {/* Message principal en rouge — s'adresse à l'ATTRAPÉ */}
           <OutlinedText
-            text={`TU AS ATTRAPÉ ${capturedName.toUpperCase()} !`}
+            text={`TU T'ES FAIT ATTRAPER PAR ${capturerName.toUpperCase()} !`}
             style={styles.subtitle}
             outlineColor="#AF2121"
             outlineWidth={1}
           />
 
-          {/* Jetons disponibles chez la victime */}
+          {/* Jetons que TU possèdes encore */}
           <Text style={styles.tokensLabel}>
             {tokensAvailable > 0
-              ? `Il lui reste ${tokensAvailable} jeton${tokensAvailable > 1 ? 's' : ''} — à toi de choisir !`
-              : 'Il n’a aucun jeton en poche.'}
+              ? `Il te reste ${tokensAvailable} jeton${tokensAvailable > 1 ? 's' : ''} — à toi de choisir !`
+              : 'Tu n’as aucun jeton en poche.'}
           </Text>
           <View style={styles.tokensRow}>
             {tokenSlots.map((filled, i) => (
@@ -189,18 +188,18 @@ export const CaptureChoicePopup = memo(function CaptureChoicePopup({
           <View style={styles.optionsWrap}>
             <OptionCard
               icon={<HomeIcon />}
-              title="LE RENVOYER À SA MAISON"
-              subtitle="Il repart de zéro — à toi le terrain"
+              title="RENTRER À LA MAISON"
+              subtitle="Ton pion repart de zéro, tu gardes tes jetons"
               selected={selected === 'send_home'}
               onPress={() => setSelected('send_home')}
             />
             <OptionCard
               icon={<CoinIcon />}
-              title="RÉCUPÉRER SES JETONS"
+              title="DONNER MES JETONS"
               subtitle={
                 tokensAvailable > 0
-                  ? `Tu empoches ses ${tokensAvailable} jeton${tokensAvailable > 1 ? 's' : ''}`
-                  : 'Aucun jeton à récupérer'
+                  ? `Tu cèdes tes ${tokensAvailable} jeton${tokensAvailable > 1 ? 's' : ''}, ton pion reste en jeu`
+                  : 'Aucun jeton à donner'
               }
               selected={selected === 'steal_tokens'}
               onPress={() => setSelected('steal_tokens')}
