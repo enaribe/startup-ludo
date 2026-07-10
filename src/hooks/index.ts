@@ -15,3 +15,4 @@ export { useMultiplayer } from './useMultiplayer';
 export { usePresenceMap } from './usePresence';
 export { useQuickMatch, type QuickMatchState } from './useQuickMatch';
 export { useResponsiveLayout } from './useResponsiveLayout';
+export { useEditions } from './useEditions';

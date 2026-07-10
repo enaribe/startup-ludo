@@ -42,6 +42,46 @@ const LOCAL_EDITIONS: Record<string, Edition> = {
 // eslint-disable-next-line import/no-mutable-exports
 export let EDITIONS: Record<EditionId, Edition> = {};
 
+// --- Réactivité : notifier les écrans quand EDITIONS change ---
+// EDITIONS est rempli de façon asynchrone (Firestore). Les composants qui
+// affichent la liste doivent se re-render quand la donnée arrive, sinon ils
+// restent bloqués sur le fallback local (une seule édition « classic »).
+type EditionsListener = () => void;
+const editionsListeners = new Set<EditionsListener>();
+
+/** S'abonner aux changements de EDITIONS. Retourne la fonction de désabonnement. */
+export function subscribeEditions(listener: EditionsListener): () => void {
+  editionsListeners.add(listener);
+  return () => {
+    editionsListeners.delete(listener);
+  };
+}
+
+// Snapshot stable pour useSyncExternalStore : régénéré uniquement quand
+// EDITIONS change, sinon on renvoie la même référence de tableau.
+let editionListSnapshot: Edition[] = [];
+
+function computeEditionListSnapshot(): Edition[] {
+  editionListSnapshot =
+    Object.keys(EDITIONS).length === 0
+      ? Object.values(LOCAL_EDITIONS)
+      : Object.values(EDITIONS);
+  return editionListSnapshot;
+}
+computeEditionListSnapshot();
+
+/** Snapshot mémoïsé de la liste des éditions (référence stable). */
+export function getEditionListSnapshot(): Edition[] {
+  return editionListSnapshot;
+}
+
+/** Applique une nouvelle valeur de EDITIONS et notifie les abonnés. */
+function setEditions(next: Record<EditionId, Edition>): void {
+  EDITIONS = next;
+  computeEditionListSnapshot();
+  editionsListeners.forEach((listener) => listener());
+}
+
 /**
  * Charge les éditions : AsyncStorage d'abord, puis Firestore si stale (>24h).
  * Les données locales ne sont utilisées qu'en fallback si aucune donnée disponible.
@@ -53,14 +93,14 @@ export async function refreshEditionsFromFirestore(): Promise<void> {
       fetchEditionsFromFirestore,
       (data) => {
         // Firestore vide = suppression → fallback local
-        EDITIONS = Object.keys(data).length > 0 ? data : { ...LOCAL_EDITIONS };
+        setEditions(Object.keys(data).length > 0 ? data : { ...LOCAL_EDITIONS });
       }
     );
   } catch {
     // Ni cache ni Firestore — fallback local
     if (Object.keys(EDITIONS).length === 0) {
       console.warn('[Data] No editions available, using local fallback');
-      EDITIONS = { ...LOCAL_EDITIONS };
+      setEditions({ ...LOCAL_EDITIONS });
     }
   }
 }
