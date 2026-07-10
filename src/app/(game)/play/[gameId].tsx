@@ -54,7 +54,11 @@ import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { getRandomDuelQuestions } from '@/data/duelQuestions';
 import { rollRandomJoker } from '@/data/jokers';
 import { crashLog } from '@/utils/gameLog';
-import type { ChallengeEvent, FundingEvent, OpportunityEvent, Player, QuizEvent, DuelResult, DuelQuestion, Joker, JokerType } from '@/types';
+import type { ChallengeEvent, FundingEvent, OpportunityEvent, Player, PlayerColor, QuizEvent, DuelResult, DuelQuestion, Joker, JokerType } from '@/types';
+
+// Online : délai max d'attente du choix de capture d'un attrapé distant avant
+// auto-résolution (renvoi base). Au-dessus de l'AFK (15 s) pour laisser réagir.
+const CAPTURE_CHOICE_TIMEOUT_MS = 20000;
 
 export default function PlayScreen() {
   const router = useRouter();
@@ -181,7 +185,7 @@ export default function PlayScreen() {
   const [showQuitConfirm, setShowQuitConfirm] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [missedFinalEntry, setMissedFinalEntry] = useState<{ tokensNeeded: number } | null>(null);
-  const [captureChoice, setCaptureChoice] = useState<{ capturedPlayerId: string; capturedPawnIndex: number } | null>(null);
+  const [captureChoice, setCaptureChoice] = useState<{ capturedPlayerId: string; capturedPawnIndex: number; capturerId: string } | null>(null);
   const [captureFailure, setCaptureFailure] = useState<{ seed: number } | null>(null);
   const [tokensStolen, setTokensStolen] = useState<{ amount: number } | null>(null);
   const [jokerAcquired, setJokerAcquired] = useState<{ type: JokerType } | null>(null);
@@ -327,6 +331,10 @@ export default function PlayScreen() {
   // Refs pour les timers IA — permet de les annuler si un nouvel événement arrive
   const aiResultTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const aiCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Online : timeout du captureur si l'attrapé distant ne répond pas (auto-renvoi base).
+  const captureChoiceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Garde contre la double-résolution (race entre réception 'kcd' et timeout).
+  const captureChoiceResolvedRef = useRef(false);
 
   // Callback stockée pour la fermeture manuelle des popups quand l'IA joue
   // (le joueur clique "FERMER" après avoir lu le contenu)
@@ -559,16 +567,41 @@ export default function PlayScreen() {
         resolveMissedFinalEntry();
       }
     },
-    onCapturePending: (capturedPlayerId, capturedPawnIndex) => {
-      setCaptureChoice({ capturedPlayerId, capturedPawnIndex });
+    onCapturePending: (capturedPlayerId, capturedPawnIndex, capturerId) => {
+      // Le popup s'adresse à l'ATTRAPÉ (règle : c'est lui qui choisit).
+      // `capturerId` = bénéficiaire des jetons en cas de « donner ».
+      if (isOnline && capturedPlayerId !== userId) {
+        // Online : l'attrapé est un joueur DISTANT. On ne montre pas le popup ici
+        // (chez le captureur) — on lui envoie une demande ; il choisira sur SON
+        // appareil et renverra le résultat ('kcd' + le broadcast ks/k/kf).
+        // Le tour reste bloqué (waitingForCaptureChoiceRef) jusqu'au 'kcd' ou timeout.
+        onlineGame.broadcastCaptureChoiceQuery(capturedPlayerId, capturedPawnIndex);
+        // Filet de sécurité : si l'attrapé ne répond pas (déco/AFK), on auto-résout
+        // en le renvoyant à la base, puis on débloque le tour.
+        captureChoiceResolvedRef.current = false;
+        if (captureChoiceTimeoutRef.current) clearTimeout(captureChoiceTimeoutRef.current);
+        captureChoiceTimeoutRef.current = setTimeout(() => {
+          // Garde anti-race : ne pas écraser un choix déjà résolu par 'kcd'.
+          if (captureChoiceResolvedRef.current) return;
+          captureChoiceResolvedRef.current = true;
+          const seed = Math.floor(Math.random() * 10000);
+          onlineGame.broadcastCapture(capturedPlayerId, capturedPawnIndex);
+          onlineGame.broadcastCaptureFailure(capturedPlayerId, seed);
+          resolveCaptureChoice();
+        }, CAPTURE_CHOICE_TIMEOUT_MS);
+        return;
+      }
+      // Local / solo hot-seat : popup directement sur cet appareil.
+      setCaptureChoice({ capturedPlayerId, capturedPawnIndex, capturerId });
     },
-    onAICapture: (capturedPlayerId, capturedPawnIndex) => {
+    onAICapture: (capturedPlayerId, capturedPawnIndex, capturerId) => {
       // L'ATTRAPÉ est une IA → elle décide elle-même (règle : c'est l'attrapé qui
       // choisit). Décision ALÉATOIRE entre céder ses jetons et rentrer à la maison.
-      // Le captureur = le joueur courant. Le tour reste bloqué jusqu'à resolveCaptureChoice().
+      // Le captureur (bénéficiaire) = `capturerId` figé au moment de la capture.
+      // Le tour reste bloqué jusqu'à resolveCaptureChoice().
       const g = useGameStore.getState().game;
       const captured = g?.players.find((p) => p.id === capturedPlayerId);
-      const capturer = g?.players[g?.currentPlayerIndex ?? 0];
+      const capturer = g?.players.find((p) => p.id === capturerId) ?? g?.players[g?.currentPlayerIndex ?? 0];
       const amount = captured?.tokens ?? 0;
 
       // Choix aléatoire ; « céder les jetons » n'a de sens que s'il en reste.
@@ -578,7 +611,7 @@ export default function PlayScreen() {
       if (giveTokens) {
         // L'IA cède ses jetons au captureur ; son pion reste en jeu.
         if (isOnline) {
-          onlineGame.broadcastCaptureSteal(capturedPlayerId, amount);
+          onlineGame.broadcastCaptureSteal(capturedPlayerId, amount, capturerId);
         } else {
           removeTokens(capturedPlayerId, amount);
           if (capturer) addTokens(capturer.id, amount);
@@ -645,6 +678,52 @@ export default function PlayScreen() {
     }
     onlineGame.clearRemoteTokensStolen();
   }, [isOnline, onlineGame.remoteTokensStolen, onlineGame.clearRemoteTokensStolen, userId, onlineGame]);
+
+  // ===== ONLINE: Un joueur a quitté (forfait) → bannière chez les autres =====
+
+  useEffect(() => {
+    if (!isOnline || !onlineGame.remotePlayerForfeit) return;
+    const { playerId } = onlineGame.remotePlayerForfeit;
+    // Pas de bannière pour soi-même (le partant a déjà quitté l'écran).
+    if (playerId !== userId) {
+      const left = game?.players.find((p) => p.id === playerId);
+      setForfeitedNotice(`${left?.name || 'Un joueur'} a quitté la partie`);
+      if (forfeitedNoticeTimerRef.current) clearTimeout(forfeitedNoticeTimerRef.current);
+      forfeitedNoticeTimerRef.current = setTimeout(() => setForfeitedNotice(null), 4000);
+    }
+    onlineGame.clearRemotePlayerForfeit();
+  }, [isOnline, onlineGame.remotePlayerForfeit, onlineGame.clearRemotePlayerForfeit, userId, game?.players, onlineGame]);
+
+  // ===== ONLINE: L'ATTRAPÉ reçoit la demande de choix → affiche le popup chez lui =====
+
+  useEffect(() => {
+    if (!isOnline || !onlineGame.remoteCaptureChoiceRequest) return;
+    const { capturedPlayerId, capturedPawnIndex, capturerId } = onlineGame.remoteCaptureChoiceRequest;
+    // Seul l'attrapé (destinataire) ouvre le popup de choix.
+    if (capturedPlayerId === userId) {
+      setCaptureChoice({ capturedPlayerId, capturedPawnIndex, capturerId });
+    }
+    onlineGame.clearRemoteCaptureChoiceRequest();
+  }, [isOnline, onlineGame.remoteCaptureChoiceRequest, onlineGame.clearRemoteCaptureChoiceRequest, userId, onlineGame]);
+
+  // ===== ONLINE: Le CAPTUREUR reçoit le signal "choix résolu" → débloque son tour =====
+
+  useEffect(() => {
+    if (!isOnline || !onlineGame.remoteCaptureChoiceDone) return;
+    const { capturerId } = onlineGame.remoteCaptureChoiceDone;
+    if (capturerId === userId) {
+      // Garde anti-race : si le timeout a déjà auto-résolu, on ignore.
+      if (!captureChoiceResolvedRef.current) {
+        captureChoiceResolvedRef.current = true;
+        if (captureChoiceTimeoutRef.current) {
+          clearTimeout(captureChoiceTimeoutRef.current);
+          captureChoiceTimeoutRef.current = null;
+        }
+        resolveCaptureChoice();
+      }
+    }
+    onlineGame.clearRemoteCaptureChoiceDone();
+  }, [isOnline, onlineGame.remoteCaptureChoiceDone, onlineGame.clearRemoteCaptureChoiceDone, userId, onlineGame, resolveCaptureChoice]);
 
   // ===== ONLINE: React to remote dice rolls =====
 
@@ -848,6 +927,17 @@ export default function PlayScreen() {
   useEffect(() => {
     if (!isOnline || !game) return;
 
+    // Partie déjà terminée (par une autre voie : arrivée, forfait, 'w'…) → on ne
+    // (ré)arme jamais le popup/timer de déconnexion, sinon broadcastWin en double.
+    if (game.status === 'finished') {
+      setShowDisconnectPopup(false);
+      if (disconnectTimerRef.current) {
+        clearTimeout(disconnectTimerRef.current);
+        disconnectTimerRef.current = null;
+      }
+      return;
+    }
+
     const disconnectedId = onlineGame.disconnectedPlayerId;
     const disconnectedName = onlineGame.disconnectedPlayerName;
 
@@ -860,10 +950,18 @@ export default function PlayScreen() {
       return;
     }
 
-    const activePlayers = game.players.filter((p) => !p.isForfeited);
-    const isLastTwo = activePlayers.length === 2;
+    // Joueurs encore en lice APRÈS le départ du déconnecté courant :
+    // ni forfait, ni déjà classés (rank), et différents du déconnecté lui-même.
+    // On exclut aussi le déconnecté du compte même s'il n'est pas encore marqué
+    // isForfeited sur ce client (le marquage 'pf' peut arriver avec un décalage).
+    const remainingAfterLeave = game.players.filter(
+      (p) => !p.isForfeited && p.rank === undefined && p.id !== disconnectedId
+    );
+    // Popup « réclamer la victoire » UNIQUEMENT s'il ne reste qu'un seul joueur
+    // (partie à 2 au départ). À 3-4 joueurs, on retire juste le partant.
+    const soloRemains = remainingAfterLeave.length <= 1;
 
-    if (isLastTwo) {
+    if (soloRemains) {
       crashLog('opponent disconnected popup (last two)', {
         disconnectedPlayerName: disconnectedName,
       });
@@ -903,6 +1001,7 @@ export default function PlayScreen() {
     onlineGame.disconnectedPlayerId,
     onlineGame.disconnectedPlayerName,
     game?.players,
+    game?.status,
     userId,
     game?.id,
     game,
@@ -915,6 +1014,7 @@ export default function PlayScreen() {
   useEffect(() => {
     return () => {
       if (forfeitedNoticeTimerRef.current) clearTimeout(forfeitedNoticeTimerRef.current);
+      if (captureChoiceTimeoutRef.current) clearTimeout(captureChoiceTimeoutRef.current);
     };
   }, []);
 
@@ -962,12 +1062,15 @@ export default function PlayScreen() {
     [actions, handleEventResolve]
   );
 
-  // Résolution du choix de capture (captureur)
+  // Résolution du choix de capture (décidé par l'ATTRAPÉ).
+  // Le bénéficiaire des jetons est le CAPTUREUR figé dans captureChoice.capturerId.
   const handleCaptureChoiceResolve = useCallback(
     (choice: 'steal_tokens' | 'send_home') => {
       if (!captureChoice || !game) return;
-      const { capturedPlayerId, capturedPawnIndex } = captureChoice;
+      const { capturedPlayerId, capturedPawnIndex, capturerId } = captureChoice;
       const capturedPlayer = game.players.find((p) => p.id === capturedPlayerId);
+      // Bénéficiaire explicite ; fallback sur le joueur courant si absent.
+      const beneficiary = game.players.find((p) => p.id === capturerId) ?? currentPlayer;
 
       // Un popup capture-résultat (jetons cédés / renvoi base) va-t-il s'afficher ?
       // Si oui, c'est SA fermeture (onContinue) qui appellera resolveCaptureChoice()
@@ -980,10 +1083,16 @@ export default function PlayScreen() {
         const amount = capturedPlayer?.tokens ?? 0;
         if (amount > 0) {
           if (isOnline) {
-            onlineGame.broadcastCaptureSteal(capturedPlayerId, amount);
-          } else if (currentPlayer) {
+            // C'est l'ATTRAPÉ local qui résout : on crédite explicitement le
+            // CAPTUREUR (capturerId), sinon le transfert serait net-zéro (l'émetteur
+            // est l'attrapé). Le broadcast applique et propage ; on affiche nous-même
+            // le popup "jetons cédés" (on ne reçoit pas notre propre action distante).
+            onlineGame.broadcastCaptureSteal(capturedPlayerId, amount, capturerId);
+            setTokensStolen({ amount });
+            resultPopupShown = true;
+          } else if (beneficiary) {
             removeTokens(capturedPlayerId, amount);
-            addTokens(currentPlayer.id, amount);
+            addTokens(beneficiary.id, amount);
             // En local, affiche le popup "jetons cédés" (partage du device)
             setTokensStolen({ amount });
             resultPopupShown = true;
@@ -993,9 +1102,11 @@ export default function PlayScreen() {
         // send_home : renvoyer à la base + afficher popup échec
         const seed = Math.floor(Math.random() * 10000);
         if (isOnline) {
+          // L'ATTRAPÉ local applique/propage le renvoi et affiche son propre popup échec.
           onlineGame.broadcastCapture(capturedPlayerId, capturedPawnIndex);
           onlineGame.broadcastCaptureFailure(capturedPlayerId, seed);
-          // Le captureur local ne voit pas le popup échec (il l'affiche chez le capturé)
+          setCaptureFailure({ seed });
+          resultPopupShown = true;
         } else {
           storeHandleCapture(capturedPlayerId, capturedPawnIndex);
           // En local, tout le monde voit le popup échec
@@ -1004,9 +1115,15 @@ export default function PlayScreen() {
         }
       }
       setCaptureChoice(null);
-      // On ne débloque QUE si aucun popup résultat n'est montré. Sinon c'est le
-      // onContinue du popup (TokensStolen / CaptureFailure) qui s'en charge.
-      if (!resultPopupShown) {
+
+      // En ONLINE, c'est l'attrapé qui a résolu : on signale au CAPTUREUR de
+      // débloquer son tour (sa turn machine est bloquée, pas la nôtre). On ne
+      // touche donc PAS resolveCaptureChoice() localement dans ce cas.
+      if (isOnline) {
+        onlineGame.broadcastCaptureChoiceDone(capturerId, Math.floor(Math.random() * 1e9));
+      } else if (!resultPopupShown) {
+        // Local : on ne débloque QUE si aucun popup résultat n'est montré. Sinon
+        // c'est le onContinue du popup (TokensStolen / CaptureFailure) qui s'en charge.
         resolveCaptureChoice();
       }
     },
@@ -1597,7 +1714,7 @@ export default function PlayScreen() {
               if (firstOther) {
                 const current = firstOther.tokens ?? 0;
                 if (current < 5) addTokens(firstOther.id, 5 - current);
-                setCaptureChoice({ capturedPlayerId: firstOther.id, capturedPawnIndex: 0 });
+                setCaptureChoice({ capturedPlayerId: firstOther.id, capturedPawnIndex: 0, capturerId: currentPlayer?.id ?? '' });
               }
             }}
           >
@@ -1609,7 +1726,7 @@ export default function PlayScreen() {
               const firstOther = game?.players.find((p) => p.id !== currentPlayer?.id);
               if (firstOther) {
                 if (firstOther.tokens > 0) removeTokens(firstOther.id, firstOther.tokens);
-                setCaptureChoice({ capturedPlayerId: firstOther.id, capturedPawnIndex: 0 });
+                setCaptureChoice({ capturedPlayerId: firstOther.id, capturedPawnIndex: 0, capturerId: currentPlayer?.id ?? '' });
               }
             }}
           >
@@ -1734,12 +1851,19 @@ export default function PlayScreen() {
         allPlayers={game?.players ?? []}
       />
 
-      {/* Capture Choice Popup (captureur) — prioritaire sur l'avertissement */}
+      {/* Capture Choice Popup — s'adresse à l'ATTRAPÉ (il décide). `capturer` sert
+          uniquement à afficher le nom de l'adversaire. Prioritaire sur l'avertissement. */}
       <CaptureChoicePopup
         visible={captureChoice !== null}
-        capturer={currentPlayer}
+        capturer={captureChoice ? (game?.players.find((p) => p.id === captureChoice.capturerId) ?? null) : null}
         captured={captureChoice ? (game?.players.find((p) => p.id === captureChoice.capturedPlayerId) ?? null) : null}
         onChoice={handleCaptureChoiceResolve}
+        handoffName={
+          // En local hot-seat, l'appareil doit passer à l'attrapé (le captureur le tenait).
+          !isOnline && captureChoice
+            ? (game?.players.find((p) => p.id === captureChoice.capturedPlayerId)?.name ?? null)
+            : null
+        }
       />
 
       {/* Capture Failure Popup (capturé — renvoi à la base) */}
@@ -1945,6 +2069,31 @@ export default function PlayScreen() {
             duel.currentPhase === 'answering'
           );
 
+        // Joueur dont c'est le tour de répondre (affiché dans le header du popup
+        // de questions), calculé selon le mode :
+        //  - IA locale : le HUMAIN répond (l'autre est l'IA).
+        //  - Online : c'est toujours MOI (chacun répond sur son device).
+        //  - Local hot-seat : challenger si challenger_turn, sinon opponent.
+        let activeDuelPlayer: { name: string; color: PlayerColor } | null = null;
+        let isMyDuelTurn = false;
+        {
+          const ch = duel.challenger;
+          const op = duel.opponent;
+          if (isAILocalDuel && ch && op) {
+            const human = ch.isAI ? op : ch;
+            activeDuelPlayer = { name: human.name, color: human.color };
+            isMyDuelTurn = true;
+          } else if (isOnline && ch && op) {
+            const me = duel.myRole === 'opponent' ? op : ch;
+            activeDuelPlayer = { name: me.name, color: me.color };
+            isMyDuelTurn = true;
+          } else if (ch && op) {
+            const active = duel.currentPhase === 'opponent_turn' ? op : ch;
+            activeDuelPlayer = { name: active.name, color: active.color };
+            isMyDuelTurn = true; // hot-seat : celui qui tient l'appareil répond
+          }
+        }
+
         console.log('[DUEL-DEBUG] rendu popup', {
           phase: duel.currentPhase,
           isActive: duel.isActive,
@@ -1982,6 +2131,8 @@ export default function PlayScreen() {
               <DuelQuestionPopup
                 visible
                 questions={duel.questions}
+                activePlayer={activeDuelPlayer}
+                isMyTurn={isMyDuelTurn}
                 onComplete={
                   isOnline
                     ? handleDuelAnswersComplete

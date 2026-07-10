@@ -1092,11 +1092,13 @@ export const useGameStore = create<GameStore>()(
           }
 
           case 'ks': {
-            // Capture steal: voler les jetons du pion capturé
-            const data = action.d as { pid: string; amount: number };
+            // Capture steal: voler les jetons du pion capturé.
+            // Bénéficiaire = le CAPTUREUR (data.cid). Fallback sur l'expéditeur
+            // (action.p) pour l'ancien flux où l'émetteur était le captureur.
+            const data = action.d as { pid: string; amount: number; cid?: string };
             if (data.amount > 0) {
               get().removeTokens(data.pid, data.amount);
-              get().addTokens(action.p, data.amount);
+              get().addTokens(data.cid ?? action.p, data.amount);
             }
             break;
           }

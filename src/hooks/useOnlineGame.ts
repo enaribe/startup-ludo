@@ -91,9 +91,13 @@ interface UseOnlineGameReturn {
   /** Broadcast capture */
   broadcastCapture: (capturedPlayerId: string, capturedPawnIndex: number) => void;
   /** Broadcast capture steal : voler les jetons du pion capturé */
-  broadcastCaptureSteal: (capturedPlayerId: string, amount: number) => void;
+  broadcastCaptureSteal: (capturedPlayerId: string, amount: number, beneficiaryId?: string) => void;
   /** Broadcast popup échec narratif au pion capturé (type 'kf') */
   broadcastCaptureFailure: (capturedPlayerId: string, seed: number) => void;
+  /** Le captureur demande à l'attrapé distant de choisir (type 'kcq') */
+  broadcastCaptureChoiceQuery: (capturedPlayerId: string, capturedPawnIndex: number) => void;
+  /** L'attrapé signale au captureur que son choix est résolu (type 'kcd') */
+  broadcastCaptureChoiceDone: (capturerId: string, nonce: number) => void;
   /** Broadcast l'acquisition d'un joker (type 'jg') */
   broadcastJokerGranted: (playerId: string, jokerType: JokerType, jokerId: string) => void;
   /** Broadcast l'utilisation d'un joker (type 'ju') */
@@ -110,6 +114,18 @@ interface UseOnlineGameReturn {
   remoteTokensStolen: { capturedPlayerId: string; amount: number } | null;
   /** Clear remote tokens stolen après affichage */
   clearRemoteTokensStolen: () => void;
+  /** Demande de choix de capture reçue par l'attrapé (affiche le popup chez lui) */
+  remoteCaptureChoiceRequest: { capturedPlayerId: string; capturedPawnIndex: number; capturerId: string } | null;
+  /** Clear la demande de choix après traitement */
+  clearRemoteCaptureChoiceRequest: () => void;
+  /** Signal "choix résolu" reçu par le captureur (débloque son tour) */
+  remoteCaptureChoiceDone: { capturerId: string; nonce: number } | null;
+  /** Clear le signal "choix résolu" après traitement */
+  clearRemoteCaptureChoiceDone: () => void;
+  /** Un joueur a quitté (forfait) — pour afficher une bannière chez les autres. */
+  remotePlayerForfeit: { playerId: string; nonce: number } | null;
+  /** Clear la notification de forfait après affichage. */
+  clearRemotePlayerForfeit: () => void;
   /** Broadcast win */
   broadcastWin: (winnerId: string) => void;
   /** Broadcast an event trigger (so opponent sees the popup) */
@@ -217,6 +233,12 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
   const [remoteEmojiReaction, setRemoteEmojiReaction] = useState<RemoteEmojiReaction | null>(null);
   const [remoteCaptureFailure, setRemoteCaptureFailure] = useState<{ capturedPlayerId: string; seed: number } | null>(null);
   const [remoteTokensStolen, setRemoteTokensStolen] = useState<{ capturedPlayerId: string; amount: number } | null>(null);
+  // Demande de choix de capture reçue par l'ATTRAPÉ (c'est lui qui décide).
+  const [remoteCaptureChoiceRequest, setRemoteCaptureChoiceRequest] = useState<{ capturedPlayerId: string; capturedPawnIndex: number; capturerId: string } | null>(null);
+  // Signal reçu par le CAPTUREUR quand l'attrapé a résolu son choix (débloque le tour).
+  const [remoteCaptureChoiceDone, setRemoteCaptureChoiceDone] = useState<{ capturerId: string; nonce: number } | null>(null);
+  // Un joueur a quitté la partie (forfait) → affiche une bannière chez les autres.
+  const [remotePlayerForfeit, setRemotePlayerForfeit] = useState<{ playerId: string; nonce: number } | null>(null);
 
   const clearRemoteEvent = useCallback(() => setRemoteEvent(null), []);
   const clearRemoteEventResult = useCallback(() => setRemoteEventResult(null), []);
@@ -226,6 +248,9 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
   const clearRemoteEmojiReaction = useCallback(() => setRemoteEmojiReaction(null), []);
   const clearRemoteCaptureFailure = useCallback(() => setRemoteCaptureFailure(null), []);
   const clearRemoteTokensStolen = useCallback(() => setRemoteTokensStolen(null), []);
+  const clearRemoteCaptureChoiceRequest = useCallback(() => setRemoteCaptureChoiceRequest(null), []);
+  const clearRemoteCaptureChoiceDone = useCallback(() => setRemoteCaptureChoiceDone(null), []);
+  const clearRemotePlayerForfeit = useCallback(() => setRemotePlayerForfeit(null), []);
 
   // Track processed actions to avoid duplicates
   const processedActionsRef = useRef<Set<string>>(new Set());
@@ -360,6 +385,19 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
           setRemoteTokensStolen({ capturedPlayerId: data.pid, amount: data.amount });
           break; // pas de return → applyRemoteAction applique le transfert
         }
+        case 'kcq': {
+          // Capture choice query : le captureur demande à l'ATTRAPÉ de choisir.
+          // Seul l'attrapé (filtré par userId côté écran) affichera le popup.
+          const data = action.d as { pid: string; pi: number; cid: string };
+          setRemoteCaptureChoiceRequest({ capturedPlayerId: data.pid, capturedPawnIndex: data.pi, capturerId: data.cid });
+          return; // UI-only
+        }
+        case 'kcd': {
+          // Capture choice done : l'attrapé a résolu → débloque le tour du captureur.
+          const data = action.d as { cid: string; nonce: number };
+          setRemoteCaptureChoiceDone({ capturerId: data.cid, nonce: data.nonce });
+          return; // UI-only
+        }
         case 'em': {
           // Emoji reaction received from another player
           const emData = action.d as { emoji: string; name: string };
@@ -373,6 +411,13 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
           console.log('[useOnlineGame] Emoji reaction reçue:', reaction);
           setRemoteEmojiReaction(reaction);
           return;
+        }
+        case 'pf': {
+          // Un joueur a quitté (forfait) → bannière chez les autres. On NE return PAS :
+          // applyRemoteAction (case 'pf' du store) marque le joueur et gère la suite.
+          const data = action.d as { pid: string };
+          setRemotePlayerForfeit({ playerId: data.pid, nonce: action.ts });
+          break;
         }
       }
 
@@ -689,17 +734,22 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
     [userId, storeHandleCapture]
   );
 
-  /** Capture: voler les jetons du pion capturé (pas de renvoi à la base) */
+  /** Capture: voler les jetons du pion capturé (pas de renvoi à la base).
+   *  `beneficiaryId` = le CAPTUREUR qui reçoit les jetons. Important : dans le
+   *  flux « l'attrapé décide », l'émetteur (userId) est l'ATTRAPÉ, pas le
+   *  captureur — il faut donc créditer explicitement le captureur, sinon le
+   *  transfert est net-zéro. Fallback sur userId (ancien flux où émetteur = captureur). */
   const broadcastCaptureSteal = useCallback(
-    (capturedPlayerId: string, amount: number) => {
+    (capturedPlayerId: string, amount: number, beneficiaryId?: string) => {
       if (!userId || amount <= 0) return;
+      const cid = beneficiaryId ?? userId;
 
       storeRemoveTokens(capturedPlayerId, amount);
-      storeAddTokens(userId, amount);
+      storeAddTokens(cid, amount);
       multiplayerSync.sendAction({
         t: 'ks',
         p: userId,
-        d: { pid: capturedPlayerId, amount },
+        d: { pid: capturedPlayerId, amount, cid },
       });
     },
     [userId, storeAddTokens, storeRemoveTokens],
@@ -713,6 +763,32 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
         t: 'kf',
         p: userId,
         d: { pid: capturedPlayerId, seed },
+      });
+    },
+    [userId],
+  );
+
+  /** Le CAPTUREUR demande à l'ATTRAPÉ (distant) de choisir son sort. */
+  const broadcastCaptureChoiceQuery = useCallback(
+    (capturedPlayerId: string, capturedPawnIndex: number) => {
+      if (!userId) return;
+      multiplayerSync.sendAction({
+        t: 'kcq',
+        p: userId,
+        d: { pid: capturedPlayerId, pi: capturedPawnIndex, cid: userId },
+      });
+    },
+    [userId],
+  );
+
+  /** L'ATTRAPÉ signale au CAPTUREUR que son choix est résolu (débloque le tour). */
+  const broadcastCaptureChoiceDone = useCallback(
+    (capturerId: string, nonce: number) => {
+      if (!userId) return;
+      multiplayerSync.sendAction({
+        t: 'kcd',
+        p: userId,
+        d: { cid: capturerId, nonce },
       });
     },
     [userId],
@@ -879,20 +955,32 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
   const forfeit = useCallback(() => {
     if (!userId || !game) return;
 
-    // Find the opponent (the one who wins by forfeit)
-    const opponent = game.players.find((p) => p.id !== userId);
-    if (opponent) {
-      storeEndGame(opponent.id);
-      multiplayerSync.sendAction({
-        t: 'f',
-        p: userId,
-        d: { winner: opponent.id },
-      });
-      multiplayerSync.updateRoomStatus('finished');
+    // Joueurs encore en lice une fois que JE quitte : ni forfait, ni classés,
+    // et différents de moi. Détermine si la partie continue ou se termine.
+    const remainingAfterLeave = game.players.filter(
+      (p) => p.id !== userId && !p.isForfeited && p.rank === undefined,
+    );
+
+    if (remainingAfterLeave.length >= 2) {
+      // 3-4 joueurs : je me retire simplement, la partie continue pour les autres.
+      // Le store marque isForfeited et fait passer le tour si c'était le mien.
+      broadcastPlayerForfeit(userId);
+    } else {
+      // Il ne reste qu'un seul autre joueur → il gagne par forfait, la partie s'arrête.
+      const winner = remainingAfterLeave[0];
+      if (winner) {
+        storeEndGame(winner.id);
+        multiplayerSync.sendAction({
+          t: 'f',
+          p: userId,
+          d: { winner: winner.id },
+        });
+        multiplayerSync.updateRoomStatus('finished');
+      }
     }
 
     multiplayerSync.leaveRoom();
-  }, [userId, game, storeEndGame]);
+  }, [userId, game, storeEndGame, broadcastPlayerForfeit]);
 
   const sendEmojiReaction = useCallback(
     (emoji: string, playerName: string) => {
@@ -913,12 +1001,20 @@ export function useOnlineGame(userId: string | null): UseOnlineGameReturn {
     broadcastCapture,
     broadcastCaptureSteal,
     broadcastCaptureFailure,
+    broadcastCaptureChoiceQuery,
+    broadcastCaptureChoiceDone,
     broadcastJokerGranted,
     broadcastJokerUsed,
     remoteCaptureFailure,
     clearRemoteCaptureFailure,
     remoteTokensStolen,
     clearRemoteTokensStolen,
+    remoteCaptureChoiceRequest,
+    clearRemoteCaptureChoiceRequest,
+    remoteCaptureChoiceDone,
+    clearRemoteCaptureChoiceDone,
+    remotePlayerForfeit,
+    clearRemotePlayerForfeit,
     broadcastWin,
     broadcastEvent,
     forfeit,

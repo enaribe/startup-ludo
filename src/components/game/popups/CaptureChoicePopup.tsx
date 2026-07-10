@@ -116,11 +116,18 @@ function OptionCard({ icon, title, subtitle, selected, onPress, disabled }: Opti
 }
 
 // ─── Popup principal ─────────────────────────────────────────────────────────
+// RÈGLE : ce popup s'adresse à l'ATTRAPÉ (`captured`) — c'est LUI qui choisit son
+// sort. `capturer` sert uniquement à afficher le nom de l'adversaire (« attrapé
+// par X ») ; c'est aussi le bénéficiaire des jetons en cas de « donner », mais
+// l'attribution est gérée par l'écran (voir handleCaptureChoiceResolve).
 interface CaptureChoicePopupProps {
   visible: boolean;
   capturer?: Player | null;
   captured: Player | null;
   onChoice: (choice: 'steal_tokens' | 'send_home') => void;
+  /** Nom de l'attrapé à qui passer l'appareil (mode local hot-seat uniquement).
+   *  Si fourni, affiche « Passe le téléphone à X ». Non fourni en solo/online. */
+  handoffName?: string | null;
 }
 
 export const CaptureChoicePopup = memo(function CaptureChoicePopup({
@@ -128,6 +135,7 @@ export const CaptureChoicePopup = memo(function CaptureChoicePopup({
   capturer,
   captured,
   onChoice,
+  handoffName,
 }: CaptureChoicePopupProps) {
   const tokensAvailable = captured?.tokens ?? 0;
   const capturerName = capturer?.name ?? 'Un adversaire';
@@ -149,6 +157,11 @@ export const CaptureChoicePopup = memo(function CaptureChoicePopup({
         <AttrapeHeader />
 
         <View style={styles.body}>
+          {/* Passe-plat hot-seat : indique à qui donner l'appareil (local uniquement) */}
+          {handoffName ? (
+            <Text style={styles.handoffHint}>📱 Passe le téléphone à {handoffName}</Text>
+          ) : null}
+
           {/* Message principal en rouge — s'adresse à l'ATTRAPÉ */}
           <OutlinedText
             text={`TU T'ES FAIT ATTRAPER PAR ${capturerName.toUpperCase()} !`}
@@ -244,6 +257,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     letterSpacing: 0.5,
     marginBottom: SPACING[4],
+  },
+  handoffHint: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.sm,
+    color: '#1F91D0',
+    textAlign: 'center',
+    marginBottom: SPACING[3],
   },
   tokensLabel: {
     fontFamily: FONTS.bodySemiBold,

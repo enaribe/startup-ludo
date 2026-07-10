@@ -79,10 +79,13 @@ export interface UseTurnMachineParams {
    *  (≤ FINAL_ENTRY_WARNING_DISTANCE cases) sans avoir encore les jetons requis.
    *  Déclenché 1× par lap pour ne pas spammer. */
   onMissedFinalEntry?: (tokensNeeded: number) => void;
-  /** Appelé quand une capture doit être résolue via popup de choix (captureur humain) */
-  onCapturePending?: (capturedPlayerId: string, capturedPawnIndex: number) => void;
-  /** Appelé quand une IA capture → choix automatique = renvoi à la base (permet d'afficher popup échec) */
-  onAICapture?: (capturedPlayerId: string, capturedPawnIndex: number) => void;
+  /** Appelé quand une capture doit être résolue via popup de choix.
+   *  RÈGLE : c'est l'ATTRAPÉ (`capturedPlayerId`) qui décide. `capturerId` = le
+   *  joueur qui a capturé (bénéficiaire des jetons en cas de « donner »). */
+  onCapturePending?: (capturedPlayerId: string, capturedPawnIndex: number, capturerId: string) => void;
+  /** Appelé quand l'ATTRAPÉ est une IA → décision automatique côté PlayScreen.
+   *  `capturerId` = le joueur qui a capturé (bénéficiaire des jetons). */
+  onAICapture?: (capturedPlayerId: string, capturedPawnIndex: number, capturerId: string) => void;
   /** Appelé au début du tour d'un joueur (après le lancer du dé). Sert au joker Investissement. */
   onTurnStart?: (playerId: string) => void;
   /** Appelé quand le tour passe RÉELLEMENT au joueur suivant (pas un rejeu-6),
@@ -540,9 +543,12 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
             // s'il cède ses jetons ou rentre à la base.
             //  - Attrapé HUMAIN → popup de choix (onCapturePending).
             //  - Attrapé IA     → décision automatique côté PlayScreen (onAICapture).
+            // Le CAPTUREUR = le joueur qui vient de bouger (currentPlayerRef) : il
+            // est le bénéficiaire des jetons si l'attrapé choisit « donner ».
             // Dans les deux cas on bloque le passage de tour tant que le choix
             // n'est pas résolu (évite qu'un event de case s'ouvre en parallèle).
             const capturedId = result!.capturedPawn!.playerId;
+            const capturerId = currentPlayerRef.current?.id ?? '';
             const capturedPlayer = gameRef.current?.players.find((p) => p.id === capturedId);
             const capturedIsHuman = !!capturedPlayer && !capturedPlayer.isAI;
             waitingForCaptureChoiceRef.current = true;
@@ -550,11 +556,13 @@ export function useTurnMachine(params: UseTurnMachineParams): UseTurnMachineRetu
               onCapturePendingRef.current(
                 capturedId,
                 result!.capturedPawn!.pawnIndex,
+                capturerId,
               );
             } else {
               onAICaptureRef.current?.(
                 capturedId,
                 result!.capturedPawn!.pawnIndex,
+                capturerId,
               );
             }
           }, animDelay);
