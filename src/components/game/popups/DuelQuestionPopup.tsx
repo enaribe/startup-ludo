@@ -18,7 +18,7 @@ import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { SPACING, BORDER_RADIUS, SHADOWS } from '@/styles/spacing';
 import { useSettingsStore } from '@/stores';
 import { usePlaySoundOnOpen } from '@/hooks/useSound';
-import type { AIDuelAnswer, DuelQuestion } from '@/types';
+import type { AIDuelAnswer, DuelQuestion, PlayerColor } from '@/types';
 
 interface AIOpponentConfig {
   /** Nom affiché de l'IA (ex: "Bot Vert") */
@@ -41,6 +41,20 @@ interface DuelQuestionPopupProps {
   /** Si fourni, active le mode "humain vs IA en direct". onComplete n'est pas appelé,
    *  c'est aiOpponent.onComplete qui reçoit les 2 scores. */
   aiOpponent?: AIOpponentConfig;
+  /** Joueur dont c'est le tour de répondre (pastille couleur + nom dans le header).
+   *  Sert à lever l'ambiguïté « c'est à qui de jouer ? » dans tous les modes. */
+  activePlayer?: { name: string; color: PlayerColor } | null;
+  /** True si le joueur actif est le joueur LOCAL (adapte le libellé « À toi de jouer »
+   *  vs « Au tour de X »). En local hot-seat, true = celui qui tient l'appareil. */
+  isMyTurn?: boolean;
+}
+
+/** Initiales du nom (1 à 2 lettres) pour la pastille du joueur actif. */
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
+  return (parts[0]![0]! + parts[1]![0]!).toUpperCase();
 }
 
 function shuffleArray<T>(array: T[]): T[] {
@@ -59,6 +73,8 @@ export const DuelQuestionPopup = memo(function DuelQuestionPopup({
   onClose,
   onProgress,
   aiOpponent,
+  activePlayer,
+  isMyTurn,
 }: DuelQuestionPopupProps) {
   const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
   usePlaySoundOnOpen(visible && questions.length > 0, 'popup-open');
@@ -219,6 +235,27 @@ export const DuelQuestionPopup = memo(function DuelQuestionPopup({
     >
       <Animated.View entering={SlideInUp.duration(280)} style={styles.card}>
         <DuelHeader />
+
+        {/* Bande « à qui de jouer » — couleur du joueur actif + son nom. Pastille
+            blanche (initiales dans la couleur du joueur) pour un contraste net. */}
+        {activePlayer && (
+          <View style={[styles.turnBanner, { backgroundColor: COLORS.players[activePlayer.color] }]}>
+            <View style={styles.turnBannerDot}>
+              <Text style={[styles.turnBannerInitials, { color: COLORS.players[activePlayer.color] }]}>
+                {getInitials(activePlayer.name)}
+              </Text>
+            </View>
+            <View style={styles.turnBannerText}>
+              <Text style={styles.turnBannerName} numberOfLines={1}>
+                {activePlayer.name}
+              </Text>
+              <Text style={styles.turnBannerLabel} numberOfLines={1}>
+                {isMyTurn ? 'À toi de jouer !' : 'À son tour de répondre'}
+              </Text>
+            </View>
+          </View>
+        )}
+
         <View style={styles.content}>
           {/* Progress */}
           <View style={styles.progressSection}>
@@ -351,6 +388,40 @@ const styles = StyleSheet.create({
     paddingBottom: SPACING[6],
     paddingHorizontal: SPACING[5],
     alignItems: 'center',
+  },
+  turnBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[3],
+    paddingVertical: SPACING[2],
+    paddingHorizontal: SPACING[4],
+  },
+  turnBannerDot: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: COLORS.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  turnBannerInitials: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES.sm,
+  },
+  turnBannerText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  turnBannerName: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES.base,
+    color: COLORS.white,
+    letterSpacing: 0.3,
+  },
+  turnBannerLabel: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.xs,
+    color: 'rgba(255,255,255,0.85)',
   },
   progressSection: {
     width: '100%',
