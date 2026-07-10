@@ -29,13 +29,22 @@ service cloud.firestore {
       );
     }
 
-    // Admin propriétaire d'un programme : ownerId du document == son uid.
-    // Vaut pour create (request.resource) comme pour update/delete (resource existant).
+    // Admin gestionnaire d'un programme (multi-admin) : son uid figure dans
+    // `ownerIds` (nouveau modèle) OU est l'ancien `ownerId` legacy (rétrocompat).
+    // `.get(champ, défaut)` évite l'erreur si le champ est absent.
+    function isProgramOwnerAfter() {
+      return request.auth.uid in request.resource.data.get('ownerIds', [])
+             || request.resource.data.get('ownerId', '') == request.auth.uid;
+    }
+    function isProgramOwnerBefore() {
+      return request.auth.uid in resource.data.get('ownerIds', [])
+             || resource.data.get('ownerId', '') == request.auth.uid;
+    }
     function ownsProgramAfter() {
-      return isAdmin() && request.resource.data.ownerId == request.auth.uid;
+      return isAdmin() && isProgramOwnerAfter();
     }
     function ownsProgramBefore() {
-      return isAdmin() && resource.data.ownerId == request.auth.uid;
+      return isAdmin() && isProgramOwnerBefore();
     }
 
     // Admin de partenaire : gère tous les programmes dont partnerId == son partnerId (claim).
@@ -104,8 +113,8 @@ service cloud.firestore {
 
     // Programmes (lecture publique) — multi-tenant :
     //  - super admin : tout
-    //  - admin de programme : uniquement SON programme (ownerId == son uid),
-    //    et il ne peut pas se déposséder (ownerId reste le sien après écriture).
+    //  - admin de programme : uniquement les programmes qu'il gère (son uid dans
+    //    ownerIds, ou legacy ownerId), et il doit rester gestionnaire après écriture.
     match /programs/{programId} {
       allow read: if true;
       // super admin : tout · admin programme : ses programmes (ownerId) ·
