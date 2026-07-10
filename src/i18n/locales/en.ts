@@ -650,6 +650,11 @@ const en: Record<string, string> = {
   'program.modeOnlineTitle': 'ONLINE GAME',
   'program.modeOnlineSub': 'Take on other players and climb the leaderboard',
   'program.modeOnlineTag': 'Ranking',
+  'program.onlineIntro': 'Play online with the other players of the program',
+  'program.onlineCreateTitle': 'CREATE A ROOM',
+  'program.onlineCreateSub': 'Open a room and share the code with other players',
+  'program.onlineJoinTitle': 'JOIN A ROOM',
+  'program.onlineJoinSub': 'Enter a room code to join the game',
   'program.soon': 'Soon',
   'program.continue': 'CONTINUE',
 

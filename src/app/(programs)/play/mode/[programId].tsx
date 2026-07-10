@@ -34,7 +34,7 @@ const MODES: {
   available: boolean;
 }[] = [
   { key: 'local', titleKey: 'program.modeLocalTitle', subtitleKey: 'program.modeLocalSub', tagIcon: 'sparkles-outline', tagKey: 'program.modeLocalTag', available: true },
-  { key: 'online', titleKey: 'program.modeOnlineTitle', subtitleKey: 'program.modeOnlineSub', tagIcon: 'trophy-outline', tagKey: 'program.modeOnlineTag', available: false },
+  { key: 'online', titleKey: 'program.modeOnlineTitle', subtitleKey: 'program.modeOnlineSub', tagIcon: 'people-outline', tagKey: 'program.modeOnlineTag', available: true },
 ];
 
 export default function ProgramModeScreen() {
@@ -79,17 +79,18 @@ export default function ProgramModeScreen() {
 
   const handleMode = (mode: ModeKey, available: boolean) => {
     if (!available) return;
+    const forwardParams = {
+      programId: program.id,
+      playerName: params.playerName ?? '',
+      profileId: params.profileId ?? '',
+      profileName: params.profileName ?? '',
+    };
     if (mode === 'local') {
       // Écran suivant : configuration de la partie locale (solo vs IA / tour par tour).
-      router.push({
-        pathname: '/(programs)/play/mode/local/[programId]',
-        params: {
-          programId: program.id,
-          playerName: params.playerName ?? '',
-          profileId: params.profileId ?? '',
-          profileName: params.profileName ?? '',
-        },
-      });
+      router.push({ pathname: '/(programs)/play/mode/local/[programId]', params: forwardParams });
+    } else if (mode === 'online') {
+      // Écran suivant : créer / rejoindre un salon entre joueurs du programme.
+      router.push({ pathname: '/(programs)/play/mode/online/[programId]', params: forwardParams });
     }
   };
 

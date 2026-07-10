@@ -16,6 +16,7 @@
 
 import database, { FirebaseDatabaseTypes } from '@react-native-firebase/database';
 import { JoinRoomError, isNetworkError } from '@/services/multiplayer/JoinRoomError';
+import { getProgramEnrollmentsForUser } from '@/services/firebase/programService';
 import {
   firebaseLog,
   getFirebaseErrorMessage,
@@ -44,6 +45,13 @@ export interface RoomConfig {
   roomName?: string;
   betAmount?: number;
   isQuickMatch?: boolean;
+  /** Salon d'un parcours PROGRAMME (absent = partie normale). */
+  program?: {
+    programId: string;
+    partnerId: string;
+    contentPackId?: string;
+    levelIndex: number;
+  };
 }
 
 export interface JoinRoomData {
@@ -143,6 +151,17 @@ export class MultiplayerSync {
         },
         // Mise par joueur (FCFA). On n'écrit le champ que si > 0 (RTDB n'accepte pas undefined).
         ...(config.betAmount && config.betAmount > 0 ? { stake: config.betAmount } : {}),
+        // Contexte programme : source de vérité partagée pour charger le même contenu.
+        ...(config.program
+          ? {
+              program: {
+                programId: config.program.programId,
+                partnerId: config.program.partnerId,
+                levelIndex: config.program.levelIndex,
+                ...(config.program.contentPackId ? { contentPackId: config.program.contentPackId } : {}),
+              },
+            }
+          : {}),
       };
 
       const hostPlayer: RealtimePlayer = {
@@ -222,6 +241,15 @@ export class MultiplayerSync {
       }
       if (foundRoom.status !== 'waiting') {
         throw new JoinRoomError('ROOM_STARTED', 'Ce salon n\'est plus disponible');
+      }
+
+      // Salon PROGRAMME : réservé aux joueurs inscrits à ce programme.
+      if (foundRoom.program?.programId) {
+        const enrollments = await getProgramEnrollmentsForUser(data.playerId);
+        const enrolled = enrollments.some((e) => e.programId === foundRoom.program!.programId);
+        if (!enrolled) {
+          throw new JoinRoomError('NOT_ENROLLED', 'Ce salon est réservé aux joueurs inscrits à ce programme.');
+        }
       }
 
       // Get existing players to determine available color

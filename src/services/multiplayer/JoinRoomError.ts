@@ -3,6 +3,7 @@ export type JoinRoomErrorCode =
   | 'ROOM_STARTED'
   | 'ROOM_FINISHED'
   | 'ROOM_FULL'
+  | 'NOT_ENROLLED'
   | 'NETWORK_ERROR'
   | 'UNKNOWN';
 
@@ -42,6 +43,11 @@ export function getJoinRoomErrorDisplay(code: JoinRoomErrorCode): JoinRoomErrorD
       return {
         title: 'Salon plein',
         message: 'Ce salon est complet (maximum 4 joueurs).',
+      };
+    case 'NOT_ENROLLED':
+      return {
+        title: 'Programme réservé',
+        message: 'Ce salon est réservé aux joueurs inscrits à ce programme.',
       };
     case 'NETWORK_ERROR':
       return {

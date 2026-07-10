@@ -650,6 +650,11 @@ const fr = {
   'program.modeOnlineTitle': 'PARTIE EN LIGNE',
   'program.modeOnlineSub': 'Affronte d\'autres joueurs et grimpe dans le classement',
   'program.modeOnlineTag': 'Classement',
+  'program.onlineIntro': 'Joue en ligne avec les autres joueurs du programme',
+  'program.onlineCreateTitle': 'CRÉER UN SALON',
+  'program.onlineCreateSub': 'Ouvre un salon et partage le code aux autres joueurs',
+  'program.onlineJoinTitle': 'REJOINDRE UN SALON',
+  'program.onlineJoinSub': 'Entre le code d\'un salon pour rejoindre la partie',
   'program.soon': 'Bientôt',
   'program.continue': 'CONTINUER',
 

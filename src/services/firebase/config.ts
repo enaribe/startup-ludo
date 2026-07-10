@@ -173,6 +173,16 @@ export interface RealtimeRoom {
   };
   /** Mise par joueur en FCFA (1 Ptw = 1000 FCFA). 0 ou absent = partie sans mise. */
   stake?: number;
+  /**
+   * Contexte PROGRAMME (salon d'un parcours). Absent = partie normale.
+   * Source de vérité partagée : tous les joueurs chargent le MÊME contentPack.
+   */
+  program?: {
+    programId: string;
+    partnerId: string;
+    contentPackId?: string;
+    levelIndex: number;
+  };
 }
 
 export interface RealtimePlayer {

@@ -29,7 +29,7 @@ import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { RadialBackground, DynamicGradientBorder } from '@/components/ui';
 import { useTranslation } from '@/i18n';
 import { multiplayerSync } from '@/services/multiplayer';
-import { useGameStore, useAuthStore, useUserStore } from '@/stores';
+import { useGameStore, useAuthStore, useUserStore, useProgramStore } from '@/stores';
 import database from '@react-native-firebase/database';
 import { REALTIME_PATHS } from '@/services/firebase/config';
 import type { RealtimePlayer } from '@/services/firebase/config';
@@ -210,11 +210,39 @@ export default function GamePreparationScreen() {
           edition: p.edition,    // Édition dérivée du secteur
         }));
 
+        // ===== CONTEXTE PROGRAMME (salon d'un parcours) =====
+        // Le salon porte le programId/contentPackId/levelIndex → tous les joueurs
+        // chargent le MÊME contenu. Chaque joueur crée SA propre session pour que
+        // sa progression de parcours avance (comme en solo).
+        let programContext: import('@/types/program').ProgramGameContext | undefined;
+        if (roomData?.program?.programId) {
+          const prog = roomData.program;
+          const uid = useAuthStore.getState().user?.id ?? '';
+          const programStore = useProgramStore.getState();
+          const enrollment = uid ? programStore.getEnrollmentForProgram(prog.programId, uid) : undefined;
+          const session = uid
+            ? programStore.createProgramSession(prog.programId, uid, false, params.gameId || `game_${roomId}`, prog.levelIndex ?? 0)
+            : null;
+          programContext = {
+            origin: 'program',
+            partnerId: prog.partnerId,
+            programId: prog.programId,
+            enrollmentId: enrollment?.id ?? null,
+            sessionId: session?.id ?? null,
+            isTrial: false,
+            contentPackId: prog.contentPackId,
+            levelIndex: prog.levelIndex ?? 0,
+            // Contenu COMMUN en online (pas de contenu persona — chacun a le sien).
+            profileId: null,
+            profileName: null,
+          };
+        }
+
         if (checkpoint && (checkpoint as unknown as CompactCheckpoint).t) {
-          initGame('online', edition, gamePlayers);
+          initGame('online', edition, gamePlayers, programContext);
           loadFromCheckpoint(decodeCheckpoint(checkpoint as unknown as CompactCheckpoint));
         } else {
-          initGame('online', edition, gamePlayers);
+          initGame('online', edition, gamePlayers, programContext);
         }
 
         multiplayerSync.setupPresence();
