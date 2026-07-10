@@ -16,9 +16,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { StartupSelectionModal } from '@/components/game/StartupSelectionModal';
 import { VersusBoard, type VersusPlayer } from '@/components/game/VersusBoard';
-import { DynamicGradientBorder, GameButton, RadialBackground } from '@/components/ui';
+import { DynamicGradientBorder, GameButton, Modal, RadialBackground } from '@/components/ui';
 import { Avatar } from '@/components/ui/Avatar';
+import { EditionTileIcon } from '@/components/icons';
 import { getDefaultProjectsForEdition, getMatchingUserStartups } from '@/data/defaultProjects';
+import { useEditions } from '@/hooks';
 import { useMultiplayer } from '@/hooks/useMultiplayer';
 import { useTranslation } from '@/i18n';
 import { buildShareMessage } from '@/services/multiplayer/inviteLink';
@@ -36,6 +38,10 @@ import { formatPtwRaw } from '@/utils/currency';
 
 const { width: screenWidth } = Dimensions.get('window');
 const contentWidth = screenWidth - SPACING[4] * 2;
+// Grille d'éditions 2 colonnes dans la popup (Modal size="lg" : maxWidth 500 / width 95%, body padding SPACING[5]).
+const EDITION_TILE_GAP = 12;
+const editionModalBodyWidth = Math.min(500, screenWidth * 0.95) - SPACING[5] * 2;
+const editionTileWidth = (editionModalBodyWidth - EDITION_TILE_GAP) / 2;
 
 export default function CreateRoomScreen() {
   const router = useRouter();
@@ -47,6 +53,11 @@ export default function CreateRoomScreen() {
     code?: string;
     isHost?: string;
     quickMatch?: string;
+    // Contexte PROGRAMME (salon d'un parcours).
+    programId?: string;
+    partnerId?: string;
+    contentPackId?: string;
+    levelIndex?: string;
   }>();
 
   const user = useAuthStore((state) => state.user);
@@ -64,8 +75,12 @@ export default function CreateRoomScreen() {
 
   const isWaitingRoom = !!params.roomId;
   const isQuickMatch = params.quickMatch === 'true';
+  // Salon PROGRAMME : l'édition est imposée par le contenu partenaire, l'hôte ne la choisit pas.
+  // Parcours NORMAL (« Nouvelle partie ») : l'hôte choisit librement l'édition, comme en local.
+  const isProgramRoom = !!params.programId;
   const [showLobby, setShowLobby] = useState(isWaitingRoom);
   const [showStartupModal, setShowStartupModal] = useState(false);
+  const [showEditionModal, setShowEditionModal] = useState(false);
   const [showInviteContact, setShowInviteContact] = useState(false);
   const isGuest = user?.isGuest ?? true;
 
@@ -80,7 +95,14 @@ export default function CreateRoomScreen() {
   // Form states
   const [roomName, setRoomName] = useState('');
   const [maxPlayers, setMaxPlayers] = useState<string>('4');
-  const [selectedEdition] = useState(params.challenge || 'classic');
+  // Édition choisie par l'hôte (parcours normal). Pré-remplie via params.challenge sinon 'classic'.
+  const [selectedEdition, setSelectedEdition] = useState(params.challenge || 'classic');
+  // Liste réactive : se met à jour dès que les éditions Firestore sont chargées.
+  const editionList = useEditions();
+  const selectedEditionData = useMemo(
+    () => editionList.find((e) => e.id === selectedEdition),
+    [editionList, selectedEdition]
+  );
   // Mise choisie, en Ptw (0 = sans mise). Convertie en FCFA pour la room.
   const [stakePtw, setStakePtw] = useState<number>(0);
 
@@ -262,6 +284,17 @@ export default function CreateRoomScreen() {
       hostName: user.displayName ?? 'Hote',
       roomName: roomName.trim(),
       betAmount: stakeFcfa,
+      // Salon PROGRAMME : porte le contexte pour que tous chargent le même contenu.
+      ...(params.programId && params.partnerId
+        ? {
+            program: {
+              programId: params.programId,
+              partnerId: params.partnerId,
+              contentPackId: params.contentPackId || undefined,
+              levelIndex: params.levelIndex ? parseInt(params.levelIndex, 10) : 0,
+            },
+          }
+        : {}),
     });
 
     if (result) {
@@ -354,6 +387,32 @@ export default function CreateRoomScreen() {
               style={{ marginTop: SPACING[5] }}
             >
               <View style={styles.configCard}>
+                {/* Choix de l'édition (= secteur) — parcours NORMAL uniquement.
+                    En salon programme, l'édition vient du contenu partenaire (non modifiable).
+                    Bouton compact qui ouvre une popup (la grille inline cassait le design). */}
+                {!isProgramRoom && (
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.fieldLabel}>{t('game.editionChoice')}</Text>
+                    <Pressable
+                      style={styles.editionSelectBtn}
+                      onPress={() => setShowEditionModal(true)}
+                    >
+                      <View style={styles.editionSelectIconWrap}>
+                        <EditionTileIcon
+                          editionId={selectedEditionData?.id ?? 'classic'}
+                          editionName={selectedEditionData?.name ?? 'Classic'}
+                          size={24}
+                          color="#FFBC40"
+                        />
+                      </View>
+                      <Text style={styles.editionSelectText} numberOfLines={1}>
+                        {(selectedEditionData?.name ?? 'Classic').replace(/^Édition\s+/i, '')}
+                      </Text>
+                      <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.4)" />
+                    </Pressable>
+                  </View>
+                )}
+
                 {/* Nom du Salon — TextInput nu, bord en CSS natif (pas de SVG par-dessus
                     sinon Android n'attache pas l'EditText à l'InputMethodManager). */}
                 <View style={styles.fieldGroup}>
@@ -443,6 +502,69 @@ export default function CreateRoomScreen() {
             disabled={!roomName.trim() || !maxPlayers}
           />
         </View>
+
+        {/* Popup de choix d'édition — grille 2 colonnes (déplacée hors du formulaire). */}
+        <Modal
+          visible={showEditionModal}
+          onClose={() => setShowEditionModal(false)}
+          title={t('game.editionChoice')}
+          size="lg"
+        >
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.editionModalGrid}
+          >
+            {editionList.map((edition) => {
+              const isSelected = selectedEdition === edition.id;
+              return (
+                <Pressable
+                  key={edition.id}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setSelectedEdition(edition.id);
+                    setShowEditionModal(false);
+                  }}
+                  style={styles.editionGridItem}
+                >
+                  <DynamicGradientBorder
+                    borderRadius={16}
+                    fill={isSelected ? 'rgba(255, 188, 64, 0.12)' : 'rgba(0, 0, 0, 0.35)'}
+                    boxWidth={editionTileWidth}
+                    style={{ width: editionTileWidth }}
+                  >
+                    <View style={styles.editionTileInner}>
+                      {isSelected ? (
+                        <View style={styles.editionTileCheckBadge}>
+                          <Ionicons name="checkmark" size={12} color="#FFFFFF" />
+                        </View>
+                      ) : null}
+                      <View style={styles.editionTileIconWrap}>
+                        <EditionTileIcon
+                          editionId={edition.id}
+                          editionName={edition.name}
+                          size={34}
+                          color={isSelected ? '#FFBC40' : '#71808E'}
+                        />
+                      </View>
+                      <Text
+                        style={[styles.editionTileName, isSelected && styles.editionTileNameSelected]}
+                        numberOfLines={2}
+                      >
+                        {edition.name.replace(/^Édition\s+/i, '')}
+                      </Text>
+                      <Text
+                        style={[styles.editionTileDesc, isSelected && styles.editionTileDescSelected]}
+                        numberOfLines={3}
+                      >
+                        {edition.description || t('game.customEdition')}
+                      </Text>
+                    </View>
+                  </DynamicGradientBorder>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </Modal>
       </View>
     );
   }
@@ -705,6 +827,88 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.body,
     fontSize: FONT_SIZES.sm,
     color: 'rgba(255, 255, 255, 0.7)',
+  },
+  // Bouton compact « édition choisie » (ouvre la popup) — même esprit que le bouton projet.
+  editionSelectBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[3],
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  editionSelectIconWrap: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  editionSelectText: {
+    flex: 1,
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.md,
+    color: '#FFFFFF',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  // Grille d'éditions dans la popup — même présentation que local-setup (2 colonnes).
+  editionModalGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    paddingBottom: SPACING[2],
+  },
+  editionGridItem: {
+    width: editionTileWidth,
+    marginBottom: EDITION_TILE_GAP,
+  },
+  editionTileInner: {
+    position: 'relative',
+    paddingHorizontal: SPACING[3],
+    paddingVertical: SPACING[4],
+    paddingTop: SPACING[5],
+    minHeight: 172,
+    alignItems: 'center',
+  },
+  editionTileCheckBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#FFBC40',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2,
+  },
+  editionTileIconWrap: {
+    marginBottom: SPACING[3],
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  editionTileName: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES.sm,
+    color: '#7F8E9E',
+    textAlign: 'center',
+    marginBottom: SPACING[2],
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  editionTileNameSelected: {
+    color: '#FFBC40',
+  },
+  editionTileDesc: {
+    fontFamily: FONTS.body,
+    fontSize: 11,
+    color: '#7F8E9E',
+    textAlign: 'center',
+    lineHeight: 16,
+  },
+  editionTileDescSelected: {
+    color: '#FFBC40',
   },
   // Bord arrondi en CSS natif RN (pas de SVG over-input → Android touch direct).
   inputBorderShell: {

@@ -191,13 +191,29 @@ export function getMatchingUserStartups(startups: Startup[], editionId: string):
 
   // Récupérer l'édition depuis la fonction getEdition
   const editionData = getEdition(editionId);
-  const sectors = editionData?.sectors || EDITION_SECTORS[editionId as EditionId] || EDITION_SECTORS.classic;
 
-  if (!sectors || sectors.length === 0) {
-    return startups; // Pas de filtre si pas de secteurs
+  // Secteurs de l'édition, par ordre de priorité :
+  //  1. champ sectors explicite de l'édition (Firestore)
+  //  2. secteurs dérivés des defaultProjects de l'édition (chaque projet porte son sector)
+  //  3. table EDITION_SECTORS locale (par id d'édition)
+  //  4. fallback classic
+  let sectors: string[] = editionData?.sectors ?? [];
+  if (sectors.length === 0 && editionData?.defaultProjects?.length) {
+    sectors = editionData.defaultProjects
+      .map((p: DefaultProject) => p.sector)
+      .filter(Boolean);
+  }
+  if (sectors.length === 0) {
+    sectors = EDITION_SECTORS[editionId as EditionId] || EDITION_SECTORS.classic;
   }
 
-  return startups.filter((s) => sectors.includes(s.sector));
+  if (!sectors || sectors.length === 0) {
+    return startups; // Pas de filtre si vraiment aucun secteur connu
+  }
+
+  // Comparaison insensible à la casse pour tolérer id normalisé vs label.
+  const normalized = new Set(sectors.map((s) => s.toLowerCase()));
+  return startups.filter((s) => s.sector && normalized.has(s.sector.toLowerCase()));
 }
 
 /**

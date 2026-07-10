@@ -22,7 +22,7 @@ import { EditionTileIcon } from '@/components/icons';
 import { RadialBackground, DynamicGradientBorder, GameButton } from '@/components/ui';
 import { StartupSelectionModal } from '@/components/game/StartupSelectionModal';
 import { getDefaultProjectsForEdition, getMatchingUserStartups } from '@/data/defaultProjects';
-import { getEditionList } from '@/data';
+import { useEditions } from '@/hooks';
 import type { PlayerColor } from '@/types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -237,6 +237,8 @@ export default function LocalSetupScreen() {
   const user = useAuthStore((state) => state.user);
   const profile = useUserStore((state) => state.profile);
   const initGame = useGameStore((state) => state.initGame);
+  // Liste réactive : se met à jour dès que les éditions Firestore sont chargées.
+  const editionList = useEditions();
 
   // États
   const [step, setStep] = useState(1);
@@ -711,7 +713,7 @@ export default function LocalSetupScreen() {
             </Text>
 
             <View style={styles.editionGrid}>
-              {getEditionList().map((edition, index) => {
+              {editionList.map((edition, index) => {
                 const isSelected = selectedEdition === edition.id;
                 return (
                   <Animated.View
