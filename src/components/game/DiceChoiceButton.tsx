@@ -20,6 +20,7 @@ import Svg, { Path } from 'react-native-svg';
 import { GamePopup } from '@/components/ui/GamePopup';
 import { GameButton } from '@/components/ui/GameButton';
 import { GradientSquareBorder } from '@/components/game/EmojiReactionBar';
+import { useTranslation } from '@/i18n';
 
 import { COLORS } from '@/styles/colors';
 import { FONTS } from '@/styles/typography';
@@ -139,6 +140,7 @@ export const DiceValuePickerPopup = memo(function DiceValuePickerPopup({
   onPick,
   onCancel,
 }: DiceValuePickerPopupProps) {
+  const { t } = useTranslation();
   const [pendingValue, setPendingValue] = useState<number | null>(null);
 
   useEffect(() => {
@@ -163,11 +165,11 @@ export const DiceValuePickerPopup = memo(function DiceValuePickerPopup({
       onRequestClose={onCancel}
       icon={<JokerIconGold size={80} />}
       spinningShape
-      title="Choisis ton dé"
-      header="Fixe la valeur de ton prochain lancer"
+      title={t('joker.dicePicker.title')}
+      header={t('joker.dicePicker.header')}
       footer={
         <GameButton
-          title={pendingValue != null ? 'UTILISER LE JOKER' : 'ANNULER'}
+          title={pendingValue != null ? t('joker.dicePicker.use') : t('joker.dicePicker.cancel')}
           variant={pendingValue != null ? 'yellow' : 'blue'}
           fullWidth
           onPress={handleConfirm}

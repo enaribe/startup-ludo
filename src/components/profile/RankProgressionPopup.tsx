@@ -11,6 +11,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { GameButton } from '@/components/ui';
 import { GamePopup } from '@/components/ui/GamePopup';
+import { useTranslation } from '@/i18n';
 import {
   RANKS,
   getRankFromXP,
@@ -27,6 +28,7 @@ interface RankProgressionPopupProps {
 }
 
 export function RankProgressionPopup({ visible, totalXP, onClose }: RankProgressionPopupProps) {
+  const { t } = useTranslation();
   const scrollRef = useRef<ScrollView>(null);
   const [pageW, setPageW] = useState(0);
   const [pageIndex, setPageIndex] = useState(0);
@@ -54,9 +56,9 @@ export function RankProgressionPopup({ visible, totalXP, onClose }: RankProgress
     <GamePopup
       visible={visible}
       onRequestClose={onClose}
-      header="PROGRESSION"
-      title="LES RANGS"
-      footer={<GameButton title="FERMER" variant="blue" fullWidth onPress={onClose} />}
+      header={t('rankProgression.title')}
+      title={t('rankProgression.ranks')}
+      footer={<GameButton title={t('rankProgression.close')} variant="blue" fullWidth onPress={onClose} />}
     >
       <View
         style={styles.carousel}
@@ -84,12 +86,12 @@ export function RankProgressionPopup({ visible, totalXP, onClose }: RankProgress
             const isNext = nextRank?.id === rank.id;
 
             const statusLabel = isCurrent
-              ? 'Rang actuel'
+              ? t('rankProgression.currentRank')
               : isReached
-                ? 'Débloqué'
+                ? t('rankProgression.unlocked')
                 : isNext
-                  ? `Plus que ${xpNeeded.toLocaleString()} XP`
-                  : 'À débloquer';
+                  ? t('rankProgression.remainingXp', { amount: xpNeeded.toLocaleString() })
+                  : t('rankProgression.toUnlock');
             const statusColor = isCurrent
               ? COLORS.primary
               : isReached
@@ -98,7 +100,7 @@ export function RankProgressionPopup({ visible, totalXP, onClose }: RankProgress
 
             return (
               <View key={rank.id} style={[styles.page, pageW > 0 && { width: pageW }]}>
-                <Text style={styles.counter}>RANG {index + 1} / {RANKS.length}</Text>
+                <Text style={styles.counter}>{t('rankProgression.counter', { current: index + 1, total: RANKS.length })}</Text>
 
                 {/* Pastille colorée + nom du rang */}
                 <View style={[styles.rankChip, { borderColor: rank.color }]}>
@@ -108,7 +110,7 @@ export function RankProgressionPopup({ visible, totalXP, onClose }: RankProgress
 
                 {/* XP requis */}
                 <Text style={styles.xpValue}>
-                  {rank.minXP === 0 ? 'Rang de départ' : `${rank.minXP.toLocaleString()} XP`}
+                  {rank.minXP === 0 ? t('rankProgression.startRank') : `${rank.minXP.toLocaleString()} XP`}
                 </Text>
                 {rank.minXP > 0 && <Text style={styles.xpLabel}>requis pour atteindre ce rang</Text>}
 

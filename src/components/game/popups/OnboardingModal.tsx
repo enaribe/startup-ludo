@@ -28,9 +28,12 @@ import Svg, { Defs, LinearGradient, Path, RadialGradient, Rect, Stop } from 'rea
 
 import { GameButton } from '@/components/ui/GameButton';
 import { OutlinedText } from '@/components/ui/OutlinedText';
+import { useTranslation } from '@/i18n';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
+
+type TFn = (key: string, params?: Record<string, string | number>) => string;
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const POPUP_WIDTH = Math.min(screenWidth - SPACING[8], 340);
@@ -186,70 +189,42 @@ function HeaderXP({ width }: { width: number }) {
 
 // ─── Slides ───────────────────────────────────────────────────────────────────
 
-function SlideWelcome({ w }: { w: number }) {
+function SlideWelcome({ w, t }: { w: number; t: TFn }) {
   return (
     <>
       <View style={styles.header}><HeaderWelcome width={w} /></View>
-      <OutlinedText
-        text={"BIENVENUE DANS STARTUP\nLUDO !"}
-        style={styles.title}
-        outlineColor="#1F91D0"
-        outlineWidth={1.5}
-      />
-      <Text style={styles.description}>
-        Créez des startups, relevez des défis entrepreneuriaux et bâtissez votre empire — le tout en jouant !
-      </Text>
+      <OutlinedText text={t('onboarding.s1.title')} style={styles.title} outlineColor="#1F91D0" outlineWidth={1.5} />
+      <Text style={styles.description}>{t('onboarding.s1.desc')}</Text>
     </>
   );
 }
 
-function SlideRocket({ w }: { w: number }) {
+function SlideRocket({ w, t }: { w: number; t: TFn }) {
   return (
     <>
       <View style={styles.header}><HeaderRocket width={w} /></View>
-      <OutlinedText
-        text={"CRÉER VOTRE\nENTREPRISES"}
-        style={styles.title}
-        outlineColor="#F35145"
-        outlineWidth={1.5}
-      />
-      <Text style={styles.description}>
-        3 cartes d'inspiration — une Cible, une Mission, un Secteur — guident votre idéation pour créer une entreprise unique.
-      </Text>
+      <OutlinedText text={t('onboarding.s2.title')} style={styles.title} outlineColor="#F35145" outlineWidth={1.5} />
+      <Text style={styles.description}>{t('onboarding.s2.desc')}</Text>
     </>
   );
 }
 
-function SlideMedal({ w }: { w: number }) {
+function SlideMedal({ w, t }: { w: number; t: TFn }) {
   return (
     <>
       <View style={styles.header}><HeaderMedal width={w} /></View>
-      <OutlinedText
-        text={"DEVENEZ LE MEILLEUR\nENTREPRENEUR"}
-        style={styles.title}
-        outlineColor="#388E3C"
-        outlineWidth={1.5}
-      />
-      <Text style={styles.description}>
-        Chaque partie ajoute une entreprise à votre portfolio. Regardez leur valorisation évoluer et grimpez au classement mondial !
-      </Text>
+      <OutlinedText text={t('onboarding.s3.title')} style={styles.title} outlineColor="#388E3C" outlineWidth={1.5} />
+      <Text style={styles.description}>{t('onboarding.s3.desc')}</Text>
     </>
   );
 }
 
-function SlideXP({ w }: { w: number }) {
+function SlideXP({ w, t }: { w: number; t: TFn }) {
   return (
     <>
       <View style={styles.header}><HeaderXP width={w} /></View>
-      <OutlinedText
-        text={"GAGNEZ DES XP, MONTEZ\nEN RANG"}
-        style={styles.title}
-        outlineColor="#CC9020"
-        outlineWidth={1.5}
-      />
-      <Text style={styles.description}>
-        Chaque partie ajoute une entreprise à votre portfolio. Regardez leur valorisation évoluer et grimpez au classement mondial !
-      </Text>
+      <OutlinedText text={t('onboarding.s4.title')} style={styles.title} outlineColor="#CC9020" outlineWidth={1.5} />
+      <Text style={styles.description}>{t('onboarding.s4.desc')}</Text>
     </>
   );
 }
@@ -285,11 +260,13 @@ function AnimatedSlide({
   onNext,
   onSkip,
   isLast,
+  t,
 }: {
   slideIndex: number;
   onNext: () => void;
   onSkip: () => void;
   isLast: boolean;
+  t: TFn;
 }) {
   const scale = useSharedValue(0.9);
   const opacity = useSharedValue(0);
@@ -326,19 +303,19 @@ function AnimatedSlide({
         )}
 
         <View style={styles.slideContent}>
-          {slideIndex === 0 && <SlideWelcome w={POPUP_WIDTH} />}
-          {slideIndex === 1 && <SlideRocket w={POPUP_WIDTH} />}
-          {slideIndex === 2 && <SlideMedal w={POPUP_WIDTH} />}
-          {slideIndex === 3 && <SlideXP w={POPUP_WIDTH} />}
+          {slideIndex === 0 && <SlideWelcome w={POPUP_WIDTH} t={t} />}
+          {slideIndex === 1 && <SlideRocket w={POPUP_WIDTH} t={t} />}
+          {slideIndex === 2 && <SlideMedal w={POPUP_WIDTH} t={t} />}
+          {slideIndex === 3 && <SlideXP w={POPUP_WIDTH} t={t} />}
         </View>
 
         <SlideDots current={slideIndex} total={TOTAL_SLIDES} />
 
         <View style={styles.buttonsRow}>
-          <GameButton variant="blue" title="PASSER" style={styles.btn} onPress={onSkip} />
+          <GameButton variant="blue" title={t('onboarding.skip')} style={styles.btn} onPress={onSkip} />
           <GameButton
             variant="yellow"
-            title={isLast ? 'TERMINER' : 'SUIVANT'}
+            title={isLast ? t('onboarding.finish') : t('onboarding.next')}
             style={styles.btn}
             onPress={onNext}
           />
@@ -354,6 +331,7 @@ export const OnboardingModal = memo(function OnboardingModal({
   visible,
   onComplete,
 }: OnboardingModalProps) {
+  const { t } = useTranslation();
   const [slideIndex, setSlideIndex] = useState(0);
 
   useEffect(() => {
@@ -380,6 +358,7 @@ export const OnboardingModal = memo(function OnboardingModal({
           onNext={goNext}
           onSkip={onComplete}
           isLast={isLastSlide}
+          t={t}
         />
       </View>
     </Modal>

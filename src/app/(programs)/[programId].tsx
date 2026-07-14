@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AutoWidthLogo } from '@/components/programs';
 import { GameButton, GuestGate, OutlinedText, RadialBackground } from '@/components/ui';
 import { useAuthStore, useProgramStore } from '@/stores';
+import { startProgramPlay } from '@/utils/programPlayNav';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS } from '@/styles/typography';
@@ -101,9 +102,10 @@ export default function ProgramDetailScreen() {
   })();
 
   const handleMainAction = () => {
-    // On peut TOUJOURS jouer (même parcours terminé). Le formulaire de candidature
-    // n'est proposé qu'en fin de partie (écran de résultats), pas ici.
-    router.push({ pathname: '/(programs)/play/[programId]', params: { programId: program.id } });
+    if (!program) return;
+    // Écran QUICK GAME supprimé : si un profil est déjà choisi → écran de mode
+    // (locale / en ligne), sinon → écran de choix de profil d'abord.
+    startProgramPlay(router, program, userId, user?.displayName || '');
   };
 
   return (

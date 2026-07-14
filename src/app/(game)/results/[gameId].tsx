@@ -32,6 +32,8 @@ import { XP_REWARDS, getChallengeXPReward } from '@/config/progression';
 import type { Achievement } from '@/config/achievements';
 import { isOwnStartup } from '@/data/defaultProjects';
 import { useSound } from '@/hooks/useSound';
+import { startProgramPlay } from '@/utils/programPlayNav';
+import { useTranslation } from '@/i18n';
 import { evaluateAchievements } from '@/services/game/achievementService';
 import { saveGameSession, updateChallengeEnrollment, updateStartupValorisation, updateUserStats, updateUserAchievements } from '@/services/firebase/firestore';
 import { useAuthStore, useChallengeStore, useGameStore, useProgramStore, useUserStore } from '@/stores';
@@ -304,6 +306,7 @@ function computeXP(
 
 export default function ResultsScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const params = useLocalSearchParams<{
     gameId: string;
     mode?: string;
@@ -399,9 +402,11 @@ export default function ResultsScreen() {
   // Titre principal selon le mode
   const mainTitleText = (() => {
     if (isLocalMode) {
-      return winner ? `${winner.name.toUpperCase()} GAGNE !` : 'PARTIE TERMINÉE';
+      return winner ? t('results.playerWins', { name: winner.name.toUpperCase() }) : t('results.gameOver');
     }
-    return isWinner ? 'VOUS GAGNEZ !' : (winner ? `${winner.name.toUpperCase()} GAGNE` : 'PARTIE TERMINÉE');
+    return isWinner
+      ? t('results.youWin')
+      : (winner ? t('results.playerWinsShort', { name: winner.name.toUpperCase() }) : t('results.gameOver'));
   })();
 
   // Son fin de partie
@@ -452,14 +457,14 @@ export default function ResultsScreen() {
 
   // Sous-titre header
   const subtitleText = isProgramGame
-    ? 'Partie Programme'
+    ? t('results.mode.program')
     : isChallengeGame
-    ? 'Partie Challenge'
+    ? t('results.mode.challenge')
     : isOnline
-      ? 'Multijoueur en ligne'
+      ? t('results.mode.online')
       : isLocalMode
-        ? 'Partie locale'
-        : 'Partie solo';
+        ? t('results.mode.local')
+        : t('results.mode.solo');
 
   const challengeXpGained = isChallengeGame
     ? getChallengeXPReward(game!.challengeContext!.levelNumber, isWinner)
@@ -730,10 +735,13 @@ export default function ResultsScreen() {
     const programId = game?.programContext?.programId ?? params.programId;
     if (!programId) return;
     resetGame();
-    router.replace({
-      pathname: '/(programs)/play/[programId]',
-      params: { programId },
-    });
+    const prog = useProgramStore.getState().getProgramById(programId);
+    if (prog) {
+      startProgramPlay(router, prog, userId ?? '', undefined, true);
+      return;
+    }
+    // Programme introuvable (cas limite) : on ouvre le détail du programme.
+    router.replace({ pathname: '/(programs)/[programId]', params: { programId } });
   };
 
   // Navigue vers l'écran 2 « Candidatez » (flow plein écran).
@@ -882,10 +890,10 @@ export default function ResultsScreen() {
             />
             <Text style={styles.stakeRecapText}>
               {stakePayoutFcfa > stakeFcfa
-                ? `Mise ${formatPtwRaw(stakeFcfa)} · Tu remportes ${formatPtwRaw(stakePayoutFcfa)} !`
+                ? t('results.stake.win', { stake: formatPtwRaw(stakeFcfa), payout: formatPtwRaw(stakePayoutFcfa) })
                 : stakePayoutFcfa > 0
-                  ? `Mise ${formatPtwRaw(stakeFcfa)} · Récupéré ${formatPtwRaw(stakePayoutFcfa)}`
-                  : `Mise ${formatPtwRaw(stakeFcfa)} · Perdue cette fois`}
+                  ? t('results.stake.recovered', { stake: formatPtwRaw(stakeFcfa), payout: formatPtwRaw(stakePayoutFcfa) })
+                  : t('results.stake.lost', { stake: formatPtwRaw(stakeFcfa) })}
             </Text>
           </Animated.View>
         )}
@@ -922,7 +930,7 @@ export default function ResultsScreen() {
           <Animated.View entering={FadeInDown.duration(300)} style={styles.xpNeededBanner}>
             <Ionicons name="lock-closed" size={14} color={COLORS.primary} />
             <Text style={styles.xpNeededText}>
-              Il te manque {xpNeededAmount.toLocaleString()} XP pour le niveau suivant
+              {t('results.xpNeeded', { amount: xpNeededAmount.toLocaleString() })}
             </Text>
           </Animated.View>
         )}
@@ -937,11 +945,11 @@ export default function ResultsScreen() {
             <Text style={styles.programTrialText}>
               {programJustCompleted
                 ? (canEnroll
-                    ? 'Parcours terminé ! Vous pouvez remplir le formulaire de candidature.'
-                    : 'Parcours terminé ! Vous pouvez rejouer autant que vous voulez.')
+                    ? t('results.program.completedCanEnroll')
+                    : t('results.program.completedReplay'))
                 : programLevelCleared
-                  ? `Niveau réussi ! Niveau ${Math.min(programProgress.currentLevel + 1, programProgress.totalLevels)}/${programProgress.totalLevels} débloqué.`
-                  : `Niveau non validé. Rejouez le niveau ${playedLevelIndex + 1}/${programProgress.totalLevels} pour avancer.`}
+                  ? t('results.program.levelCleared', { next: Math.min(programProgress.currentLevel + 1, programProgress.totalLevels), total: programProgress.totalLevels })
+                  : t('results.program.levelFailed', { level: playedLevelIndex + 1, total: programProgress.totalLevels })}
             </Text>
           </Animated.View>
         )}
@@ -955,38 +963,38 @@ export default function ResultsScreen() {
             <>
               {canEnroll ? (
                 <>
-                  <GameButton variant="yellow" fullWidth title="S'INSCRIRE AU PROGRAMME" onPress={handleGoToEnroll} />
-                  <GameButton variant="blue" fullWidth title="REJOUER" onPress={handleProgramReplay} />
-                  <GameButton variant="blue" fullWidth title="RETOUR À L'ACCUEIL" onPress={handleGoHome} />
+                  <GameButton variant="yellow" fullWidth title={t('results.btn.enroll')} onPress={handleGoToEnroll} />
+                  <GameButton variant="blue" fullWidth title={t('results.btn.replay')} onPress={handleProgramReplay} />
+                  <GameButton variant="blue" fullWidth title={t('results.btn.goHome')} onPress={handleGoHome} />
                 </>
               ) : programJustCompleted ? (
                 <>
                   {/* Parcours terminé + formulaire déjà rempli : on ne propose plus la candidature. */}
-                  <GameButton variant="yellow" fullWidth title="REJOUER" onPress={handleProgramReplay} />
-                  <GameButton variant="blue" fullWidth title="RETOUR À L'ACCUEIL" onPress={handleGoHome} />
+                  <GameButton variant="yellow" fullWidth title={t('results.btn.replay')} onPress={handleProgramReplay} />
+                  <GameButton variant="blue" fullWidth title={t('results.btn.goHome')} onPress={handleGoHome} />
                 </>
               ) : programLevelCleared ? (
                 <>
-                  <GameButton variant="yellow" fullWidth title="NIVEAU SUIVANT" onPress={handleProgramReplay} />
-                  <GameButton variant="blue" fullWidth title="RETOUR À L'ACCUEIL" onPress={handleGoHome} />
+                  <GameButton variant="yellow" fullWidth title={t('results.btn.nextLevel')} onPress={handleProgramReplay} />
+                  <GameButton variant="blue" fullWidth title={t('results.btn.goHome')} onPress={handleGoHome} />
                 </>
               ) : (
                 <>
-                  <GameButton variant="yellow" fullWidth title="REJOUER CE NIVEAU" onPress={handleProgramReplay} />
-                  <GameButton variant="blue" fullWidth title="RETOUR À L'ACCUEIL" onPress={handleGoHome} />
+                  <GameButton variant="yellow" fullWidth title={t('results.btn.replayLevel')} onPress={handleProgramReplay} />
+                  <GameButton variant="blue" fullWidth title={t('results.btn.goHome')} onPress={handleGoHome} />
                 </>
               )}
             </>
           ) : isChallengeGame ? (
             <>
-              <GameButton variant="yellow" fullWidth title="REJOUER" onPress={handleChallengeReplay} />
-              <GameButton variant="blue" fullWidth title="NIVEAU SUIVANT" onPress={handleNextLevel} />
-              <GameButton variant="red" fullWidth title="RETOUR À L'ACCUEIL" onPress={handleGoHome} />
+              <GameButton variant="yellow" fullWidth title={t('results.btn.replay')} onPress={handleChallengeReplay} />
+              <GameButton variant="blue" fullWidth title={t('results.btn.nextLevel')} onPress={handleNextLevel} />
+              <GameButton variant="red" fullWidth title={t('results.btn.goHome')} onPress={handleGoHome} />
             </>
           ) : (
             <>
-              <GameButton variant="yellow" fullWidth title="NOUVELLE PARTIE" onPress={handlePlayAgain} />
-              <GameButton variant="blue" fullWidth title="RETOUR À L'ACCUEIL" onPress={handleGoHome} />
+              <GameButton variant="yellow" fullWidth title={t('results.btn.newGame')} onPress={handlePlayAgain} />
+              <GameButton variant="blue" fullWidth title={t('results.btn.goHome')} onPress={handleGoHome} />
             </>
           )}
         </Animated.View>
@@ -1004,13 +1012,13 @@ export default function ResultsScreen() {
             <View style={styles.convertIconCircle}>
               <Ionicons name="person-add" size={32} color={COLORS.primary} />
             </View>
-            <Text style={styles.convertTitle}>Sauvegarder ta progression ?</Text>
+            <Text style={styles.convertTitle}>{t('results.convert.title')}</Text>
             <Text style={styles.convertBody}>
-              Cree un compte pour conserver tes XP, ton projet et acceder au mode en ligne !
+              {t('results.convert.body')}
             </Text>
-            <GameButton variant="yellow" fullWidth title="CREER UN COMPTE" onPress={handleConvert} />
+            <GameButton variant="yellow" fullWidth title={t('results.convert.create')} onPress={handleConvert} />
             <Pressable style={styles.convertSkip} onPress={handleSkipConvert}>
-              <Text style={styles.convertSkipText}>Plus tard</Text>
+              <Text style={styles.convertSkipText}>{t('results.convert.later')}</Text>
             </Pressable>
           </View>
         </View>

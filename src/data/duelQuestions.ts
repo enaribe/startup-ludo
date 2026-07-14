@@ -1,4 +1,22 @@
+import { eventManager } from '@/services/game/EventManager';
+import { useSettingsStore } from '@/stores';
 import type { DuelQuestion } from '@/types';
+
+/**
+ * Applique la traduction de la langue courante à une question de duel.
+ * FR = source. Pour une autre langue, lit `translations[lang].{question, options[]}`
+ * (les duels d'édition portent ce champ), avec repli sur le texte original.
+ */
+function localizeDuelQuestion(q: DuelQuestion, lang: string): DuelQuestion {
+  if (lang === 'fr') return q;
+  const tr = (q as { translations?: Record<string, { question?: string; options?: string[] }> }).translations?.[lang];
+  if (!tr) return q;
+  return {
+    ...q,
+    question: tr.question || q.question,
+    options: q.options.map((opt, i) => ({ ...opt, text: tr.options?.[i] || opt.text })),
+  };
+}
 
 // Questions de duel par défaut (fallback si l'édition n'a pas de duels)
 export const DUEL_QUESTIONS: DuelQuestion[] = [
@@ -179,7 +197,48 @@ export function getRandomDuelQuestions(count: number = 3, editionId?: string): D
   // Marquer les questions sélectionnées comme utilisées
   selected.forEach((q) => usedDuelQuestionIds.add(q.id));
 
-  return selected;
+  // Appliquer la traduction de la langue courante (contenu des questions).
+  const lang: string = useSettingsStore.getState?.().language ?? 'fr';
+  return selected.map((q) => localizeDuelQuestion(q, lang));
+}
+
+/**
+ * Re-localise des questions de duel REÇUES en ligne dans la langue du joueur LOCAL.
+ * L'émetteur a diffusé les questions dans SA langue ; on retrouve chaque question
+ * par `id` dans le pool partagé (édition ou questions par défaut) et on réapplique
+ * la langue locale (fallback : question reçue telle quelle si `id` introuvable).
+ */
+export function localizeReceivedDuelQuestions(
+  questions: DuelQuestion[],
+  editionId?: string,
+): DuelQuestion[] {
+  const lang: string = useSettingsStore.getState?.().language ?? 'fr';
+  // Pas de raccourci `fr` : la question reçue peut être dans la langue de l'hôte
+  // (ex. hôte EN → récepteur FR). On re-résout TOUJOURS depuis la source par id
+  // pour obtenir la version de la langue locale (FR = texte source).
+
+  // Pool source (mêmes règles que getRandomDuelQuestions).
+  let pool: DuelQuestion[] = DUEL_QUESTIONS;
+  if (editionId) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { EDITIONS } = require('@/data');
+      const edition = EDITIONS[editionId];
+      if (edition && Array.isArray(edition.duels) && edition.duels.length > 0) {
+        pool = edition.duels as DuelQuestion[];
+      }
+    } catch {
+      // fallback silencieux
+    }
+  }
+
+  return questions.map((q) => {
+    // Priorité au contentPack du programme (via EventManager), sinon pool générique.
+    const viaPack = eventManager.localizeDuelQuestionById(q.id, q) as DuelQuestion;
+    if (viaPack !== q) return viaPack;
+    const src = pool.find((p) => p.id === q.id) ?? q;
+    return localizeDuelQuestion(src, lang);
+  });
 }
 
 /**

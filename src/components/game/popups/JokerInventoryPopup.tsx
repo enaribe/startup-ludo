@@ -9,7 +9,8 @@ import { Modal } from '@/components/ui/Modal';
 import { COLORS } from '@/styles/colors';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { SPACING, BORDER_RADIUS, SHADOWS } from '@/styles/spacing';
-import { JOKER_CATALOG } from '@/data/jokers';
+import { JOKER_CATALOG, getJokerText } from '@/data/jokers';
+import { useTranslation } from '@/i18n';
 import type { Joker } from '@/types';
 
 import { PopupHeader } from './PopupHeader';
@@ -29,7 +30,7 @@ const BAG_ICON = (
   </G>
 );
 
-const LABEL = (
+const makeLabel = (text: string) => (
   <SvgText
     x="65"
     y="50"
@@ -38,13 +39,15 @@ const LABEL = (
     fontFamily="LuckiestGuy_400Regular"
     letterSpacing="1"
   >
-    TES JOKERS
+    {text}
   </SvgText>
 );
 
 // ─── Card d'un joker (avec compteur si plusieurs du même type) ───────────────
 function JokerCard({ joker, count, onUse }: { joker: Joker; count: number; onUse: () => void }) {
+  const { t } = useTranslation();
   const meta = JOKER_CATALOG[joker.type];
+  const text = getJokerText(joker.type, t);
   return (
     <View style={styles.jokerCard}>
       <View style={[styles.jokerIconWrap, { backgroundColor: meta.color }]}>
@@ -56,11 +59,11 @@ function JokerCard({ joker, count, onUse }: { joker: Joker; count: number; onUse
         )}
       </View>
       <View style={styles.jokerTextWrap}>
-        <Text style={styles.jokerTitle} numberOfLines={1}>{meta.title}</Text>
-        <Text style={styles.jokerDescription} numberOfLines={2}>{meta.description}</Text>
+        <Text style={styles.jokerTitle} numberOfLines={1}>{text.title}</Text>
+        <Text style={styles.jokerDescription} numberOfLines={2}>{text.description}</Text>
       </View>
       <Pressable style={styles.useButton} onPress={onUse}>
-        <Text style={styles.useButtonText}>UTILISER</Text>
+        <Text style={styles.useButtonText}>{t('joker.use')}</Text>
       </Pressable>
     </View>
   );
@@ -80,6 +83,7 @@ export const JokerInventoryPopup = memo(function JokerInventoryPopup({
   onUse,
   onClose,
 }: JokerInventoryPopupProps) {
+  const { t } = useTranslation();
   // Regrouper les jokers par type — on affiche une seule carte par type
   // avec un badge "xN", et on consomme le premier exemplaire au clic UTILISER.
   const groupedJokers = jokers.reduce<{ joker: Joker; count: number }[]>((acc, joker) => {
@@ -95,15 +99,15 @@ export const JokerInventoryPopup = memo(function JokerInventoryPopup({
   return (
     <Modal visible={visible} onClose={onClose} closeOnBackdrop showCloseButton={false} bareContent>
       <Animated.View entering={SlideInUp.duration(280)} style={styles.card}>
-        <PopupHeader color="#1F91D0" icon={BAG_ICON} label={LABEL} />
+        <PopupHeader color="#1F91D0" icon={BAG_ICON} label={makeLabel(t('joker.inventoryTitle'))} />
 
         <View style={styles.body}>
           {jokers.length === 0 ? (
             <View style={styles.emptyWrap}>
               <Ionicons name="sparkles-outline" size={40} color="#71808E" />
-              <Text style={styles.emptyTitle}>AUCUN JOKER</Text>
+              <Text style={styles.emptyTitle}>{t('joker.empty')}</Text>
               <Text style={styles.emptyText}>
-                Atterris sur une case joker{'\n'}pour en obtenir un !
+                {t('joker.emptyHint')}
               </Text>
             </View>
           ) : (
@@ -125,7 +129,7 @@ export const JokerInventoryPopup = memo(function JokerInventoryPopup({
           )}
 
           <View style={styles.buttonWrap}>
-            <GameButton title="FERMER" variant="blue" fullWidth onPress={onClose} />
+            <GameButton title={t('joker.close')} variant="blue" fullWidth onPress={onClose} />
           </View>
         </View>
       </Animated.View>

@@ -15,6 +15,7 @@ import Svg, { Path } from 'react-native-svg';
 import { GameButton } from './GameButton';
 import { GamePopup, GAME_POPUP_WIDTH } from './GamePopup';
 import { OutlinedText } from './OutlinedText';
+import { useTranslation } from '@/i18n';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
@@ -114,11 +115,11 @@ function ClassementIcon() {
 
 const VARIANT_CONFIG: Record<
   InfoModalVariant,
-  { title: string; outlineColor: string; header: string }
+  { titleKey: string; outlineColor: string }
 > = {
-  accueil:    { title: 'ACCUEIL',           outlineColor: '#1F91D0', header: 'Informations' },
-  portfolio:  { title: 'PORTFOLIO',         outlineColor: '#1F91D0', header: 'Informations' },
-  classement: { title: 'CLASSEMENT GLOBAL', outlineColor: '#1F91D0', header: 'Informations' },
+  accueil:    { titleKey: 'infoModal.home',      outlineColor: '#1F91D0' },
+  portfolio:  { titleKey: 'infoModal.portfolio', outlineColor: '#1F91D0' },
+  classement: { titleKey: 'infoModal.ranking',   outlineColor: '#1F91D0' },
 };
 
 function VariantIcon({ variant }: { variant: InfoModalVariant }) {
@@ -184,17 +185,18 @@ export const InfoModal = memo(function InfoModal({
   description,
   sections,
 }: InfoModalProps) {
+  const { t } = useTranslation();
   const config = VARIANT_CONFIG[variant];
 
   return (
     <GamePopup
       visible={visible}
       onRequestClose={onClose}
-      header={config.header}
+      header={t('infoModal.header')}
       icon={<VariantIcon variant={variant} />}
       title={
         <OutlinedText
-          text={config.title}
+          text={t(config.titleKey)}
           outlineColor={config.outlineColor}
           outlineWidth={2}
           style={styles.title}
@@ -204,7 +206,7 @@ export const InfoModal = memo(function InfoModal({
         <GameButton
           variant="yellow"
           fullWidth
-          title="FERMER"
+          title={t('infoModal.close')}
           onPress={onClose}
         />
       }

@@ -372,7 +372,6 @@ export type RootStackParamList = {
   '(game)/online-setup': undefined;
   '(programs)/partner/[partnerId]': { partnerId: string };
   '(programs)/[programId]': { programId: string };
-  '(programs)/play/[programId]': { programId: string };
   '(game)/lobby/[roomId]': { roomId: string };
   '(game)/play/[gameId]': { gameId: string };
   '(game)/results/[gameId]': { gameId: string };

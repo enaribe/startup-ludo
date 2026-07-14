@@ -18,6 +18,7 @@ import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { SPACING, BORDER_RADIUS, SHADOWS } from '@/styles/spacing';
 import { useSettingsStore } from '@/stores';
 import { usePlaySoundOnOpen } from '@/hooks/useSound';
+import { useTranslation } from '@/i18n';
 import type { AIDuelAnswer, DuelQuestion, PlayerColor } from '@/types';
 
 interface AIOpponentConfig {
@@ -76,6 +77,7 @@ export const DuelQuestionPopup = memo(function DuelQuestionPopup({
   activePlayer,
   isMyTurn,
 }: DuelQuestionPopupProps) {
+  const { t } = useTranslation();
   const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
   usePlaySoundOnOpen(visible && questions.length > 0, 'popup-open');
 
@@ -250,7 +252,7 @@ export const DuelQuestionPopup = memo(function DuelQuestionPopup({
                 {activePlayer.name}
               </Text>
               <Text style={styles.turnBannerLabel} numberOfLines={1}>
-                {isMyTurn ? 'À toi de jouer !' : 'À son tour de répondre'}
+                {isMyTurn ? t('duel.yourTurn') : t('duel.theirTurn')}
               </Text>
             </View>
           </View>
@@ -278,11 +280,11 @@ export const DuelQuestionPopup = memo(function DuelQuestionPopup({
                 {aiAnswered ? (
                   <View style={styles.aiAnsweredRow}>
                     <Ionicons name="checkmark-circle" size={14} color={COLORS.success} />
-                    <Text style={styles.aiAnsweredText}>A répondu</Text>
+                    <Text style={styles.aiAnsweredText}>{t('duel.answered')}</Text>
                   </View>
                 ) : (
                   <View style={styles.aiThinkingRow}>
-                    <Text style={styles.aiThinkingText}>Réfléchit</Text>
+                    <Text style={styles.aiThinkingText}>{t('duel.thinking')}</Text>
                     <Animated.View style={[styles.aiDot, dot1Style]} />
                     <Animated.View style={[styles.aiDot, dot2Style]} />
                     <Animated.View style={[styles.aiDot, dot3Style]} />
@@ -353,7 +355,7 @@ export const DuelQuestionPopup = memo(function DuelQuestionPopup({
           {isAIMode && aiOpponent ? (
             <View style={styles.scoreVsRow}>
               <View style={styles.scoreCol}>
-                <Text style={styles.scoreVsLabel}>Vous</Text>
+                <Text style={styles.scoreVsLabel}>{t('duel.you')}</Text>
                 <Text style={styles.scoreVsValue}>{totalScore}</Text>
               </View>
               <Text style={styles.scoreVsSep}>VS</Text>
@@ -364,7 +366,7 @@ export const DuelQuestionPopup = memo(function DuelQuestionPopup({
             </View>
           ) : (
             <View style={styles.scoreSection}>
-              <Text style={styles.scoreLabel}>Score actuel</Text>
+              <Text style={styles.scoreLabel}>{t('duel.currentScore')}</Text>
               <Text style={styles.scoreValue}>{totalScore}</Text>
             </View>
           )}

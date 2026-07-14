@@ -22,6 +22,7 @@ import { EditionTileIcon } from '@/components/icons';
 import { RadialBackground, DynamicGradientBorder, GameButton } from '@/components/ui';
 import { StartupSelectionModal } from '@/components/game/StartupSelectionModal';
 import { getDefaultProjectsForEdition, getMatchingUserStartups } from '@/data/defaultProjects';
+import { getLocalizedEdition } from '@/data/types';
 import { useEditions } from '@/hooks';
 import type { PlayerColor } from '@/types';
 
@@ -715,6 +716,7 @@ export default function LocalSetupScreen() {
             <View style={styles.editionGrid}>
               {editionList.map((edition, index) => {
                 const isSelected = selectedEdition === edition.id;
+                const loc = getLocalizedEdition(edition, language);
                 return (
                   <Animated.View
                     key={edition.id}
@@ -753,13 +755,13 @@ export default function LocalSetupScreen() {
                             style={[styles.editionTileName, isSelected && styles.editionTileNameSelected]}
                             numberOfLines={2}
                           >
-                            {edition.name.replace(/^Édition\s+/i, '')}
+                            {loc.name.replace(/^Édition\s+/i, '')}
                           </Text>
                           <Text
                             style={[styles.editionTileDesc, isSelected && styles.editionTileDescSelected]}
                             numberOfLines={3}
                           >
-                            {edition.description || t('game.customEdition')}
+                            {loc.description || t('game.customEdition')}
                           </Text>
                         </View>
                       </DynamicGradientBorder>

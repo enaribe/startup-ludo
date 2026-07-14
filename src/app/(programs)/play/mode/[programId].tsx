@@ -48,13 +48,27 @@ export default function ProgramModeScreen() {
     profileName?: string;
   }>();
   const user = useAuthStore((state) => state.user);
+  const userId = user?.id ?? '';
   const isGuest = user?.isGuest ?? true;
   const programs = useProgramStore((state) => state.programs);
+  const enrollments = useProgramStore((state) => state.enrollments);
+  const getEnrollmentForProgram = useProgramStore((state) => state.getEnrollmentForProgram);
 
   const program = useMemo(
     () => programs.find((item) => item.id === params.programId),
     [programs, params.programId]
   );
+
+  // Persona courant : celui reçu en param, sinon celui mémorisé sur l'inscription.
+  const currentProfileName = useMemo(() => {
+    if (params.profileName) return params.profileName;
+    const enrollment = getEnrollmentForProgram(params.programId, userId);
+    const p = program?.profiles?.find(
+      (x) => x.id === enrollment?.profileId && x.enabled !== false && !x.isDraft
+    );
+    return p?.name ?? null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.profileName, params.programId, userId, program, enrollments]);
 
   if (isGuest) {
     return (
@@ -92,6 +106,13 @@ export default function ProgramModeScreen() {
       // Écran suivant : créer / rejoindre un salon entre joueurs du programme.
       router.push({ pathname: '/(programs)/play/mode/online/[programId]', params: forwardParams });
     }
+  };
+
+  const openProfileChoice = () => {
+    router.push({
+      pathname: '/(programs)/play/profile/[programId]',
+      params: { programId: program.id, playerName: params.playerName ?? '' },
+    });
   };
 
   const contentWidth = SCREEN_WIDTH - SPACING[4] * 2;
@@ -180,6 +201,21 @@ export default function ProgramModeScreen() {
             </Pressable>
           </Animated.View>
         ))}
+
+        {/* Choix / changement de profil (persona du parcours) */}
+        <Animated.View entering={FadeInDown.delay(400).duration(500)} style={styles.profileSection}>
+          {currentProfileName && (
+            <Text style={styles.currentProfileText}>
+              {t('program.currentProfile', { name: currentProfileName })}
+            </Text>
+          )}
+          <GameButton
+            title={currentProfileName ? t('program.changeProfileBtn') : t('program.chooseProfile')}
+            variant={currentProfileName ? 'blue' : 'yellow'}
+            fullWidth
+            onPress={openProfileChoice}
+          />
+        </Animated.View>
       </ScrollView>
     </View>
   );
@@ -306,6 +342,16 @@ const styles = StyleSheet.create({
   tagTextSoon: {
     color: THEME.accent,
     textTransform: 'none',
+  },
+  profileSection: {
+    marginTop: SPACING[2],
+    gap: SPACING[2],
+  },
+  currentProfileText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.sm,
+    color: THEME.textSecondary,
+    textAlign: 'center',
   },
   center: {
     flex: 1,

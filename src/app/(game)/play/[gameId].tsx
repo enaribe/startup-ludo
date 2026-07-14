@@ -51,7 +51,7 @@ import { useDuel } from '@/hooks/useDuel';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
-import { getRandomDuelQuestions } from '@/data/duelQuestions';
+import { getRandomDuelQuestions, localizeReceivedDuelQuestions } from '@/data/duelQuestions';
 import { rollRandomJoker } from '@/data/jokers';
 import { crashLog } from '@/utils/gameLog';
 import type { ChallengeEvent, FundingEvent, OpportunityEvent, Player, PlayerColor, QuizEvent, DuelResult, DuelQuestion, Joker, JokerType } from '@/types';
@@ -59,6 +59,18 @@ import type { ChallengeEvent, FundingEvent, OpportunityEvent, Player, PlayerColo
 // Online : délai max d'attente du choix de capture d'un attrapé distant avant
 // auto-résolution (renvoi base). Au-dessus de l'AFK (15 s) pour laisser réagir.
 const CAPTURE_CHOICE_TIMEOUT_MS = 20000;
+
+/**
+ * Questions d'un duel : on privilégie les VRAIS duels du programme/édition via le
+ * contentPack de l'EventManager (localisés dans la langue du joueur). On ne
+ * retombe sur les questions génériques (getRandomDuelQuestions) que si aucune
+ * source de duels n'est disponible.
+ */
+function resolveDuelQuestions(count: number, edition?: string): DuelQuestion[] {
+  const fromPack = eventManager.getDuelQuestions(count) as DuelQuestion[];
+  if (fromPack.length >= count) return fromPack;
+  return getRandomDuelQuestions(count, edition);
+}
 
 export default function PlayScreen() {
   const router = useRouter();
@@ -455,7 +467,7 @@ export default function PlayScreen() {
             const otherPlayers = game?.players?.filter((p) => p.id !== currentPlayer?.id) ?? [];
             if (otherPlayers.length >= 1) {
               const humanPlayer = otherPlayers[0]!;
-              const questions = getRandomDuelQuestions(3, currentPlayer?.edition || game?.edition);
+              const questions = resolveDuelQuestions(3, currentPlayer?.edition || game?.edition);
               // AI est challenger, humain est opponent. Le mode "live AI" est activé
               // automatiquement par useDuel (détection isAI). Le humain verra l'IA
               // "réfléchir" et répondre en parallèle dans DuelQuestionPopup.
@@ -504,7 +516,7 @@ export default function PlayScreen() {
           if (otherPlayers.length === 1) {
             const opponentId = otherPlayers[0]!.id;
             // L'attaquant (challenger) impose son édition pour le duel
-            const questions = getRandomDuelQuestions(3, currentPlayer.edition || game?.edition);
+            const questions = resolveDuelQuestions(3, currentPlayer.edition || game?.edition);
             duel.startDuelWithQuestions(currentPlayer.id, opponentId, questions);
             if (isOnline) {
               onlineGame.broadcastDuelStart(currentPlayer.id, opponentId, questions as unknown as Record<string, unknown>[]);
@@ -758,7 +770,12 @@ export default function PlayScreen() {
     if (eventType === 'duel') {
       // Extraire les données du duel
       const duelData = eventData as { challengerId?: string; opponentId?: string; questions?: DuelQuestion[] };
-      const { challengerId, opponentId, questions } = duelData;
+      const { challengerId, opponentId } = duelData;
+      // Re-localiser les questions reçues dans la langue du joueur LOCAL
+      // (l'émetteur les a diffusées dans SA langue ; pool partagé → résolution par id).
+      const questions = duelData.questions
+        ? localizeReceivedDuelQuestions(duelData.questions, currentPlayer?.edition || game?.edition)
+        : duelData.questions;
 
       crashLog('duel remote received', { challengerId, opponentId, questionsCount: questions?.length, myId: userId });
 
@@ -819,18 +836,26 @@ export default function PlayScreen() {
         eventManager.markUsed(eventType as import('@/types').EventType, remoteEventId);
       }
 
+      // Re-localiser dans la langue du joueur LOCAL : l'émetteur a diffusé le
+      // contenu dans SA langue, mais le pool est partagé → on retrouve l'objet
+      // par id et on réapplique notre langue (fallback : payload reçu tel quel).
+      const localized = eventManager.localizeEventById(
+        eventType as import('@/types').EventType,
+        eventData as Record<string, unknown>,
+      );
+
       switch (eventType) {
         case 'quiz':
-          setQuizData(eventData as unknown as QuizEvent);
+          setQuizData(localized as unknown as QuizEvent);
           break;
         case 'funding':
-          setFundingData(eventData as unknown as FundingEvent);
+          setFundingData(localized as unknown as FundingEvent);
           break;
         case 'opportunity':
-          setOpportunityData(eventData as unknown as OpportunityEvent);
+          setOpportunityData(localized as unknown as OpportunityEvent);
           break;
         case 'challenge':
-          setChallengeData(eventData as unknown as ChallengeEvent);
+          setChallengeData(localized as unknown as ChallengeEvent);
           break;
         default:
           console.warn('[PlayScreen] Type d\'événement distant inconnu:', eventType);
@@ -1295,7 +1320,7 @@ export default function PlayScreen() {
       duel.selectOpponent(opponent.id);
       // L'attaquant (challenger) impose son édition pour le duel
       const challengerEdition = duel.challenger.edition || game?.edition;
-      const questions = getRandomDuelQuestions(3, challengerEdition);
+      const questions = resolveDuelQuestions(3, challengerEdition);
       duel.startDuelWithQuestions(duel.challenger.id, opponent.id, questions);
       if (isOnline) {
         onlineGame.broadcastDuelStart(duel.challenger.id, opponent.id, questions as unknown as Record<string, unknown>[]);

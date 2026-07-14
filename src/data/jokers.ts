@@ -53,6 +53,21 @@ export const JOKER_CATALOG: Record<JokerType, JokerMetadata> = {
 
 export const ALL_JOKER_TYPES: JokerType[] = ['dice_choice', 'reroll', 'shield', 'steal', 'investment'];
 
+/**
+ * Libellés traduits d'un joker. `JOKER_CATALOG` reste la source des données
+ * non textuelles (icône, couleur) ; le texte vient de l'i18n (clés joker.<type>.*).
+ */
+export function getJokerText(
+  type: JokerType,
+  t: (key: string) => string,
+): { title: string; shortTitle: string; description: string } {
+  return {
+    title: t(`joker.${type}.title`),
+    shortTitle: t(`joker.${type}.short`),
+    description: t(`joker.${type}.desc`),
+  };
+}
+
 /** Historique anti-répétition : jokers déjà tirés depuis le dernier reset. */
 const usedJokerTypes = new Set<JokerType>();
 

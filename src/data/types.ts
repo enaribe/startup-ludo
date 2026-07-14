@@ -164,6 +164,12 @@ export interface DefaultProject {
 
 // ===== ÉDITION COMPLÈTE =====
 
+/** Traduction des métadonnées d'une édition (nom / description). FR = source. */
+export interface EditionTranslation {
+  name?: string;
+  description?: string;
+}
+
 export interface Edition {
   id: EditionId;
   name: string;
@@ -178,6 +184,24 @@ export interface Edition {
   challenges: Challenge[];
   startupIdeas?: StartupIdea[];
   defaultProjects?: DefaultProject[];
+  /** Traductions du nom / description par langue (ex. `en`). */
+  translations?: Record<string, EditionTranslation>;
+}
+
+/**
+ * Nom et description d'une édition dans la langue demandée.
+ * FR = source ; pour toute autre langue, lit `translations[lang]` avec repli
+ * sur le champ original si la traduction manque.
+ */
+export function getLocalizedEdition(
+  edition: Pick<Edition, 'name' | 'description' | 'translations'>,
+  lang: string,
+): { name: string; description: string } {
+  const tr = lang !== 'fr' ? edition.translations?.[lang] : undefined;
+  return {
+    name: tr?.name || edition.name,
+    description: tr?.description || edition.description,
+  };
 }
 
 // ===== HELPERS POUR VALIDATION =====

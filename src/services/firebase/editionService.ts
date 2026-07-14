@@ -37,6 +37,7 @@ export async function fetchEditionsFromFirestore(): Promise<Record<EditionId, Ed
         challenges: data.challenges || [],
         startupIdeas: data.startupIdeas || [],
         defaultProjects: data.defaultProjects || [],
+        translations: data.translations || {},
       } as Edition;
     });
 

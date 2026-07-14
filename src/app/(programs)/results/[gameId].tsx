@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GameButton, OutlinedText, RadialBackground } from '@/components/ui';
 import { useAuthStore, useGameStore, useProgramStore } from '@/stores';
+import { startProgramPlay } from '@/utils/programPlayNav';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS } from '@/styles/typography';
@@ -53,10 +54,8 @@ export default function ProgramResultsScreen() {
 
   const replay = () => {
     resetGame();
-    router.replace({
-      pathname: '/(programs)/play/[programId]',
-      params: { programId: params.programId },
-    });
+    if (!program) { goHome(); return; }
+    startProgramPlay(router, program, userId ?? '', undefined, true);
   };
 
   const goToEnroll = () => {

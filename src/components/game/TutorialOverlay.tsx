@@ -20,6 +20,7 @@ import { GameButton } from '@/components/ui/GameButton';
 import { GamePopup, GamePopupGradientBorder } from '@/components/ui/GamePopup';
 import { TUTORIAL_STEPS } from '@/config/tutorialSteps';
 import { useTutorialStore, type TargetRect } from '@/stores/useTutorialStore';
+import { useTranslation } from '@/i18n';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
@@ -41,6 +42,7 @@ interface TutorialOverlayProps {
 }
 
 export function TutorialOverlay({ safeTop = 110, safeBottom = 90 }: TutorialOverlayProps) {
+  const { t } = useTranslation();
   const active = useTutorialStore((s) => s.active);
   const stepIndex = useTutorialStore((s) => s.stepIndex);
   const targets = useTutorialStore((s) => s.targets);
@@ -73,10 +75,10 @@ export function TutorialOverlay({ safeTop = 110, safeBottom = 90 }: TutorialOver
   const StepBody = (
     <>
       <Text style={styles.stepCounter}>
-        ÉTAPE {stepIndex + 1} / {TUTORIAL_STEPS.length}
+        {t('tutorial.step', { current: stepIndex + 1, total: TUTORIAL_STEPS.length })}
       </Text>
-      <Text style={styles.title}>{step.title}</Text>
-      <Text style={styles.text}>{step.text}</Text>
+      <Text style={styles.title}>{t(step.titleKey)}</Text>
+      <Text style={styles.text}>{t(step.textKey)}</Text>
 
       <View style={styles.dotsRow}>
         {TUTORIAL_STEPS.map((_, i) => (
@@ -87,12 +89,12 @@ export function TutorialOverlay({ safeTop = 110, safeBottom = 90 }: TutorialOver
       <View style={styles.actions}>
         {!isLast && (
           <Pressable onPress={skip} hitSlop={8} style={styles.skipBtn}>
-            <Text style={styles.skipText}>Passer</Text>
+            <Text style={styles.skipText}>{t('tutorial.skip')}</Text>
           </Pressable>
         )}
         <View style={styles.nextBtnWrap}>
           <GameButton
-            title={isLast ? 'TERMINER' : isFirst ? 'COMMENCER' : 'SUIVANT'}
+            title={isLast ? t('tutorial.finish') : isFirst ? t('tutorial.start') : t('tutorial.next')}
             variant="yellow"
             fullWidth
             onPress={handleNext}
@@ -135,18 +137,18 @@ export function TutorialOverlay({ safeTop = 110, safeBottom = 90 }: TutorialOver
             />
           </View>
         }
-        header={`ÉTAPE ${stepIndex + 1} / ${TUTORIAL_STEPS.length}`}
-        title={step.title}
+        header={t('tutorial.step', { current: stepIndex + 1, total: TUTORIAL_STEPS.length })}
+        title={t(step.titleKey)}
         footer={
           <View style={styles.actions}>
             {!isLast && (
               <Pressable onPress={skip} hitSlop={8} style={styles.skipBtn}>
-                <Text style={styles.skipText}>Passer</Text>
+                <Text style={styles.skipText}>{t('tutorial.skip')}</Text>
               </Pressable>
             )}
             <View style={styles.nextBtnWrap}>
               <GameButton
-                title={isLast ? 'TERMINER' : 'COMMENCER'}
+                title={isLast ? t('tutorial.finish') : t('tutorial.start')}
                 variant="yellow"
                 fullWidth
                 onPress={handleNext}
@@ -155,7 +157,7 @@ export function TutorialOverlay({ safeTop = 110, safeBottom = 90 }: TutorialOver
           </View>
         }
       >
-        <Text style={styles.popupText}>{step.text}</Text>
+        <Text style={styles.popupText}>{t(step.textKey)}</Text>
         <View style={styles.dotsRowCentered}>
           {TUTORIAL_STEPS.map((_, i) => (
             <View key={i} style={[styles.dot, i === stepIndex && styles.dotActive]} />

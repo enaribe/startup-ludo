@@ -20,6 +20,7 @@ import { DynamicGradientBorder, GameButton, Modal, RadialBackground } from '@/co
 import { Avatar } from '@/components/ui/Avatar';
 import { EditionTileIcon } from '@/components/icons';
 import { getDefaultProjectsForEdition, getMatchingUserStartups } from '@/data/defaultProjects';
+import { getLocalizedEdition } from '@/data/types';
 import { useEditions } from '@/hooks';
 import { useMultiplayer } from '@/hooks/useMultiplayer';
 import { useTranslation } from '@/i18n';
@@ -46,7 +47,7 @@ const editionTileWidth = (editionModalBodyWidth - EDITION_TILE_GAP) / 2;
 export default function CreateRoomScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const params = useLocalSearchParams<{
     challenge?: string;
     roomId?: string;
@@ -516,6 +517,7 @@ export default function CreateRoomScreen() {
           >
             {editionList.map((edition) => {
               const isSelected = selectedEdition === edition.id;
+              const loc = getLocalizedEdition(edition, language);
               return (
                 <Pressable
                   key={edition.id}
@@ -550,13 +552,13 @@ export default function CreateRoomScreen() {
                         style={[styles.editionTileName, isSelected && styles.editionTileNameSelected]}
                         numberOfLines={2}
                       >
-                        {edition.name.replace(/^Édition\s+/i, '')}
+                        {loc.name.replace(/^Édition\s+/i, '')}
                       </Text>
                       <Text
                         style={[styles.editionTileDesc, isSelected && styles.editionTileDescSelected]}
                         numberOfLines={3}
                       >
-                        {edition.description || t('game.customEdition')}
+                        {loc.description || t('game.customEdition')}
                       </Text>
                     </View>
                   </DynamicGradientBorder>

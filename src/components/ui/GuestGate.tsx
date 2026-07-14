@@ -11,6 +11,7 @@ import Svg, { Path } from 'react-native-svg';
 
 import { GameButton } from '@/components/ui/GameButton';
 import { RadialBackground } from '@/components/ui/RadialBackground';
+import { useTranslation } from '@/i18n';
 import { COLORS } from '@/styles/colors';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { SPACING } from '@/styles/spacing';
@@ -54,6 +55,7 @@ interface GuestGateProps {
 export function GuestGate({ featureName, description, showBack = true }: GuestGateProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -62,7 +64,7 @@ export function GuestGate({ featureName, description, showBack = true }: GuestGa
       {showBack && (
         <Pressable style={styles.backRow} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={20} color="rgba(255,255,255,0.6)" />
-          <Text style={styles.backText}>Retour</Text>
+          <Text style={styles.backText}>{t('common.back')}</Text>
         </Pressable>
       )}
 
@@ -70,19 +72,19 @@ export function GuestGate({ featureName, description, showBack = true }: GuestGa
         <View style={styles.iconWrap}>
           <LockIcon />
         </View>
-        <Text style={styles.title}>{featureName.toUpperCase()}</Text>
-        <Text style={styles.subtitle}>Fonctionnalité réservée aux membres</Text>
+        <Text style={styles.title}>{(featureName || t('guestGate.defaultTitle')).toUpperCase()}</Text>
+        <Text style={styles.subtitle}>{t('guestGate.defaultTitle')}</Text>
         {description && <Text style={styles.description}>{description}</Text>}
 
         <View style={styles.actions}>
           <GameButton
-            title="CRÉER UN COMPTE"
+            title={t('guestGate.createAccount')}
             variant="yellow"
             fullWidth
             onPress={() => router.push('/(auth)/register')}
           />
           <GameButton
-            title="SE CONNECTER"
+            title={t('guestGate.signIn')}
             variant="blue"
             fullWidth
             onPress={() => router.push('/(auth)/login')}

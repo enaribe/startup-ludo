@@ -10,7 +10,8 @@ import { OutlinedText } from '@/components/ui/OutlinedText';
 import { COLORS } from '@/styles/colors';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { SPACING, BORDER_RADIUS, SHADOWS } from '@/styles/spacing';
-import { JOKER_CATALOG } from '@/data/jokers';
+import { JOKER_CATALOG, getJokerText } from '@/data/jokers';
+import { useTranslation } from '@/i18n';
 import type { JokerType } from '@/types';
 
 import { PopupHeader } from './PopupHeader';
@@ -27,7 +28,7 @@ const STAR_ICON = (
   </G>
 );
 
-const LABEL = (
+const makeLabel = (text: string) => (
   <SvgText
     x="65"
     y="50"
@@ -36,7 +37,7 @@ const LABEL = (
     fontFamily="LuckiestGuy_400Regular"
     letterSpacing="1"
   >
-    JOKER OBTENU !
+    {text}
   </SvgText>
 );
 
@@ -66,37 +67,39 @@ export const JokerAcquiredPopup = memo(function JokerAcquiredPopup({
   onContinue,
   onUseNow,
 }: JokerAcquiredPopupProps) {
+  const { t } = useTranslation();
   const meta = jokerType ? JOKER_CATALOG[jokerType] : null;
+  const text = jokerType ? getJokerText(jokerType, t) : null;
   const canUseNow = jokerType ? USABLE_NOW.has(jokerType) : false;
 
   return (
     <Modal visible={visible} onClose={onContinue} closeOnBackdrop={false} showCloseButton={false} bareContent>
       <Animated.View entering={SlideInUp.duration(280)} style={styles.card}>
-        <PopupHeader color="#FFBC40" icon={STAR_ICON} label={LABEL} decorRight={DECOR_RIGHT} />
+        <PopupHeader color="#FFBC40" icon={STAR_ICON} label={makeLabel(t('joker.acquiredTitle'))} decorRight={DECOR_RIGHT} />
 
         <View style={styles.body}>
-          {meta && (
+          {meta && text && (
             <>
               <View style={[styles.iconBadge, { backgroundColor: meta.color }]}>
                 <Ionicons name={meta.iconName as never} size={44} color="#FFFFFF" />
               </View>
 
               <OutlinedText
-                text={meta.title}
+                text={text.title}
                 style={styles.title}
                 outlineColor="#AF7900"
                 outlineWidth={1}
               />
 
               <View style={styles.descriptionBox}>
-                <Text style={styles.description}>{meta.description}</Text>
+                <Text style={styles.description}>{text.description}</Text>
               </View>
             </>
           )}
 
           <View style={styles.buttonWrap}>
             <GameButton
-              title="ACTIVER MAINTENANT"
+              title={t('joker.useNow')}
               variant="green"
               fullWidth
               disabled={!canUseNow}
@@ -105,10 +108,10 @@ export const JokerAcquiredPopup = memo(function JokerAcquiredPopup({
               }}
             />
             {!canUseNow && (
-              <Text style={styles.useNowHint}>Utilisable à ton prochain tour</Text>
+              <Text style={styles.useNowHint}>{t('joker.useNowHint')}</Text>
             )}
             <View style={styles.buttonSpacer} />
-            <GameButton title="COLLECTER" variant="yellow" fullWidth onPress={onContinue} />
+            <GameButton title={t('joker.collect')} variant="yellow" fullWidth onPress={onContinue} />
           </View>
         </View>
       </Animated.View>

@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInUp, FadeOutUp } from 'react-native-reanimated';
 
 import { DynamicGradientBorder } from '@/components/ui/GradientBorder';
+import { useTranslation } from '@/i18n';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 
@@ -13,6 +14,7 @@ interface GuestPromoBannerProps {
 
 export function GuestPromoBanner({ onDismiss }: GuestPromoBannerProps) {
   const router = useRouter();
+  const { t } = useTranslation();
 
   const handleCreateAccount = () => {
     router.push('/(auth)/register');
@@ -30,9 +32,9 @@ export function GuestPromoBanner({ onDismiss }: GuestPromoBannerProps) {
             <Ionicons name="person-add" size={20} color="#FFBC40" />
           </View>
           <View style={styles.textWrap}>
-            <Text style={styles.title}>MODE INVITÉ</Text>
+            <Text style={styles.title}>{t('guestBanner.title')}</Text>
             <Text style={styles.subtitle} numberOfLines={2}>
-              Crée un compte pour sauvegarder ta progression
+              {t('guestBanner.desc')}
             </Text>
           </View>
           <Pressable
@@ -40,7 +42,7 @@ export function GuestPromoBanner({ onDismiss }: GuestPromoBannerProps) {
             onPress={handleCreateAccount}
             hitSlop={8}
           >
-            <Text style={styles.ctaText}>CRÉER</Text>
+            <Text style={styles.ctaText}>{t('guestBanner.cta')}</Text>
           </Pressable>
           <Pressable
             style={styles.closeBtn}

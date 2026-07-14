@@ -18,6 +18,7 @@ import Animated, {
 import Svg, { Defs, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 
 import { getLevelFromXP } from '@/config/progression';
+import { useTranslation } from '@/i18n';
 import { useUserStore } from '@/stores';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
@@ -161,6 +162,7 @@ interface ProgressionPopupProps {
 }
 
 export function ProgressionPopup({ visible, onContinue, xpGained, valorisationGain }: ProgressionPopupProps) {
+  const { t } = useTranslation();
   const profile = useUserStore((s) => s.profile);
 
   const totalValorisation = profile?.startups?.reduce(
@@ -223,8 +225,8 @@ export function ProgressionPopup({ visible, onContinue, xpGained, valorisationGa
               <Animated.View entering={FadeInDown.delay(160).duration(320)}>
                 <Text style={styles.titleText}>
                   {valorisationGain != null
-                    ? 'VOTRE ENTREPRISE A GAGNÉ'
-                    : 'VOS ENTREPRISES VALENT\nDÉSORMAIS'}
+                    ? t('progression.companyGained')
+                    : t('progression.companiesWorth')}
                 </Text>
               </Animated.View>
 
@@ -254,7 +256,7 @@ export function ProgressionPopup({ visible, onContinue, xpGained, valorisationGa
 
               {/* Bouton */}
               <Animated.View entering={FadeInDown.delay(440).duration(320)} style={styles.buttonContainer}>
-                <GameButton variant="yellow" fullWidth title="CONTINUER" onPress={onContinue} />
+                <GameButton variant="yellow" fullWidth title={t('common.continue')} onPress={onContinue} />
               </Animated.View>
             </View>
           </GradientBorderWrapper>

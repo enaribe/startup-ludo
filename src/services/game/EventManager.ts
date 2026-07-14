@@ -434,6 +434,37 @@ export class EventManager {
   }
 
   /**
+   * Retourne `count` questions de duel issues du CONTENTPACK du programme (ou de
+   * l'édition à défaut), localisées dans la langue du joueur. Anti-doublon via
+   * usedDuelIds. Un `Duel` a le même format qu'un `DuelQuestion`.
+   *
+   * Retourne un tableau vide si aucune source de duels n'est disponible — le
+   * caller doit alors se rabattre sur les questions génériques.
+   */
+  getDuelQuestions(count: number): { id: string; question: string; options: { text: string; points: number }[]; category: string }[] {
+    const pool = this.contentPack?.duels.length
+      ? this.contentPack.duels
+      : getEdition(this.editionId).duels;
+    // Un duel a besoin de `count` questions DISTINCTES : si le pool est trop petit,
+    // on retourne [] pour laisser le caller basculer sur les questions génériques
+    // (jamais de doublon dans un même duel).
+    if (pool.length < count) return [];
+
+    // Priorité aux duels non encore utilisés dans la partie ; on complète avec les
+    // autres si nécessaire, sans jamais répéter une question dans CE duel.
+    const fresh = pool.filter((d) => !this.usedDuelIds.has(d.id));
+    const shuffle = <T,>(arr: T[]) => [...arr].sort(() => Math.random() - 0.5);
+    const ordered = [...shuffle(fresh), ...shuffle(pool.filter((d) => this.usedDuelIds.has(d.id)))];
+    const selected = ordered.slice(0, count);
+
+    return selected.map((d0) => {
+      this.usedDuelIds.add(d0.id);
+      const d = this.tDuel(d0);
+      return { id: d.id, question: d.question, options: d.options, category: d.category };
+    });
+  }
+
+  /**
    * Génère une opportunité aléatoire (évite les doublons)
    */
   generateOpportunityEvent(): GeneratedOpportunityEvent | null {
@@ -495,6 +526,81 @@ export class EventManager {
         rarity: this.inferRarity(FIXED_POINTS.challenge),
       },
     };
+  }
+
+  /**
+   * Re-localise UNE question de duel reçue en ligne, en cherchant l'original par
+   * `id` dans le contentPack du programme PUIS l'édition. Retourne `fallback`
+   * (la question reçue) si l'id est introuvable localement.
+   */
+  localizeDuelQuestionById(
+    id: string,
+    fallback: { id: string; question: string; options: { text: string; points: number }[]; category: string },
+  ): { id: string; question: string; options: { text: string; points: number }[]; category: string } {
+    const src =
+      this.contentPack?.duels.find((d) => d.id === id) ??
+      getEdition(this.editionId).duels.find((d) => d.id === id);
+    if (!src) return fallback;
+    const d = this.tDuel(src);
+    return { id: d.id, question: d.question, options: d.options, category: d.category };
+  }
+
+  /**
+   * Re-localise un événement REÇU en ligne dans la langue du joueur LOCAL.
+   *
+   * En online, l'émetteur diffuse un event déjà résolu dans SA langue, mais avec
+   * l'`id` d'origine. Le pool de contenu étant identique chez tous les joueurs,
+   * on retrouve l'objet source par `id` et on réapplique la traduction locale, en
+   * ne remplaçant QUE les champs textuels (les champs non-traduisibles reçus —
+   * reward, value, rarity, correctAnswer… — sont conservés).
+   *
+   * Fallback : si l'`id` est introuvable localement (event fallback, pool filtré
+   * différemment…), on retourne le payload reçu tel quel.
+   */
+  localizeEventById(
+    eventType: EventType,
+    received: Record<string, unknown>,
+  ): Record<string, unknown> {
+    const id = (received as { id?: string }).id;
+    if (!id) return received;
+
+    const findIn = <T extends { id: string }>(pool: T[] | undefined, edPool: T[]): T | undefined =>
+      (pool && pool.length ? pool : edPool).find((x) => x.id === id);
+
+    switch (eventType) {
+      case 'quiz': {
+        const src = findIn(this.contentPack?.quizzes, getEdition(this.editionId).quizzes);
+        if (!src) return received;
+        const q = this.tQuiz(src);
+        return { ...received, question: q.question, options: q.options, explanation: q.explanation || undefined };
+      }
+      case 'duel': {
+        const src = findIn(this.contentPack?.duels, getEdition(this.editionId).duels);
+        if (!src) return received;
+        const d = this.tDuel(src);
+        return { ...received, question: d.question, options: d.options };
+      }
+      case 'funding': {
+        const src = findIn(this.contentPack?.fundings, getEdition(this.editionId).fundings);
+        if (!src) return received;
+        const f = this.tFunding(src);
+        return { ...received, name: f.title, description: f.description };
+      }
+      case 'opportunity': {
+        const src = findIn(this.contentPack?.opportunities, getEdition(this.editionId).opportunities);
+        if (!src) return received;
+        const o = this.tOpportunity(src);
+        return { ...received, title: o.title, description: o.description };
+      }
+      case 'challenge': {
+        const src = findIn(this.contentPack?.challengeEvents, getEdition(this.editionId).challenges);
+        if (!src) return received;
+        const c = this.tChallenge(src);
+        return { ...received, title: c.title, description: c.description };
+      }
+      default:
+        return received;
+    }
   }
 
   /**
