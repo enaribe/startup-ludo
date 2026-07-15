@@ -69,7 +69,7 @@
         "APP_ENV": "production",
         "EXPO_PUBLIC_APP_MODE": "forum",
         "EXPO_PUBLIC_EVENT_NAME": "Forum Dakar 2026",
-        "EXPO_PUBLIC_STORE_URL": "https://play.google.com/store/apps/details?id=com.startupludo.app"
+        "EXPO_PUBLIC_STORE_URL": "https://apps.apple.com/sn/app/startup-ludo/id6751894733?l=fr-FR"
       }
     },
     "forum-preview": {
@@ -78,7 +78,7 @@
         "APP_ENV": "preview",
         "EXPO_PUBLIC_APP_MODE": "forum",
         "EXPO_PUBLIC_EVENT_NAME": "Forum Dakar 2026",
-        "EXPO_PUBLIC_STORE_URL": "https://play.google.com/store/apps/details?id=com.startupludo.app"
+        "EXPO_PUBLIC_STORE_URL": "https://apps.apple.com/sn/app/startup-ludo/id6751894733?l=fr-FR"
       }
     }
   },

@@ -36,7 +36,9 @@ export function resolveEditionTileIconVariant(editionId: string, editionName: st
   if (id.includes('fintech') || name.includes('fintech')) return 'fintech';
   if (
     id.includes('sante') ||
+    id.includes('health') ||
     name.includes('sante') ||
+    name.includes('health') ||
     name.includes('bien-etre') ||
     name.includes('bien etre')
   ) {

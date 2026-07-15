@@ -10,7 +10,7 @@ import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-n
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ForumPlayLeafIcon, ForumTrophyIcon } from '@/components/icons';
+import { ForumTrophyIcon } from '@/components/icons';
 import { GameButton } from '@/components/ui/GameButton';
 import { RadialBackground } from '@/components/ui/RadialBackground';
 import { useForumScale } from '@/hooks/useForumScale';
@@ -327,7 +327,6 @@ export default function ForumResultsScreen() {
             variant="yellow"
             size="lg"
             fullWidth
-            leftIcon={<ForumPlayLeafIcon width={sp(28)} height={sp(15)} />}
             onPress={handleNewGame}
           />
           <GameButton title="ACCUEIL" variant="blue" fullWidth onPress={handleHome} />

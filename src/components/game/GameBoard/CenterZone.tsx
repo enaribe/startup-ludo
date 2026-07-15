@@ -1,7 +1,7 @@
 /**
  * CenterZone - Zone centrale du plateau (arrivée)
  *
- * Mode forum : image Agribusiness (milieu.png) ; sinon logo Startup Ludo.
+ * Mode forum : carte Healthtech (Africa Health + Mastercard + logo AFYA FEST) ; sinon logo Startup Ludo.
  */
 
 import Constants from 'expo-constants';
@@ -14,7 +14,9 @@ import { FONTS, FONT_SIZES } from '@/styles/typography';
 const IS_FORUM_MODE = Constants.expoConfig?.extra?.appMode === 'forum';
 
 const CENTER_IMAGE_DEFAULT: ImageSourcePropType = require('../../../../assets/images/logostartupludo.png');
-const CENTER_IMAGE_FORUM: ImageSourcePropType = require('../../../../assets/images/milieu.png');
+const AFRICA_HEALTH_IMAGE: ImageSourcePropType = require('../../../../assets/images/africa-health-collaborative.png');
+const MASTERCARD_IMAGE: ImageSourcePropType = require('../../../../assets/images/mastercard-foundation.png');
+const AFYA_FEST_IMAGE: ImageSourcePropType = require('../../../../assets/images/afya-fest-2026.png');
 
 interface CenterZoneProps {
   size: number;
@@ -29,17 +31,38 @@ export const CenterZone = memo(function CenterZone({
   top,
   finishedPawns,
 }: CenterZoneProps) {
-  const centerSource = IS_FORUM_MODE ? CENTER_IMAGE_FORUM : CENTER_IMAGE_DEFAULT;
-  /** Logo large horizontal ; milieu.png plutôt carré */
-  const centerImageStyle = IS_FORUM_MODE
-    ? { width: size * 0.88, height: size * 0.88 }
-    : { width: size * 0.85, height: size * 0.45 };
-
   return (
     <View style={[styles.container, { width: size, height: size, left, top }]}>
-      <View style={styles.centerContent}>
-        <Image source={centerSource} style={centerImageStyle} resizeMode="contain" />
-      </View>
+      {IS_FORUM_MODE ? (
+        <View style={[styles.forumCard, { width: size, height: size, padding: size * 0.08 }]}>
+          <View style={styles.forumPartnerRow}>
+            <Image
+              source={AFRICA_HEALTH_IMAGE}
+              style={{ width: size * 0.2, height: size * 0.2 * (512 / 1205) }}
+              resizeMode="contain"
+              accessibilityLabel="Africa Health Collaborative"
+            />
+            <Image
+              source={MASTERCARD_IMAGE}
+              style={{ width: size * 0.11, height: size * 0.11 * (114 / 109) }}
+              resizeMode="contain"
+              accessibilityLabel="En partenariat avec Mastercard Foundation"
+            />
+          </View>
+          <View style={styles.forumAfyaWrap}>
+            <Image
+              source={AFYA_FEST_IMAGE}
+              style={{ width: size * 0.62, height: size * 0.62 * (512 / 809) }}
+              resizeMode="contain"
+              accessibilityLabel="AFYA FEST 2026"
+            />
+          </View>
+        </View>
+      ) : (
+        <View style={styles.centerContent}>
+          <Image source={CENTER_IMAGE_DEFAULT} style={{ width: size * 0.85, height: size * 0.45 }} resizeMode="contain" />
+        </View>
+      )}
 
       {/* Cases vert / jaune / rouge / bleu (pions terminés) – au-dessus, sans bordure jaune */}
       {finishedPawns.map((pawn, index) => {
@@ -86,6 +109,23 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   centerContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  forumCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  forumPartnerRow: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  forumAfyaWrap: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },

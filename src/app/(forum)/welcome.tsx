@@ -25,8 +25,6 @@ import Animated, {
   FadeInDown,
   FadeInLeft,
   FadeInRight,
-  FadeInUp,
-  ZoomIn,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -39,17 +37,12 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
-  AgribusinessLeafIcon,
-  AgribusinessThemeBadge,
-  ConsortiumJeunesseSenegalLogo,
   ForumDecorBottomLeftIcon,
   ForumDecorBottomRightIcon,
   ForumDecorTopLeftIcon,
   ForumDecorTopRightIcon,
   ForumLeaderboardRankTrophyIcon,
-  ForumPlayLeafIcon,
   ForumTrophyIcon,
-  MastercardFoundationLogo,
 } from '@/components/icons';
 import { DynamicGradientBorder, GameButton, RadialBackground } from '@/components/ui';
 import { useForumScale } from '@/hooks/useForumScale';
@@ -64,8 +57,9 @@ const MAX_H_PADDING = 40;
 const FORUM_WELCOME_ROTATION_MS = 5000;
 const shapeImage = require('../../../assets/images/shape.png');
 const logoImage = require('../../../assets/images/logostartupludo.png');
-const yeahImage = require('../../../assets/images/yeah.png');
-const diceImage = require('../../../assets/images/de.png');
+const afyaFestImage = require('../../../assets/images/afya-fest-2026.png');
+const africaHealthImage = require('../../../assets/images/africa-health-collaborative.png');
+const mastercardImage = require('../../../assets/images/mastercard-foundation.png');
 
 type ForumStyles = ReturnType<typeof createStyles>;
 
@@ -105,8 +99,6 @@ function springWithStiffness(
 }
 
 /** Références stables pour éviter de relancer les effets à chaque rendu */
-const SPRING_FLOAT_DICE = springWithStiffness(OSCILLATE_SPRING, 7);
-const SPRING_FLOAT_LEAVES = springWithStiffness(OSCILLATE_SPRING, -6);
 const SPRING_BOUNCE_CHEVRON = springWithStiffness(OSCILLATE_SPRING, -4);
 const SPRING_TROPHY_TILT = springWithStiffness(TROPHY_ROCK_SPRING, 4);
 
@@ -195,13 +187,20 @@ function createStyles(screenWidth: number) {
       borderRadius: 8,
       padding: 4,
     },
-    cardOuter: {
-      marginBottom: 0,
-    },
-    cardInner: {
-      padding: SPACING[4],
+    forumCard: {
+      backgroundColor: '#FFFFFF',
+      borderRadius: 25,
+      padding: SPACING[5],
+      alignItems: 'center',
+      gap: SPACING[5],
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+      elevation: 4,
     },
     partnerRow: {
+      width: '100%',
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'flex-start',
@@ -216,84 +215,20 @@ function createStyles(screenWidth: number) {
       alignItems: 'flex-end',
       justifyContent: 'flex-start',
     },
-    yeahLogoWrap: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginTop: SPACING[3],
-      marginBottom: SPACING[3],
+    partnerMastercardLogo: {
+      height: 48,
+      aspectRatio: 109 / 114,
     },
-    yeahLogo: {
-      width: '100%',
-      maxWidth: 280,
-      height: Math.min(42, screenWidth * 0.11),
-      maxHeight: 48,
+    partnerAfricaHealthLogo: {
+      height: 40,
+      aspectRatio: 1205 / 512,
     },
-    themeBadgeWrap: {
-      alignItems: 'center',
-      marginTop: SPACING[2],
-    },
-    heroVisual: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginTop: SPACING[3],
-      marginBottom: SPACING[3],
-    },
-    heroVisualLeft: {
-      flex: 1,
-      alignItems: 'flex-end',
-      justifyContent: 'center',
-      paddingRight: SPACING[4],
-    },
-    heroTrophyCenter: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingHorizontal: SPACING[4],
-      marginLeft: -SPACING[2],
-    },
-    heroVisualRight: {
-      flex: 1,
-      alignItems: 'flex-start',
-      justifyContent: 'center',
-      paddingLeft: SPACING[4],
-    },
-    heroDiceContainer: {
-      width: screenWidth * 0.23,
-      height: screenWidth * 0.25,
-      position: 'relative',
-    },
-    heroDiceLarge: {
-      width: screenWidth * 0.13,
-      height: screenWidth * 0.13,
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      transform: [{ rotate: '-10deg' }],
-    },
-    heroDiceSmall: {
-      width: screenWidth * 0.075,
-      height: screenWidth * 0.075,
-      position: 'absolute',
-      bottom: 10,
-      right: 10,
-      transform: [{ rotate: '15deg' }],
-    },
-    heroCoinsContainer: {
-      width: screenWidth * 0.16,
-      height: screenWidth * 0.2,
-      position: 'relative',
-    },
-    heroCoinLarge: {
-      position: 'absolute',
-      top: 0,
-      right: 0,
-    },
-    heroCoinSmall: {
-      position: 'absolute',
-      bottom: 0,
-      left: 0,
+    afyaFestLogo: {
+      width: Math.min(screenWidth * 0.6, 240),
+      height: Math.min(screenWidth * 0.6, 240) * (512 / 809),
     },
     headlineContainer: {
+      width: '100%',
       alignItems: 'center',
       marginTop: 0,
       paddingHorizontal: SPACING[1],
@@ -301,29 +236,27 @@ function createStyles(screenWidth: number) {
     headlineQuestionSmall: {
       fontFamily: FONTS.title,
       fontSize: screenWidth * 0.052,
-      lineHeight: screenWidth * 0.052 * 1.12,
-      color: '#FFFFFF',
+      lineHeight: screenWidth * 0.052 * 1.2,
+      color: '#3ABDE8',
       textAlign: 'center',
-      textShadowColor: '#4CAF50',
-      textShadowOffset: { width: 0, height: 2 },
-      textShadowRadius: 4,
-      marginBottom: 6,
+      marginBottom: 2,
       letterSpacing: 0.3,
     },
     headlineQuestionLarge: {
       fontFamily: FONTS.title,
       fontSize: screenWidth * 0.058,
-      lineHeight: screenWidth * 0.058 * 1.1,
-      color: '#FFFFFF',
+      lineHeight: screenWidth * 0.058 * 1.2,
+      color: '#3ABDE8',
       textAlign: 'center',
-      textShadowColor: '#4CAF50',
-      textShadowOffset: { width: 0, height: 2 },
-      textShadowRadius: 4,
       letterSpacing: 0.2,
     },
-    chevronWrap: {
+    chevronPill: {
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      backgroundColor: '#FFBC40',
       alignItems: 'center',
-      marginTop: SPACING[2],
+      justifyContent: 'center',
     },
     footer: {
       fontFamily: FONTS.body,
@@ -353,11 +286,6 @@ function createStyles(screenWidth: number) {
       paddingVertical: SPACING[2],
       paddingHorizontal: SPACING[5],
       borderRadius: 999,
-    },
-    leaderboardPillLeaf: {
-      position: 'absolute',
-      top: -6,
-      right: -4,
     },
     leaderboardPillText: {
       fontFamily: FONTS.title,
@@ -411,41 +339,6 @@ function createStyles(screenWidth: number) {
 }
 
 /** Flottement vertical léger (dés / feuilles) — ressort pour montée et descente fluides */
-const GentleFloat = memo(function GentleFloat({
-  children,
-  amplitude = 6,
-  /** Délai avant le début des oscillations (phase indépendante) */
-  startDelayMs = 0,
-  /** Ressort légèrement différent pour éviter que les cycles se verrouillent entre eux */
-  springConfig = OSCILLATE_SPRING,
-}: {
-  children: ReactNode;
-  amplitude?: number;
-  startDelayMs?: number;
-  springConfig?: SpringOscConfig;
-}) {
-  const reduceMotion = useReducedMotion();
-  const y = useSharedValue(0);
-  useEffect(() => {
-    if (reduceMotion) return;
-    y.value = withDelay(
-      startDelayMs,
-      withRepeat(
-        withSequence(
-          withSpring(-amplitude, springConfig),
-          withSpring(0, springConfig)
-        ),
-        -1,
-        false
-      )
-    );
-  }, [reduceMotion, y, amplitude, startDelayMs, springConfig]);
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: y.value }],
-  }));
-  return <Animated.View style={animatedStyle}>{children}</Animated.View>;
-});
-
 /** Chevron invite à défiler / jouer */
 const BouncingChevron = memo(function BouncingChevron({
   color,
@@ -477,7 +370,7 @@ const BouncingChevron = memo(function BouncingChevron({
   }));
   return (
     <Animated.View style={animatedStyle}>
-      <Ionicons name="chevron-down" size={22} color={color} />
+      <Ionicons name="chevron-down" size={16} color={color} />
     </Animated.View>
   );
 });
@@ -685,19 +578,27 @@ const ForumScreenCornerDecor = memo(function ForumScreenCornerDecor({
 });
 
 const PartnerStrip = memo(function PartnerStrip({
-  screenWidth,
   styles: s,
 }: {
-  screenWidth: number;
   styles: ForumStyles;
 }) {
   return (
     <View style={s.partnerRow}>
       <View style={s.partnerLeft}>
-        <ConsortiumJeunesseSenegalLogo width={Math.min(screenWidth * 0.22, 92)} />
+        <Image
+          source={africaHealthImage}
+          style={s.partnerAfricaHealthLogo}
+          resizeMode="contain"
+          accessibilityLabel="Africa Health Collaborative"
+        />
       </View>
       <View style={s.partnerRight}>
-        <MastercardFoundationLogo height={32} />
+        <Image
+          source={mastercardImage}
+          style={s.partnerMastercardLogo}
+          resizeMode="contain"
+          accessibilityLabel="En partenariat avec Mastercard Foundation"
+        />
       </View>
     </View>
   );
@@ -718,8 +619,6 @@ const ForumLeaderboardSection = memo(function ForumLeaderboardSection({
 }) {
   const avatarSize = sp(36);
   const trophySize = sp(46);
-  const pillLeafW = sp(18);
-  const pillLeafH = sp(10);
 
   return (
     <Animated.View entering={FadeIn.duration(380)} style={s.leaderboardOuter}>
@@ -727,9 +626,6 @@ const ForumLeaderboardSection = memo(function ForumLeaderboardSection({
         <View style={s.leaderboardPillWrap}>
           <View style={s.leaderboardPill}>
             <Text style={[s.leaderboardPillText, { fontSize: fs(FONT_SIZES.lg) }]}>TOP ENTREPRENEURS</Text>
-          </View>
-          <View style={s.leaderboardPillLeaf} pointerEvents="none">
-            <ForumPlayLeafIcon width={pillLeafW} height={pillLeafH} />
           </View>
         </View>
         {entries.length === 0 ? (
@@ -829,10 +725,6 @@ export default function ForumWelcomeScreen() {
   }, [reduceMotion]);
 
   const qrSize = Math.min(56, screenWidth * 0.14);
-  const trophyW = Math.min(screenWidth * 0.28, 110);
-  const leafLarge = Math.min(46, screenWidth * 0.11);
-  const leafSmall = Math.min(26, screenWidth * 0.065);
-  const badgeW = Math.min(cardWidth - SPACING[5] * 2, 136);
   const headerTrophyW = Math.min(screenWidth * 0.38, 130);
   const showLeaderboard = contentPhase === 'leaderboard';
 
@@ -893,88 +785,29 @@ export default function ForumWelcomeScreen() {
         {contentPhase === 'welcome' ? (
         <Animated.View
           entering={FadeInDown.delay(200).duration(520).springify().damping(17)}
-          style={styles.cardOuter}
+          style={styles.forumCard}
         >
-          <DynamicGradientBorder borderRadius={20} fill="rgba(0, 0, 0, 0.35)" boxWidth={cardWidth}>
-            <View style={styles.cardInner}>
-              <Animated.View entering={FadeInDown.delay(260).duration(420).springify().damping(18)}>
-                <PartnerStrip screenWidth={screenWidth} styles={styles} />
-              </Animated.View>
+          <PartnerStrip styles={styles} />
 
-              <Animated.View entering={FadeInUp.delay(320).duration(420)} style={styles.yeahLogoWrap}>
-                <Image
-                  source={yeahImage}
-                  style={styles.yeahLogo}
-                  resizeMode="contain"
-                  accessibilityLabel="YEAH — Yaakaar jeunesse et entrepreneuriat"
-                />
-              </Animated.View>
+          <Image
+            source={afyaFestImage}
+            style={styles.afyaFestLogo}
+            resizeMode="contain"
+            accessibilityLabel="AFYA FEST 2026"
+          />
 
-              <Animated.View entering={ZoomIn.delay(380).duration(450).springify().damping(16)} style={styles.themeBadgeWrap}>
-                <AgribusinessThemeBadge width={badgeW} />
-              </Animated.View>
+          <View style={styles.headlineContainer}>
+            <Text style={styles.headlineQuestionSmall}>QUI EST LE MEILLEUR</Text>
+            <Text style={styles.headlineQuestionLarge}>ENTREPRENEUR HEALTHTECH ?</Text>
+          </View>
 
-              <View style={styles.heroVisual}>
-                <Animated.View
-                  entering={FadeInRight.delay(420).duration(450).springify().damping(17)}
-                  style={styles.heroVisualLeft}
-                >
-                  <GentleFloat amplitude={5} springConfig={SPRING_FLOAT_DICE}>
-                    <View style={styles.heroDiceContainer}>
-                      <Image source={diceImage} style={styles.heroDiceLarge} resizeMode="contain" />
-                      <Image source={diceImage} style={styles.heroDiceSmall} resizeMode="contain" />
-                    </View>
-                  </GentleFloat>
-                </Animated.View>
-
-                <Animated.View
-                  entering={ZoomIn.delay(440).duration(480).springify().damping(15)}
-                  style={styles.heroTrophyCenter}
-                >
-                  <TrophyTilt
-                    width={trophyW}
-                    startDelayMs={220}
-                    springConfig={SPRING_TROPHY_TILT}
-                  >
-                    <ForumTrophyIcon width={trophyW} />
-                  </TrophyTilt>
-                </Animated.View>
-
-                <Animated.View
-                  entering={FadeInLeft.delay(420).duration(450).springify().damping(17)}
-                  style={styles.heroVisualRight}
-                >
-                  <GentleFloat
-                    amplitude={5}
-                    startDelayMs={440}
-                    springConfig={SPRING_FLOAT_LEAVES}
-                  >
-                    <View style={styles.heroCoinsContainer}>
-                      <View style={styles.heroCoinLarge}>
-                        <AgribusinessLeafIcon size={leafLarge} />
-                      </View>
-                      <View style={styles.heroCoinSmall}>
-                        <AgribusinessLeafIcon size={leafSmall} />
-                      </View>
-                    </View>
-                  </GentleFloat>
-                </Animated.View>
-              </View>
-
-              <Animated.View entering={FadeInDown.delay(500).duration(420)} style={styles.headlineContainer}>
-                <Text style={styles.headlineQuestionSmall}>QUI EST LE MEILLEUR</Text>
-                <Text style={styles.headlineQuestionLarge}>ENTREPRENEUR AGRICOLE ?</Text>
-              </Animated.View>
-
-              <Animated.View entering={FadeIn.delay(560).duration(400)} style={styles.chevronWrap}>
-                <BouncingChevron
-                  color="#FFBC40"
-                  startDelayMs={620}
-                  springConfig={SPRING_BOUNCE_CHEVRON}
-                />
-              </Animated.View>
-            </View>
-          </DynamicGradientBorder>
+          <View style={styles.chevronPill}>
+            <BouncingChevron
+              color="#FFFFFF"
+              startDelayMs={620}
+              springConfig={SPRING_BOUNCE_CHEVRON}
+            />
+          </View>
         </Animated.View>
         ) : (
           <ForumLeaderboardSection cardWidth={cardWidth} styles={styles} entries={leaderboardEntries} fs={forumFs} sp={forumSp} />
@@ -990,7 +823,6 @@ export default function ForumWelcomeScreen() {
               size="lg"
               fullWidth
               title="Touchez pour jouer"
-              leftIcon={<ForumPlayLeafIcon width={30} height={16} />}
               onPress={handlePlay}
             />
 

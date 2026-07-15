@@ -42,8 +42,8 @@ const COLORS_BY_COUNT: Record<number, PlayerColor[]> = {
   4: ['yellow', 'blue', 'green', 'red'],
 };
 
-/** Id Firestore de l'édition Agriculture (contenu quiz/duels/etc. chargé comme le jeu classique). */
-const FORUM_EDITION_ID = 'agriculture' as const;
+/** Id Firestore de l'édition Healthtech (contenu quiz/duels/etc. chargé comme le jeu classique). */
+const FORUM_EDITION_ID = 'healthtech' as const;
 
 const FORM_LABEL_NAVY = '#0C243E';
 const FORM_INPUT_BG = '#F3F4F6';

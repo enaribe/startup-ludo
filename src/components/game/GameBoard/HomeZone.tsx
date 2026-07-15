@@ -2,7 +2,7 @@
  * HomeZone - Zone maison du joueur
  *
  * Mode classique : yellowhouse, bluehouse, redhouse, greenhouse
- * Mode forum (appMode forum) : variantes *agri* pour les quatre couleurs
+ * Mode forum (appMode forum) : variantes *health* (Healthtech) pour les quatre couleurs
  */
 
 import Constants from 'expo-constants';
@@ -28,12 +28,12 @@ const HOUSE_IMAGES_CLASSIC: Record<PlayerColor, ImageSourcePropType> = {
   green: require('../../../../assets/images/greenhouse.png'),
 };
 
-/** Plateau forum uniquement — assets Agribusiness */
+/** Plateau forum uniquement — assets Healthtech */
 const HOUSE_IMAGES_FORUM: Record<PlayerColor, ImageSourcePropType> = {
-  yellow: require('../../../../assets/images/yellowhouseagri.png'),
-  blue: require('../../../../assets/images/bluehouseagri.png'),
-  red: require('../../../../assets/images/redhouseagri.png'),
-  green: require('../../../../assets/images/greenhouseagri.png'),
+  yellow: require('../../../../assets/images/yellowhealth.png'),
+  blue: require('../../../../assets/images/bluehealth.png'),
+  red: require('../../../../assets/images/redhealth.png'),
+  green: require('../../../../assets/images/greenhealth.png'),
 };
 
 export const HomeZone = memo(function HomeZone({
