@@ -15,6 +15,7 @@ module.exports = {
   expo: {
     name: IS_FORUM ? 'Startup Ludo — Forum' : 'Startup Ludo',
     slug: 'startup-ludo',
+    owner: 'enatech',
     version: '2.0.3',
     orientation: 'portrait',
     icon: resolvedIcon,
@@ -95,7 +96,7 @@ module.exports = {
           : ''),
       router: {},
       eas: {
-        projectId: '85630621-2ecd-450e-a7ff-e3df54cc76f2',
+        projectId: '49911c3e-90a9-40da-9664-d11c1f60f498',
       },
     },
   },

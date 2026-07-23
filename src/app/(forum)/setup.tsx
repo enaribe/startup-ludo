@@ -4,7 +4,7 @@
  * Fond : plateau Ludo (aperçu) + flou + voile (toutes les étapes).
  * Étape 1 : nombre de joueurs (Solo / 2 / 3 / 4)
  * Étape 2.. : saisie Nom + Nom de startup (séquentiel)
- * → initGame (édition Agriculture, id Firestore) → /(forum)/play
+ * → initGame (édition Healthtech, id Firestore) → /(forum)/play
  */
 
 import { Ionicons } from '@expo/vector-icons';
@@ -200,7 +200,7 @@ function PlayerForm({
           { fontSize: fs(FONT_SIZES.base), marginBottom: sp(8), marginTop: sp(20) },
         ]}
       >
-        Nom de votre Entreprise Agricole
+        Nom de votre Entreprise
       </Text>
       <TextInput
         style={[
