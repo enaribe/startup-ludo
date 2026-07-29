@@ -20,6 +20,7 @@ import { TOKENS_TO_FINISH } from '@/config/boardConfig';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
+import { useTranslation } from '@/i18n';
 import type { Player } from '@/types';
 
 // ─── Constantes layout ───────────────────────────────────────────────────────
@@ -179,6 +180,7 @@ function TokenTrack({
 // ─── Ligne joueur ────────────────────────────────────────────────────────────
 
 function PlayerRow({ player, isHighlighted }: { player: Player; isHighlighted: boolean }) {
+  const { t } = useTranslation();
   const [h, setH] = useState(0);
   const w = GAME_POPUP_WIDTH - SPACING[5] * 2;
   const playerColor = COLORS.players[player.color];
@@ -192,7 +194,7 @@ function PlayerRow({ player, isHighlighted }: { player: Player; isHighlighted: b
         <View style={[styles.playerDot, { backgroundColor: playerColor }]} />
         <Text style={styles.playerName}>{player.name}</Text>
         <Text style={[styles.playerTokens, { color: isHighlighted ? COLORS.error : COLORS.textSecondary }]}>
-          {player.tokens} / {TOKENS_TO_FINISH} jetons
+          {t('missedFinal.playerTokens', { current: player.tokens, total: TOKENS_TO_FINISH })}
         </Text>
       </View>
     </View>
@@ -216,24 +218,25 @@ export const MissedFinalEntryPopup = memo(function MissedFinalEntryPopup({
   currentPlayer,
   allPlayers,
 }: MissedFinalEntryPopupProps) {
+  const { t } = useTranslation();
   const currentTokens = currentPlayer?.tokens ?? 0;
   const playerColor = currentPlayer ? COLORS.players[currentPlayer.color] : COLORS.primary;
 
   const titleText =
     tokensNeeded === 1
-      ? 'ENCORE 1 JETON\nÀ COLLECTER'
-      : `ENCORE ${tokensNeeded} JETONS\nÀ COLLECTER`;
+      ? t('missedFinal.titleSingular')
+      : t('missedFinal.titlePlural', { count: tokensNeeded });
 
   const warningText =
     tokensNeeded === 1
-      ? "Sans 1 jeton supplémentaire avant l'entrée du couloir final, votre pion devra refaire un tour complet."
-      : `Sans ${tokensNeeded} jetons supplémentaires avant l'entrée du couloir final, votre pion devra refaire un tour complet.`;
+      ? t('missedFinal.warningSingular')
+      : t('missedFinal.warningPlural', { count: tokensNeeded });
 
   return (
     <GamePopup
       visible={visible}
       onRequestClose={onContinue}
-      header="Attention"
+      header={t('missedFinal.header')}
       icon={<SadFaceIcon />}
     >
       {/* Titre avec stroke bleu */}
@@ -273,7 +276,7 @@ export const MissedFinalEntryPopup = memo(function MissedFinalEntryPopup({
 
       {/* Bouton */}
       <View style={styles.buttonContainer}>
-        <GameButton variant="yellow" fullWidth title="COMPRIS" onPress={onContinue} />
+        <GameButton variant="yellow" fullWidth title={t('missedFinal.gotIt')} onPress={onContinue} />
       </View>
     </GamePopup>
   );

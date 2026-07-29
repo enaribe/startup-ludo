@@ -17,6 +17,7 @@ import { getRankFromXP, getRankProgress, getXPForNextRank } from '@/config/progr
 import { useAvatarPicker } from '@/hooks/useAvatarPicker';
 import { AvatarPickerModal } from '@/components/profile/AvatarPickerModal';
 import { RankProgressionPopup } from '@/components/profile/RankProgressionPopup';
+import { SavedOpportunitiesCard } from '@/components/profile/SavedOpportunitiesCard';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -265,6 +266,9 @@ export default function ProfilScreen() {
               </Animated.View>
             ))}
           </View>
+
+          {/* Opportunités sponsor sauvegardées en partie — clic = ouvre le lien */}
+          <SavedOpportunitiesCard width={contentWidth} />
         </View>
       </ScrollView>
 

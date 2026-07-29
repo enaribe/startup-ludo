@@ -75,7 +75,6 @@ export default function AllPartnersScreen() {
                 <PartnerHomeCard
                   key={partner.id}
                   partner={partner}
-                  programCount={partnerPrograms.length}
                   playerCount={playerCount}
                   onPress={() => router.push({
                     pathname: '/(programs)/partner/[partnerId]',

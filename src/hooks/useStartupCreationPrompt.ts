@@ -26,6 +26,7 @@ export function useStartupCreationPrompt() {
   const isGuest = useAuthStore((state) => state.user?.isGuest ?? true);
   const [visible, setVisible] = useState(false);
   const checkedRef = useRef(false); // ne vérifier qu'une fois par montage
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const hasStartup = (profile?.startups?.length ?? 0) > 0;
 
@@ -41,6 +42,12 @@ export function useStartupCreationPrompt() {
     checkAndShow();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasStartup, isGuest]);
+
+  // Annule un éventuel setVisible(true) différé si l'écran est démonté
+  // (évite un popup fantôme qui bloquerait les taps au retour).
+  useEffect(() => () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+  }, []);
 
   const checkAndShow = async () => {
     try {
@@ -64,11 +71,11 @@ export function useStartupCreationPrompt() {
 
       if (shouldShow) {
         // Petit délai pour laisser l'écran se charger d'abord
-        setTimeout(() => setVisible(true), 1200);
+        timerRef.current = setTimeout(() => setVisible(true), 1200);
       }
     } catch (e) {
       // En cas d'erreur AsyncStorage, on affiche quand même
-      setTimeout(() => setVisible(true), 1200);
+      timerRef.current = setTimeout(() => setVisible(true), 1200);
     }
   };
 

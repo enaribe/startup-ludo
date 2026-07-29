@@ -121,6 +121,11 @@ export interface FundingEvent {
   amount: number;
   condition?: string;
   rarity: 'common' | 'rare' | 'epic' | 'legendary';
+  /** Carte sponsor (édition sponsorisée) : habillage dédié avec logo. */
+  sponsored?: boolean;
+  sponsorLogoUrl?: string;
+  /** Lien externe de l'opportunité réelle du sponsor (sauvegardable dans le profil). */
+  sponsorLinkUrl?: string;
 }
 
 // Option de réponse pour un duel (toutes sont "correctes" mais avec des points différents)
@@ -201,6 +206,25 @@ export interface OpportunityEvent {
   effect: 'advance' | 'tokens' | 'protection' | 'special' | 'extraTurn' | 'shield' | 'boost';
   value: number;
   rarity: 'common' | 'rare' | 'epic' | 'legendary';
+  /** Carte sponsor (édition sponsorisée) : habillage dédié avec logo. */
+  sponsored?: boolean;
+  sponsorLogoUrl?: string;
+  /** Lien externe de l'opportunité réelle du sponsor (sauvegardable dans le profil). */
+  sponsorLinkUrl?: string;
+}
+
+/**
+ * Opportunité sponsor sauvegardée par le joueur pendant une partie.
+ * Stockée dans savedOpportunities/{userId} ; un clic depuis le profil ouvre linkUrl.
+ */
+export interface SavedSponsorOpportunity {
+  /** Id de la carte sponsor (clé de dédoublonnage). */
+  id: string;
+  kind: 'opportunity' | 'funding';
+  text: string;
+  logoUrl?: string;
+  linkUrl: string;
+  savedAt: number;
 }
 
 export interface ChallengeEvent {

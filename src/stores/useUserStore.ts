@@ -12,6 +12,33 @@ import {
   getRankProgress,
   type RankInfo,
 } from '@/config/progression';
+import { ACHIEVEMENTS_MAP } from '@/config/achievements';
+import {
+  setProgressionAttributes,
+  setValuationAttributes,
+  trackAchievementUnlocked,
+  trackRankReached,
+  trackStartupCreated,
+} from '@/services/analytics';
+
+/**
+ * Pousse les attributs de progression du profil vers Customer.io
+ * (segments « il te manque X XP », ciblage par rang, etc.).
+ */
+function syncProgressionAttributes(profile: UserProfile): void {
+  const next = getXPForNextRank(profile.xp);
+  setProgressionAttributes({
+    xp: profile.xp,
+    rank: profile.rank,
+    xpToNextRank: next.nextRank ? next.nextRank.minXP - profile.xp : null,
+    gamesPlayed: profile.gamesPlayed,
+    gamesWon: profile.gamesWon,
+  });
+  setValuationAttributes({
+    valorisationTotal: profile.startups.reduce((sum, s) => sum + (s.valorisation ?? 0), 0),
+    startupsCount: profile.startups.length,
+  });
+}
 
 interface UserStoreState {
   profile: UserProfile | null;
@@ -103,6 +130,8 @@ export const useUserStore = create<UserStore>()(
         });
         // Refresh progression info when profile is set
         get().refreshProgressionInfo();
+        // Customer.io : attributs initiaux du profil (segments de campagnes)
+        if (profile) syncProgressionAttributes(profile);
       },
 
       loadProfile: async (userId) => {
@@ -182,6 +211,13 @@ export const useUserStore = create<UserStore>()(
         // Refresh all progression info
         get().refreshProgressionInfo();
 
+        // Customer.io : rang atteint + attributs à jour (campagnes progression)
+        if (rankUp) {
+          trackRankReached({ rank: rankUp.id, previousRank: getRankFromXP(oldXP).id });
+        }
+        const updatedProfile = get().profile;
+        if (updatedProfile) syncProgressionAttributes(updatedProfile);
+
         return rankUp;
       },
 
@@ -246,6 +282,15 @@ export const useUserStore = create<UserStore>()(
             state.profile.startups.push(startup);
           }
         });
+        // Customer.io : coupe la campagne « crée ta startup » + attributs valorisation
+        const profile = get().profile;
+        if (profile) {
+          trackStartupCreated({ sector: startup.sector, name: startup.name });
+          setValuationAttributes({
+            valorisationTotal: profile.startups.reduce((sum, s) => sum + (s.valorisation ?? 0), 0),
+            startupsCount: profile.startups.length,
+          });
+        }
       },
 
       updateStartup: (startupId, updates) => {
@@ -275,11 +320,19 @@ export const useUserStore = create<UserStore>()(
       },
 
       addAchievement: (achievementId) => {
+        const alreadyUnlocked = get().profile?.achievements.includes(achievementId) ?? false;
         set((state) => {
           if (state.profile && !state.profile.achievements.includes(achievementId)) {
             state.profile.achievements.push(achievementId);
           }
         });
+        // Customer.io : badge débloqué (rappel « Nouveau badge ! »)
+        if (!alreadyUnlocked && get().profile) {
+          trackAchievementUnlocked({
+            achievementId,
+            name: ACHIEVEMENTS_MAP[achievementId]?.title ?? achievementId,
+          });
+        }
       },
 
       hasAchievement: (achievementId) => {

@@ -170,6 +170,41 @@ export interface EditionTranslation {
   description?: string;
 }
 
+/**
+ * Carte d'événement sponsor (opportunité ou financement) injectée en partie
+ * (~25 % de chance sur une case opportunité/financement d'une édition sponsorisée).
+ */
+export interface SponsorEventCard {
+  id: string;
+  /** Texte affiché dans la carte. */
+  text: string;
+  /** Jetons gagnés (défaut : 2 pour une opportunité, 4 pour un financement). */
+  tokens?: number;
+  /** Logo affiché dans la carte (peut différer du visuel de l'édition, ex. DER, Orange Bank). */
+  logoUrl?: string;
+  /** Lien externe de l'opportunité réelle — permet au joueur de la sauvegarder et de l'ouvrir depuis son profil. */
+  linkUrl?: string;
+}
+
+/**
+ * Sponsoring d'une édition (géré depuis l'admin).
+ * Quand `enabled`, un popup sponsor s'affiche au choix de l'édition :
+ * le joueur doit cliquer « JOUER » pour continuer.
+ */
+export interface EditionSponsor {
+  enabled: boolean;
+  /** Nom du sponsor affiché dans le texte (ex. "Mastercard Foundation"). */
+  name: string;
+  /** Visuel central du popup (affiche/photo de la thématique). */
+  imageUrl: string;
+  /** Lien « en savoir plus » (optionnel). */
+  linkUrl?: string;
+  /** Opportunités sponsor injectées en partie. */
+  opportunities?: SponsorEventCard[];
+  /** Financements sponsor injectés en partie. */
+  fundings?: SponsorEventCard[];
+}
+
 export interface Edition {
   id: EditionId;
   name: string;
@@ -186,6 +221,8 @@ export interface Edition {
   defaultProjects?: DefaultProject[];
   /** Traductions du nom / description par langue (ex. `en`). */
   translations?: Record<string, EditionTranslation>;
+  /** Sponsoring de l'édition (popup au choix de l'édition). */
+  sponsor?: EditionSponsor | null;
 }
 
 /**

@@ -5,6 +5,7 @@
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
+import { useTranslation } from '@/i18n';
 import { useSettingsStore } from '@/stores';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
@@ -42,6 +43,7 @@ export const VictoryPopup = memo(function VictoryPopup({
   onPlayAgain,
   onGoHome,
 }: VictoryPopupProps) {
+  const { t } = useTranslation();
   const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
 
   // Animation values
@@ -150,7 +152,7 @@ export const VictoryPopup = memo(function VictoryPopup({
           entering={SlideInUp.delay(200).duration(280)}
           style={styles.title}
         >
-          Victoire !
+          {t('victoryPopup.title')}
         </Animated.Text>
 
         {/* Winner Info */}
@@ -171,7 +173,7 @@ export const VictoryPopup = memo(function VictoryPopup({
             <View style={styles.statItem}>
               <Ionicons name="cash" size={20} color={COLORS.primary} />
               <Text style={styles.statValue}>{winner.tokens}</Text>
-              <Text style={styles.statLabel}>jetons</Text>
+              <Text style={styles.statLabel}>{t('victoryPopup.tokens')}</Text>
             </View>
           </View>
         </Animated.View>
@@ -181,7 +183,7 @@ export const VictoryPopup = memo(function VictoryPopup({
           entering={FadeIn.delay(600)}
           style={styles.leaderboard}
         >
-          <Text style={styles.leaderboardTitle}>Classement final</Text>
+          <Text style={styles.leaderboardTitle}>{t('victoryPopup.finalRanking')}</Text>
           {sortedPlayers.map((player, index) => (
             <View
               key={player.id}
@@ -215,7 +217,7 @@ export const VictoryPopup = memo(function VictoryPopup({
           style={styles.actions}
         >
           <Button
-            title="Rejouer"
+            title={t('victoryPopup.playAgain')}
             variant="primary"
             size="lg"
             fullWidth
@@ -223,7 +225,7 @@ export const VictoryPopup = memo(function VictoryPopup({
             leftIcon={<Ionicons name="refresh" size={20} color={COLORS.white} />}
           />
           <Button
-            title="Retour à l'accueil"
+            title={t('victoryPopup.backHome')}
             variant="outline"
             size="md"
             fullWidth

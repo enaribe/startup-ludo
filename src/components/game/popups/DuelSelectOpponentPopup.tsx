@@ -9,6 +9,7 @@ import { COLORS } from '@/styles/colors';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { SPACING, BORDER_RADIUS, SHADOWS } from '@/styles/spacing';
 import { usePlaySoundOnOpen } from '@/hooks/useSound';
+import { useTranslation } from '@/i18n';
 import type { Player } from '@/types';
 
 interface DuelSelectOpponentPopupProps {
@@ -26,6 +27,7 @@ export const DuelSelectOpponentPopup = memo(function DuelSelectOpponentPopup({
   onSelectOpponent,
   onClose,
 }: DuelSelectOpponentPopupProps) {
+  const { t } = useTranslation();
   usePlaySoundOnOpen(visible, 'popup-open');
 
   return (
@@ -51,12 +53,12 @@ export const DuelSelectOpponentPopup = memo(function DuelSelectOpponentPopup({
             </View>
             <View style={styles.playerCardText}>
               <Text style={styles.playerCardName} numberOfLines={1}>
-                {currentPlayer.startupName || 'Entreprise'}
+                {currentPlayer.startupName || t('duelSelect.company')}
               </Text>
               <Text style={styles.playerCardSubtitle}>{currentPlayer.name}</Text>
             </View>
             <View style={styles.challengerTag}>
-              <Text style={styles.challengerTagText}>TOI</Text>
+              <Text style={styles.challengerTagText}>{t('duelSelect.you')}</Text>
             </View>
           </Animated.View>
 
@@ -65,7 +67,7 @@ export const DuelSelectOpponentPopup = memo(function DuelSelectOpponentPopup({
 
           {/* Message */}
           <View style={styles.messageBox}>
-            <Text style={styles.message}>Choisis ton adversaire pour le duel !</Text>
+            <Text style={styles.message}>{t('duelSelect.chooseOpponent')}</Text>
           </View>
 
           {/* Liste des adversaires */}
@@ -83,15 +85,15 @@ export const DuelSelectOpponentPopup = memo(function DuelSelectOpponentPopup({
                       </View>
                       <View style={styles.playerCardText}>
                         <Text style={styles.playerCardName} numberOfLines={1}>
-                          {opponent.startupName || 'Entreprise'}
+                          {opponent.startupName || t('duelSelect.company')}
                         </Text>
                         <Text style={styles.playerCardSubtitle}>
-                          {opponent.isAI ? 'IA' : opponent.name}
+                          {opponent.isAI ? t('duelSelect.ai') : opponent.name}
                         </Text>
                       </View>
                       <View style={styles.selectBadge}>
                         <Ionicons name="flash" size={13} color={COLORS.white} />
-                        <Text style={styles.selectBadgeText}>Défier</Text>
+                        <Text style={styles.selectBadgeText}>{t('duelSelect.challenge')}</Text>
                       </View>
                     </View>
                   )}

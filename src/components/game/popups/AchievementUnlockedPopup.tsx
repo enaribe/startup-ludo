@@ -14,6 +14,7 @@ import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { GamePopup } from '@/components/ui/GamePopup';
 import { GameButton } from '@/components/ui/GameButton';
 import { RARITY_COLORS, RARITY_LABELS, type Achievement } from '@/config/achievements';
+import { useTranslation } from '@/i18n';
 
 interface AchievementUnlockedPopupProps {
   /** Succès à présenter (vide = popup masqué). */
@@ -26,6 +27,7 @@ export function AchievementUnlockedPopup({
   achievements,
   onClose,
 }: AchievementUnlockedPopupProps) {
+  const { t } = useTranslation();
   const [index, setIndex] = useState(0);
 
   // Réinitialise le curseur quand une nouvelle fournée arrive
@@ -55,8 +57,11 @@ export function AchievementUnlockedPopup({
       onRequestClose={handleNext}
       header={
         achievements.length > 1
-          ? `SUCCÈS DÉBLOQUÉ · ${index + 1}/${achievements.length}`
-          : 'SUCCÈS DÉBLOQUÉ'
+          ? t('achievementUnlocked.headerCounter', {
+              current: index + 1,
+              total: achievements.length,
+            })
+          : t('achievementUnlocked.header')
       }
       spinningShape
       icon={
@@ -71,7 +76,7 @@ export function AchievementUnlockedPopup({
       title={current.title}
       footer={
         <GameButton
-          title={isLast ? 'SUPER !' : 'SUIVANT'}
+          title={isLast ? t('achievementUnlocked.done') : t('achievementUnlocked.next')}
           variant="yellow"
           fullWidth
           onPress={handleNext}

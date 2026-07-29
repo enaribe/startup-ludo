@@ -10,14 +10,15 @@ import * as admin from 'firebase-admin';
 // Initialize Firebase Admin SDK
 admin.initializeApp();
 
-// Export Game Functions
-export { createRoom } from './game/createRoom';
-export { joinRoom } from './game/joinRoom';
-export { processGameAction } from './game/processGameAction';
+// Callables legacy (createRoom, joinRoom, processGameAction, updateStats) :
+// jamais déployés ni appelés par l'app (rooms gérées côté client via Realtime DB).
+// Ils ne compilent pas (style v2 sur API v1) → exclus du build (cf. tsconfig.json).
+
+// Export Notification Functions (FCM direct, hors Customer.io)
+export { onGameInvitationCreated } from './notifications/onGameInvitationCreated';
 
 // Export User Functions
 export { onUserCreate } from './user/onUserCreate';
-export { updateStats } from './user/updateStats';
 export {
   updateLeaderboard,
   resetWeeklyStats,

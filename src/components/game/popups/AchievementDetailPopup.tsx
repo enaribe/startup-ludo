@@ -7,6 +7,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+import { useTranslation } from '@/i18n';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
@@ -31,6 +32,8 @@ export function AchievementDetailPopup({
   progress,
   onClose,
 }: AchievementDetailPopupProps) {
+  const { t } = useTranslation();
+
   if (!achievement) return null;
 
   const isSecret = achievement.secret && !isUnlocked;
@@ -44,7 +47,7 @@ export function AchievementDetailPopup({
     <GamePopup
       visible
       onRequestClose={onClose}
-      header={isUnlocked ? 'SUCCÈS DÉBLOQUÉ' : 'COMMENT DÉBLOQUER'}
+      header={isUnlocked ? t('achievementDetail.headerUnlocked') : t('achievementDetail.headerHowTo')}
       icon={
         <View style={[styles.iconBadge, { borderColor: isUnlocked ? rarityColor : 'rgba(255,255,255,0.2)' }]}>
           <Ionicons
@@ -61,7 +64,7 @@ export function AchievementDetailPopup({
       }
       title={title}
       footer={
-        <GameButton title="FERMÉ" variant="yellow" fullWidth onPress={onClose} />
+        <GameButton title={t('achievementDetail.close')} variant="yellow" fullWidth onPress={onClose} />
       }
     >
       <View style={styles.content}>
@@ -75,10 +78,10 @@ export function AchievementDetailPopup({
 
         {/* Explication : comment débloquer */}
         <View style={styles.howBlock}>
-          <Text style={styles.howLabel}>OBJECTIF</Text>
+          <Text style={styles.howLabel}>{t('achievementDetail.objective')}</Text>
           <Text style={styles.howText}>
             {isSecret
-              ? 'Ce succès est secret — joue pour le découvrir !'
+              ? t('achievementDetail.secretHint')
               : (progress?.howTo ?? achievement.description)}
           </Text>
         </View>
@@ -104,14 +107,14 @@ export function AchievementDetailPopup({
         {isUnlocked && (
           <View style={styles.unlockedRow}>
             <Ionicons name="checkmark-circle" size={16} color={COLORS.success} />
-            <Text style={styles.unlockedText}>Succès obtenu</Text>
+            <Text style={styles.unlockedText}>{t('achievementDetail.obtained')}</Text>
           </View>
         )}
 
         {/* Récompense XP */}
         <View style={styles.xpRow}>
           <Ionicons name="star" size={16} color={COLORS.success} />
-          <Text style={styles.xpText}>Récompense : +{achievement.xpReward} XP</Text>
+          <Text style={styles.xpText}>{t('achievementDetail.reward', { xp: achievement.xpReward })}</Text>
         </View>
       </View>
     </GamePopup>

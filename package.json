@@ -26,6 +26,8 @@
     "@react-navigation/elements": "^2.6.3",
     "@react-navigation/native": "^7.1.8",
     "@shopify/flash-list": "^2.2.0",
+    "customerio-expo-plugin": "^3.6.2",
+    "customerio-reactnative": "^6.5.2",
     "expo": "~54.0.32",
     "expo-apple-authentication": "~8.0.8",
     "expo-audio": "^1.1.1",

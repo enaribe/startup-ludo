@@ -19,6 +19,7 @@ import { COLORS } from '@/styles/colors';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { SPACING, BORDER_RADIUS, SHADOWS } from '@/styles/spacing';
 import { useSettingsStore } from '@/stores';
+import { useTranslation } from '@/i18n';
 import { useSound, usePlaySoundOnOpen } from '@/hooks/useSound';
 import type { QuizEvent } from '@/types';
 import { crashLog } from '@/utils/gameLog';
@@ -127,6 +128,7 @@ export const QuizPopup = memo(function QuizPopup({
   spectatorResult,
   onSpectatorClose,
 }: QuizPopupProps) {
+  const { t } = useTranslation();
   const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
   const { play: playSound } = useSound();
   usePlaySoundOnOpen(visible && !!quiz, 'popup-open');
@@ -284,7 +286,7 @@ export const QuizPopup = memo(function QuizPopup({
           {isSpectator && (
             <View style={styles.spectatorBanner}>
               <Ionicons name="eye" size={14} color={COLORS.white} />
-              <Text style={styles.spectatorText}>L'adversaire répond au quiz...</Text>
+              <Text style={styles.spectatorText}>{t('quizPopup.spectatorAnswering')}</Text>
             </View>
           )}
 
@@ -384,7 +386,7 @@ export const QuizPopup = memo(function QuizPopup({
           {hasAnswered && (
             <Animated.View style={[styles.resultWrap, resultAnimStyle]}>
               <Text style={[styles.resultTitle, !isCorrect && styles.resultTitleLoss]}>
-                {isCorrect ? 'VOUS GAGNEZ' : 'VOUS PERDEZ'}
+                {isCorrect ? t('quizPopup.win') : t('quizPopup.lose')}
               </Text>
               <Animated.View
                 style={[
@@ -406,7 +408,7 @@ export const QuizPopup = memo(function QuizPopup({
               <View style={styles.explanationBox}>
                 <View style={styles.explanationHeader}>
                   <Ionicons name="bulb-outline" size={16} color="#FF9800" />
-                  <Text style={styles.explanationTitle}>Explication</Text>
+                  <Text style={styles.explanationTitle}>{t('quizPopup.explanation')}</Text>
                 </View>
                 <Text style={styles.explanationText}>{quiz.explanation}</Text>
               </View>
@@ -416,7 +418,7 @@ export const QuizPopup = memo(function QuizPopup({
           {/* Bouton FERMER en mode spectateur — apparaît après la réponse de l'IA */}
           {isSpectator && hasAnswered && onSpectatorClose && (
             <Animated.View entering={FadeInDown.duration(220)} style={styles.spectatorCloseWrap}>
-              <GameButton title="FERMER" onPress={onSpectatorClose} variant="blue" fullWidth />
+              <GameButton title={t('quizPopup.close')} onPress={onSpectatorClose} variant="blue" fullWidth />
             </Animated.View>
           )}
         </ScrollView>

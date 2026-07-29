@@ -2,7 +2,7 @@
   "expo": {
     "name": "Startup Ludo",
     "slug": "startup-ludo",
-    "version": "2.2.0",
+    "version": "2.3.0",
     "orientation": "portrait",
     "icon": "./assets/images/iconludo.png",
     "scheme": "startupludo",
@@ -11,7 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.startupludo.app",
-      "buildNumber": "43",
+      "buildNumber": "44",
       "googleServicesFile": "./GoogleService-Info.plist",
       "usesAppleSignIn": true,
       "infoPlist": {
@@ -21,7 +21,7 @@
     },
     "android": {
       "package": "com.startupludo.app",
-      "versionCode": 43,
+      "versionCode": 44,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#0C243E",
@@ -72,6 +72,24 @@
         {
           "photosPermission": "Startup Ludo accède à tes photos pour définir ta photo de profil.",
           "cameraPermission": "Startup Ludo accède à ta caméra pour prendre ta photo de profil."
+        }
+      ],
+      [
+        "customerio-expo-plugin",
+        {
+          "android": {
+            "googleServicesFile": "./google-services.json",
+            "setHighPriorityPushHandler": true
+          },
+          "ios": {
+            "pushNotification": {
+              "provider": "fcm",
+              "googleServicesFile": "./GoogleService-Info.plist",
+              "useRichPush": false,
+              "showPushAppInForeground": false,
+              "handleDeeplinkInKilledState": true
+            }
+          }
         }
       ]
     ],

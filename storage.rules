@@ -46,6 +46,13 @@ service firebase.storage {
       allow delete: if isAdmin();
     }
 
+    // Images éditions (visuel du popup sponsor) — admin uniquement en écriture, lecture publique
+    match /editions/{editionId}/{fileName} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidImage();
+      allow delete: if isAdmin();
+    }
+
     // Documents sources d'un programme (base de contenu pour la génération) — admin uniquement,
     // documents (PDF/DOCX/MD/TXT/PPTX) jusqu'à 25 Mo. Règle plus spécifique que le wildcard ci-dessous.
     match /programs/{programId}/sources/{fileName} {

@@ -21,6 +21,7 @@ import '../../global.css';
 
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { GameInvitationPopup } from '@/components/game/GameInvitationPopup';
+import { ForceUpdatePopup } from '@/components/ui/ForceUpdatePopup';
 import { COLORS } from '@/styles/colors';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useInvitationStore } from '@/stores/useInvitationStore';
@@ -35,6 +36,7 @@ import {
 import { refreshIdeationFromFirestore } from '@/constants/ideation';
 import { useBackgroundMusic } from '@/hooks/useBackgroundMusic';
 import { resetGuestBannerDismissOnAppStart } from '@/hooks/useGuestBannerDismiss';
+import { initCustomerIO } from '@/services/analytics';
 
 // Keep splash screen visible while loading resources
 SplashScreen.preventAutoHideAsync();
@@ -124,6 +126,8 @@ export default function RootLayout() {
     if (authInitialized.current) return;
     authInitialized.current = true;
     console.log('[App] Starting auth initialization...');
+    // Customer.io doit être initialisé avant l'identify déclenché par l'auth
+    initCustomerIO();
     const unsubscribe = useAuthStore.getState().initializeAuth();
 
     // Safety timeout: if auth doesn't initialize within 5 seconds, force it
@@ -226,6 +230,8 @@ export default function RootLayout() {
             <PresenceGate />
             <InvitationListenerGate />
             <GameInvitationPopup />
+            {/* Mise à jour obligatoire — monté en dernier pour passer au-dessus de tout */}
+            <ForceUpdatePopup />
             <StatusBar style="light" />
           </View>
         </SafeAreaProvider>

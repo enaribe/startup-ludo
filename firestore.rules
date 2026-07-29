@@ -151,6 +151,26 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // App config (version minimale de l'app, liens stores — popup mise à jour obligatoire)
+    // Lecture publique : vérifiée au démarrage de l'app, avant même l'authentification.
+    match /appConfig/{docId} {
+      allow read: if true;  // Aucune donnée sensible
+      allow write: if isSuperAdmin();
+    }
+
+    // Tokens push FCM (notifications directes envoyées par les Cloud Functions).
+    // Privé : chaque joueur ne gère que ses propres tokens ; les functions
+    // (Admin SDK) lisent/nettoient sans passer par ces règles.
+    match /pushTokens/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // Opportunités sponsor sauvegardées en partie (bouton « Sauvegarder ») —
+    // privé : chaque joueur ne gère que sa propre liste.
+    match /savedOpportunities/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
     // Leaderboards collection
     match /leaderboards/{leaderboardId} {
       allow read: if isAuthenticated();
@@ -254,6 +274,35 @@ service cloud.firestore {
                       (resource.data.fromUserId == request.auth.uid ||
                        resource.data.toUserId == request.auth.uid);
       allow delete: if isAdmin();
+    }
+
+    // Précommandes du site vitrine (startupludo web)
+    // Création publique (formulaire de précommande), gestion réservée aux admins
+    match /preorders/{preorderId} {
+      allow create: if request.resource.data.keys().hasAll(['product', 'name', 'email', 'status', 'createdAt']) &&
+                      request.resource.data.product is string &&
+                      request.resource.data.name is string &&
+                      request.resource.data.name.size() >= 2 &&
+                      request.resource.data.name.size() <= 120 &&
+                      request.resource.data.email is string &&
+                      request.resource.data.email.matches('.+@.+\\..+') &&
+                      request.resource.data.status == 'new';
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Messages du formulaire de contact du site vitrine
+    match /contactMessages/{messageId} {
+      allow create: if request.resource.data.keys().hasAll(['name', 'email', 'message', 'status', 'createdAt']) &&
+                      request.resource.data.name is string &&
+                      request.resource.data.name.size() >= 2 &&
+                      request.resource.data.name.size() <= 120 &&
+                      request.resource.data.email is string &&
+                      request.resource.data.email.matches('.+@.+\\..+') &&
+                      request.resource.data.message is string &&
+                      request.resource.data.message.size() >= 5 &&
+                      request.resource.data.message.size() <= 5000 &&
+                      request.resource.data.status == 'new';
+      allow read, update, delete: if isAdmin();
     }
 
     // Follows collection - relations de suivi entre joueurs

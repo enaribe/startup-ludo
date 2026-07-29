@@ -10,6 +10,7 @@ import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import Animated, { SlideInUp, FadeIn } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 
+import { useTranslation } from '@/i18n';
 import { Modal } from '@/components/ui/Modal';
 import { Avatar } from '@/components/ui/Avatar';
 import { COLORS } from '@/styles/colors';
@@ -35,6 +36,7 @@ export const StealTargetSelectPopup = memo(function StealTargetSelectPopup({
   onSelectTarget,
   onClose,
 }: StealTargetSelectPopupProps) {
+  const { t } = useTranslation();
   usePlaySoundOnOpen(visible, 'popup-open');
 
   return (
@@ -45,7 +47,7 @@ export const StealTargetSelectPopup = memo(function StealTargetSelectPopup({
           <View style={styles.headerIcon}>
             <Ionicons name="flash" size={22} color={COLORS.white} />
           </View>
-          <Text style={styles.headerTitle}>VOL ÉCLAIR</Text>
+          <Text style={styles.headerTitle}>{t('stealTarget.headerTitle')}</Text>
         </View>
 
         <ScrollView
@@ -56,7 +58,10 @@ export const StealTargetSelectPopup = memo(function StealTargetSelectPopup({
         >
           <View style={styles.messageBox}>
             <Text style={styles.message}>
-              Choisis l'adversaire à qui voler {STEAL_AMOUNT} jetons.
+              {t('stealTarget.message', {
+                count: STEAL_AMOUNT,
+                tokens: t(STEAL_AMOUNT > 1 ? 'stealTarget.tokenPlural' : 'stealTarget.tokenSingular'),
+              })}
             </Text>
           </View>
 
@@ -80,16 +85,17 @@ export const StealTargetSelectPopup = memo(function StealTargetSelectPopup({
                         </View>
                         <View style={styles.playerCardText}>
                           <Text style={styles.playerCardName} numberOfLines={1}>
-                            {opponent.startupName || 'Entreprise'}
+                            {opponent.startupName || t('stealTarget.company')}
                           </Text>
                           <Text style={styles.playerCardSubtitle}>
-                            {opponent.isAI ? 'IA' : opponent.name} • {opponent.tokens} jetons
+                            {opponent.isAI ? t('stealTarget.ai') : opponent.name} • {opponent.tokens}{' '}
+                            {t(opponent.tokens > 1 ? 'stealTarget.tokenPlural' : 'stealTarget.tokenSingular')}
                           </Text>
                         </View>
                         <View style={[styles.selectBadge, !canSteal && styles.selectBadgeDisabled]}>
                           <Ionicons name="flash" size={13} color={COLORS.white} />
                           <Text style={styles.selectBadgeText}>
-                            {canSteal ? 'Voler' : '0'}
+                            {canSteal ? t('stealTarget.steal') : '0'}
                           </Text>
                         </View>
                       </View>
@@ -101,7 +107,7 @@ export const StealTargetSelectPopup = memo(function StealTargetSelectPopup({
           </View>
 
           <Pressable onPress={onClose} style={styles.cancelButton} hitSlop={8}>
-            <Text style={styles.cancelText}>Annuler</Text>
+            <Text style={styles.cancelText}>{t('stealTarget.cancel')}</Text>
           </Pressable>
         </ScrollView>
       </Animated.View>

@@ -6,6 +6,7 @@ import { G, Path, Text as SvgText } from 'react-native-svg';
 import { GameButton } from '@/components/ui/GameButton';
 import { Modal } from '@/components/ui/Modal';
 import { OutlinedText } from '@/components/ui/OutlinedText';
+import { useTranslation } from '@/i18n';
 import { COLORS } from '@/styles/colors';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { SPACING, BORDER_RADIUS, SHADOWS } from '@/styles/spacing';
@@ -27,7 +28,7 @@ const COINS_ICON = (
 );
 
 // Label "JETONS CÉDÉS !"
-const LABEL = (
+const makeLabel = (text: string) => (
   <SvgText
     x="65"
     y="50"
@@ -36,7 +37,7 @@ const LABEL = (
     fontFamily="LuckiestGuy_400Regular"
     letterSpacing="1"
   >
-    JETONS CÉDÉS !
+    {text}
   </SvgText>
 );
 
@@ -61,13 +62,14 @@ export const TokensStolenPopup = memo(function TokensStolenPopup({
   amount,
   onContinue,
 }: TokensStolenPopupProps) {
+  const { t } = useTranslation();
   return (
     <Modal visible={visible} onClose={onContinue} closeOnBackdrop={false} showCloseButton={false} bareContent>
       <Animated.View entering={SlideInUp.duration(280)} style={styles.card}>
         <PopupHeader
           color="#F35145"
           icon={COINS_ICON}
-          label={LABEL}
+          label={makeLabel(t('tokensStolen.headerLabel'))}
           decorRight={DECOR_RIGHT}
         />
 
@@ -78,7 +80,7 @@ export const TokensStolenPopup = memo(function TokensStolenPopup({
               <Text style={styles.badgeCheck}>✓</Text>
             </View>
             <OutlinedText
-              text="JETONS SAUVÉS"
+              text={t('tokensStolen.badge')}
               style={styles.badgeLabel}
               outlineColor="#AF2121"
               outlineWidth={1}
@@ -87,23 +89,26 @@ export const TokensStolenPopup = memo(function TokensStolenPopup({
 
           {/* Description */}
           <Text style={styles.question}>
-            Ton adversaire t&apos;a laissé en jeu en échange de tes jetons.
+            {t('tokensStolen.description')}
           </Text>
 
           {/* Option révélée (passive — pas cliquable) */}
           <View style={styles.optionCard}>
-            <Text style={styles.optionTitle}>CÉDER TOUS VOS JETONS</Text>
+            <Text style={styles.optionTitle}>{t('tokensStolen.optionTitle')}</Text>
             <Text style={styles.optionSubtitle}>
               {amount != null && amount > 0
-                ? `Tu as cédé ${amount} jeton${amount > 1 ? 's' : ''} — mais tu restes en jeu`
-                : 'Le prix fort — mais vous restez en jeu'}
+                ? t('tokensStolen.optionSubtitleAmount', {
+                    amount,
+                    token: amount > 1 ? t('tokensStolen.tokenPlural') : t('tokensStolen.tokenSingular'),
+                  })
+                : t('tokensStolen.optionSubtitle')}
             </Text>
           </View>
 
           {/* Bouton CONTINUER */}
           <View style={styles.buttonWrap}>
             <GameButton
-              title="CONTINUER"
+              title={t('tokensStolen.continue')}
               variant="yellow"
               fullWidth
               onPress={onContinue}

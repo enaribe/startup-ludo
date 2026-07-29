@@ -968,6 +968,210 @@ const en: Record<string, string> = {
   'infoModal.home': 'HOME',
   'infoModal.portfolio': 'PORTFOLIO',
   'infoModal.ranking': 'GLOBAL RANKING',
+  // ═══ Game popups (missing translations) ═══
+
+  // ReturnBonusPopup.tsx
+  'returnBonus.header': 'Reconnection bonus',
+  'returnBonus.title': 'WELCOME BACK!',
+  'returnBonus.xpLabel': 'Return bonus XP',
+  'returnBonus.claim': 'COLLECT',
+
+  // QuizPopup.tsx
+  'quizPopup.spectatorAnswering': 'Your opponent is answering the quiz...',
+  'quizPopup.win': 'YOU WIN',
+  'quizPopup.lose': 'YOU LOSE',
+  'quizPopup.explanation': 'Explanation',
+  'quizPopup.close': 'CLOSE',
+
+  // VictoryPopup.tsx
+  'victoryPopup.title': 'Victory!',
+  'victoryPopup.tokens': 'tokens',
+  'victoryPopup.finalRanking': 'Final ranking',
+  'victoryPopup.playAgain': 'Play again',
+  'victoryPopup.backHome': 'Back to home',
+
+  // InvestmentPopups.tsx
+  'investment.title': 'INVESTMENT',
+  'investment.pickerHeader': 'Stake your tokens: win double if you score points on your next turn, otherwise you lose them.',
+  'investment.confirmInvest': 'INVEST {{count}} {{token}}',
+  'investment.cancel': 'CANCEL',
+  'investment.tokenUpper': 'TOKEN',
+  'investment.tokensUpper': 'TOKENS',
+  'investment.token': 'token',
+  'investment.tokens': 'tokens',
+  'investment.ifWon': '→ {{amount}} if won',
+  'investment.wonTitle': 'WINNING INVESTMENT!',
+  'investment.lostTitle': 'INVESTMENT LOST',
+  'investment.wonHeader': 'Your bet of {{stake}} {{token}} earns {{gain}} tokens!',
+  'investment.lostHeader': 'You lost your stake of {{stake}} {{token}}.',
+  'investment.continue': 'CONTINUE',
+
+  // FundingPopup.tsx
+  'fundingPopup.header': 'FUNDING',
+  'fundingPopup.spectatorBanner': 'The opponent receives funding',
+  'fundingPopup.collect': 'Collect',
+  'fundingPopup.close': 'CLOSE',
+
+  // DuelResultPopup.tsx
+  'duelResult.company': 'Company',
+  'duelResult.waitingForAnswer': '{{name}} is answering...',
+  'duelResult.draw': 'DRAW',
+  'duelResult.youWon': 'YOU WON!',
+  'duelResult.youLost': 'YOU LOST',
+  'duelResult.tokensGained': '+{{amount}} tokens gained',
+  'duelResult.noTokenGained': 'No token gained',
+  'duelResult.continue': 'Continue',
+
+  // TokensStolenPopup.tsx
+  'tokensStolen.headerLabel': 'TOKENS GIVEN UP!',
+  'tokensStolen.badge': 'TOKENS SAVED',
+  'tokensStolen.description': 'Your opponent let you stay in the game in exchange for your tokens.',
+  'tokensStolen.optionTitle': 'GIVE UP ALL YOUR TOKENS',
+  'tokensStolen.optionSubtitleAmount': 'You gave up {{amount}} {{token}} — but you stay in the game',
+  'tokensStolen.optionSubtitle': 'The high price — but you stay in the game',
+  'tokensStolen.tokenSingular': 'token',
+  'tokensStolen.tokenPlural': 'tokens',
+  'tokensStolen.continue': 'CONTINUE',
+
+  // DuelPreparePopup.tsx
+  'duelPrepare.getReady': 'Get ready to answer\nthe 3 questions!',
+  'duelPrepare.turnOf': 'It\'s {{name}}\'s\nturn',
+  'duelPrepare.companyFallback': 'Company',
+  'duelPrepare.start': 'Start',
+
+  // EventPopup.tsx
+  'eventPopup.opportunityLabel': 'OPPORTUNITY',
+  'eventPopup.challengeLabel': 'CHALLENGE',
+  'eventPopup.spectatorOpportunity': 'Your opponent is seizing an opportunity',
+  'eventPopup.spectatorChallenge': 'Your opponent is facing a challenge',
+  'eventPopup.benefit': 'Benefit',
+  'eventPopup.continue': 'Continue',
+  'eventPopup.close': 'CLOSE',
+
+  // DuelSelectOpponentPopup.tsx
+  'duelSelect.company': 'Company',
+  'duelSelect.you': 'YOU',
+  'duelSelect.chooseOpponent': 'Choose your opponent for the duel!',
+  'duelSelect.ai': 'AI',
+  'duelSelect.challenge': 'Challenge',
+
+  // DuelSpectatorPopup.tsx
+  'duelSpectator.spectatorMode': 'SPECTATOR MODE',
+  'duelSpectator.answered': '{{answered}}/{{total}} answered',
+  'duelSpectator.inProgress': 'Duel in progress...',
+
+  // CaptureChoicePopup.tsx
+  'captureChoice.header': 'CAUGHT!',
+  'captureChoice.defaultOpponent': 'An opponent',
+  'captureChoice.handoff': '📱 Pass the phone to {{name}}',
+  'captureChoice.caughtBy': 'YOU GOT CAUGHT BY {{name}}!',
+  'captureChoice.tokensLeft': 'You have {{count}} {{token}} left — your call!',
+  'captureChoice.noTokens': 'You have no tokens on hand.',
+  'captureChoice.tokenSingular': 'token',
+  'captureChoice.tokenPlural': 'tokens',
+  'captureChoice.goHomeTitle': 'GO BACK HOME',
+  'captureChoice.goHomeSubtitle': 'Your pawn starts over, you keep your tokens',
+  'captureChoice.giveTokensTitle': 'GIVE MY TOKENS',
+  'captureChoice.giveTokensSubtitle': 'You give up your {{count}} {{token}}, your pawn stays in play',
+  'captureChoice.giveTokensNone': 'No tokens to give',
+  'captureChoice.continue': 'CONTINUE',
+
+  // CaptureFailurePopup.tsx
+  'captureFailure.headerLabel': 'BACK TO SQUARE ONE',
+  'captureFailure.restart': 'RESTART',
+  'captureFailure.scenario1Title': 'BANKRUPTCY',
+  'captureFailure.scenario1Description': 'Your cash is dry. The banks have cut you off and suppliers are demanding their dues. Back to square one.',
+  'captureFailure.scenario2Title': 'COURT-ORDERED LIQUIDATION',
+  'captureFailure.scenario2Description': 'The commercial court has ordered liquidation. The assets are sold, the teams scattered. You have to start all over.',
+  'captureFailure.scenario3Title': 'INSOLVENCY',
+  'captureFailure.scenario3Description': 'You can\'t pay the salaries this month. The adventure ends abruptly and you start from scratch.',
+  'captureFailure.scenario4Title': 'FAILED PIVOT',
+  'captureFailure.scenario4Description': 'Your change of strategy failed to convince the market. The customers left, and so did the investors. Back to the starting point.',
+  'captureFailure.scenario5Title': 'PARTNERS\' FALLOUT',
+  'captureFailure.scenario5Description': 'Your co-founder left with half the team. The company didn\'t survive the split.',
+  'captureFailure.scenario6Title': 'NONEXISTENT MARKET',
+  'captureFailure.scenario6Description': 'You built a product nobody wants. The market was just an illusion. You have to start from scratch.',
+  'captureFailure.scenario7Title': 'FOUNDER BURNOUT',
+  'captureFailure.scenario7Description': 'Exhausted, you have to put the company on hold. By the time you recover, everything has to be rebuilt.',
+  'captureFailure.scenario8Title': 'COMPETITIVE ASSAULT',
+  'captureFailure.scenario8Description': 'An industry giant copied your product and crushed your market. Your company doesn\'t recover from it.',
+  'captureFailure.scenario9Title': 'LOSS OF THE KEY CLIENT',
+  'captureFailure.scenario9Description': 'Your biggest client terminated their contract. Without them, the structure no longer holds. Back to the start.',
+  'captureFailure.scenario10Title': 'FAILED FUNDRAISING',
+  'captureFailure.scenario10Description': 'No investor wanted to join this round. The cash is exhausted, the adventure ends.',
+
+  // CreateStartupPromptPopup.tsx
+  'createStartupPrompt.header': 'New Company',
+  'createStartupPrompt.title': 'CREATE YOUR COMPANY\nBEFORE PLAYING!',
+  'createStartupPrompt.description': 'Draw 3 inspiration cards and imagine the next West African unicorn in 5 minutes',
+  'createStartupPrompt.cardsCaption': 'Your 3 inspiration cards',
+  'createStartupPrompt.createButton': 'CREATE MY COMPANY',
+
+  // QuitConfirmPopup.tsx
+  'quitConfirm.title': 'QUIT?',
+  'quitConfirm.descriptionOnline': 'If you quit, you forfeit the game.',
+  'quitConfirm.descriptionOffline': 'Your progress will be lost if you quit now.',
+  'quitConfirm.cancel': 'Cancel',
+  'quitConfirm.confirm': 'Quit',
+
+  // StealTargetSelectPopup.tsx
+  'stealTarget.headerTitle': 'FLASH STEAL',
+  'stealTarget.message': 'Choose the opponent to steal {{count}} {{tokens}} from.',
+  'stealTarget.tokenSingular': 'token',
+  'stealTarget.tokenPlural': 'tokens',
+  'stealTarget.company': 'Company',
+  'stealTarget.ai': 'AI',
+  'stealTarget.steal': 'Steal',
+  'stealTarget.cancel': 'Cancel',
+
+  // AchievementDetailPopup.tsx
+  'achievementDetail.headerUnlocked': 'ACHIEVEMENT UNLOCKED',
+  'achievementDetail.headerHowTo': 'HOW TO UNLOCK',
+  'achievementDetail.close': 'CLOSE',
+  'achievementDetail.objective': 'OBJECTIVE',
+  'achievementDetail.secretHint': 'This achievement is secret — play to discover it!',
+  'achievementDetail.obtained': 'Achievement obtained',
+  'achievementDetail.reward': 'Reward: +{{xp}} XP',
+
+  // AchievementUnlockedPopup.tsx
+  'achievementUnlocked.header': 'ACHIEVEMENT UNLOCKED',
+  'achievementUnlocked.headerCounter': 'ACHIEVEMENT UNLOCKED · {{current}}/{{total}}',
+  'achievementUnlocked.done': 'AWESOME!',
+  'achievementUnlocked.next': 'NEXT',
+
+  // MissedFinalEntryPopup.tsx
+  'missedFinal.header': 'Warning',
+  'missedFinal.titleSingular': '1 MORE TOKEN\nTO COLLECT',
+  'missedFinal.titlePlural': '{{count}} MORE TOKENS\nTO COLLECT',
+  'missedFinal.warningSingular': 'Without 1 more token before entering the final stretch, your pawn will have to go around the board again.',
+  'missedFinal.warningPlural': 'Without {{count}} more tokens before entering the final stretch, your pawn will have to go around the board again.',
+  'missedFinal.playerTokens': '{{current}} / {{total}} tokens',
+  'missedFinal.gotIt': 'GOT IT',
+
+  // ═══ Sponsored edition popup ═══
+  'sponsoredEdition.badge': 'Sponsored',
+  'sponsoredEdition.text': 'This theme is sponsored by {{name}}…',
+  'sponsoredEdition.learnMore': 'learn more',
+  'sponsoredEdition.play': 'PLAY',
+
+  // Sponsor events in game — Save button + Profile section
+  'sponsorEvent.save': 'Save for later',
+  'sponsorEvent.saved': 'Saved — find it in your profile',
+  'profile.savedOpportunitiesTitle': 'My opportunities',
+  'profile.savedOpportunitiesHint': 'Tap an opportunity to open the link',
+
+  // ═══ Push notifications pre-prompt ═══
+  'pushPrompt.header': 'Notifications',
+  'pushPrompt.title': 'NEVER MISS A CHALLENGE',
+  'pushPrompt.description': 'Game invitations, rewards, leaderboard: turn on notifications to stay in the race. 🔔',
+  'pushPrompt.accept': 'TURN ON',
+  'pushPrompt.later': 'LATER',
+
+  // ═══ Forced update ═══
+  'forceUpdate.header': 'Update',
+  'forceUpdate.title': 'UPDATE REQUIRED',
+  'forceUpdate.description': 'A new version of Startup Ludo is available. Update the app to keep playing.',
+  'forceUpdate.button': 'UPDATE NOW',
 };
 
 export default en;

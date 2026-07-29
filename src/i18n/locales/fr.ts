@@ -968,6 +968,211 @@ const fr = {
   'infoModal.home': 'ACCUEIL',
   'infoModal.portfolio': 'PORTFOLIO',
   'infoModal.ranking': 'CLASSEMENT GLOBAL',
+
+  // ═══ Popups du jeu (traductions manquantes) ═══
+
+  // ReturnBonusPopup.tsx
+  'returnBonus.header': 'Bonus reconnexion',
+  'returnBonus.title': 'BON RETOUR !',
+  'returnBonus.xpLabel': 'XP bonus retour',
+  'returnBonus.claim': 'RÉCUPÉRER',
+
+  // QuizPopup.tsx
+  'quizPopup.spectatorAnswering': 'L\'adversaire répond au quiz...',
+  'quizPopup.win': 'VOUS GAGNEZ',
+  'quizPopup.lose': 'VOUS PERDEZ',
+  'quizPopup.explanation': 'Explication',
+  'quizPopup.close': 'FERMER',
+
+  // VictoryPopup.tsx
+  'victoryPopup.title': 'Victoire !',
+  'victoryPopup.tokens': 'jetons',
+  'victoryPopup.finalRanking': 'Classement final',
+  'victoryPopup.playAgain': 'Rejouer',
+  'victoryPopup.backHome': 'Retour à l\'accueil',
+
+  // InvestmentPopups.tsx
+  'investment.title': 'INVESTISSEMENT',
+  'investment.pickerHeader': 'Mise des jetons : gagne le double si tu marques des points à ton prochain tour, sinon tu les perds.',
+  'investment.confirmInvest': 'INVESTIR {{count}} {{token}}',
+  'investment.cancel': 'ANNULER',
+  'investment.tokenUpper': 'JETON',
+  'investment.tokensUpper': 'JETONS',
+  'investment.token': 'jeton',
+  'investment.tokens': 'jetons',
+  'investment.ifWon': '→ {{amount}} si gagné',
+  'investment.wonTitle': 'INVESTISSEMENT GAGNANT !',
+  'investment.lostTitle': 'INVESTISSEMENT PERDU',
+  'investment.wonHeader': 'Ton pari de {{stake}} {{token}} rapporte {{gain}} jetons !',
+  'investment.lostHeader': 'Tu as perdu ta mise de {{stake}} {{token}}.',
+  'investment.continue': 'CONTINUER',
+
+  // FundingPopup.tsx
+  'fundingPopup.header': 'FINANCEMENT',
+  'fundingPopup.spectatorBanner': 'L\'adversaire reçoit un financement',
+  'fundingPopup.collect': 'Collecter',
+  'fundingPopup.close': 'FERMER',
+
+  // DuelResultPopup.tsx
+  'duelResult.company': 'Entreprise',
+  'duelResult.waitingForAnswer': '{{name}} est en train de répondre...',
+  'duelResult.draw': 'ÉGALITÉ',
+  'duelResult.youWon': 'VOUS AVEZ GAGNÉ !',
+  'duelResult.youLost': 'VOUS AVEZ PERDU',
+  'duelResult.tokensGained': '+{{amount}} jetons gagnés',
+  'duelResult.noTokenGained': 'Aucun jeton gagné',
+  'duelResult.continue': 'Continuer',
+
+  // TokensStolenPopup.tsx
+  'tokensStolen.headerLabel': 'JETONS CÉDÉS !',
+  'tokensStolen.badge': 'JETONS SAUVÉS',
+  'tokensStolen.description': 'Ton adversaire t\'a laissé en jeu en échange de tes jetons.',
+  'tokensStolen.optionTitle': 'CÉDER TOUS VOS JETONS',
+  'tokensStolen.optionSubtitleAmount': 'Tu as cédé {{amount}} {{token}} — mais tu restes en jeu',
+  'tokensStolen.optionSubtitle': 'Le prix fort — mais vous restez en jeu',
+  'tokensStolen.tokenSingular': 'jeton',
+  'tokensStolen.tokenPlural': 'jetons',
+  'tokensStolen.continue': 'CONTINUER',
+
+  // DuelPreparePopup.tsx
+  'duelPrepare.getReady': 'Prépare-toi à répondre\naux 3 questions !',
+  'duelPrepare.turnOf': 'C\'est au tour de\n{{name}}',
+  'duelPrepare.companyFallback': 'Entreprise',
+  'duelPrepare.start': 'Commencer',
+
+  // EventPopup.tsx
+  'eventPopup.opportunityLabel': 'OPPORTUNITÉ',
+  'eventPopup.challengeLabel': 'CHALLENGE',
+  'eventPopup.spectatorOpportunity': 'L\'adversaire profite d\'une opportunité',
+  'eventPopup.spectatorChallenge': 'L\'adversaire subit un challenge',
+  'eventPopup.benefit': 'Profiter',
+  'eventPopup.continue': 'Continuer',
+  'eventPopup.close': 'FERMER',
+
+  // DuelSelectOpponentPopup.tsx
+  'duelSelect.company': 'Entreprise',
+  'duelSelect.you': 'TOI',
+  'duelSelect.chooseOpponent': 'Choisis ton adversaire pour le duel !',
+  'duelSelect.ai': 'IA',
+  'duelSelect.challenge': 'Défier',
+
+  // DuelSpectatorPopup.tsx
+  'duelSpectator.spectatorMode': 'MODE SPECTATEUR',
+  'duelSpectator.answered': '{{answered}}/{{total}} répondu',
+  'duelSpectator.inProgress': 'Duel en cours...',
+
+  // CaptureChoicePopup.tsx
+  'captureChoice.header': 'ATTRAPÉ !',
+  'captureChoice.defaultOpponent': 'Un adversaire',
+  'captureChoice.handoff': '📱 Passe le téléphone à {{name}}',
+  'captureChoice.caughtBy': 'TU T\'ES FAIT ATTRAPER PAR {{name}} !',
+  'captureChoice.tokensLeft': 'Il te reste {{count}} {{token}} — à toi de choisir !',
+  'captureChoice.noTokens': 'Tu n\'as aucun jeton en poche.',
+  'captureChoice.tokenSingular': 'jeton',
+  'captureChoice.tokenPlural': 'jetons',
+  'captureChoice.goHomeTitle': 'RENTRER À LA MAISON',
+  'captureChoice.goHomeSubtitle': 'Ton pion repart de zéro, tu gardes tes jetons',
+  'captureChoice.giveTokensTitle': 'DONNER MES JETONS',
+  'captureChoice.giveTokensSubtitle': 'Tu cèdes tes {{count}} {{token}}, ton pion reste en jeu',
+  'captureChoice.giveTokensNone': 'Aucun jeton à donner',
+  'captureChoice.continue': 'CONTINUER',
+
+  // CaptureFailurePopup.tsx
+  'captureFailure.headerLabel': 'RETOUR AU BERCAIL',
+  'captureFailure.restart': 'RECOMMENCER',
+  'captureFailure.scenario1Title': 'FAILLITE',
+  'captureFailure.scenario1Description': 'Ta trésorerie est à sec. Les banques ont coupé les vivres et les fournisseurs réclament leur dû. Retour à la case départ.',
+  'captureFailure.scenario2Title': 'LIQUIDATION JUDICIAIRE',
+  'captureFailure.scenario2Description': 'Le tribunal de commerce a prononcé la liquidation. Les actifs sont vendus, les équipes dispersées. Il faut tout recommencer.',
+  'captureFailure.scenario3Title': 'CESSATION DE PAIEMENT',
+  'captureFailure.scenario3Description': 'Impossible de payer les salaires ce mois-ci. L\'aventure s\'arrête brutalement et tu repars de zéro.',
+  'captureFailure.scenario4Title': 'PIVOT RATÉ',
+  'captureFailure.scenario4Description': 'Ton changement de stratégie n\'a pas convaincu le marché. Les clients sont partis, les investisseurs aussi. Retour au point de départ.',
+  'captureFailure.scenario5Title': 'RUPTURE D\'ASSOCIÉS',
+  'captureFailure.scenario5Description': 'Ton co-fondateur est parti avec la moitié de l\'équipe. L\'entreprise n\'a pas survécu à la rupture.',
+  'captureFailure.scenario6Title': 'MARCHÉ INEXISTANT',
+  'captureFailure.scenario6Description': 'Tu as construit un produit dont personne ne veut. Le marché n\'était qu\'une illusion. Il faut repartir de zéro.',
+  'captureFailure.scenario7Title': 'BURN-OUT DU FONDATEUR',
+  'captureFailure.scenario7Description': 'Épuisé, tu dois mettre l\'entreprise en pause. Le temps que tu récupères, il faut tout reconstruire.',
+  'captureFailure.scenario8Title': 'ATTAQUE CONCURRENTIELLE',
+  'captureFailure.scenario8Description': 'Un géant du secteur a copié ton produit et écrasé ton marché. Ton entreprise ne s\'en remet pas.',
+  'captureFailure.scenario9Title': 'PERTE DU CLIENT CLÉ',
+  'captureFailure.scenario9Description': 'Ton plus gros client a résilié son contrat. Sans lui, la structure ne tient plus. Retour au départ.',
+  'captureFailure.scenario10Title': 'LEVÉE DE FONDS RATÉE',
+  'captureFailure.scenario10Description': 'Aucun investisseur n\'a voulu suivre ce round. Les liquidités sont épuisées, l\'aventure s\'arrête.',
+
+  // CreateStartupPromptPopup.tsx
+  'createStartupPrompt.header': 'Nouvelle Entreprise',
+  'createStartupPrompt.title': 'CRÉEZ VOTRE ENTREPRISE\nAVANT DE JOUER !',
+  'createStartupPrompt.description': 'Tirez 3 cartes d\'inspiration et imaginez la prochaine licorne ouest-africaine en 5 minutes',
+  'createStartupPrompt.cardsCaption': 'Vos 3 cartes d\'inspiration',
+  'createStartupPrompt.createButton': 'CRÉER MON ENTREPRISE',
+
+  // QuitConfirmPopup.tsx
+  'quitConfirm.title': 'QUITTER ?',
+  'quitConfirm.descriptionOnline': 'Si tu quittes, tu perds la partie par forfait.',
+  'quitConfirm.descriptionOffline': 'Ta progression sera perdue si tu quittes maintenant.',
+  'quitConfirm.cancel': 'Annuler',
+  'quitConfirm.confirm': 'Quitter',
+
+  // StealTargetSelectPopup.tsx
+  'stealTarget.headerTitle': 'VOL ÉCLAIR',
+  'stealTarget.message': 'Choisis l\'adversaire à qui voler {{count}} {{tokens}}.',
+  'stealTarget.tokenSingular': 'jeton',
+  'stealTarget.tokenPlural': 'jetons',
+  'stealTarget.company': 'Entreprise',
+  'stealTarget.ai': 'IA',
+  'stealTarget.steal': 'Voler',
+  'stealTarget.cancel': 'Annuler',
+
+  // AchievementDetailPopup.tsx
+  'achievementDetail.headerUnlocked': 'SUCCÈS DÉBLOQUÉ',
+  'achievementDetail.headerHowTo': 'COMMENT DÉBLOQUER',
+  'achievementDetail.close': 'FERMÉ',
+  'achievementDetail.objective': 'OBJECTIF',
+  'achievementDetail.secretHint': 'Ce succès est secret — joue pour le découvrir !',
+  'achievementDetail.obtained': 'Succès obtenu',
+  'achievementDetail.reward': 'Récompense : +{{xp}} XP',
+
+  // AchievementUnlockedPopup.tsx
+  'achievementUnlocked.header': 'SUCCÈS DÉBLOQUÉ',
+  'achievementUnlocked.headerCounter': 'SUCCÈS DÉBLOQUÉ · {{current}}/{{total}}',
+  'achievementUnlocked.done': 'SUPER !',
+  'achievementUnlocked.next': 'SUIVANT',
+
+  // MissedFinalEntryPopup.tsx
+  'missedFinal.header': 'Attention',
+  'missedFinal.titleSingular': 'ENCORE 1 JETON\nÀ COLLECTER',
+  'missedFinal.titlePlural': 'ENCORE {{count}} JETONS\nÀ COLLECTER',
+  'missedFinal.warningSingular': 'Sans 1 jeton supplémentaire avant l\'entrée du couloir final, votre pion devra refaire un tour complet.',
+  'missedFinal.warningPlural': 'Sans {{count}} jetons supplémentaires avant l\'entrée du couloir final, votre pion devra refaire un tour complet.',
+  'missedFinal.playerTokens': '{{current}} / {{total}} jetons',
+  'missedFinal.gotIt': 'COMPRIS',
+
+  // ═══ Popup édition sponsorisée ═══
+  'sponsoredEdition.badge': 'Sponsorisé',
+  'sponsoredEdition.text': 'Cette thématique est sponsorisée par {{name}}…',
+  'sponsoredEdition.learnMore': 'en savoir plus',
+  'sponsoredEdition.play': 'JOUER',
+
+  // Événements sponsor en partie — bouton Sauvegarder + section Profil
+  'sponsorEvent.save': 'Sauvegarder pour plus tard',
+  'sponsorEvent.saved': 'Sauvegardée — à retrouver dans ton profil',
+  'profile.savedOpportunitiesTitle': 'Mes opportunités',
+  'profile.savedOpportunitiesHint': 'Clique sur une opportunité pour ouvrir le lien',
+
+  // ═══ Pré-prompt notifications push ═══
+  'pushPrompt.header': 'Notifications',
+  'pushPrompt.title': 'NE RATE AUCUN DÉFI',
+  'pushPrompt.description': 'Invitations de parties, récompenses, classement : active les notifications pour rester dans la course. 🔔',
+  'pushPrompt.accept': 'ACTIVER',
+  'pushPrompt.later': 'PLUS TARD',
+
+  // ═══ Mise à jour obligatoire ═══
+  'forceUpdate.header': 'Mise à jour',
+  'forceUpdate.title': 'MISE À JOUR REQUISE',
+  'forceUpdate.description': 'Une nouvelle version de Startup Ludo est disponible. Mettez à jour l\'application pour continuer à jouer.',
+  'forceUpdate.button': 'METTRE À JOUR',
 } as const;
 
 export default fr;

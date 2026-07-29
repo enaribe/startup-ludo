@@ -17,6 +17,7 @@ import {
   setProgramEnrollment,
   setProgramSession,
 } from '@/services/firebase/programService';
+import { trackProgramEnrolled } from '@/services/analytics';
 import type {
   PartnerProgram,
   ProgramEnrollment,
@@ -216,6 +217,13 @@ export const useProgramStore = create<ProgramStoreState & ProgramStoreActions>()
 
         setProgramEnrollment(enrollment).catch(() => {
           get().setError("Impossible de synchroniser l'inscription au programme.");
+        });
+
+        // Customer.io : campagne « ton parcours t'attend »
+        trackProgramEnrolled({
+          programId,
+          programName: program.name,
+          partnerId: program.partnerId,
         });
 
         return enrollment;

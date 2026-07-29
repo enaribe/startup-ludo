@@ -1,4 +1,4 @@
-import { memo, useEffect } from 'react';
+import { memo, useEffect, type ReactNode } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import Animated, {
   cancelAnimation,
@@ -15,11 +15,13 @@ import { Modal } from '@/components/ui/Modal';
 import { GameButton } from '@/components/ui/GameButton';
 import { OutlinedText } from '@/components/ui/OutlinedText';
 import { PopupHeader } from './PopupHeader';
+import { SponsorEventPopup } from './SponsorEventPopup';
 import { COLORS } from '@/styles/colors';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { SPACING, BORDER_RADIUS, SHADOWS } from '@/styles/spacing';
 import { useSettingsStore } from '@/stores';
 import { usePlaySoundOnOpen } from '@/hooks/useSound';
+import { useTranslation } from '@/i18n';
 import type { FundingEvent } from '@/types';
 import { crashLog } from '@/utils/gameLog';
 
@@ -58,7 +60,7 @@ const FUND_ICON = (
   </G>
 );
 
-const FUND_LABEL = (
+const makeFundLabel = (text: string) => (
   <SvgText
     x="68"
     y="50"
@@ -67,7 +69,7 @@ const FUND_LABEL = (
     fontFamily="LuckiestGuy_400Regular"
     letterSpacing="1"
   >
-    FINANCEMENT
+    {text}
   </SvgText>
 );
 
@@ -78,13 +80,13 @@ const FUND_DECOR_RIGHT = (
   </>
 );
 
-function FundingHeader() {
+function FundingHeader({ label }: { label: ReactNode }) {
   return (
     <PopupHeader
       color="#4CAF50"
       iconDefs={FUND_ICON_DEFS}
       icon={FUND_ICON}
-      label={FUND_LABEL}
+      label={label}
       decorRight={FUND_DECOR_RIGHT}
     />
   );
@@ -112,6 +114,7 @@ export const FundingPopup = memo(function FundingPopup({
   isSpectator = false,
   onSpectatorClose,
 }: FundingPopupProps) {
+  const { t } = useTranslation();
   const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
   usePlaySoundOnOpen(visible && !!funding, 'popup-open');
 
@@ -162,10 +165,39 @@ export const FundingPopup = memo(function FundingPopup({
 
   if (!funding) return null;
 
+  // Carte SPONSOR (édition sponsorisée) → habillage vert dédié avec logo
+  if (funding.sponsored) {
+    return (
+      <SponsorEventPopup
+        visible={visible}
+        label={t('fundingPopup.header')}
+        description={funding.description}
+        value={funding.amount}
+        logoUrl={funding.sponsorLogoUrl}
+        savePayload={
+          funding.sponsorLinkUrl
+            ? {
+                id: funding.id,
+                kind: 'funding',
+                text: funding.description,
+                logoUrl: funding.sponsorLogoUrl,
+                linkUrl: funding.sponsorLinkUrl,
+              }
+            : undefined
+        }
+        spectatorText={t('fundingPopup.spectatorBanner')}
+        onAccept={handleAccept}
+        onClose={onClose}
+        isSpectator={isSpectator}
+        onSpectatorClose={onSpectatorClose}
+      />
+    );
+  }
+
   return (
     <Modal visible={visible} onClose={onClose} closeOnBackdrop={false} showCloseButton={false} bareContent>
       <Animated.View entering={FadeIn.duration(220)} style={styles.card}>
-        <FundingHeader />
+        <FundingHeader label={makeFundLabel(t('fundingPopup.header'))} />
 
         <ScrollView
           contentContainerStyle={styles.scrollContent}
@@ -175,7 +207,7 @@ export const FundingPopup = memo(function FundingPopup({
           {isSpectator && (
             <View style={styles.spectatorBanner}>
               <Ionicons name="eye" size={14} color={COLORS.white} />
-              <Text style={styles.spectatorText}>L'adversaire reçoit un financement</Text>
+              <Text style={styles.spectatorText}>{t('fundingPopup.spectatorBanner')}</Text>
             </View>
           )}
 
@@ -207,14 +239,14 @@ export const FundingPopup = memo(function FundingPopup({
           {/* Bouton */}
           {!isSpectator && (
             <Animated.View entering={FadeInDown.delay(500).duration(220)} style={styles.buttonWrap}>
-              <GameButton title="Collecter" onPress={handleAccept} variant="green" fullWidth />
+              <GameButton title={t('fundingPopup.collect')} onPress={handleAccept} variant="green" fullWidth />
             </Animated.View>
           )}
 
           {/* Bouton FERMER en mode spectateur (IA joue) */}
           {isSpectator && onSpectatorClose && (
             <Animated.View entering={FadeInDown.delay(300).duration(220)} style={styles.buttonWrap}>
-              <GameButton title="FERMER" onPress={onSpectatorClose} variant="blue" fullWidth />
+              <GameButton title={t('fundingPopup.close')} onPress={onSpectatorClose} variant="blue" fullWidth />
             </Animated.View>
           )}
         </ScrollView>

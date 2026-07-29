@@ -18,6 +18,7 @@ export { InfoModal } from './InfoModal';
 export type { InfoSection } from './InfoModal';
 export { ProgressionPopup } from './ProgressionPopup';
 export { GamePopup, GamePopupSpinningShape, GamePopupGradientBorder, GAME_POPUP_WIDTH } from './GamePopup';
+export { ForceUpdatePopup } from './ForceUpdatePopup';
 export { OutlinedText } from './OutlinedText';
 export { GuestGate } from './GuestGate';
 export { GuestPromoBanner } from './GuestPromoBanner';

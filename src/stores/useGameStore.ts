@@ -22,10 +22,12 @@ import type { CheckpointData } from '@/utils/onlineCodec';
 import { useChallengeStore } from '@/stores/useChallengeStore';
 import { useProgramStore } from '@/stores/useProgramStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
+import { useUserStore } from '@/stores/useUserStore';
 import { MAX_TOKENS } from '@/config/boardConfig';
 import { gameLog } from '@/utils/gameLog';
 import { resetDuelQuestionPool } from '@/data/duelQuestions';
 import { resetJokerPool, markJokerUsed } from '@/data/jokers';
+import { trackEvent } from '@/services/analytics';
 
 /** Action compacte recue d'un joueur distant via RTDB */
 export interface RemoteAction {
@@ -333,6 +335,14 @@ export const useGameStore = create<GameStore>()(
             state.playerEffects[p.id] = createDefaultEffects();
           });
         });
+
+        trackEvent('game_started', {
+          mode,
+          edition,
+          players_count: players.length,
+          is_program: !!programContext,
+          is_challenge: !!challengeContext,
+        });
       },
 
       resetGame: () => {
@@ -348,6 +358,32 @@ export const useGameStore = create<GameStore>()(
       },
 
       endGame: (winnerId) => {
+        const game = get().game;
+        // Ne tracker qu'une fois (endGame peut être rappelé sur une partie déjà finie)
+        if (game && game.status !== 'finished') {
+          // Résultat du joueur local (campagnes « revanche ? » / « encore chaud ? »)
+          const localUserId = useUserStore.getState().profile?.userId;
+          const won = localUserId != null && winnerId === localUserId;
+          const winnerName = game.players.find((p) => p.id === winnerId)?.name;
+
+          trackEvent('game_finished', {
+            mode: game.mode,
+            edition: game.edition,
+            players_count: game.players.length,
+            turns: game.currentTurn,
+            won,
+            winner_name: winnerName,
+          });
+          if (game.mode === 'online' && localUserId) {
+            const opponentName = won
+              ? game.players.find((p) => p.id !== localUserId)?.name
+              : winnerName;
+            trackEvent(won ? 'online_game_won' : 'online_game_lost', {
+              opponent_name: opponentName,
+            });
+          }
+        }
+
         set((state) => {
           if (state.game) {
             state.game.status = 'finished';

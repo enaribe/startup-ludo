@@ -10,6 +10,7 @@ import Svg, { Path } from 'react-native-svg';
 import { GameButton } from '@/components/ui/GameButton';
 import { GamePopup, GamePopupGradientBorder, GAME_POPUP_WIDTH } from '@/components/ui/GamePopup';
 import { RETURN_BONUS_XP } from '@/hooks/useReturnBonus';
+import { useTranslation } from '@/i18n';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
@@ -32,6 +33,7 @@ function PartyPopperIcon() {
 // ─── Bloc XP bonus ────────────────────────────────────────────────────────────
 
 function XPBonusBlock() {
+  const { t } = useTranslation();
   const [h, setH] = useState(0);
   const w = GAME_POPUP_WIDTH - SPACING[5] * 2;
 
@@ -49,7 +51,7 @@ function XPBonusBlock() {
         />
       )}
       <Text style={styles.xpAmount}>+{RETURN_BONUS_XP}</Text>
-      <Text style={styles.xpLabel}>XP bonus retour</Text>
+      <Text style={styles.xpLabel}>{t('returnBonus.xpLabel')}</Text>
     </View>
   );
 }
@@ -67,15 +69,16 @@ export const ReturnBonusPopup = memo(function ReturnBonusPopup({
   onClaim,
   onDismiss,
 }: ReturnBonusPopupProps) {
+  const { t } = useTranslation();
   return (
     <GamePopup
       visible={visible}
       onRequestClose={onDismiss}
-      header="Bonus reconnexion"
+      header={t('returnBonus.header')}
       icon={<PartyPopperIcon />}
     >
       {/* Titre */}
-      <Text style={styles.title}>BON RETOUR !</Text>
+      <Text style={styles.title}>{t('returnBonus.title')}</Text>
 
       {/* Bloc XP */}
       <View style={styles.xpBlockWrapper}>
@@ -87,7 +90,7 @@ export const ReturnBonusPopup = memo(function ReturnBonusPopup({
         <GameButton
           variant="yellow"
           fullWidth
-          title="RÉCUPÉRER"
+          title={t('returnBonus.claim')}
           onPress={onClaim}
         />
       </View>

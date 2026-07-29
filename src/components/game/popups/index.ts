@@ -10,6 +10,8 @@ export { VictoryPopup } from './VictoryPopup';
 export { QuitConfirmPopup } from './QuitConfirmPopup';
 export { MissedFinalEntryPopup } from './MissedFinalEntryPopup';
 export { CreateStartupPromptPopup } from './CreateStartupPromptPopup';
+export { NotificationPermissionPopup } from './NotificationPermissionPopup';
+export { SponsoredEditionPopup } from './SponsoredEditionPopup';
 export { ReturnBonusPopup } from './ReturnBonusPopup';
 export { OnboardingModal } from './OnboardingModal';
 export { CaptureChoicePopup } from './CaptureChoicePopup';

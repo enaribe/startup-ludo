@@ -14,6 +14,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { trackReturnBonusClaimed } from '@/services/analytics';
 import { useAuthStore, useUserStore } from '@/stores';
 
 const STORAGE_KEY = '@return_bonus_last_claimed';
@@ -31,6 +32,7 @@ export function useReturnBonus() {
 
   const [visible, setVisible] = useState(false);
   const checkedRef = useRef(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!profile) return;
@@ -42,6 +44,12 @@ export function useReturnBonus() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile, isGuest]);
 
+  // Annule un éventuel setVisible(true) différé si l'écran est démonté
+  // (évite un popup fantôme qui bloquerait les taps au retour).
+  useEffect(() => () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+  }, []);
+
   const checkAndShow = async () => {
     try {
       const lastClaimedStr = await AsyncStorage.getItem(STORAGE_KEY);
@@ -50,11 +58,11 @@ export function useReturnBonus() {
 
       if (elapsed >= MIN_INTERVAL_MS) {
         // Petit délai pour laisser l'écran s'afficher
-        setTimeout(() => setVisible(true), 800);
+        timerRef.current = setTimeout(() => setVisible(true), 800);
       }
     } catch {
       // En cas d'erreur AsyncStorage, on affiche quand même
-      setTimeout(() => setVisible(true), 800);
+      timerRef.current = setTimeout(() => setVisible(true), 800);
     }
   };
 
@@ -62,6 +70,8 @@ export function useReturnBonus() {
     setVisible(false);
     // Créditer l'XP immédiatement
     addXP(RETURN_BONUS_XP);
+    // Customer.io : coupe la campagne « ton bonus t'attend »
+    trackReturnBonusClaimed({ xp: RETURN_BONUS_XP });
     // Persister le timestamp de réclamation
     try {
       await AsyncStorage.setItem(STORAGE_KEY, String(Date.now()));

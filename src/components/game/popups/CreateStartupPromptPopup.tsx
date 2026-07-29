@@ -8,6 +8,7 @@ import { memo } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { RocketIcon } from '@/components/icons';
+import { useTranslation } from '@/i18n';
 import { GameButton } from '@/components/ui/GameButton';
 import { GamePopup, GAME_POPUP_WIDTH } from '@/components/ui/GamePopup';
 import { OutlinedText } from '@/components/ui/OutlinedText';
@@ -41,17 +42,19 @@ export const CreateStartupPromptPopup = memo(function CreateStartupPromptPopup({
   onCreateStartup,
   onDismiss,
 }: CreateStartupPromptPopupProps) {
+  const { t } = useTranslation();
+
   return (
     <GamePopup
       visible={visible}
       onRequestClose={onDismiss}
-      header="Nouvelle Entreprise"
+      header={t('createStartupPrompt.header')}
       icon={<RocketIcon color="#1F91D0" size={64} withShadow={false} />}
     >
       {/* Titre avec stroke bleu */}
       <View style={styles.titleWrapper}>
         <OutlinedText
-          text={"CRÉEZ VOTRE ENTREPRISE\nAVANT DE JOUER !"}
+          text={t('createStartupPrompt.title')}
           style={styles.title}
           outlineColor="#1F91D0"
           outlineWidth={1.5}
@@ -60,21 +63,21 @@ export const CreateStartupPromptPopup = memo(function CreateStartupPromptPopup({
 
       {/* Description */}
       <Text style={styles.description}>
-        Tirez 3 cartes d'inspiration et imaginez la prochaine licorne ouest-africaine en 5 minutes
+        {t('createStartupPrompt.description')}
       </Text>
 
       {/* Cartes d'inspiration */}
       <InspirationCards />
 
       {/* Légende cartes */}
-      <Text style={styles.cardsCaption}>Vos 3 cartes d'inspiration</Text>
+      <Text style={styles.cardsCaption}>{t('createStartupPrompt.cardsCaption')}</Text>
 
       {/* Bouton principal */}
       <View style={styles.buttonWrapper}>
         <GameButton
           variant="yellow"
           fullWidth
-          title="CRÉER MON ENTREPRISE"
+          title={t('createStartupPrompt.createButton')}
           onPress={onCreateStartup}
         />
       </View>

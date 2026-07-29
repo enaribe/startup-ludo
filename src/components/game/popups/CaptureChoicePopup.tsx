@@ -4,6 +4,7 @@ import Animated, { SlideInUp } from 'react-native-reanimated';
 import Svg, { G, Path, Text as SvgText } from 'react-native-svg';
 
 import { GameButton } from '@/components/ui/GameButton';
+import { useTranslation } from '@/i18n';
 import { Modal } from '@/components/ui/Modal';
 import { OutlinedText } from '@/components/ui/OutlinedText';
 import { COLORS } from '@/styles/colors';
@@ -24,19 +25,21 @@ const SAD_ICON = (
   </G>
 );
 
-// Label "ATTRAPÉ !" dans le header
-const ATTRAPE_LABEL = (
-  <SvgText
-    x="65"
-    y="50"
-    fill="white"
-    fontSize="22"
-    fontFamily="LuckiestGuy_400Regular"
-    letterSpacing="1"
-  >
-    ATTRAPÉ !
-  </SvgText>
-);
+// Label header (texte "ATTRAPÉ !" traduisible)
+function AttrapeLabel({ text }: { text: string }) {
+  return (
+    <SvgText
+      x="65"
+      y="50"
+      fill="white"
+      fontSize="22"
+      fontFamily="LuckiestGuy_400Regular"
+      letterSpacing="1"
+    >
+      {text}
+    </SvgText>
+  );
+}
 
 // Décoration droite (dés, repris du EventPopup)
 const DECOR_RIGHT = (
@@ -74,12 +77,12 @@ function CoinIcon({ color = '#71808E' }: { color?: string }) {
 }
 
 // ─── Header complet ──────────────────────────────────────────────────────────
-function AttrapeHeader() {
+function AttrapeHeader({ label }: { label: string }) {
   return (
     <PopupHeader
       color="#F35145"
       icon={SAD_ICON}
-      label={ATTRAPE_LABEL}
+      label={<AttrapeLabel text={label} />}
       decorRight={DECOR_RIGHT}
     />
   );
@@ -137,8 +140,9 @@ export const CaptureChoicePopup = memo(function CaptureChoicePopup({
   onChoice,
   handoffName,
 }: CaptureChoicePopupProps) {
+  const { t } = useTranslation();
   const tokensAvailable = captured?.tokens ?? 0;
-  const capturerName = capturer?.name ?? 'Un adversaire';
+  const capturerName = capturer?.name ?? t('captureChoice.defaultOpponent');
 
   const [selected, setSelected] = useState<'send_home' | 'steal_tokens'>('send_home');
 
@@ -154,17 +158,17 @@ export const CaptureChoicePopup = memo(function CaptureChoicePopup({
   return (
     <Modal visible={visible} onClose={() => {}} closeOnBackdrop={false} showCloseButton={false} bareContent>
       <Animated.View entering={SlideInUp.duration(280)} style={styles.card}>
-        <AttrapeHeader />
+        <AttrapeHeader label={t('captureChoice.header')} />
 
         <View style={styles.body}>
           {/* Passe-plat hot-seat : indique à qui donner l'appareil (local uniquement) */}
           {handoffName ? (
-            <Text style={styles.handoffHint}>📱 Passe le téléphone à {handoffName}</Text>
+            <Text style={styles.handoffHint}>{t('captureChoice.handoff', { name: handoffName })}</Text>
           ) : null}
 
           {/* Message principal en rouge — s'adresse à l'ATTRAPÉ */}
           <OutlinedText
-            text={`TU T'ES FAIT ATTRAPER PAR ${capturerName.toUpperCase()} !`}
+            text={t('captureChoice.caughtBy', { name: capturerName.toUpperCase() })}
             style={styles.subtitle}
             outlineColor="#AF2121"
             outlineWidth={1}
@@ -173,8 +177,11 @@ export const CaptureChoicePopup = memo(function CaptureChoicePopup({
           {/* Jetons que TU possèdes encore */}
           <Text style={styles.tokensLabel}>
             {tokensAvailable > 0
-              ? `Il te reste ${tokensAvailable} jeton${tokensAvailable > 1 ? 's' : ''} — à toi de choisir !`
-              : 'Tu n’as aucun jeton en poche.'}
+              ? t('captureChoice.tokensLeft', {
+                  count: tokensAvailable,
+                  token: t(tokensAvailable > 1 ? 'captureChoice.tokenPlural' : 'captureChoice.tokenSingular'),
+                })
+              : t('captureChoice.noTokens')}
           </Text>
           <View style={styles.tokensRow}>
             {tokenSlots.map((filled, i) => (
@@ -201,18 +208,21 @@ export const CaptureChoicePopup = memo(function CaptureChoicePopup({
           <View style={styles.optionsWrap}>
             <OptionCard
               icon={<HomeIcon />}
-              title="RENTRER À LA MAISON"
-              subtitle="Ton pion repart de zéro, tu gardes tes jetons"
+              title={t('captureChoice.goHomeTitle')}
+              subtitle={t('captureChoice.goHomeSubtitle')}
               selected={selected === 'send_home'}
               onPress={() => setSelected('send_home')}
             />
             <OptionCard
               icon={<CoinIcon />}
-              title="DONNER MES JETONS"
+              title={t('captureChoice.giveTokensTitle')}
               subtitle={
                 tokensAvailable > 0
-                  ? `Tu cèdes tes ${tokensAvailable} jeton${tokensAvailable > 1 ? 's' : ''}, ton pion reste en jeu`
-                  : 'Aucun jeton à donner'
+                  ? t('captureChoice.giveTokensSubtitle', {
+                      count: tokensAvailable,
+                      token: t(tokensAvailable > 1 ? 'captureChoice.tokenPlural' : 'captureChoice.tokenSingular'),
+                    })
+                  : t('captureChoice.giveTokensNone')
               }
               selected={selected === 'steal_tokens'}
               onPress={() => setSelected('steal_tokens')}
@@ -223,7 +233,7 @@ export const CaptureChoicePopup = memo(function CaptureChoicePopup({
           {/* Bouton CONTINUER */}
           <View style={styles.buttonWrap}>
             <GameButton
-              title="CONTINUER"
+              title={t('captureChoice.continue')}
               variant="yellow"
               fullWidth
               onPress={() => onChoice(selected)}

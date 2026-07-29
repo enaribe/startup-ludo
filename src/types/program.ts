@@ -7,6 +7,8 @@ export interface ProgramPartner {
   shortName: string;
   description: string;
   logoUrl?: string | null;
+  /** Logo secondaire affiché en haut à gauche de la carte partenaire de l'accueil (ex. co-partenaire). */
+  secondaryLogoUrl?: string | null;
   /** Image de fond de la carte partenaire sur l'accueil (visuel vertical avec bouton PARTICIPER). */
   bannerUrl?: string | null;
   /** PNG détouré (fond transparent) affiché à droite du header de l'écran partenaire, par-dessus le dégradé. */

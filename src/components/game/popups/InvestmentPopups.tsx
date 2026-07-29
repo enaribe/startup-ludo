@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { GameButton } from '@/components/ui';
 import { GamePopup } from '@/components/ui/GamePopup';
+import { useTranslation } from '@/i18n';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
@@ -33,6 +34,7 @@ export const InvestmentStakePickerPopup = memo(function InvestmentStakePickerPop
   onPick,
   onCancel,
 }: InvestmentStakePickerPopupProps) {
+  const { t } = useTranslation();
   const [pending, setPending] = useState<number | null>(null);
 
   useEffect(() => {
@@ -51,11 +53,18 @@ export const InvestmentStakePickerPopup = memo(function InvestmentStakePickerPop
       visible={visible}
       onRequestClose={onCancel}
       icon={<Ionicons name="trending-up" size={64} color={INVEST_COLOR} />}
-      title="INVESTISSEMENT"
-      header="Mise des jetons : gagne le double si tu marques des points à ton prochain tour, sinon tu les perds."
+      title={t('investment.title')}
+      header={t('investment.pickerHeader')}
       footer={
         <GameButton
-          title={pending != null ? `INVESTIR ${pending} JETON${pending > 1 ? 'S' : ''}` : 'ANNULER'}
+          title={
+            pending != null
+              ? t('investment.confirmInvest', {
+                  count: pending,
+                  token: pending > 1 ? t('investment.tokensUpper') : t('investment.tokenUpper'),
+                })
+              : t('investment.cancel')
+          }
           variant={pending != null ? 'yellow' : 'blue'}
           fullWidth
           onPress={handleConfirm}
@@ -73,9 +82,9 @@ export const InvestmentStakePickerPopup = memo(function InvestmentStakePickerPop
             >
               <Text style={[styles.stakeValue, selected && styles.stakeValueActive]}>{s}</Text>
               <Text style={[styles.stakeLabel, selected && styles.stakeLabelActive]}>
-                jeton{s > 1 ? 's' : ''}
+                {s > 1 ? t('investment.tokens') : t('investment.token')}
               </Text>
-              <Text style={styles.stakeGain}>→ {s * 2} si gagné</Text>
+              <Text style={styles.stakeGain}>{t('investment.ifWon', { amount: s * 2 })}</Text>
             </Pressable>
           );
         })}
@@ -101,6 +110,7 @@ export const InvestmentResultPopup = memo(function InvestmentResultPopup({
   gain,
   onClose,
 }: InvestmentResultPopupProps) {
+  const { t } = useTranslation();
   return (
     <GamePopup
       visible={visible}
@@ -112,13 +122,20 @@ export const InvestmentResultPopup = memo(function InvestmentResultPopup({
           color={won ? COLORS.success : COLORS.error}
         />
       }
-      title={won ? 'INVESTISSEMENT GAGNANT !' : 'INVESTISSEMENT PERDU'}
+      title={won ? t('investment.wonTitle') : t('investment.lostTitle')}
       header={
         won
-          ? `Ton pari de ${stake} jeton${stake > 1 ? 's' : ''} rapporte ${gain} jetons !`
-          : `Tu as perdu ta mise de ${stake} jeton${stake > 1 ? 's' : ''}.`
+          ? t('investment.wonHeader', {
+              stake,
+              token: stake > 1 ? t('investment.tokens') : t('investment.token'),
+              gain,
+            })
+          : t('investment.lostHeader', {
+              stake,
+              token: stake > 1 ? t('investment.tokens') : t('investment.token'),
+            })
       }
-      footer={<GameButton title="CONTINUER" variant="yellow" fullWidth onPress={onClose} />}
+      footer={<GameButton title={t('investment.continue')} variant="yellow" fullWidth onPress={onClose} />}
     />
   );
 });

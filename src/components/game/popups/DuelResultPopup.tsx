@@ -21,6 +21,7 @@ import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { SPACING, BORDER_RADIUS, SHADOWS } from '@/styles/spacing';
 import { useSettingsStore } from '@/stores';
 import { useSound, usePlaySoundOnOpen } from '@/hooks/useSound';
+import { useTranslation } from '@/i18n';
 import type { Player, DuelResult } from '@/types';
 
 interface DuelResultPopupProps {
@@ -46,6 +47,7 @@ export const DuelResultPopup = memo(function DuelResultPopup({
   waitingForName,
   onClose,
 }: DuelResultPopupProps) {
+  const { t } = useTranslation();
   const hapticsEnabled = useSettingsStore((state) => state.hapticsEnabled);
   const { play: playSound } = useSound();
   usePlaySoundOnOpen(visible && isWaitingForOpponent && !result, 'popup-open');
@@ -103,7 +105,7 @@ export const DuelResultPopup = memo(function DuelResultPopup({
                 <Avatar name={challenger.name} playerColor={challenger.color} size="md" showBorder />
               </View>
               <View style={styles.playerCardText}>
-                <Text style={styles.playerCardName} numberOfLines={1}>{challenger.startupName || 'Entreprise'}</Text>
+                <Text style={styles.playerCardName} numberOfLines={1}>{challenger.startupName || t('duelResult.company')}</Text>
                 <Text style={styles.playerCardSubtitle}>{challenger.name}</Text>
               </View>
             </Animated.View>
@@ -115,7 +117,7 @@ export const DuelResultPopup = memo(function DuelResultPopup({
                 <Avatar name={opponent.name} playerColor={opponent.color} size="md" showBorder />
               </View>
               <View style={styles.playerCardText}>
-                <Text style={styles.playerCardName} numberOfLines={1}>{opponent.startupName || 'Entreprise'}</Text>
+                <Text style={styles.playerCardName} numberOfLines={1}>{opponent.startupName || t('duelResult.company')}</Text>
                 <Text style={styles.playerCardSubtitle}>{opponent.name}</Text>
               </View>
             </Animated.View>
@@ -124,7 +126,7 @@ export const DuelResultPopup = memo(function DuelResultPopup({
               <View style={styles.waitingRow}>
                 <ActivityIndicator size="small" color={COLORS.warning} />
                 <Text style={styles.message}>
-                  {opponentName} est en train de répondre...
+                  {t('duelResult.waitingForAnswer', { name: opponentName })}
                 </Text>
               </View>
             </Animated.View>
@@ -152,7 +154,7 @@ export const DuelResultPopup = memo(function DuelResultPopup({
   const feedbackBorder = isDraw ? 'rgba(255,152,0,0.25)' : isWinner ? '#2ECC71' : '#F35145';
   const feedbackDividerColor = isDraw ? 'rgba(255,152,0,0.3)' : 'rgba(255,255,255,0.2)';
   const feedbackIcon = isDraw ? 'remove-circle' : isWinner ? 'trophy' : 'close-circle';
-  const feedbackLabel = isDraw ? 'ÉGALITÉ' : isWinner ? 'VOUS AVEZ GAGNÉ !' : 'VOUS AVEZ PERDU';
+  const feedbackLabel = isDraw ? t('duelResult.draw') : isWinner ? t('duelResult.youWon') : t('duelResult.youLost');
   const feedbackGradStart = isWinner ? '#2ECC71' : '#F35145';
   const feedbackGradEnd = isWinner ? '#1A9E50' : '#C0392B';
 
@@ -166,7 +168,7 @@ export const DuelResultPopup = memo(function DuelResultPopup({
               <Avatar name={challenger.name} playerColor={challenger.color} size="md" showBorder />
             </View>
             <View style={styles.playerCardText}>
-              <Text style={styles.playerCardName} numberOfLines={1}>{challenger.startupName || 'Entreprise'}</Text>
+              <Text style={styles.playerCardName} numberOfLines={1}>{challenger.startupName || t('duelResult.company')}</Text>
               <Text style={styles.playerCardSubtitle}>{challenger.name}</Text>
               <Text style={[styles.scoreLine, challengerWon && styles.scoreWinner]}>{result.challengerScore} pts</Text>
             </View>
@@ -179,7 +181,7 @@ export const DuelResultPopup = memo(function DuelResultPopup({
               <Avatar name={opponent.name} playerColor={opponent.color} size="md" showBorder />
             </View>
             <View style={styles.playerCardText}>
-              <Text style={styles.playerCardName} numberOfLines={1}>{opponent.startupName || 'Entreprise'}</Text>
+              <Text style={styles.playerCardName} numberOfLines={1}>{opponent.startupName || t('duelResult.company')}</Text>
               <Text style={styles.playerCardSubtitle}>{opponent.name}</Text>
               <Text style={[styles.scoreLine, opponentWon && styles.scoreWinner]}>{result.opponentScore} pts</Text>
             </View>
@@ -208,13 +210,13 @@ export const DuelResultPopup = memo(function DuelResultPopup({
             {/* Récompense */}
             <View style={styles.rewardRow}>
               <Text style={[styles.rewardText, { color: feedbackRewardColor }]}>
-                {currentPlayerReward > 0 ? `+${currentPlayerReward} jetons gagnés` : 'Aucun jeton gagné'}
+                {currentPlayerReward > 0 ? t('duelResult.tokensGained', { amount: currentPlayerReward }) : t('duelResult.noTokenGained')}
               </Text>
             </View>
           </Animated.View>
 
           <View style={styles.buttonWrapper}>
-            <GameButton title="Continuer" onPress={onClose} variant="yellow" fullWidth />
+            <GameButton title={t('duelResult.continue')} onPress={onClose} variant="yellow" fullWidth />
           </View>
         </View>
       </Animated.View>

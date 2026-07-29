@@ -25,10 +25,14 @@ import {
   ensureUsernameForUser,
   type UserProfile,
 } from '@/services/firebase';
+import Constants from 'expo-constants';
+import { registerPushToken, unregisterPushToken } from '@/services/firebase/pushTokenService';
 import { useUserStore } from './useUserStore';
 import { useSocialStore } from './useSocialStore';
 import { useProgramStore } from './useProgramStore';
+import { useSettingsStore } from './useSettingsStore';
 import { clearLeaderboardCache } from '@/hooks/useLeaderboardCache';
+import { identifyUser, clearIdentity } from '@/services/analytics';
 
 interface AuthState {
   user: User | null;
@@ -144,6 +148,22 @@ export const useAuthStore = create<AuthStore>()(
               state.isLoading = false;
               state.isInitialized = true;
             });
+
+            // Customer.io : identifier le joueur pour le tracking et les campagnes.
+            // `language` permet de servir les textes de notifs dans la bonne langue.
+            identifyUser(authUser.id, {
+              email: authUser.email ?? undefined,
+              name: authUser.displayName ?? undefined,
+              is_guest: authUser.isAnonymous,
+              language: useSettingsStore.getState().language,
+              app_version: Constants.expoConfig?.version,
+            });
+
+            // Notifications directes (FCM pur, hors Customer.io) : rafraîchir le
+            // token du device si la permission est déjà accordée. No-op sinon.
+            if (!authUser.isAnonymous) {
+              registerPushToken(authUser.id);
+            }
 
             // Load user profile from Firestore
             // Load social data (non-bloquant)
@@ -549,6 +569,14 @@ export const useAuthStore = create<AuthStore>()(
         });
 
         try {
+          // Retirer le token push de ce device AVANT le signOut (écriture authentifiée) :
+          // le prochain compte sur ce téléphone ne recevra pas les notifs de l'ancien.
+          const currentUserId = _get().user?.id;
+          if (currentUserId) {
+            await unregisterPushToken(currentUserId);
+          }
+          // Customer.io : oublier l'utilisateur avant la déconnexion
+          clearIdentity();
           // Sign out from Google if signed in
           await signOutFromGoogle();
           // Sign out from Firebase
@@ -574,6 +602,8 @@ export const useAuthStore = create<AuthStore>()(
         });
 
         try {
+          // Customer.io : oublier l'utilisateur avant la suppression
+          clearIdentity();
           // Delete user account from Firebase
           await firebaseDeleteAccount();
           // Clear local state

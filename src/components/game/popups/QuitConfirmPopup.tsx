@@ -8,6 +8,7 @@ import { COLORS } from '@/styles/colors';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { SPACING, BORDER_RADIUS, SHADOWS } from '@/styles/spacing';
 import { usePlaySoundOnOpen } from '@/hooks/useSound';
+import { useTranslation } from '@/i18n';
 
 interface QuitConfirmPopupProps {
   visible: boolean;
@@ -22,6 +23,7 @@ export const QuitConfirmPopup = memo(function QuitConfirmPopup({
   onConfirm,
   isOnline = false,
 }: QuitConfirmPopupProps) {
+  const { t } = useTranslation();
   usePlaySoundOnOpen(visible, 'popup-open');
 
   return (
@@ -40,14 +42,14 @@ export const QuitConfirmPopup = memo(function QuitConfirmPopup({
           </View>
 
           {/* Titre */}
-          <Text style={styles.title}>QUITTER ?</Text>
+          <Text style={styles.title}>{t('quitConfirm.title')}</Text>
 
           {/* Description */}
           <View style={styles.descriptionBox}>
             <Text style={styles.description}>
               {isOnline
-                ? 'Si tu quittes, tu perds la partie par forfait.'
-                : 'Ta progression sera perdue si tu quittes maintenant.'}
+                ? t('quitConfirm.descriptionOnline')
+                : t('quitConfirm.descriptionOffline')}
             </Text>
           </View>
 
@@ -55,7 +57,7 @@ export const QuitConfirmPopup = memo(function QuitConfirmPopup({
           <View style={styles.buttonRow}>
             <View style={styles.buttonWrapper}>
               <GameButton
-                title="Annuler"
+                title={t('quitConfirm.cancel')}
                 onPress={onCancel}
                 variant="blue"
                 fullWidth
@@ -63,7 +65,7 @@ export const QuitConfirmPopup = memo(function QuitConfirmPopup({
             </View>
             <View style={styles.buttonWrapper}>
               <GameButton
-                title="Quitter"
+                title={t('quitConfirm.confirm')}
                 onPress={onConfirm}
                 variant="red"
                 fullWidth

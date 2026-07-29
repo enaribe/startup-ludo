@@ -59,6 +59,9 @@ export const FIRESTORE_COLLECTIONS = {
   programSessions: 'programSessions',
   ideationCards: 'ideationCards',
   partnershipApplications: 'partnershipApplications',
+  appConfig: 'appConfig',
+  pushTokens: 'pushTokens',
+  savedOpportunities: 'savedOpportunities',
 } as const;
 
 // ===== ERROR HANDLING =====

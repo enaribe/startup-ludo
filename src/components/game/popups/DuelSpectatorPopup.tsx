@@ -15,6 +15,7 @@ import { COLORS } from '@/styles/colors';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { SPACING, BORDER_RADIUS, SHADOWS } from '@/styles/spacing';
 import { usePlaySoundOnOpen } from '@/hooks/useSound';
+import { useTranslation } from '@/i18n';
 import type { Player } from '@/types';
 
 interface DuelSpectatorPopupProps {
@@ -45,6 +46,7 @@ export const DuelSpectatorPopup = memo(function DuelSpectatorPopup({
   opponentAnswered = 0,
   totalQuestions = 3,
 }: DuelSpectatorPopupProps) {
+  const { t } = useTranslation();
   usePlaySoundOnOpen(visible, 'popup-open');
 
   const pulseAnim = useSharedValue(1);
@@ -76,7 +78,7 @@ export const DuelSpectatorPopup = memo(function DuelSpectatorPopup({
         <View style={styles.content}>
           {/* Bandeau spectateur */}
           <View style={styles.spectatorBadge}>
-            <Text style={styles.spectatorBadgeText}>MODE SPECTATEUR</Text>
+            <Text style={styles.spectatorBadgeText}>{t('duelSpectator.spectatorMode')}</Text>
           </View>
 
           {/* VS Section avec scores live */}
@@ -96,7 +98,7 @@ export const DuelSpectatorPopup = memo(function DuelSpectatorPopup({
                 <Text style={styles.scoreChipValue}>{challengerScore}</Text>
               </View>
               <Text style={styles.answeredText}>
-                {challengerAnswered}/{totalQuestions} répondu
+                {t('duelSpectator.answered', { answered: challengerAnswered, total: totalQuestions })}
               </Text>
             </View>
 
@@ -120,7 +122,7 @@ export const DuelSpectatorPopup = memo(function DuelSpectatorPopup({
                 <Text style={styles.scoreChipValue}>{opponentScore}</Text>
               </View>
               <Text style={styles.answeredText}>
-                {opponentAnswered}/{totalQuestions} répondu
+                {t('duelSpectator.answered', { answered: opponentAnswered, total: totalQuestions })}
               </Text>
             </View>
           </View>
@@ -129,7 +131,7 @@ export const DuelSpectatorPopup = memo(function DuelSpectatorPopup({
           <View style={styles.messageBox}>
             <ActivityIndicator size="small" color={COLORS.success} style={styles.loader} />
             <Text style={styles.message}>
-              Duel en cours...
+              {t('duelSpectator.inProgress')}
             </Text>
           </View>
         </View>

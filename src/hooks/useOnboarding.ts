@@ -22,6 +22,7 @@ export function useOnboarding() {
   const isGuest = useAuthStore((state) => state.user?.isGuest ?? true);
   const [visible, setVisible] = useState(false);
   const checkedRef = useRef(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!profile) return;
@@ -33,16 +34,22 @@ export function useOnboarding() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile, isGuest]);
 
+  // Annule un éventuel setVisible(true) différé si l'écran est démonté
+  // (évite un popup fantôme qui bloquerait les taps au retour).
+  useEffect(() => () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+  }, []);
+
   const checkAndShow = async () => {
     try {
       const completed = await AsyncStorage.getItem(STORAGE_KEY);
       if (!completed) {
         // Petit délai pour laisser le home s'afficher d'abord
-        setTimeout(() => setVisible(true), 600);
+        timerRef.current = setTimeout(() => setVisible(true), 600);
       }
     } catch {
       // En cas d'erreur, on affiche quand même l'onboarding
-      setTimeout(() => setVisible(true), 600);
+      timerRef.current = setTimeout(() => setVisible(true), 600);
     }
   };
 

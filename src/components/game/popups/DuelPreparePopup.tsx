@@ -6,6 +6,7 @@ import { COLORS } from '@/styles/colors';
 import { BORDER_RADIUS, SHADOWS, SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { usePlaySoundOnOpen } from '@/hooks/useSound';
+import { useTranslation } from '@/i18n';
 import type { Player } from '@/types';
 import { memo, useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -31,6 +32,7 @@ export const DuelPreparePopup = memo(function DuelPreparePopup({
   isOnline = false,
   onStart,
 }: DuelPreparePopupProps) {
+  const { t } = useTranslation();
   usePlaySoundOnOpen(visible && !!challenger && !!opponent, 'popup-open');
 
   useEffect(() => {
@@ -62,8 +64,8 @@ export const DuelPreparePopup = memo(function DuelPreparePopup({
     : (!isOnline || isCurrentPlayerOpponent);
 
   const message = isMyTurn
-    ? 'Prépare-toi à répondre\naux 3 questions !'
-    : `C'est au tour de\n${activePlayer.name}`;
+    ? t('duelPrepare.getReady')
+    : t('duelPrepare.turnOf', { name: activePlayer.name });
 
   return (
     <Modal
@@ -84,7 +86,7 @@ export const DuelPreparePopup = memo(function DuelPreparePopup({
                   <Avatar name={challenger.name} playerColor={challenger.color} size="md" showBorder />
                 </View>
                 <View style={styles.playerCardText}>
-                  <Text style={styles.playerCardName} numberOfLines={1}>{challenger.startupName || 'Entreprise'}</Text>
+                  <Text style={styles.playerCardName} numberOfLines={1}>{challenger.startupName || t('duelPrepare.companyFallback')}</Text>
                   <Text style={styles.playerCardSubtitle}>{challenger.name}</Text>
                 </View>
               </Animated.View>
@@ -96,7 +98,7 @@ export const DuelPreparePopup = memo(function DuelPreparePopup({
                   <Avatar name={opponent.name} playerColor={opponent.color} size="md" showBorder />
                 </View>
                 <View style={styles.playerCardText}>
-                  <Text style={styles.playerCardName} numberOfLines={1}>{opponent.startupName || 'Entreprise'}</Text>
+                  <Text style={styles.playerCardName} numberOfLines={1}>{opponent.startupName || t('duelPrepare.companyFallback')}</Text>
                   <Text style={styles.playerCardSubtitle}>{opponent.name}</Text>
                 </View>
               </Animated.View>
@@ -110,7 +112,7 @@ export const DuelPreparePopup = memo(function DuelPreparePopup({
                 <Avatar name={activePlayer.name} playerColor={activePlayer.color} size="md" showBorder />
               </View>
               <View style={styles.playerCardText}>
-                <Text style={styles.playerCardName} numberOfLines={1}>{activePlayer.startupName || 'Entreprise'}</Text>
+                <Text style={styles.playerCardName} numberOfLines={1}>{activePlayer.startupName || t('duelPrepare.companyFallback')}</Text>
                 <Text style={styles.playerCardSubtitle}>{activePlayer.name}</Text>
               </View>
             </View>
@@ -124,7 +126,7 @@ export const DuelPreparePopup = memo(function DuelPreparePopup({
           {/* Bouton Commencer — gradient jaune/orange (design system: variant yellow) */}
           {isMyTurn && (
             <View style={styles.buttonWrapper}>
-              <GameButton title="Commencer" onPress={handleStart} variant="yellow" fullWidth />
+              <GameButton title={t('duelPrepare.start')} onPress={handleStart} variant="yellow" fullWidth />
             </View>
           )}
         </View>

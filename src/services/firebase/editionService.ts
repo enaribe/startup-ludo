@@ -38,6 +38,7 @@ export async function fetchEditionsFromFirestore(): Promise<Record<EditionId, Ed
         startupIdeas: data.startupIdeas || [],
         defaultProjects: data.defaultProjects || [],
         translations: data.translations || {},
+        sponsor: data.sponsor || null,
       } as Edition;
     });
 

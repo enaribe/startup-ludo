@@ -20,7 +20,8 @@ import { DynamicGradientBorder, GameButton, Modal, RadialBackground } from '@/co
 import { Avatar } from '@/components/ui/Avatar';
 import { EditionTileIcon } from '@/components/icons';
 import { getDefaultProjectsForEdition, getMatchingUserStartups } from '@/data/defaultProjects';
-import { getLocalizedEdition } from '@/data/types';
+import { getLocalizedEdition, type Edition } from '@/data/types';
+import { SponsoredEditionPopup } from '@/components/game/popups';
 import { useEditions } from '@/hooks';
 import { useMultiplayer } from '@/hooks/useMultiplayer';
 import { useTranslation } from '@/i18n';
@@ -98,6 +99,10 @@ export default function CreateRoomScreen() {
   const [maxPlayers, setMaxPlayers] = useState<string>('4');
   // Édition choisie par l'hôte (parcours normal). Pré-remplie via params.challenge sinon 'classic'.
   const [selectedEdition, setSelectedEdition] = useState(params.challenge || 'classic');
+  // Édition sponsorisée en attente de confirmation (popup « JOUER »).
+  // Le modal de sélection est fermé AVANT d'ouvrir ce popup : jamais deux
+  // modales natives empilées (bug Android : taps avalés).
+  const [sponsorEdition, setSponsorEdition] = useState<Edition | null>(null);
   // Liste réactive : se met à jour dès que les éditions Firestore sont chargées.
   const editionList = useEditions();
   const selectedEditionData = useMemo(
@@ -523,8 +528,14 @@ export default function CreateRoomScreen() {
                   key={edition.id}
                   onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setSelectedEdition(edition.id);
-                    setShowEditionModal(false);
+                    if (edition.sponsor?.enabled && edition.sponsor.imageUrl) {
+                      // Édition sponsorisée → fermer ce modal puis afficher le popup sponsor
+                      setShowEditionModal(false);
+                      setSponsorEdition(edition);
+                    } else {
+                      setSelectedEdition(edition.id);
+                      setShowEditionModal(false);
+                    }
                   }}
                   style={styles.editionGridItem}
                 >
@@ -567,6 +578,20 @@ export default function CreateRoomScreen() {
             })}
           </ScrollView>
         </Modal>
+
+        {/* Popup édition sponsorisée : « JOUER » valide le choix */}
+        {sponsorEdition?.sponsor ? (
+          <SponsoredEditionPopup
+            visible
+            editionName={getLocalizedEdition(sponsorEdition, language).name.replace(/^Édition\s+/i, '')}
+            sponsor={sponsorEdition.sponsor}
+            onPlay={() => {
+              setSelectedEdition(sponsorEdition.id);
+              setSponsorEdition(null);
+            }}
+            onDismiss={() => setSponsorEdition(null)}
+          />
+        ) : null}
       </View>
     );
   }

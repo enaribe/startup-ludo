@@ -56,6 +56,10 @@ export interface GeneratedFundingEvent {
     type: 'investisseur' | 'subvention' | 'crowdfunding' | 'concours' | 'partenariat';
     amount: number;
     rarity: 'common' | 'rare' | 'epic' | 'legendary';
+    /** Carte sponsor (édition sponsorisée) : habillage dédié avec logo. */
+    sponsored?: boolean;
+    sponsorLogoUrl?: string;
+    sponsorLinkUrl?: string;
   };
 }
 
@@ -78,6 +82,10 @@ export interface GeneratedOpportunityEvent {
     effect: 'tokens' | 'extraTurn' | 'shield' | 'boost';
     value: number;
     rarity: 'common' | 'rare' | 'epic' | 'legendary';
+    /** Carte sponsor (édition sponsorisée) : habillage dédié avec logo. */
+    sponsored?: boolean;
+    sponsorLogoUrl?: string;
+    sponsorLinkUrl?: string;
   };
 }
 
@@ -120,6 +128,12 @@ const DEFAULT_QUIZ_CONFIG = {
 
 const FUNDING_TYPES = ['investisseur', 'subvention', 'crowdfunding', 'concours', 'partenariat'] as const;
 
+/**
+ * Probabilité qu'une case opportunité/financement tire une carte SPONSOR
+ * (édition sponsorisée uniquement, tant qu'il reste des cartes non vues).
+ */
+const SPONSOR_EVENT_CHANCE = 0.25;
+
 // ===== CLASSE PRINCIPALE =====
 
 export class EventManager {
@@ -128,6 +142,7 @@ export class EventManager {
   private usedFundingIds: Set<string> = new Set();
   private usedOpportunityIds: Set<string> = new Set();
   private usedChallengeIds: Set<string> = new Set();
+  private usedSponsorCardIds: Set<string> = new Set();
   // Mémoire des DERNIERS ids montrés par Set (partagée par référence du Set).
   // Sert à éviter qu'un contenu juste vu ressorte immédiatement après un
   // recyclage (pool épuisé — cas fréquent quand le pion refait un tour de plateau).
@@ -213,8 +228,27 @@ export class EventManager {
     this.usedFundingIds.clear();
     this.usedOpportunityIds.clear();
     this.usedChallengeIds.clear();
+    this.usedSponsorCardIds.clear();
     // Repart d'une mémoire « récents » vierge pour la nouvelle partie/niveau.
     this.recentIds = new WeakMap();
+  }
+
+  /**
+   * Tire éventuellement une carte SPONSOR (édition sponsorisée) :
+   * ~SPONSOR_EVENT_CHANCE de chance, anti-doublon sur la partie.
+   * Retourne null si l'édition n'est pas sponsorisée, si toutes les cartes
+   * ont été vues, ou si le tirage tombe sur le contenu normal.
+   */
+  private pickSponsorCard(kind: 'opportunity' | 'funding') {
+    const sponsor = getEdition(this.editionId).sponsor;
+    if (!sponsor?.enabled) return null;
+    const pool = (kind === 'funding' ? sponsor.fundings : sponsor.opportunities) ?? [];
+    const available = pool.filter((card) => card.text && !this.usedSponsorCardIds.has(card.id));
+    if (available.length === 0) return null;
+    if (Math.random() >= SPONSOR_EVENT_CHANCE) return null;
+    const card = available[Math.floor(Math.random() * available.length)]!;
+    this.usedSponsorCardIds.add(card.id);
+    return card;
   }
 
   /**
@@ -375,6 +409,26 @@ export class EventManager {
    * Génère un financement aléatoire (évite les doublons)
    */
   generateFundingEvent(): GeneratedFundingEvent | null {
+    // Édition sponsorisée : ~25 % de chance de tirer un financement sponsor
+    const sponsorCard = this.pickSponsorCard('funding');
+    if (sponsorCard) {
+      const amount = sponsorCard.tokens ?? FIXED_POINTS.funding;
+      return {
+        type: 'funding',
+        data: {
+          id: sponsorCard.id,
+          name: '',
+          description: sponsorCard.text,
+          type: 'partenariat',
+          amount,
+          rarity: this.inferRarity(amount),
+          sponsored: true,
+          sponsorLogoUrl: sponsorCard.logoUrl || undefined,
+          sponsorLinkUrl: sponsorCard.linkUrl || undefined,
+        },
+      };
+    }
+
     const pool = this.contentPack?.fundings.length
       ? this.contentPack.fundings
       : getEdition(this.editionId).fundings;
@@ -468,6 +522,26 @@ export class EventManager {
    * Génère une opportunité aléatoire (évite les doublons)
    */
   generateOpportunityEvent(): GeneratedOpportunityEvent | null {
+    // Édition sponsorisée : ~25 % de chance de tirer une opportunité sponsor
+    const sponsorCard = this.pickSponsorCard('opportunity');
+    if (sponsorCard) {
+      const value = sponsorCard.tokens ?? FIXED_POINTS.opportunity;
+      return {
+        type: 'opportunity',
+        data: {
+          id: sponsorCard.id,
+          title: '',
+          description: sponsorCard.text,
+          effect: 'tokens',
+          value,
+          rarity: this.inferRarity(value),
+          sponsored: true,
+          sponsorLogoUrl: sponsorCard.logoUrl || undefined,
+          sponsorLinkUrl: sponsorCard.linkUrl || undefined,
+        },
+      };
+    }
+
     const pool = this.contentPack?.opportunities.length
       ? this.contentPack.opportunities
       : getEdition(this.editionId).opportunities;

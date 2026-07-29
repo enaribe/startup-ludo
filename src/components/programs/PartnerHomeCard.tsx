@@ -11,33 +11,29 @@ import type { ProgramPartner } from '@/types/program';
 
 interface PartnerHomeCardProps {
   partner: ProgramPartner;
-  programCount: number;
   playerCount: number;
   onPress?: () => void;
 }
 
 export const PartnerHomeCard = memo(function PartnerHomeCard({
   partner,
-  programCount,
   playerCount,
   onPress,
 }: PartnerHomeCardProps) {
-  const parcoursLabel = programCount > 1 ? 'parcours actifs' : 'parcours actif';
-
   const overlay = (
     <View style={styles.overlay}>
       <View style={styles.topRow}>
+        <View style={styles.secondaryLogoBlock}>
+          {partner.secondaryLogoUrl ? (
+            <Image source={{ uri: partner.secondaryLogoUrl }} style={styles.secondaryLogo} resizeMode="contain" />
+          ) : null}
+        </View>
         <View style={styles.partnershipBlock}>
-          <Text style={styles.partnershipText}>En partenariat avec</Text>
           {partner.logoUrl ? (
             <Image source={{ uri: partner.logoUrl }} style={styles.partnerLogo} resizeMode="contain" />
           ) : (
             <Text style={styles.partnerShortName}>{partner.shortName}</Text>
           )}
-        </View>
-        <View style={styles.activeBadge}>
-          <View style={styles.activeDot} />
-          <Text style={styles.activeBadgeText}>{programCount} {parcoursLabel}</Text>
         </View>
       </View>
 
@@ -105,22 +101,22 @@ const styles = StyleSheet.create({
   topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  secondaryLogoBlock: {
     alignItems: 'flex-start',
+  },
+  secondaryLogo: {
+    width: 84,
+    height: 52,
   },
   partnershipBlock: {
     gap: 6,
-  },
-  partnershipText: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: 11,
-    color: COLORS.white,
-    textShadowColor: 'rgba(0,0,0,0.45)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+    alignItems: 'flex-end',
   },
   partnerLogo: {
-    width: 84,
-    height: 52,
+    width: 60,
+    height: 38,
   },
   partnerShortName: {
     fontFamily: FONTS.title,
@@ -129,26 +125,6 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.45)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
-  },
-  activeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    backgroundColor: COLORS.white,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 20,
-  },
-  activeDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: COLORS.info,
-  },
-  activeBadgeText: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: 12,
-    color: '#132840',
   },
   centerBlock: {
     alignItems: 'center',

@@ -13,5 +13,14 @@
     "resolveJsonModule": true
   },
   "compileOnSave": true,
-  "include": ["src"]
+  "include": ["src"],
+  // Callables legacy jamais déployés ni appelés par l'app (les rooms sont gérées
+  // côté client via Realtime DB) : écrits en style v2 avec l'API v1, ils ne
+  // compilent pas. Exclus du build en attendant une éventuelle réécriture.
+  "exclude": [
+    "src/game/createRoom.ts",
+    "src/game/joinRoom.ts",
+    "src/game/processGameAction.ts",
+    "src/user/updateStats.ts"
+  ]
 }

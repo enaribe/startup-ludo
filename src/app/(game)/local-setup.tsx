@@ -21,8 +21,9 @@ import { useTranslation } from '@/i18n';
 import { EditionTileIcon } from '@/components/icons';
 import { RadialBackground, DynamicGradientBorder, GameButton } from '@/components/ui';
 import { StartupSelectionModal } from '@/components/game/StartupSelectionModal';
+import { SponsoredEditionPopup } from '@/components/game/popups';
 import { getDefaultProjectsForEdition, getMatchingUserStartups } from '@/data/defaultProjects';
-import { getLocalizedEdition } from '@/data/types';
+import { getLocalizedEdition, type Edition } from '@/data/types';
 import { useEditions } from '@/hooks';
 import type { PlayerColor } from '@/types';
 
@@ -250,6 +251,8 @@ export default function LocalSetupScreen() {
     { name: t('game.ai'), color: 'blue', isAI: true },
   ]);
   const [selectedEdition, setSelectedEdition] = useState('classic');
+  // Édition sponsorisée en attente de confirmation (popup « JOUER »)
+  const [sponsorEdition, setSponsorEdition] = useState<Edition | null>(null);
 
   // Step 3: Ideation
   const [startupSelections, setStartupSelections] = useState<Record<number, StartupSelection>>({});
@@ -337,12 +340,15 @@ export default function LocalSetupScreen() {
 
   // Auto-select pour les IA quand on entre dans le step 3
   // On tire sans remise pour éviter que deux IA prennent la même entreprise.
-  const autoSelectAI = useCallback(() => {
+  // `projectsPool` permet de passer les projets d'une édition qui vient d'être
+  // choisie dans le même tick (le mémo `defaultProjects` serait encore périmé).
+  const autoSelectAI = useCallback((projectsPool?: typeof defaultProjects) => {
+    const sourceProjects = projectsPool ?? defaultProjects;
     const newSelections: Record<number, StartupSelection> = {};
     const takenIds = new Set<string>();
     players.forEach((player, index) => {
       if (player.isAI) {
-        const pool = defaultProjects.filter((p) => !takenIds.has(p.id));
+        const pool = sourceProjects.filter((p) => !takenIds.has(p.id));
         if (pool.length === 0) return;
         const randomProject = pool[Math.floor(Math.random() * pool.length)]!;
         newSelections[index] = {
@@ -406,6 +412,16 @@ export default function LocalSetupScreen() {
     } else {
       handleStartGame();
     }
+  };
+
+  // Choix d'édition (step 2) : taper une édition valide le choix ET avance
+  // directement au step 3 (plus de bouton « SUIVANT » en bas sur cet écran).
+  // On passe les projets de l'édition fraîchement choisie à autoSelectAI car
+  // le mémo `defaultProjects` n'est pas encore recalculé dans ce tick.
+  const advanceWithEdition = (editionId: string) => {
+    setSelectedEdition(editionId);
+    setStep(3);
+    autoSelectAI(getDefaultProjectsForEdition(editionId));
   };
 
   const handleStartGame = () => {
@@ -724,7 +740,15 @@ export default function LocalSetupScreen() {
                     style={styles.editionGridItem}
                   >
                     <Pressable
-                      onPress={() => setSelectedEdition(edition.id)}
+                      onPress={() => {
+                        // Édition sponsorisée → popup sponsor, « SUIVANT » valide et avance.
+                        // Sinon → le tap valide le choix et avance directement.
+                        if (edition.sponsor?.enabled && edition.sponsor.imageUrl) {
+                          setSponsorEdition(edition);
+                        } else {
+                          advanceWithEdition(edition.id);
+                        }
+                      }}
                       style={styles.editionGridItemPress}
                     >
                       <DynamicGradientBorder
@@ -953,16 +977,35 @@ export default function LocalSetupScreen() {
         );
       })()}
 
-      {/* Bouton fixe en bas (sans fond) */}
-      <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
-        <GameButton
-          variant="yellow"
-          fullWidth
-          title={buttonText.toUpperCase()}
-          onPress={handleNext}
-          disabled={isNextDisabled}
+      {/* Popup édition sponsorisée : « SUIVANT » valide le choix et avance */}
+      {sponsorEdition?.sponsor ? (
+        <SponsoredEditionPopup
+          visible
+          editionName={getLocalizedEdition(sponsorEdition, language).name.replace(/^Édition\s+/i, '')}
+          sponsor={sponsorEdition.sponsor}
+          buttonTitle={t('common.next')}
+          onPlay={() => {
+            const editionId = sponsorEdition.id;
+            setSponsorEdition(null);
+            advanceWithEdition(editionId);
+          }}
+          onDismiss={() => setSponsorEdition(null)}
         />
-      </View>
+      ) : null}
+
+      {/* Bouton fixe en bas (sans fond) — masqué au step 2 : le choix
+          d'édition avance directement (ou via le popup sponsor) */}
+      {step !== 2 && (
+        <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
+          <GameButton
+            variant="yellow"
+            fullWidth
+            title={buttonText.toUpperCase()}
+            onPress={handleNext}
+            disabled={isNextDisabled}
+          />
+        </View>
+      )}
     </View>
   );
 }

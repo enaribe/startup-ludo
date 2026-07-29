@@ -6,6 +6,7 @@ import { G, Path, Text as SvgText } from 'react-native-svg';
 import { GameButton } from '@/components/ui/GameButton';
 import { Modal } from '@/components/ui/Modal';
 import { OutlinedText } from '@/components/ui/OutlinedText';
+import { useTranslation } from '@/i18n';
 import { COLORS } from '@/styles/colors';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { SPACING, BORDER_RADIUS, SHADOWS } from '@/styles/spacing';
@@ -24,7 +25,7 @@ const SAD_ICON = (
 );
 
 // Label "RETOUR AU BERCAIL" dans le header
-const ECHEC_LABEL = (
+const makeEchecLabel = (text: string) => (
   <SvgText
     x="65"
     y="50"
@@ -33,7 +34,7 @@ const ECHEC_LABEL = (
     fontFamily="LuckiestGuy_400Regular"
     letterSpacing="1"
   >
-    RETOUR AU BERCAIL
+    {text}
   </SvgText>
 );
 
@@ -45,12 +46,12 @@ const DECOR_RIGHT = (
   </>
 );
 
-function EchecHeader() {
+function EchecHeader({ label }: { label: string }) {
   return (
     <PopupHeader
       color="#F35145"
       icon={SAD_ICON}
-      label={ECHEC_LABEL}
+      label={makeEchecLabel(label)}
       decorRight={DECOR_RIGHT}
     />
   );
@@ -58,51 +59,21 @@ function EchecHeader() {
 
 // ─── Scénarios narratifs ─────────────────────────────────────────────────────
 interface FailureScenario {
-  title: string;
-  description: string;
+  titleKey: string;
+  descriptionKey: string;
 }
 
 const FAILURE_SCENARIOS: FailureScenario[] = [
-  {
-    title: 'FAILLITE',
-    description: "Ta trésorerie est à sec. Les banques ont coupé les vivres et les fournisseurs réclament leur dû. Retour à la case départ.",
-  },
-  {
-    title: 'LIQUIDATION JUDICIAIRE',
-    description: "Le tribunal de commerce a prononcé la liquidation. Les actifs sont vendus, les équipes dispersées. Il faut tout recommencer.",
-  },
-  {
-    title: 'CESSATION DE PAIEMENT',
-    description: "Impossible de payer les salaires ce mois-ci. L'aventure s'arrête brutalement et tu repars de zéro.",
-  },
-  {
-    title: 'PIVOT RATÉ',
-    description: "Ton changement de stratégie n'a pas convaincu le marché. Les clients sont partis, les investisseurs aussi. Retour au point de départ.",
-  },
-  {
-    title: "RUPTURE D'ASSOCIÉS",
-    description: "Ton co-fondateur est parti avec la moitié de l'équipe. L'entreprise n'a pas survécu à la rupture.",
-  },
-  {
-    title: 'MARCHÉ INEXISTANT',
-    description: "Tu as construit un produit dont personne ne veut. Le marché n'était qu'une illusion. Il faut repartir de zéro.",
-  },
-  {
-    title: 'BURN-OUT DU FONDATEUR',
-    description: "Épuisé, tu dois mettre l'entreprise en pause. Le temps que tu récupères, il faut tout reconstruire.",
-  },
-  {
-    title: 'ATTAQUE CONCURRENTIELLE',
-    description: "Un géant du secteur a copié ton produit et écrasé ton marché. Ton entreprise ne s'en remet pas.",
-  },
-  {
-    title: 'PERTE DU CLIENT CLÉ',
-    description: "Ton plus gros client a résilié son contrat. Sans lui, la structure ne tient plus. Retour au départ.",
-  },
-  {
-    title: 'LEVÉE DE FONDS RATÉE',
-    description: "Aucun investisseur n'a voulu suivre ce round. Les liquidités sont épuisées, l'aventure s'arrête.",
-  },
+  { titleKey: 'captureFailure.scenario1Title', descriptionKey: 'captureFailure.scenario1Description' },
+  { titleKey: 'captureFailure.scenario2Title', descriptionKey: 'captureFailure.scenario2Description' },
+  { titleKey: 'captureFailure.scenario3Title', descriptionKey: 'captureFailure.scenario3Description' },
+  { titleKey: 'captureFailure.scenario4Title', descriptionKey: 'captureFailure.scenario4Description' },
+  { titleKey: 'captureFailure.scenario5Title', descriptionKey: 'captureFailure.scenario5Description' },
+  { titleKey: 'captureFailure.scenario6Title', descriptionKey: 'captureFailure.scenario6Description' },
+  { titleKey: 'captureFailure.scenario7Title', descriptionKey: 'captureFailure.scenario7Description' },
+  { titleKey: 'captureFailure.scenario8Title', descriptionKey: 'captureFailure.scenario8Description' },
+  { titleKey: 'captureFailure.scenario9Title', descriptionKey: 'captureFailure.scenario9Description' },
+  { titleKey: 'captureFailure.scenario10Title', descriptionKey: 'captureFailure.scenario10Description' },
 ];
 
 function pickRandomScenario(seed?: number): FailureScenario {
@@ -125,17 +96,18 @@ export const CaptureFailurePopup = memo(function CaptureFailurePopup({
   seed,
   onContinue,
 }: CaptureFailurePopupProps) {
+  const { t } = useTranslation();
   const scenario = useMemo(() => pickRandomScenario(seed), [seed, visible]);
 
   return (
     <Modal visible={visible} onClose={onContinue} closeOnBackdrop={false} showCloseButton={false} bareContent>
       <Animated.View entering={SlideInUp.duration(280)} style={styles.card}>
-        <EchecHeader />
+        <EchecHeader label={t('captureFailure.headerLabel')} />
 
         <View style={styles.body}>
           {/* Titre du scénario en rouge */}
           <OutlinedText
-            text={scenario.title}
+            text={t(scenario.titleKey)}
             style={styles.scenarioTitle}
             outlineColor="#AF2121"
             outlineWidth={1}
@@ -143,13 +115,13 @@ export const CaptureFailurePopup = memo(function CaptureFailurePopup({
 
           {/* Description */}
           <View style={styles.descriptionBox}>
-            <Text style={styles.description}>{scenario.description}</Text>
+            <Text style={styles.description}>{t(scenario.descriptionKey)}</Text>
           </View>
 
           {/* Bouton RECOMMENCER */}
           <View style={styles.buttonWrap}>
             <GameButton
-              title="RECOMMENCER"
+              title={t('captureFailure.restart')}
               variant="yellow"
               fullWidth
               onPress={onContinue}

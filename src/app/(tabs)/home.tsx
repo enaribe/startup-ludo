@@ -14,12 +14,13 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
-import { CreateStartupPromptPopup, OnboardingModal, ReturnBonusPopup } from '@/components/game/popups';
+import { CreateStartupPromptPopup, NotificationPermissionPopup, OnboardingModal, ReturnBonusPopup } from '@/components/game/popups';
 import { ProgramIcon } from '@/components/icons';
 import { PartnerHomeCard } from '@/components/programs';
 import { Avatar, DynamicGradientBorder, GameButton, GuestPromoBanner, InfoModal, ProgressionPopup, RadialBackground } from '@/components/ui';
 import type { InfoSection } from '@/components/ui';
 import { useOnboarding } from '@/hooks/useOnboarding';
+import { usePushPermissionPrompt } from '@/hooks/usePushPermissionPrompt';
 import { useReturnBonus } from '@/hooks/useReturnBonus';
 import { useStartupCreationPrompt } from '@/hooks/useStartupCreationPrompt';
 import { useGuestBannerDismiss } from '@/hooks/useGuestBannerDismiss';
@@ -129,7 +130,22 @@ export default function HomeScreen() {
   const { visible: showOnboarding, complete: completeOnboarding } = useOnboarding();
   const { visible: showStartupPrompt, dismiss: dismissStartupPrompt } = useStartupCreationPrompt();
   const { visible: showReturnBonus, claim: claimReturnBonus, dismiss: dismissReturnBonus } = useReturnBonus();
+  const { visible: showPushPrompt, accept: acceptPushPrompt, dismiss: dismissPushPrompt } = usePushPermissionPrompt();
   const [showProgression, setShowProgression] = useState(false);
+
+  // ── Sérialisation des popups d'accueil ──
+  // À la 1ʳᵉ connexion, onboarding + bonus retour + prompt startup peuvent
+  // devenir visibles quasi simultanément (timers 600/800/1200 ms). Empiler
+  // plusieurs <Modal> natives sur Android laisse parfois une fenêtre
+  // transparente qui bloque tous les taps ("Nouvelle partie" ne répond plus
+  // jusqu'à déco/reco). On n'affiche donc qu'UN modal à la fois, par
+  // priorité : onboarding → bonus retour → prompt startup. Quand l'un se
+  // ferme, le suivant (toujours flagué visible par son hook) prend la place.
+  const onboardingVisible = showOnboarding;
+  const returnBonusVisible = showReturnBonus && !onboardingVisible;
+  const startupPromptVisible = showStartupPrompt && !onboardingVisible && !returnBonusVisible;
+  const pushPromptVisible =
+    showPushPrompt && !onboardingVisible && !returnBonusVisible && !startupPromptVisible;
 
   const { showProgression: showProgressionParam, xpGained: xpGainedParam, valorisationGain: valorisationGainParam } =
     useLocalSearchParams<{ showProgression?: string; xpGained?: string; valorisationGain?: string }>();
@@ -433,7 +449,6 @@ export default function HomeScreen() {
                   <View style={{ width: CARD_WIDTH }}>
                     <PartnerHomeCard
                       partner={partner}
-                      programCount={partnerPrograms.length}
                       playerCount={playerCount}
                       onPress={() => router.push({
                         pathname: '/(programs)/partner/[partnerId]',
@@ -473,20 +488,27 @@ export default function HomeScreen() {
 
       {/* Onboarding (première connexion uniquement) */}
       <OnboardingModal
-        visible={showOnboarding}
+        visible={onboardingVisible}
         onComplete={completeOnboarding}
       />
 
       {/* Popup bonus reconnexion */}
       <ReturnBonusPopup
-        visible={showReturnBonus}
+        visible={returnBonusVisible}
         onClaim={claimReturnBonus}
         onDismiss={dismissReturnBonus}
       />
 
+      {/* Pré-prompt permission notifications */}
+      <NotificationPermissionPopup
+        visible={pushPromptVisible}
+        onAccept={acceptPushPrompt}
+        onDismiss={dismissPushPrompt}
+      />
+
       {/* Popup création startup */}
       <CreateStartupPromptPopup
-        visible={showStartupPrompt}
+        visible={startupPromptVisible}
         onCreateStartup={() => {
           dismissStartupPrompt();
           router.push('/(startup)/ideation');
