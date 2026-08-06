@@ -195,10 +195,14 @@ export interface EditionSponsor {
   enabled: boolean;
   /** Nom du sponsor affiché dans le texte (ex. "Mastercard Foundation"). */
   name: string;
-  /** Visuel central du popup (affiche/photo de la thématique). */
+  /** Visuel plein cadre du popup (affiche/photo de la thématique). */
   imageUrl: string;
+  /** Logo du sponsor affiché dans l'encart « En partenariat avec » (optionnel). */
+  logoUrl?: string;
   /** Lien « en savoir plus » (optionnel). */
   linkUrl?: string;
+  /** Description longue affichée sur l'écran « en savoir plus » (optionnel). */
+  description?: string;
   /** Opportunités sponsor injectées en partie. */
   opportunities?: SponsorEventCard[];
   /** Financements sponsor injectés en partie. */

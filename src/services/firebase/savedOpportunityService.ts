@@ -53,7 +53,9 @@ export function subscribeToSavedOpportunities(
     doc(getFirestore(), FIRESTORE_COLLECTIONS.savedOpportunities, userId),
     (snapshot) => {
       const items = (snapshot?.data()?.items ?? {}) as Record<string, SavedSponsorOpportunity>;
-      callback(Object.values(items).sort((a, b) => (b.savedAt ?? 0) - (a.savedAt ?? 0)));
+      const sorted = Object.values(items).sort((a, b) => (b.savedAt ?? 0) - (a.savedAt ?? 0));
+      if (__DEV__) console.log(`[Sponsor] Profil : ${sorted.length} opportunité(s) sauvegardée(s) reçue(s)`);
+      callback(sorted);
     },
     (error) => {
       firebaseLog('Failed to subscribe to saved opportunities', error);

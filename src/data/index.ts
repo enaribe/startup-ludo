@@ -22,8 +22,8 @@ import type {
   StartupIdea,
 } from './types';
 
-import { fetchEditionsFromFirestore } from '@/services/firebase/editionService';
-import { cachedFetch } from '@/services/firebase/cacheHelper';
+import { subscribeToEditionsFromFirestore } from '@/services/firebase/editionService';
+import { loadFromCache, saveToCache } from '@/services/firebase/cacheHelper';
 
 // Import de l'édition JSON (fallback local)
 import classicData from './editions/classic.json';
@@ -79,30 +79,70 @@ export function getEditionListSnapshot(): Edition[] {
 function setEditions(next: Record<EditionId, Edition>): void {
   EDITIONS = next;
   computeEditionListSnapshot();
+  if (__DEV__) {
+    const ids = Object.keys(next);
+    console.log(
+      `[Editions] setEditions: ${ids.length} édition(s) [${ids.join(', ') || 'aucune → fallback local'}] — ${editionsListeners.size} écran(s) notifié(s)`
+    );
+  }
   editionsListeners.forEach((listener) => listener());
 }
 
+// Listener Firestore actif (une seule souscription pour toute la vie de l'app)
+let editionsUnsubscribe: (() => void) | null = null;
+
 /**
- * Charge les éditions : AsyncStorage d'abord, puis Firestore si stale (>24h).
- * Les données locales ne sont utilisées qu'en fallback si aucune donnée disponible.
+ * Charge les éditions de façon RÉSILIENTE :
+ * 1. Cache AsyncStorage appliqué immédiatement (affichage instantané au boot).
+ * 2. Listener temps réel Firestore : le SDK natif gère les retries et la
+ *    reconnexion — un démarrage sans réseau n'est plus fatal, la liste arrive
+ *    dès que la connexion revient (cause des « éditions qui disparaissent »).
+ * Les données locales ne servent qu'en dernier recours (jamais de réseau + pas de cache).
  */
 export async function refreshEditionsFromFirestore(): Promise<void> {
-  try {
-    await cachedFetch<Record<EditionId, Edition>>(
-      'editions',
-      fetchEditionsFromFirestore,
-      (data) => {
-        // Firestore vide = suppression → fallback local
-        setEditions(Object.keys(data).length > 0 ? data : { ...LOCAL_EDITIONS });
-      }
-    );
-  } catch {
-    // Ni cache ni Firestore — fallback local
-    if (Object.keys(EDITIONS).length === 0) {
-      console.warn('[Data] No editions available, using local fallback');
-      setEditions({ ...LOCAL_EDITIONS });
-    }
+  if (editionsUnsubscribe) {
+    if (__DEV__) console.log('[Editions] refresh ignoré : listener Firestore déjà actif');
+    return; // déjà abonné — ne pas empiler les listeners
   }
+  if (__DEV__) console.log('[Editions] Démarrage : lecture cache local puis souscription Firestore…');
+
+  // 1. Cache local pour un affichage immédiat en attendant le premier snapshot
+  try {
+    const cached = await loadFromCache<Record<EditionId, Edition>>('editions');
+    if (cached && Object.keys(cached.data).length > 0 && Object.keys(EDITIONS).length === 0) {
+      setEditions(cached.data);
+      console.log(`[Data] Editions: ${Object.keys(cached.data).length} depuis le cache local (en attente de Firestore)`);
+    }
+  } catch {
+    // Cache illisible — non bloquant
+  }
+
+  // 2. Souscription temps réel (retries gérés par le SDK natif)
+  editionsUnsubscribe = subscribeToEditionsFromFirestore(
+    (data) => {
+      const count = Object.keys(data).length;
+      if (count === 0 && __DEV__) {
+        console.warn(
+          '[Editions] Snapshot Firestore VIDE (0 doc) → affichage du fallback local (classic). ' +
+            'Si la base contient bien des éditions, c\'est un snapshot cache natif vide au boot — le snapshot serveur doit suivre.'
+        );
+      }
+      // Firestore vide = suppression → fallback local
+      setEditions(count > 0 ? data : { ...LOCAL_EDITIONS });
+      if (count > 0) {
+        saveToCache('editions', data);
+      }
+    },
+    (error) => {
+      // Erreur fatale du listener (ex. permission-denied) — fallback si rien d'affiché
+      console.warn('[Editions] Listener Firestore en ERREUR fatale :', error);
+      if (Object.keys(EDITIONS).length === 0) {
+        console.warn('[Data] No editions available, using local fallback');
+        setEditions({ ...LOCAL_EDITIONS });
+      }
+    }
+  );
+  if (__DEV__) console.log('[Editions] Listener Firestore souscrit — en attente du premier snapshot');
 }
 
 export function getEdition(id: EditionId): Edition {

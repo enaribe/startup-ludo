@@ -1151,6 +1151,7 @@ const fr = {
 
   // ═══ Popup édition sponsorisée ═══
   'sponsoredEdition.badge': 'Sponsorisé',
+  'sponsoredEdition.partnership': 'En partenariat avec :',
   'sponsoredEdition.text': 'Cette thématique est sponsorisée par {{name}}…',
   'sponsoredEdition.learnMore': 'en savoir plus',
   'sponsoredEdition.play': 'JOUER',

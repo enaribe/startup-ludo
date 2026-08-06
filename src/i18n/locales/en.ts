@@ -1150,6 +1150,7 @@ const en: Record<string, string> = {
 
   // ═══ Sponsored edition popup ═══
   'sponsoredEdition.badge': 'Sponsored',
+  'sponsoredEdition.partnership': 'In partnership with:',
   'sponsoredEdition.text': 'This theme is sponsored by {{name}}…',
   'sponsoredEdition.learnMore': 'learn more',
   'sponsoredEdition.play': 'PLAY',

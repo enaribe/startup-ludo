@@ -229,6 +229,7 @@ export class EventManager {
     this.usedOpportunityIds.clear();
     this.usedChallengeIds.clear();
     this.usedSponsorCardIds.clear();
+    this.sponsorStatusLogged = false;
     // Repart d'une mémoire « récents » vierge pour la nouvelle partie/niveau.
     this.recentIds = new WeakMap();
   }
@@ -241,14 +242,51 @@ export class EventManager {
    */
   private pickSponsorCard(kind: 'opportunity' | 'funding') {
     const sponsor = getEdition(this.editionId).sponsor;
+    this.logSponsorStatusOnce(sponsor);
     if (!sponsor?.enabled) return null;
     const pool = (kind === 'funding' ? sponsor.fundings : sponsor.opportunities) ?? [];
     const available = pool.filter((card) => card.text && !this.usedSponsorCardIds.has(card.id));
-    if (available.length === 0) return null;
-    if (Math.random() >= SPONSOR_EVENT_CHANCE) return null;
+    if (available.length === 0) {
+      if (__DEV__ && pool.length > 0) {
+        console.log(`[Sponsor] Tirage ${kind} : toutes les cartes sponsor déjà vues cette partie → contenu normal`);
+      }
+      return null;
+    }
+    if (Math.random() >= SPONSOR_EVENT_CHANCE) {
+      if (__DEV__) {
+        console.log(
+          `[Sponsor] Tirage ${kind} : perdu (${Math.round(SPONSOR_EVENT_CHANCE * 100)} % de chance, ` +
+            `${available.length} carte(s) dispo) → contenu normal`
+        );
+      }
+      return null;
+    }
     const card = available[Math.floor(Math.random() * available.length)]!;
     this.usedSponsorCardIds.add(card.id);
+    if (__DEV__) {
+      console.log(
+        `[Sponsor] Tirage ${kind} : GAGNÉ → carte "${card.text.slice(0, 60)}" ` +
+          `(+${card.tokens ?? FIXED_POINTS[kind]}, logo: ${card.logoUrl ? 'oui' : 'non'}, lien: ${card.linkUrl ? 'oui' : 'non'})`
+      );
+    }
     return card;
+  }
+
+  /** État sponsor loggé une seule fois par partie, au premier passage sur une case concernée. */
+  private sponsorStatusLogged = false;
+  private logSponsorStatusOnce(sponsor: ReturnType<typeof getEdition>['sponsor']): void {
+    if (!__DEV__ || this.sponsorStatusLogged) return;
+    this.sponsorStatusLogged = true;
+    if (!sponsor?.enabled) {
+      console.log(`[Sponsor] Partie sur "${this.editionId}" : édition non sponsorisée, aucun événement sponsor ne sera tiré`);
+      return;
+    }
+    const opp = (sponsor.opportunities ?? []).filter((c) => c.text).length;
+    const fund = (sponsor.fundings ?? []).filter((c) => c.text).length;
+    console.log(
+      `[Sponsor] Partie sur "${this.editionId}" sponsorisée par "${sponsor.name}" : ` +
+        `${opp} opportunité(s) et ${fund} financement(s) sponsor, ${Math.round(SPONSOR_EVENT_CHANCE * 100)} % de chance par case`
+    );
   }
 
   /**

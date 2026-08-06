@@ -83,8 +83,10 @@ export const SponsorEventPopup = memo(function SponsorEventPopup({
     try {
       await saveSponsorOpportunity(user.id, { ...savePayload, savedAt: Date.now() });
       setSaved(true);
-    } catch {
-      // Offline / erreur réseau : le joueur peut réessayer
+      if (__DEV__) console.log(`[Sponsor] Opportunité sauvegardée dans le profil (${savePayload.id})`);
+    } catch (error) {
+      // Offline / règles non déployées : le joueur peut réessayer
+      console.warn('[Sponsor] Échec de la sauvegarde de l\'opportunité', error);
     } finally {
       setSaving(false);
     }

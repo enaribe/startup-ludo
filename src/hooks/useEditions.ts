@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 
 import { getEditionListSnapshot, subscribeEditions } from '@/data';
 import type { Edition } from '@/data/types';
@@ -12,5 +12,16 @@ import type { Edition } from '@/data/types';
  * (une seule édition « classic ») quand ils sont montés avant la fin du fetch.
  */
 export function useEditions(): Edition[] {
-  return useSyncExternalStore(subscribeEditions, getEditionListSnapshot, getEditionListSnapshot);
+  const editions = useSyncExternalStore(subscribeEditions, getEditionListSnapshot, getEditionListSnapshot);
+
+  // Diagnostic : ce que l'écran de liste AFFICHE réellement (et quand ça change)
+  useEffect(() => {
+    if (__DEV__) {
+      console.log(
+        `[Editions] Écran liste : ${editions.length} édition(s) affichée(s) → [${editions.map((e) => e.id).join(', ')}]`
+      );
+    }
+  }, [editions]);
+
+  return editions;
 }

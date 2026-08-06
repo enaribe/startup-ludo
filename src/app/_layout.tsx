@@ -27,7 +27,6 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import { useInvitationStore } from '@/stores/useInvitationStore';
 import { refreshEditionsFromFirestore } from '@/data';
 import { refreshDefaultProjectsFromFirestore } from '@/data/defaultProjects';
-import { clearCache } from '@/services/firebase/cacheHelper';
 import {
   setPresenceAppActive,
   startPresenceSession,
@@ -142,19 +141,14 @@ export default function RootLayout() {
     // Réinitialiser le dismiss de la bannière "invité" à chaque lancement complet
     resetGuestBannerDismissOnAppStart();
 
-    // DEBUG: Clear caches to force fresh fetch (remove after debugging)
-    if (__DEV__) {
-      clearCache('editions').then(() => console.log('[App] Editions cache cleared'));
-    }
-
-    // Load editions from Firestore (priority) or fallback to local JSONs
+    // Éditions : listener temps réel Firestore (retries auto) + cache local
     refreshEditionsFromFirestore()
       .then(() => {
         editionsLoaded.current = true;
-        console.log('[App] Editions loaded successfully');
+        console.log('[App] Editions sync started (realtime listener)');
       })
       .catch((error) => {
-        console.warn('[App] Failed to load editions, using local fallback:', error);
+        console.warn('[App] Failed to start editions sync, using local fallback:', error);
         editionsLoaded.current = true;
       });
     refreshDefaultProjectsFromFirestore();
