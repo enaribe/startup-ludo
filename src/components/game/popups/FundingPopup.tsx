@@ -185,6 +185,8 @@ export const FundingPopup = memo(function FundingPopup({
               }
             : undefined
         }
+        cardId={funding.id}
+        editionId={funding.sponsorEditionId}
         spectatorText={t('fundingPopup.spectatorBanner')}
         onAccept={handleAccept}
         onClose={onClose}

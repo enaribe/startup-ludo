@@ -39,10 +39,12 @@ export const PartnerHomeCard = memo(function PartnerHomeCard({
 
       <View style={styles.centerBlock}>
         <Text style={styles.partnerTitle} numberOfLines={2}>{partner.name}</Text>
-        <View style={styles.playerBadge}>
-          <Ionicons name="people" size={15} color={COLORS.primary} />
-          <Text style={styles.playerBadgeText}>{playerCount.toLocaleString()} joueurs</Text>
-        </View>
+        {playerCount > 0 ? (
+          <View style={styles.playerBadge}>
+            <Ionicons name="people" size={15} color={COLORS.primary} />
+            <Text style={styles.playerBadgeText}>{playerCount.toLocaleString()} joueurs</Text>
+          </View>
+        ) : null}
       </View>
 
       <GameButton

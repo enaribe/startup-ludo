@@ -8,7 +8,8 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "test:rules": "firebase emulators:exec --only firestore \"node --test test/*.test.mjs\""
   },
   "dependencies": {
     "@expo-google-fonts/luckiest-guy": "^0.4.1",
@@ -68,9 +69,11 @@
     "zustand": "^5.0.10"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.1",
     "@types/react": "~19.1.0",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~10.0.0",
+    "firebase": "^12.17.1",
     "prettier": "^3.8.1",
     "typescript": "~5.9.2"
   },

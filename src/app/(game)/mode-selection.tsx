@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,6 +10,7 @@ import { LocalModeIcon, OnlineModeIcon } from '@/components/game/ModeSelectionIc
 import { RocketIcon } from '@/components/icons';
 import { useTranslation } from '@/i18n';
 import { DynamicGradientBorder, GameButton, GamePopup, OutlinedText, ProgressionPopup, RadialBackground } from '@/components/ui';
+import { getMonRattachement } from '@/services/firebase/classService';
 import { useAuthStore, useSettingsStore, useUserStore } from '@/stores';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
@@ -43,6 +44,33 @@ export default function GameModeSelectionScreen() {
   const [showNoProjectPopup, setShowNoProjectPopup] = useState(false);
   const [showGuestPopup, setShowGuestPopup] = useState(false);
   const [showProgression, setShowProgression] = useState(false);
+
+  // ═══ Mode Classe — même logique que l'entrée de home.tsx (lot 5) ═══
+  // Le rattachement se relit à CHAQUE focus : l'élève peut venir de saisir son
+  // code, et un état périmé l'enverrait sur le mauvais écran. Rien n'est chargé
+  // pour un invité : le serveur refuse les comptes anonymes, la carte est masquée.
+  const [hasClassLink, setHasClassLink] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      // `annule` : l'écran peut perdre le focus avant la fin de la lecture.
+      let annule = false;
+      if (isGuest) {
+        setHasClassLink(false);
+        return () => {
+          annule = true;
+        };
+      }
+      void (async () => {
+        const lien = await getMonRattachement();
+        if (annule) return;
+        setHasClassLink(!!lien);
+      })();
+      return () => {
+        annule = true;
+      };
+    }, [isGuest])
+  );
 
   useEffect(() => {
     if (showProgressionParam === '1') setShowProgression(true);
@@ -84,6 +112,14 @@ export default function GameModeSelectionScreen() {
       pathname: '/(game)/online-hub',
       params: challenge ? { challenge } : undefined,
     });
+  };
+
+  /**
+   * Mode Classe : un élève déjà rattaché va directement à ses séances (le code
+   * ne lui sert plus jamais), un élève pas encore rattaché va à la saisie.
+   */
+  const handleClassMode = () => {
+    router.push(hasClassLink ? '/(class)/my-classes' : '/(class)/join');
   };
 
   const handleCreateAccount = () => {
@@ -216,6 +252,42 @@ export default function GameModeSelectionScreen() {
             </DynamicGradientBorder>
           </Pressable>
         </Animated.View>
+
+        {/* Mode Classe — icône école verte. Masquée pour un invité : le
+            rattachement exige un vrai compte (le serveur refuse les anonymes),
+            proposer une porte qui se refermera aussitôt n'aiderait personne. */}
+        {!isGuest && (
+          <Animated.View entering={FadeInDown.delay(400).duration(500)}>
+            <Pressable onPress={handleClassMode}>
+              <DynamicGradientBorder
+                borderRadius={24}
+                fill={THEME.cardFill}
+                boxWidth={contentWidth}
+                style={{ marginTop: SPACING[4] }}
+              >
+                <View style={styles.cardContent}>
+                  <View style={styles.iconColumn}>
+                    <Ionicons name="school" size={40} color="#4CAF50" />
+                  </View>
+
+                  <View style={styles.cardTextContainer}>
+                    <Text style={styles.cardTitle}>{t('game.classGameTitle')}</Text>
+                    <Text style={styles.cardDescription}>
+                      {t('game.classGameDesc')}
+                    </Text>
+
+                    <View style={styles.tagsRow}>
+                      <View style={styles.tag}>
+                        <Ionicons name="school-outline" size={12} color={THEME.textMuted} />
+                        <Text style={styles.tagText}>{t('game.tagWithClass')}</Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              </DynamicGradientBorder>
+            </Pressable>
+          </Animated.View>
+        )}
       </View>
 
       {/* Popup - Aucun projet (GamePopup design system) */}

@@ -62,7 +62,33 @@ export const FIRESTORE_COLLECTIONS = {
   appConfig: 'appConfig',
   pushTokens: 'pushTokens',
   savedOpportunities: 'savedOpportunities',
+  /** Métriques des cartes sponsor (vues/sauvegardes/clics) — un doc par édition. */
+  sponsorMetrics: 'sponsorMetrics',
+
+  // ===== Mode Classe (lot 5) — parcours élève =====
+  /**
+   * Miroir de rattachement, UN document par élève (`classLinks/{uid}`).
+   * Écrit uniquement par l'Admin SDK du back-office, fermé en écriture à tous :
+   * c'est LA preuve opposable qu'un compte appartient à une classe.
+   */
+  classLinks: 'classLinks',
+  /** Séances de classe. L'élève ne lit que celles de SA classe en `running`. */
+  classSessions: 'classSessions',
+  /**
+   * Contenu pédagogique figé d'une séance (`classSessions/{sid}/content`).
+   * Un seul document, `generated`, écrit par l'enseignant depuis le back-office.
+   */
+  classSessionContent: (sessionId: string) => `classSessions/${sessionId}/content`,
+  /**
+   * Participation de l'élève (`classSessions/{sid}/participants/{learnerId}`).
+   * L'élève n'écrit QUE son propre document — les règles l'ancrent sur
+   * `learners.linkedUid`, un champ qu'il ne contrôle pas.
+   */
+  classSessionParticipants: (sessionId: string) => `classSessions/${sessionId}/participants`,
 } as const;
+
+/** Id du document unique portant le contenu généré d'une séance. */
+export const CLASS_SESSION_CONTENT_DOC = 'generated';
 
 // ===== ERROR HANDLING =====
 

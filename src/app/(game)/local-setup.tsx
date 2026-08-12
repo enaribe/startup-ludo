@@ -983,6 +983,7 @@ export default function LocalSetupScreen() {
           visible
           editionName={getLocalizedEdition(sponsorEdition, language).name.replace(/^Édition\s+/i, '')}
           sponsor={sponsorEdition.sponsor}
+          editionId={sponsorEdition.id}
           buttonTitle={t('common.next')}
           onPlay={() => {
             const editionId = sponsorEdition.id;

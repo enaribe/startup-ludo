@@ -12,7 +12,7 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { memo, useEffect, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { Dimensions, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -25,6 +25,10 @@ import { GameButton } from '@/components/ui/GameButton';
 import { OutlinedText } from '@/components/ui/OutlinedText';
 import type { EditionSponsor } from '@/data/types';
 import { useTranslation } from '@/i18n';
+import {
+  trackSponsoredEditionView,
+  watchSponsorViews,
+} from '@/services/firebase/sponsorMetricsService';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS } from '@/styles/typography';
@@ -41,6 +45,12 @@ interface SponsoredEditionPopupProps {
   /** Nom (localisé) de l'édition, ex. "Agritech". */
   editionName: string;
   sponsor: EditionSponsor;
+  /**
+   * Id de l'édition sponsorisée — sert à compter l'impression du popup
+   * (`totals.editionPopupViews`) et à amorcer le suivi du plafond de vues.
+   * Optionnel : sans lui, rien n'est compté et le popup fonctionne comme avant.
+   */
+  editionId?: string;
   /** Libellé du bouton de validation (défaut : « JOUER »). Ex. « SUIVANT » dans le setup local. */
   buttonTitle?: string;
   /** Valide le choix de l'édition et ferme le popup. */
@@ -53,6 +63,7 @@ export const SponsoredEditionPopup = memo(function SponsoredEditionPopup({
   visible,
   editionName,
   sponsor,
+  editionId,
   buttonTitle,
   onPlay,
   onDismiss,
@@ -77,6 +88,29 @@ export const SponsoredEditionPopup = memo(function SponsoredEditionPopup({
     opacity: opacity.value,
     transform: [{ scale: scale.value }],
   }));
+
+  /**
+   * Impression du popup d'édition : comptée UNE fois par ouverture.
+   * La ref garde la trace de l'édition déjà comptée pour cette ouverture et est
+   * remise à null à la fermeture — un re-render (setShowDetail, animation…) ne
+   * recompte donc jamais.
+   */
+  const countedEditionId = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!visible) {
+      countedEditionId.current = null;
+      return;
+    }
+    if (!editionId || countedEditionId.current === editionId) return;
+    countedEditionId.current = editionId;
+
+    trackSponsoredEditionView(editionId);
+    // Le joueur vient de choisir cette édition sponsorisée : on amorce ici
+    // l'abonnement au total de vues, pour que le plafond (`viewsGoal`) soit
+    // déjà connu quand la partie démarre et tire ses premières cartes.
+    watchSponsorViews(editionId);
+  }, [visible, editionId]);
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onDismiss}>

@@ -13,3 +13,4 @@ export { useProgramStore } from './useProgramStore';
 export { useSocialStore } from './useSocialStore';
 export { useInvitationStore } from './useInvitationStore';
 export { useTutorialStore, type TutorialTargetId, type TargetRect } from './useTutorialStore';
+export { useClassStore } from './useClassStore';

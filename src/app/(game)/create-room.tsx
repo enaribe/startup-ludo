@@ -585,6 +585,7 @@ export default function CreateRoomScreen() {
             visible
             editionName={getLocalizedEdition(sponsorEdition, language).name.replace(/^Édition\s+/i, '')}
             sponsor={sponsorEdition.sponsor}
+            editionId={sponsorEdition.id}
             onPlay={() => {
               setSelectedEdition(sponsorEdition.id);
               setSponsorEdition(null);

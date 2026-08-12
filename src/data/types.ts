@@ -207,6 +207,10 @@ export interface EditionSponsor {
   opportunities?: SponsorEventCard[];
   /** Financements sponsor injectés en partie. */
   fundings?: SponsorEventCard[];
+  /** Volume de vues acheté par le sponsor ; au-delà, les cartes ne sont plus tirées. */
+  viewsGoal?: number;
+  /** Diffusion suspendue manuellement (admin) ou budget épuisé. */
+  paused?: boolean;
 }
 
 export interface Edition {

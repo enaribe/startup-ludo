@@ -16,6 +16,7 @@ import {
   removeSavedOpportunity,
   subscribeToSavedOpportunities,
 } from '@/services/firebase/savedOpportunityService';
+import { trackSponsorCardClick } from '@/services/firebase/sponsorMetricsService';
 import { useAuthStore } from '@/stores';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
@@ -47,7 +48,14 @@ export const SavedOpportunitiesCard = memo(function SavedOpportunitiesCard({
   if (!userId || items.length === 0) return null;
 
   const handleOpen = (item: SavedSponsorOpportunity) => {
-    if (item.linkUrl) Linking.openURL(item.linkUrl).catch(() => undefined);
+    if (!item.linkUrl) return;
+    // Un CLIC = une ouverture de lien. Compté à chaque ouverture (le joueur peut
+    // légitimement revenir plusieurs fois sur l'opportunité), avant l'appel
+    // système pour ne rien perdre si l'app passe en arrière-plan.
+    // `editionId` est absent des items sauvegardés avant l'ajout des métriques :
+    // leur clic n'est alors pas attribuable et n'est pas compté.
+    if (item.editionId) trackSponsorCardClick(item.editionId, item.id);
+    Linking.openURL(item.linkUrl).catch(() => undefined);
   };
 
   const handleRemove = (item: SavedSponsorOpportunity) => {

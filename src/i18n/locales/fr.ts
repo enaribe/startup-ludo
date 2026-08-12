@@ -378,6 +378,9 @@ const fr = {
   'game.onlineGameDesc': 'Affronte des joueurs du monde entier en temps réel.',
   'game.tagRanking': 'Classement',
   'game.tagAccountRequired': 'Compte requis',
+  'game.classGameTitle': 'MODE CLASSE',
+  'game.classGameDesc': 'Rejoins la séance lancée par ton enseignant et joue avec ta classe.',
+  'game.tagWithClass': 'Avec votre classe',
   'game.noProjectHeader': 'Nouveau projet requis',
   'game.noProjectTitle': 'AUCUN PROJET',
   'game.createMyStartup': 'Créer mon entreprise',
@@ -1174,6 +1177,54 @@ const fr = {
   'forceUpdate.title': 'MISE À JOUR REQUISE',
   'forceUpdate.description': 'Une nouvelle version de Startup Ludo est disponible. Mettez à jour l\'application pour continuer à jouer.',
   'forceUpdate.button': 'METTRE À JOUR',
+
+  // ═══ Mode Classe — parcours élève ═══
+  // Accueil
+
+  // Saisie du code
+  'class.joinHeader': 'Ma classe',
+  'class.joinTitle': 'REJOINDRE UNE CLASSE',
+  'class.joinSubtitle': 'Saisis le code à 6 caractères donné par ton enseignant.',
+  'class.codeLabel': 'Code de la classe',
+  'class.codeHint': 'Le code n\'est valable que quelques minutes. Ton enseignant peut le réafficher si besoin.',
+  'class.joinCta': 'CONTINUER',
+  'class.guestBlocked': 'Crée un compte pour rejoindre ta classe : c\'est lui qui garde ta progression et tes certificats.',
+
+  // Choix du nom
+  'class.pickHeader': 'Ma classe',
+  'class.pickTitle': 'QUI ES-TU ?',
+  'class.pickSubtitle': 'Choisis ton nom dans la liste de ta classe.',
+  'class.nameTakenBadge': 'Déjà pris',
+  'class.allNamesTaken': 'Tous les noms de cette classe sont déjà rattachés. Préviens ton enseignant.',
+  'class.confirmTitle': 'TU ES BIEN {{name}} ?',
+  'class.confirmBody': 'Ce choix est définitif : ton compte sera rattaché à ce nom pour toute l\'année. En cas d\'erreur, seul ton enseignant pourra le corriger.',
+  'class.confirmCta': 'OUI, C\'EST MOI',
+  'class.confirmCancel': 'CE N\'EST PAS MOI',
+
+  // Ma classe et ses séances
+  'class.myClassesHeader': 'Ma classe',
+  'class.myClassFallback': 'Ma classe',
+  'class.learnerFallback': 'Élève',
+  'class.linkedAs': 'Rattaché en tant que {{name}}',
+  'class.sessionsTitle': 'SÉANCES EN COURS',
+  'class.sessionLive': 'En direct',
+  'class.sessionFallbackTitle': 'Séance de classe',
+  'class.sessionDuration': 'Durée prévue : {{minutes}} min',
+  'class.joinSessionCta': 'REJOINDRE LA SÉANCE',
+  'class.noSessionTitle': 'AUCUNE SÉANCE',
+  'class.noSessionBody': 'Ta séance apparaîtra ici dès que ton enseignant l\'aura lancée.',
+  'class.noClassTitle': 'AUCUNE CLASSE',
+  'class.noClassBody': 'Tu n\'es rattaché à aucune classe. Demande le code à ton enseignant.',
+
+  // Erreurs — un message DISTINCT par cause, sinon l'élève reste bloqué
+  'class.errorInvalidCode': 'Ce code n\'est plus valide. Demande à ton enseignant de le réactiver.',
+  'class.errorRateLimited': 'Trop de tentatives. Patiente environ {{minutes}} min avant de réessayer.',
+  'class.errorOffline': 'Pas de connexion. Vérifie ton réseau et réessaie.',
+  'class.errorUnauthenticated': 'Connecte-toi avec ton compte pour rejoindre ta classe.',
+  'class.errorNameTaken': 'Ce nom vient d\'être choisi par un autre élève. Sélectionne le tien.',
+  'class.errorConflict': 'Ce nom n\'est plus disponible. Sélectionne le tien dans la liste.',
+  'class.errorEmptyClass': 'Aucun élève dans cette classe pour le moment. Préviens ton enseignant.',
+  'class.errorUnknown': 'Une erreur est survenue. Réessaie dans un instant.',
 } as const;
 
 export default fr;

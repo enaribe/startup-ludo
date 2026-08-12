@@ -220,6 +220,13 @@ export default function RootLayout() {
                   animation: 'slide_from_right',
                 }}
               />
+              {/* Mode Classe — parcours élève (rattachement + séances) */}
+              <Stack.Screen
+                name="(class)"
+                options={{
+                  animation: 'slide_from_right',
+                }}
+              />
             </Stack>
             <PresenceGate />
             <InvitationListenerGate />

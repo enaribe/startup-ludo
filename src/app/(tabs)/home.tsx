@@ -767,6 +767,8 @@ const styles = StyleSheet.create({
   challengeCardContent: {
     padding: 14,
   },
+  // ═══ Mode Classe — carte d'entrée de l'accueil ═══
+  // Séance en cours : le vert du design system, qui signale « c'est ouvert ».
   challengeTopRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',

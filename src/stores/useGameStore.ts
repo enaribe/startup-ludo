@@ -13,10 +13,10 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
-import type { GameState, GameMode, Player, GameEvent, PlayerColor, PawnState, EventType, ChallengeContext, ProgramGameContext, JokerType } from '@/types';
+import type { GameState, GameMode, Player, GameEvent, PlayerColor, PawnState, EventType, ChallengeContext, ClassGameContext, ProgramGameContext, JokerType } from '@/types';
 import { newJokerId } from '@/data/jokers';
 import { GameEngine, type MoveResult, type ValidMove } from '@/services/game/GameEngine';
-import { eventManager, type GeneratedGameEvent } from '@/services/game/EventManager';
+import { eventManager, type GameContentPack, type GeneratedGameEvent } from '@/services/game/EventManager';
 import type { EditionId } from '@/data';
 import type { CheckpointData } from '@/utils/onlineCodec';
 import { useChallengeStore } from '@/stores/useChallengeStore';
@@ -76,7 +76,26 @@ interface GameStoreState {
 
 interface GameStoreActions {
   // Cycle de vie du jeu
-  initGame: (mode: GameMode, edition: string, players: Omit<Player, 'tokens' | 'pawns'>[], gameContext?: ChallengeContext | ProgramGameContext) => void;
+  /**
+   * Démarre une partie.
+   *
+   * @param gameContext Contexte d'origine. Trois valeurs possibles, mutuellement
+   *   exclusives et discriminées par `origin` : challenge (legacy, sans `origin`),
+   *   programme partenaire, ou séance de classe (Mode Classe).
+   * @param classContent Contenu pédagogique d'une séance de classe, DÉJÀ chargé
+   *   par l'écran appelant. Il est passé à part et non porté par le contexte :
+   *   `initGame` est synchrone (le moteur ne peut pas attendre le réseau au
+   *   démarrage) et le contenu vit dans Firestore. L'écran le lit AVANT, ce qui
+   *   lui permet en prime d'afficher un état de chargement et de se rabattre
+   *   proprement sur l'édition choisie par l'enseignant si rien n'a été généré.
+   */
+  initGame: (
+    mode: GameMode,
+    edition: string,
+    players: Omit<Player, 'tokens' | 'pawns'>[],
+    gameContext?: ChallengeContext | ProgramGameContext | ClassGameContext,
+    classContent?: GameContentPack
+  ) => void;
   resetGame: () => void;
   endGame: (winnerId: string) => void;
 
@@ -182,13 +201,25 @@ export const useGameStore = create<GameStore>()(
 
       // ===== CYCLE DE VIE =====
 
-      initGame: (mode, edition, players, gameContext) => {
+      initGame: (mode, edition, players, gameContext, classContent) => {
         const gameId = `game_${Date.now()}`;
         const programContext =
           gameContext && 'origin' in gameContext && gameContext.origin === 'program'
             ? gameContext
             : undefined;
-        const challengeContext = programContext ? undefined : gameContext as ChallengeContext | undefined;
+        const classContext =
+          gameContext && 'origin' in gameContext && gameContext.origin === 'class'
+            ? gameContext
+            : undefined;
+        // Le contexte challenge est le seul à ne pas porter de discriminant
+        // `origin` (il précède les deux autres) : il se déduit donc par
+        // élimination. Tester les `origin` connus AVANT ce repli est ce qui
+        // évite qu'une séance de classe soit prise pour un challenge — et
+        // finisse par chercher un sous-niveau qui n'existe pas.
+        const challengeContext =
+          programContext || classContext
+            ? undefined
+            : (gameContext as ChallengeContext | undefined);
 
         // Configurer l'EventManager avec l'édition
         eventManager.setEdition(edition as EditionId);
@@ -251,6 +282,28 @@ export const useGameStore = create<GameStore>()(
             gameLog('store', '[GameStore] Program content loaded into EventManager:', programContext.programId);
           } else {
             gameLog('store', '[GameStore] Program content not found, using edition fallback:', programContext.programId);
+          }
+        }
+
+        // ═══ MODE CLASSE ═══
+        // Le contenu de la séance — le cours de l'enseignant passé par la
+        // génération IA, puis relu par lui — est injecté par le MÊME canal que
+        // celui des programmes : `eventManager.setContentPack()`. Le moteur de
+        // jeu ne sait pas, et n'a pas à savoir, qu'il joue une séance de classe.
+        //
+        // Contrairement au programme, le pack ne se lit pas dans un store local
+        // (il vit dans Firestore, propre à cette séance) : l'écran l'a chargé
+        // avant d'appeler `initGame` et le passe en paramètre. S'il est absent
+        // — l'enseignant n'a rien généré, ou le réseau a lâché — on ne pose
+        // aucun pack : la partie se joue avec le contenu de l'ÉDITION qu'il a
+        // choisie, déjà appliquée par `setEdition` ci-dessus. C'est un repli
+        // légitime (la voie « une édition existante » du wizard), pas une panne.
+        if (classContext) {
+          if (classContent) {
+            eventManager.setContentPack(classContent);
+            gameLog('store', '[GameStore] Class session content loaded into EventManager:', classContext.sessionId);
+          } else {
+            gameLog('store', '[GameStore] No class content, using edition fallback:', classContext.editionId);
           }
         }
 
@@ -320,6 +373,7 @@ export const useGameStore = create<GameStore>()(
             ranking: [],
             challengeContext,
             programContext,
+            classContext,
             createdAt: Date.now(),
             updatedAt: Date.now(),
           };
@@ -342,6 +396,7 @@ export const useGameStore = create<GameStore>()(
           players_count: players.length,
           is_program: !!programContext,
           is_challenge: !!challengeContext,
+          is_class: !!classContext,
         });
       },
 

@@ -174,6 +174,8 @@ export const EventPopup = memo(function EventPopup({
               }
             : undefined
         }
+        cardId={event.id}
+        editionId={(event as OpportunityEvent).sponsorEditionId}
         spectatorText={t('eventPopup.spectatorOpportunity')}
         onAccept={handleAccept}
         onClose={onClose}

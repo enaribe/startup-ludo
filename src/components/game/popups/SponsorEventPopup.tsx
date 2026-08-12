@@ -7,7 +7,7 @@
  * badge « +N » jetons et bouton CONTINUER.
  */
 
-import { memo, useEffect, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,6 +18,10 @@ import { OutlinedText } from '@/components/ui/OutlinedText';
 import { usePlaySoundOnOpen } from '@/hooks/useSound';
 import { useTranslation } from '@/i18n';
 import { saveSponsorOpportunity } from '@/services/firebase/savedOpportunityService';
+import {
+  trackSponsorCardSave,
+  trackSponsorCardView,
+} from '@/services/firebase/sponsorMetricsService';
 import { useAuthStore } from '@/stores';
 import type { SavedSponsorOpportunity } from '@/types';
 import { COLORS } from '@/styles/colors';
@@ -42,6 +46,13 @@ interface SponsorEventPopupProps {
    * la retrouve dans son Profil après la partie. Absent si la carte n'a pas de lien.
    */
   savePayload?: Omit<SavedSponsorOpportunity, 'savedAt'>;
+  /**
+   * Identifiants de la carte sponsor pour le comptage des métriques
+   * (vue + sauvegarde). Optionnels : si absents, rien n'est compté et le
+   * popup fonctionne exactement comme avant.
+   */
+  cardId?: string;
+  editionId?: string;
   onAccept: () => void;
   onClose: () => void;
   isSpectator?: boolean;
@@ -56,6 +67,8 @@ export const SponsorEventPopup = memo(function SponsorEventPopup({
   logoUrl,
   spectatorText,
   savePayload,
+  cardId,
+  editionId,
   onAccept,
   onClose,
   isSpectator = false,
@@ -77,12 +90,52 @@ export const SponsorEventPopup = memo(function SponsorEventPopup({
     }
   }, [visible, savePayload?.id]);
 
+  /**
+   * Garde anti-double-comptage : mémorise la clé « édition/carte » de la
+   * DERNIÈRE vue comptée. Le popup étant monté en permanence (visible bascule),
+   * ce useEffect se rejoue à chaque re-render de la partie ; sans cette garde on
+   * compterait une vue par render au lieu d'une par affichage.
+   * La clé est remise à null à la fermeture, donc une même carte revue plus tard
+   * (autre partie, autre joueur) recompte bien une nouvelle vue.
+   */
+  const countedViewKey = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!visible) {
+      countedViewKey.current = null;
+      return;
+    }
+    if (!editionId || !cardId) return;
+
+    const key = `${editionId}/${cardId}`;
+    if (countedViewKey.current === key) return;
+    countedViewKey.current = key;
+
+    // CHOIX DOCUMENTÉ — la vue SPECTATEUR compte comme une vue normale.
+    // Le popup sponsor s'affiche à toute la table (le joueur actif comme les
+    // spectateurs qui regardent l'IA ou un adversaire jouer) : le sponsor est
+    // donc réellement vu par chacun d'eux, et chaque paire d'yeux doit être
+    // facturée. On ne distingue pas les deux cas pour garder un compteur unique
+    // simple à lire côté admin ; `isSpectator` reste disponible si le besoin de
+    // les séparer apparaît plus tard.
+    trackSponsorCardView(editionId, cardId);
+  }, [visible, editionId, cardId]);
+
   const handleSave = async () => {
     if (!canSave || !savePayload || saved || saving) return;
     setSaving(true);
     try {
-      await saveSponsorOpportunity(user.id, { ...savePayload, savedAt: Date.now() });
+      // `editionId` est stocké avec l'item : il permettra d'attribuer le CLIC
+      // (ouverture du lien depuis le profil) à la bonne édition sponsorisée.
+      await saveSponsorOpportunity(user.id, {
+        ...savePayload,
+        ...(editionId ? { editionId } : {}),
+        savedAt: Date.now(),
+      });
       setSaved(true);
+      // Compté APRÈS succès uniquement — et une seule fois, le bouton se
+      // désactive dès `saved` (garde `saved || saving` en entrée du handler).
+      if (editionId && cardId) trackSponsorCardSave(editionId, cardId);
       if (__DEV__) console.log(`[Sponsor] Opportunité sauvegardée dans le profil (${savePayload.id})`);
     } catch (error) {
       // Offline / règles non déployées : le joueur peut réessayer

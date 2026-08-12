@@ -12,11 +12,57 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    // ── Rôles scolaires (Mode Classe) ────────────────────────────────────
+    // Déclarés AVANT isAdmin() car celui-ci les exclut (voir plus bas).
+    // Comme tous les rôles du back-office, un enseignant et un admin
+    // d'établissement portent `admin: true` dans leurs claims. Leur périmètre
+    // réel (établissement, classes) vit lui aussi dans le token : les règles
+    // Firestore ne peuvent pas lire users/{uid}.
+    function isTeacher() {
+      return isAuthenticated() && request.auth.token.teacher == true;
+    }
+    function isEstabAdmin() {
+      return isAuthenticated() && request.auth.token.establishment_admin == true;
+    }
+    function isSchoolRole() {
+      return isTeacher() || isEstabAdmin();
+    }
+    // Établissement de rattachement, lu dans le token (source de vérité serveur :
+    // il est posé par /api/admins depuis le token de l'appelant, jamais du corps).
+    function myEstablishment() {
+      return request.auth.token.establishmentId;
+    }
+
     // Admin: vérifie l'email ou le custom claim "admin"
+    //
+    // ⚠️ EXCLUSION DES RÔLES SCOLAIRES — point de sécurité central.
+    // `admin: true` est posé sur les rôles scolaires par cohérence avec les
+    // autres rôles du back-office. Sans précaution, un simple enseignant
+    // hériterait donc ici des pleins droits en écriture sur les éditions, le
+    // contenu du jeu, les leads, les précommandes, etc.
+    //
+    // CHOIX : l'exclusion est faite DANS isAdmin() plutôt qu'en ajoutant
+    // `&& !isSchoolRole()` à chaque règle. Trois raisons :
+    //   1. Sûreté par défaut : ~20 règles utilisent isAdmin() aujourd'hui, et
+    //      toute règle ajoutée demain en hérite automatiquement. Répéter la
+    //      condition, c'est n'attendre qu'un seul oubli pour ouvrir une brèche.
+    //   2. Le précédent sponsor montre la limite de l'autre approche : il a
+    //      fallu penser au `!isSponsor()` de `match /editions` (l.~135), et rien
+    //      ne garantit qu'on y penserait à chaque nouvelle collection.
+    //   3. Lisibilité : la définition du rôle porte sa propre borne. Une règle
+    //      qui dit `isAdmin()` dit bien « un administrateur de la plateforme »,
+    //      pas « n'importe quel porteur du claim admin ».
+    // Le sponsor, lui, n'est PAS exclu ici : il l'est règle par règle, car
+    // l'existant en dépend (`isAdmin() && !isSponsor()` dans /editions). On ne
+    // touche pas à ce comportement pour ne rien casser.
+    //
+    // Conséquence assumée : les rôles scolaires n'obtiennent AUCUN droit par
+    // héritage. Leurs accès (établissements, classes, séances) seront accordés
+    // explicitement par les règles dédiées des lots 2 à 5.
     function isAdmin() {
       return isAuthenticated() && (
         request.auth.token.email == 'startupludo@concree.com' ||
-        request.auth.token.admin == true
+        (request.auth.token.admin == true && !isSchoolRole())
       );
     }
 
@@ -58,6 +104,31 @@ service cloud.firestore {
       return isPartnerAdmin() && resource.data.partnerId == request.auth.token.partnerId;
     }
 
+    // ── Sponsor d'édition ────────────────────────────────────────────────
+    // Un sponsor (ADEPME, Mastercard Foundation…) achète le sponsoring d'une
+    // ou plusieurs éditions. Son compte porte aussi `admin: true` (cohérence
+    // avec les autres rôles du back-office), donc SANS ces règles il aurait
+    // les pleins droits d'un admin : il faut le borner explicitement à ses
+    // éditions ET au seul champ `sponsor`.
+    function isSponsor() {
+      return isAuthenticated() && request.auth.token.sponsor == true;
+    }
+
+    // L'édition visée fait-elle partie du périmètre acheté par ce sponsor ?
+    function sponsorOwnsEdition(editionId) {
+      return isSponsor() &&
+             request.auth.token.editionIds is list &&
+             editionId in request.auth.token.editionIds;
+    }
+
+    // Le sponsor ne touche QUE le champ `sponsor` : le contenu pédagogique
+    // (quiz, duels, financements, opportunités, défis) reste hors de portée.
+    function onlyTouchesSponsorField() {
+      return request.resource.data.diff(resource.data)
+               .affectedKeys()
+               .hasOnly(['sponsor', 'updatedAt']);
+    }
+
     function isValidUser() {
       return isAuthenticated() &&
              request.resource.data.keys().hasAll(['email', 'displayName', 'createdAt']) &&
@@ -96,7 +167,18 @@ service cloud.firestore {
     // Editions collection (PUBLIC read - game content, write for admins)
     match /editions/{editionId} {
       allow read: if true;  // Public read - no sensitive data
-      allow write: if isAdmin();
+
+      // Un sponsor n'est PAS un admin d'édition : il ne peut que mettre à jour
+      // le champ `sponsor` des éditions qu'il a achetées (jamais en créer ni en
+      // supprimer, jamais toucher au contenu du jeu). Le contrôle par claim est
+      // indispensable : l'isolation de l'UI ne protège rien côté données.
+      allow update: if sponsorOwnsEdition(editionId) && onlyTouchesSponsorField();
+
+      // Les vrais admins gardent la main pleine (y compris sur le sponsoring).
+      // Placé après la règle sponsor : en Firestore les `allow` se cumulent,
+      // un sponsor non couvert ci-dessus retombe donc sur isAdmin() — d'où le
+      // besoin d'exclure explicitement le sponsor ici.
+      allow create, update, delete: if isAdmin() && !isSponsor();
     }
 
     // Challenge programs (PUBLIC read - game content, write for admins)
@@ -169,6 +251,607 @@ service cloud.firestore {
     // privé : chaque joueur ne gère que sa propre liste.
     match /savedOpportunities/{userId} {
       allow read, write: if isOwner(userId);
+    }
+
+    // Métriques des cartes sponsor (vues / sauvegardes / clics) — un doc par
+    // édition, facturation du sponsoring et rapport du back-office sponsor.
+    //
+    // LECTURE : tout utilisateur authentifié. Nécessaire côté jeu — le client
+    // s'abonne à `totals.views` pour arrêter la diffusion quand le plafond
+    // acheté (`viewsGoal`) est atteint. Aucune donnée personnelle dans ce doc
+    // (uniquement des compteurs agrégés), donc pas d'enjeu de confidentialité.
+    //
+    // ÉCRITURE : tout utilisateur authentifié (increment depuis l'app). Créer
+    // le doc à la volée est autorisé — le premier événement de l'édition l'écrit.
+    // Le delete reste réservé à l'admin : un compteur de facturation ne doit pas
+    // pouvoir être remis à zéro depuis un client.
+    //
+    // LIMITE ASSUMÉE : un client malveillant peut gonfler ces compteurs (les
+    // règles Firestore ne savent pas vérifier qu'un increment vaut exactement +1
+    // sur un doc absent, ni limiter la fréquence). C'est le même compromis que
+    // `gameSessions` / `userStats`, déjà en écriture client dans ce projet.
+    // ALTERNATIVE si la facturation doit être infalsifiable : passer l'écriture
+    // à `if false` et router le comptage via une Cloud Function callable
+    // (`trackSponsorMetric`) qui valide l'appelant, l'editionId et le cardId
+    // avant d'incrémenter avec l'Admin SDK. Non implémenté ici pour rester
+    // cohérent avec l'existant et éviter la latence d'un appel par carte vue.
+    match /sponsorMetrics/{editionId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // MODE CLASSE — établissements, classes, élèves (lot 2)
+    // ══════════════════════════════════════════════════════════════════
+    //
+    // PRINCIPE : tout le périmètre vient des CLAIMS DU TOKEN
+    // (`establishmentId`, `classIds`), posés par /api/admins. Les règles
+    // Firestore ne peuvent pas lire users/{uid} : un périmètre stocké
+    // uniquement en base serait invérifiable ici.
+    //
+    // QUI N'A RIEN ICI : partner_admin, sponsor, admin de programme. Aucune de
+    // ces règles n'appelle isAdmin() — et isAdmin() exclut déjà les rôles
+    // scolaires (lot 1). Les trois collections sont donc fermées par défaut à
+    // tout rôle non explicitement nommé ci-dessous. Seul isSuperAdmin() garde
+    // un accès complet (création commerciale et support).
+
+    // La classe visée appartient-elle à MON établissement ? Deux variantes :
+    // `resource` pour un document existant (lecture, update, delete),
+    // `request.resource` pour la valeur écrite — un directeur ne peut ni lire
+    // une classe d'un autre établissement, ni en créer une hors du sien.
+    function classeDeMonEtablissementBefore() {
+      return isEstabAdmin() && resource.data.establishmentId == myEstablishment();
+    }
+    function classeDeMonEtablissementAfter() {
+      return isEstabAdmin() && request.resource.data.establishmentId == myEstablishment();
+    }
+
+    // La classe visée est-elle dans le claim `classIds` de cet enseignant ?
+    // Vérification sur l'ID DU DOCUMENT : elle est donc évaluable sans lire le
+    // document, ce qui la rend utilisable pour la sous-collection `learners`
+    // (dont le parent n'est pas chargé) sans aucun get() facturé.
+    function maClasse(cid) {
+      return isTeacher()
+             && request.auth.token.classIds is list
+             && cid in request.auth.token.classIds;
+    }
+
+    // Classes du claim, sous forme de liste sûre.
+    //
+    // Variante de `maClasse()` pour les cas où la classe visée est un CHAMP du
+    // document et non un segment du chemin (les séances) : `cid in <liste>` n'y
+    // est pas utilisable sans avoir d'abord garanti que le claim est bien une
+    // liste — un compte scolaire créé avant le lot 3 n'en a pas, et
+    // l'évaluation échouerait au lieu de refuser proprement.
+    function mesClasses() {
+      return request.auth.token.classIds is list ? request.auth.token.classIds : [];
+    }
+
+    // La classe parente appartient-elle à l'établissement du directeur ?
+    // `exists()` d'abord : sans lui, un `get()` sur une classe supprimée ferait
+    // échouer l'évaluation au lieu de refuser proprement.
+    function classeParenteDeMonEtablissement(cid) {
+      return isEstabAdmin()
+             && exists(/databases/$(database)/documents/classes/$(cid))
+             && get(/databases/$(database)/documents/classes/$(cid)).data.establishmentId == myEstablishment();
+    }
+
+    // Établissements. Lecture par les DEUX rôles scolaires du même
+    // établissement (l'enseignant consulte la validité de la licence avant une
+    // séance) ; écriture par le seul directeur. Création et suppression sont
+    // des gestes commerciaux : super admin uniquement.
+    //
+    // La condition porte sur l'ID du document (`eid`), pas sur son contenu : un
+    // rôle scolaire ne peut donc lire QUE le document dont l'id est exactement
+    // son claim. Lister la collection reste impossible pour lui — seul le super
+    // admin le peut (sélecteur d'établissement du back-office).
+    match /establishments/{eid} {
+      allow read: if isSuperAdmin() || (isSchoolRole() && myEstablishment() == eid);
+
+      // Le directeur met à jour l'IDENTITÉ de son établissement (nom, ville…),
+      // JAMAIS les termes du contrat.
+      //
+      // Sans la restriction ci-dessous, `allow update` lui laissait réécrire
+      // `licenseValidUntil`, `maxTeachers` et `maxLearners` : il prolongeait sa
+      // propre licence et relevait ses quotas depuis la console de son
+      // navigateur. Ces champs sont vendus — ils ne se modifient que par
+      // `/api/establishments` (Admin SDK, super admin), qui contourne ces règles.
+      allow update: if isSuperAdmin()
+                    || (isEstabAdmin()
+                        && myEstablishment() == eid
+                        && !request.resource.data.diff(resource.data).affectedKeys()
+                             .hasAny(['licenseCode', 'licenseValidUntil',
+                                      'maxTeachers', 'maxLearners', 'isActive']));
+
+      allow create, delete: if isSuperAdmin();
+    }
+
+    // Classes.
+    //
+    // LECTURE : le directeur lit les classes de son établissement (le champ
+    // `establishmentId` du document est comparé à son claim — c'est pourquoi
+    // l'écran interroge la collection avec un where() sur ce même champ, sans
+    // quoi la requête serait refusée en bloc) ; l'enseignant lit UNIQUEMENT les
+    // classes de son claim `classIds`, par ID de document (d'où la lecture doc
+    // par doc côté back-office, jamais un listing de la collection).
+    //
+    // ÉCRITURE : le directeur seul, et jamais hors de son établissement. Sur un
+    // update, les DEUX états sont contrôlés (before ET after) : sans le
+    // `before`, un directeur pourrait s'approprier la classe d'un autre
+    // établissement en réécrivant simplement son `establishmentId`.
+    //
+    // L'enseignant n'écrit pas la classe au lot 2 — l'ouverture de la fenêtre de
+    // rattachement (joinCode / joinCodeExpiresAt) viendra au lot 4.
+    match /classes/{cid} {
+      // `get` : le directeur lit les classes de son établissement, l'enseignant
+      // celles de son claim `classIds`.
+      //
+      // `list` : autorisé UNIQUEMENT au directeur (filtre `establishmentId`) et
+      // au super admin. Un enseignant ne liste jamais la collection — d'où
+      // `getClassesByIds`, qui lit document par document.
+      // Exception nécessaire : la vérification d'unicité du code de rattachement
+      // (`where('joinCode','==',…)`) est un listing. Elle est donc faite par
+      // l'API serveur `/api/class/verifier-code`, en Admin SDK, et non depuis le
+      // navigateur de l'enseignant — l'ouvrir ici exposerait toutes les classes
+      // de tous les établissements à qui devine un code.
+      allow read: if isSuperAdmin() || classeDeMonEtablissementBefore() || maClasse(cid);
+      allow create: if isSuperAdmin() || classeDeMonEtablissementAfter();
+      allow update: if isSuperAdmin()
+                    || (classeDeMonEtablissementBefore() && classeDeMonEtablissementAfter())
+                    // L'ENSEIGNANT ouvre et ferme la fenêtre de rattachement de
+                    // SA classe (lot 4a) : c'est son geste de rentrée, il ne
+                    // passe pas par la direction. Il est strictement borné aux
+                    // champs ci-dessous — nom, niveau et `establishmentId` lui
+                    // restent interdits, sans quoi il pourrait déplacer sa
+                    // classe vers un autre établissement.
+                    //
+                    // `learnerCount` fait partie de la liste : c'est le COMPTEUR
+                    // DÉNORMALISÉ des élèves, que l'écran de classe réécrit après
+                    // chaque mouvement (`majEffectif`). Sans lui, l'enseignant —
+                    // qui a pourtant le droit d'ajouter, d'importer et de retirer
+                    // les élèves de sa classe (cf. `learners` ci-dessous) —
+                    // laissait l'effectif affiché au directeur dériver à chaque
+                    // geste. Ce n'est pas un élargissement de son périmètre : il
+                    // ne fait que refléter des écritures qui lui sont déjà
+                    // permises, sur la sous-collection qui fait autorité.
+                    || (maClasse(cid)
+                        && request.resource.data.diff(resource.data).affectedKeys()
+                             .hasOnly(['joinCode', 'joinCodeExpiresAt',
+                                       'learnerCount', 'updatedAt']));
+      allow delete: if isSuperAdmin() || classeDeMonEtablissementBefore();
+
+      // Élèves d'une classe.
+      //
+      // ⚠️ Les règles d'une sous-collection ne sont PAS héritées du parent :
+      // sans ce bloc, `classes/{cid}/learners/{lid}` serait totalement fermé.
+      // Elles sont donc réécrites explicitement.
+      //
+      // Pour l'ENSEIGNANT, la condition reste évaluable sans lire la classe :
+      // `maClasse(cid)` ne porte que sur l'id du document parent, disponible
+      // dans le chemin. Il peut écrire : gérer la liste de SA classe (ajout,
+      // import, retrait) fait partie de son métier.
+      //
+      // Pour le DIRECTEUR, l'appartenance à son établissement est portée par le
+      // document PARENT, absent de `resource` ici. D'où le get() sur la classe —
+      // une lecture facturée, mais c'est le seul moyen de tenir l'invariant :
+      // sans elle, un directeur pourrait lire les élèves de n'importe quelle
+      // classe en devinant son id, et la liste nominative d'élèves mineurs est
+      // précisément ce qu'il faut protéger.
+      match /learners/{lid} {
+        allow read: if isSuperAdmin() || maClasse(cid) || classeParenteDeMonEtablissement(cid);
+        allow write: if isSuperAdmin() || maClasse(cid) || classeParenteDeMonEtablissement(cid);
+      }
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // MODE CLASSE — ACCÈS DE L'ÉLÈVE (lot 4a)
+    // ══════════════════════════════════════════════════════════════════
+    //
+    // ── CE QUI EST VÉRIFIÉ ICI, ET QUI NE CHANGE PAS ─────────────────
+    //
+    // Un élève est un JOUEUR : son compte n'a AUCUN claim scolaire — ni
+    // `teacher`, ni `establishment_admin`, ni `establishmentId`, ni `classIds`.
+    // Les règles `classes` et `learners` ci-dessus lui sont donc intégralement
+    // fermées, et c'est vérifié plutôt que supposé :
+    //
+    //   • `classes/{cid}` en lecture exige isSuperAdmin() (claim `super_admin`),
+    //     classeDeMonEtablissementBefore() (claim `establishment_admin`) ou
+    //     maClasse(cid) (claim `teacher` + `classIds`). Un élève ne satisfait
+    //     aucune des trois : il ne peut PAS lire une classe en devinant son id,
+    //     ni a fortiori lister la collection.
+    //   • `classes/{cid}/learners/{lid}` : mêmes conditions, réécrites
+    //     explicitement (les sous-collections n'héritent pas du parent). La
+    //     liste nominative d'élèves MINEURS est donc inaccessible en Firestore
+    //     direct — c'est l'objet même de la protection.
+    //
+    // Sa SEULE porte d'entrée est `GET /api/class/join/[code]` (Admin SDK), qui
+    // renvoie une projection minimale — prénom + initiale du nom — pendant les
+    // quelques minutes d'ouverture de la fenêtre, sous limite de tentatives par
+    // IP. Le rattachement (`POST /api/class/link`) écrit lui aussi en Admin SDK :
+    // AUCUNE règle n'a donc à ouvrir `learners` en écriture à l'élève, et aucune
+    // ne le fait. Rien à ajouter ici pour le lot 4a — c'est le bon résultat.
+    //
+    // ── LECTURE DE SA CLASSE PAR L'ÉLÈVE (question du lot 5) ────────
+    //
+    // CHOIX RETENU : **l'élève ne lira PAS `classes/{cid}` en Firestore ; le
+    // lot 5 passera par une API.** Aucune règle n'est ajoutée pour lui.
+    //
+    // L'alternative examinée était une règle fondée sur `users/{uid}.classIds`,
+    // lisible par get() depuis les règles :
+    //
+    //     allow read: if isAuthenticated() && cid in
+    //       get(/databases/$(database)/documents/users/$(request.auth.uid))
+    //         .data.get('classIds', []);
+    //
+    // Elle est techniquement valide — l'interdiction de lire `users/{uid}` porte
+    // sur le claim d'un AUTRE utilisateur, pas sur un get() pendant l'évaluation.
+    // Elle est refusée pour trois raisons, par ordre de gravité :
+    //
+    //   1. ⚠️ ELLE SERAIT AUTO-DÉLIVRÉE — rédhibitoire. `match /users/{userId}`
+    //      autorise `allow update: if isOwner(userId)` : tout joueur authentifié
+    //      écrit SON propre document, donc son propre `classIds`. Un élève y
+    //      ajouterait n'importe quel id de classe et lirait la classe
+    //      correspondante. Ce champ n'est pas un claim signé par le serveur :
+    //      c'est une donnée que son porteur contrôle. Fonder un droit de lecture
+    //      dessus, c'est fonder un droit sur la déclaration de l'intéressé —
+    //      exactement ce que le lot 1 proscrit (« tout le périmètre vient des
+    //      CLAIMS DU TOKEN »). La refermer supposerait de restreindre
+    //      `users/{uid}` en écriture champ par champ pour interdire `classIds`
+    //      au propriétaire : une règle utilisée par toute l'app mobile, hors
+    //      périmètre du lot 4a et disproportionné.
+    //
+    //   2. Un claim `classIds` n'est PAS une option pour l'élève. Les custom
+    //      claims sont posés par /api/admins pour les comptes du back-office et
+    //      n'entrent en vigueur qu'après rafraîchissement du jeton. En poser un
+    //      sur chaque compte élève ferait de chaque élève un compte à
+    //      privilèges, et le rattachement ne prendrait effet qu'après
+    //      déconnexion/reconnexion — ingérable devant une classe.
+    //
+    //   3. Coût : un get() facturé à chaque lecture de classe, sur le chemin le
+    //      plus fréquent du parcours élève (chaque ouverture de l'app).
+    //
+    // CE QUE FERA LE LOT 5 À LA PLACE : une route type `GET /api/class/mine`,
+    // authentifiée par le jeton de l'élève, qui lit `users/{uid}.classIds` en
+    // Admin SDK et renvoie le strict nécessaire (nom et niveau de la classe,
+    // séances en cours). Trois avantages décisifs : le serveur RECOUPE
+    // `classIds` avec `learners.linkedUid == uid` — il vérifie donc le
+    // rattachement RÉEL et non la déclaration du client, ce qu'une règle
+    // Firestore ne sait pas faire ; la projection reste minimale (ni
+    // `establishmentId`, ni `teacherIds`, ni `learnerCount`) ; et c'est le patron
+    // déjà éprouvé des deux routes du lot 4a.
+    //
+    // À TENIR AU LOT 5 : la règle `classSessions/{sid}/participants` esquissée
+    // au plan s'appuie, elle, sur `learners.linkedUid == request.auth.uid` — un
+    // champ que SEUL l'Admin SDK écrit, jamais l'élève. Celle-là est saine et
+    // reste la bonne approche pour l'écriture de la progression.
+
+    // ══════════════════════════════════════════════════════════════════
+    // MODE CLASSE — SÉANCES (lot 4b)
+    // ══════════════════════════════════════════════════════════════════
+    //
+    // Une séance n'a PAS de code : le code à 6 caractères vit sur la classe et
+    // ne sert qu'au rattachement (lot 4a). Un élève rattaché voit la séance
+    // depuis son profil, sans rien saisir.
+    //
+    // ── ENSEIGNANT ──────────────────────────────────────────────────
+    // Il lit et écrit les séances de SES classes (claim `classIds`) dont il est
+    // le `teacherId`. Les DEUX conditions sont exigées, et ce n'est pas
+    // redondant : `classIds` seul laisserait un co-enseignant modifier la séance
+    // d'un collègue sur une classe partagée ; `teacherId` seul laisserait un
+    // enseignant créer une séance sur une classe qui n'est pas la sienne en
+    // devinant son id. Sur un update, l'état AVANT et l'état APRÈS sont tous
+    // deux contrôlés — sans le `before`, on pourrait s'approprier la séance d'un
+    // collègue en réécrivant simplement son `teacherId`.
+    //
+    // ── DIRECTEUR ───────────────────────────────────────────────────
+    // Lecture seule, bornée à son établissement. Le champ `establishmentId` du
+    // document est comparé à son claim : l'écran doit donc interroger la
+    // collection avec un where() sur ce même champ, sinon la requête est refusée
+    // en bloc (même contrainte que la grille des classes du lot 2). Il n'écrit
+    // pas : piloter une séance est un geste d'enseignant, et son propre compte
+    // porte `classIds` s'il enseigne (double rôle) — auquel cas il passe par la
+    // règle enseignant ci-dessus.
+    //
+    // ── AUTRES RÔLES ────────────────────────────────────────────────
+    // Aucun. `isAdmin()` exclut déjà les rôles scolaires (voir sa définition),
+    // et n'apparaît nulle part ici : ni admin de programme, ni admin de
+    // partenaire, ni sponsor n'a de raison de lire les séances d'un
+    // établissement client. Seul le super admin passe, pour le support.
+    //
+    // ── ÉLÈVE (préparé pour le lot 5) ───────────────────────────────
+    //
+    // ⚠️ LE PLAN PRÉCONISAIT `get(users/$(uid)).data.classIds`. C'EST REFUSÉ,
+    // pour la raison déjà établie au bloc « ACCÈS DE L'ÉLÈVE » ci-dessus :
+    // `match /users/{userId}` autorise `allow update: if isOwner(userId)`, donc
+    // TOUT joueur écrit son propre `classIds`. Un droit de lecture fondé dessus
+    // serait AUTO-DÉLIVRÉ : il suffirait d'y ajouter un id de classe deviné pour
+    // lire les séances de n'importe quelle classe. `classIds` sur `users` n'est
+    // pas un claim signé par le serveur, c'est une donnée que son porteur
+    // contrôle.
+    //
+    // ANCRAGE RETENU : `classes/{classId}/learners/{lid}.linkedUid`, écrit
+    // UNIQUEMENT par l'Admin SDK (transaction de `POST /api/class/link`) et
+    // jamais par l'élève — les règles `learners` ci-dessus lui sont fermées.
+    // C'est le même ancrage que la future règle `participants`, et c'est le seul
+    // qui prouve un rattachement RÉEL plutôt qu'une déclaration du client.
+    //
+    // Il manque toutefois le maillon `uid → learnerId` : les règles ne savent
+    // pas interroger une sous-collection, seulement lire un document dont elles
+    // connaissent le chemin. Deux façons de le fournir ont été écartées :
+    //
+    //   • un CLAIM `learnerId` posé au rattachement — les custom claims
+    //     n'entrent en vigueur qu'après rafraîchissement du jeton, donc après
+    //     déconnexion/reconnexion. Ingérable devant une classe, et déjà écarté
+    //     pour `classIds` au bloc précédent, pour la même raison ;
+    //   • un `learnerId` passé par le client — une règle ne reçoit aucun
+    //     paramètre de la requête ; ce n'est simplement pas exprimable.
+    //
+    // ANCRAGE RETENU : un MIROIR écrit par le serveur,
+    // `classSessions/{sid}/../` non — plus simplement `classLinks/{uid}`, un
+    // document par élève posé par `POST /api/class/link` (Admin SDK) dans la
+    // même transaction que `linkedUid`, et fermé en écriture à tous. Il porte
+    // `{ classId, learnerId }`. La règle le lit par un chemin qu'elle connaît
+    // (`request.auth.uid`), ce qui referme le maillon manquant sans claim et
+    // sans paramètre client. **Ce document reste à écrire au lot 5** : tant
+    // qu'il n'existe pas, la règle ci-dessous refuse — elle échoue FERMÉE, ce
+    // qui est le bon défaut.
+    //
+    // La condition `status == 'running'` est ce qui rend l'ensemble étroit :
+    // une séance programmée ou terminée reste invisible, un élève ne peut pas
+    // explorer le calendrier de sa classe.
+    //
+    // 💰 COÛT — TROIS LECTURES FACTURÉES EN PLUS par séance affichée à un élève :
+    //   1. `exists()` + 2. `get()` sur `classLinks/{uid}` — Firestore ne
+    //      mutualise pas les deux, et `exists()` est nécessaire : sans lui, un
+    //      élève non rattaché ferait ÉCHOUER l'évaluation au lieu d'être refusé
+    //      proprement (même précaution que `classeParenteDeMonEtablissement`) ;
+    //   3. le document de séance lui-même.
+    // Ordre de grandeur : 30 élèves × 1 séance/jour × 180 jours ≈ 16 000
+    // lectures/an et par classe — négligeable au regard du quota, mais à NE PAS
+    // mettre sur un chemin appelé en boucle. C'est pourquoi cette règle sert
+    // l'AFFICHAGE de la séance, pas l'écriture de la progression en jeu :
+    // celle-ci passera par `participants`, écrite au fil de la partie et ancrée
+    // sur `linkedUid` (get direct, chemin connu, une seule lecture).
+    //
+    // ALTERNATIVE si le coût devenait un sujet : router aussi cette lecture par
+    // une API en Admin SDK (patron `/api/class/mine` retenu au lot 4a), qui fait
+    // le recoupement une fois et sert une projection. La règle ci-dessous reste
+    // le filet : elle garantit qu'un accès Firestore direct ne contourne rien.
+    match /classSessions/{sid} {
+      // LECTURE DE L'ENSEIGNANT : `teacherId == uid` SEUL, volontairement.
+      //
+      // Y ajouter `mesClasses().hasAny([classId])` rendait l'écran « Séances »
+      // inutilisable : Firestore n'accepte une requête que si son FILTRE garantit
+      // à lui seul la lisibilité de chaque résultat — il ne filtre pas après
+      // coup. Un `where('teacherId','==',uid)` ne peut rien promettre sur
+      // `classId`, donc la requête entière était refusée.
+      //
+      // La condition retirée était de toute façon redondante : `allow create`
+      // impose déjà que la classe soit dans son périmètre, et `allow update`
+      // fige `classId`. Une séance portant son `teacherId` est donc
+      // nécessairement sur une de ses classes. Si on lui retire une classe plus
+      // tard, il garde la lecture de ses propres séances passées — ce qui est le
+      // comportement voulu (ses rapports lui restent accessibles).
+      // Second cas de lecture enseignant : les séances d'UNE de ses classes,
+      // y compris celles lancées par un collègue co-affecté (`getSessionsByClass`,
+      // utilisé par la fiche de classe). Ici le filtre porte sur `classId`, donc
+      // la condition peut s'y appuyer sans casser la requête.
+      allow read: if isSuperAdmin()
+                  // `isSchoolRole()` et non `isTeacher()` : le directeur qui
+                  // enseigne (double rôle) n'a PAS le claim `teacher` — son rôle
+                  // reste `establishment_admin`, seul son `classIds` est posé.
+                  // Avec `isTeacher()`, ces clauses lui étaient fermées et le
+                  // commentaire DIRECTEUR ci-dessus mentait. L'ancrage réel ne
+                  // change pas : `teacherId == uid` et le claim `classIds`.
+                  || (isSchoolRole() && resource.data.teacherId == request.auth.uid)
+                  || (isSchoolRole() && mesClasses().hasAny([resource.data.classId]))
+                  || (isEstabAdmin() && resource.data.establishmentId == myEstablishment())
+                  // Requêtes du directeur filtrées par CLASSE (`where classId ==`)
+                  // — recalcul des cumuls, historique de la fiche élève. La
+                  // clause `establishmentId` ci-dessus ne les couvre pas : le
+                  // filtre ne prouvant rien sur `establishmentId`, Firestore
+                  // refusait la requête EN BLOC. Ici le filtre fixe `classId`,
+                  // et le get() sur la classe parente prouve l'appartenance à
+                  // son établissement — même ancrage que pour les `learners`.
+                  || (isEstabAdmin() && classeParenteDeMonEtablissement(resource.data.classId));
+
+      // `request.resource` : la séance n'existe pas encore, on contrôle ce qui
+      // est écrit. L'enseignant s'y désigne lui-même et vise une de SES classes.
+      // `isSchoolRole()` sur les trois règles d'écriture, pour le double rôle
+      // (cf. lecture ci-dessus). Le périmètre effectif est INCHANGÉ : il vient
+      // de `teacherId == uid` et du claim `classIds` — un directeur qui
+      // n'enseigne aucune classe a un `classIds` vide et ne peut rien écrire.
+      allow create: if isSuperAdmin()
+                    || (isSchoolRole()
+                        && request.resource.data.teacherId == request.auth.uid
+                        && mesClasses().hasAny([request.resource.data.classId]));
+
+      // Les DEUX états sont contrôlés. Sans le `before` sur `teacherId`, un
+      // enseignant s'approprierait la séance d'un collègue en réécrivant ce
+      // champ ; sans le figeage de `classId`, il déplacerait une séance vers une
+      // classe qui n'est pas la sienne après coup.
+      allow update: if isSuperAdmin()
+                    || (isSchoolRole()
+                        && resource.data.teacherId == request.auth.uid
+                        && request.resource.data.teacherId == request.auth.uid
+                        && mesClasses().hasAny([resource.data.classId])
+                        && request.resource.data.classId == resource.data.classId);
+
+      allow delete: if isSuperAdmin()
+                    || (isSchoolRole() && resource.data.teacherId == request.auth.uid);
+
+      // Lecture des séances EN COURS par l'élève rattaché à la classe (lot 5).
+      //
+      // `list` est nécessaire, et non un simple `get` : personne ne transmet à
+      // l'élève l'identifiant de la séance. Son écran « ma classe » interroge
+      // `where(classId == …) && where(status == 'running')` — sans `list`, il
+      // n'affiche jamais rien.
+      //
+      // Pourquoi c'est sûr : Firestore n'autorise une requête que si le filtre
+      // GARANTIT À LUI SEUL la lisibilité de chaque résultat possible ; sinon
+      // il refuse la requête entière, il ne filtre pas après coup. Le périmètre
+      // est donc exactement celui du `get` — les séances en cours de SA classe.
+      allow get, list: if isAuthenticated()
+                       && resource.data.status == 'running'
+                       && eleveRattacheA(resource.data.classId);
+
+      // Cours source déposés par l'enseignant (texte extrait + chunks).
+      // FERMÉS à l'élève : c'est le support de cours du professeur, le jeu n'en
+      // a aucun besoin — seul le contenu généré à partir de lui est joué.
+      // Les sous-collections n'héritant pas du parent, la règle est réécrite.
+      match /sourceDocs/{document=**} {
+        allow read, write: if isSuperAdmin()
+                           || (isTeacher() && seanceDeMaClasse(sid))
+                           || (isEstabAdmin() && seanceDeMonEtablissement(sid));
+      }
+
+      // Contenu généré (quiz, duels, financements, opportunités).
+      //
+      // OUVERT EN LECTURE à l'élève d'une séance en cours. Ce point mérite
+      // d'être justifié, car il contient les bonnes réponses :
+      //
+      //   1. Le moteur de jeu tourne ENTIÈREMENT sur le téléphone. Pour poser
+      //      une question et dire si la réponse est juste, il lui faut
+      //      `correctAnswer` en local. Sans cette lecture, aucune partie de
+      //      classe n'est jouable.
+      //   2. C'est déjà le modèle du jeu : `editions` et `programs` sont en
+      //      `allow read: if true` — TOUT le contenu du jeu, corrigés compris,
+      //      est lisible par n'importe quel joueur. Cette règle-ci est donc
+      //      STRICTEMENT PLUS RESTRICTIVE que l'existant : séance en cours,
+      //      élève réellement rattaché à la classe.
+      //   3. Le seul remède réel serait une correction côté serveur, donc un
+      //      moteur en ligne — au prix de la jouabilité hors ligne, qui est
+      //      précisément ce qui permet de jouer sur le wifi d'un établissement.
+      //
+      // L'ÉCRITURE reste réservée au back-office : un élève ne peut pas
+      // fabriquer ni altérer le contenu de sa séance.
+      match /content/{document=**} {
+        allow read: if isSuperAdmin()
+                    || (isTeacher() && seanceDeMaClasse(sid))
+                    || (isEstabAdmin() && seanceDeMonEtablissement(sid))
+                    // `exists()` d'abord : les deux `get()` ci-dessous portent
+                    // sur une séance qui peut ne pas exister (contenu préparé
+                    // par le wizard avant création de la séance, ou séance
+                    // supprimée). Sans lui, l'évaluation ÉCHOUE au lieu de
+                    // refuser proprement — même précaution que partout ailleurs.
+                    || (isAuthenticated()
+                        && exists(/databases/$(database)/documents/classSessions/$(sid))
+                        && get(/databases/$(database)/documents/classSessions/$(sid)).data.status == 'running'
+                        && eleveRattacheA(get(/databases/$(database)/documents/classSessions/$(sid)).data.classId));
+        allow write: if isSuperAdmin()
+                     || (isTeacher() && seanceDeMaClasse(sid))
+                     || (isEstabAdmin() && seanceDeMonEtablissement(sid));
+      }
+
+      // Progression et réponses de CHAQUE élève pendant la séance.
+      // L'id du document est le `learnerId` : l'élève n'écrit que le sien,
+      // vérifié sur `learners.linkedUid` — le seul champ que le back-office
+      // écrit et que le client ne peut pas falsifier.
+      match /participants/{learnerId} {
+        allow read: if isSuperAdmin()
+                    || (isTeacher() && seanceDeMaClasse(sid))
+                    || (isEstabAdmin() && seanceDeMonEtablissement(sid))
+                    || estCetEleve(sid, learnerId);
+        allow create, update: if estCetEleve(sid, learnerId);
+        // Personne ne supprime une trace de participation : c'est la base du
+        // rapport de séance et des certificats.
+        allow delete: if isSuperAdmin();
+      }
+    }
+
+    // L'élève est-il RÉELLEMENT rattaché à cette classe ?
+    //
+    // Lu dans `classLinks/{uid}` — miroir écrit par le seul Admin SDK
+    // (`POST /api/class/link`), fermé en écriture à tous par la règle ci-dessous.
+    // C'est la différence décisive avec `users/{uid}.classIds`, que l'élève
+    // écrit lui-même : ici, il ne peut pas s'auto-délivrer le droit.
+    //
+    // `exists()` d'abord : sans lui, un élève non encore rattaché ferait ÉCHOUER
+    // l'évaluation au lieu d'être refusé proprement.
+    function eleveRattacheA(cid) {
+      return exists(/databases/$(database)/documents/classLinks/$(request.auth.uid))
+             && get(/databases/$(database)/documents/classLinks/$(request.auth.uid))
+                  .data.get('classId', '') == cid;
+    }
+
+    // Ce compte est-il bien CET élève de CETTE séance ?
+    //
+    // Double vérification, volontairement redondante :
+    //   1. `classLinks/{uid}.learnerId == learnerId` — l'élève n'écrit que SA
+    //      ligne de participation, pas celle d'un camarade ;
+    //   2. la séance visée porte bien la classe de son rattachement.
+    // Les deux viennent de documents que seul l'Admin SDK écrit.
+    function estCetEleve(sid, learnerId) {
+      return isAuthenticated()
+             && exists(/databases/$(database)/documents/classLinks/$(request.auth.uid))
+             && get(/databases/$(database)/documents/classLinks/$(request.auth.uid))
+                  .data.get('learnerId', '') == learnerId
+             // `exists()` sur la séance : un participant écrit sous une séance
+             // supprimée ferait ÉCHOUER l'évaluation au lieu d'être refusé.
+             && exists(/databases/$(database)/documents/classSessions/$(sid))
+             && eleveRattacheA(
+                  get(/databases/$(database)/documents/classSessions/$(sid)).data.classId
+                );
+    }
+
+    // Miroir de rattachement d'un élève, écrit UNIQUEMENT par l'Admin SDK.
+    // Lecture par son propriétaire (l'app mobile y trouve sa classe et son
+    // learnerId sans passer par une API) ; AUCUNE écriture n'est autorisée à
+    // qui que ce soit — c'est ce qui fait de ce document une source de vérité
+    // opposable, au contraire de `users/{uid}.classIds`.
+    match /classLinks/{uid} {
+      allow read: if isOwner(uid) || isSuperAdmin();
+      allow write: if false;
+    }
+
+    // La séance appartient-elle à une classe de cet enseignant ? Sert aux
+    // SOUS-COLLECTIONS, dont le document parent n'est pas dans `resource` —
+    // d'où le get(), facturé mais seul moyen de tenir l'invariant.
+    //
+    // ⚠️ CAS DE LA SÉANCE PAS ENCORE ÉCRITE — c'est le cas NORMAL, pas un cas
+    // limite. Le wizard `/seances/nouvelle` tire l'id de la séance dès le
+    // montage et écrit `sourceDocs` (dépôt du cours) puis `content` (génération)
+    // AVANT de créer le document de séance, qui n'est écrit qu'à la validation
+    // finale. Un wizard abandonné ne doit pas laisser de séance fantôme.
+    //
+    // Avec `exists()` seul, tout le parcours de préparation était donc refusé :
+    // le document parent n'existe pas encore, la condition ne peut pas être
+    // évaluée sur son `teacherId`.
+    //
+    // POURQUOI C'EST SÛR d'autoriser l'enseignant sur une séance inexistante :
+    // il n'y a rien à lire (aucun document sous une séance qui n'existe pas, et
+    // s'il y en avait, ce serait les siens — il en est l'unique auteur possible),
+    // et ce qu'il écrit reste inerte tant que la séance n'est pas créée. Or
+    // `allow create` sur `classSessions/{sid}` impose `teacherId == uid` ET une
+    // classe de son périmètre : il ne peut PAS faire aboutir une séance sur la
+    // classe d'un collègue. Le pire scénario est donc qu'il écrive du contenu
+    // sous un id de séance jamais créé — des orphelins invisibles, exactement ce
+    // que le wizard produit déjà en cas d'abandon.
+    //
+    // La borne `isTeacher()` reste portée par les règles appelantes : un élève
+    // ou un rôle non scolaire ne passe par aucune de ces fonctions.
+    function seanceDeMaClasse(sid) {
+      return !exists(/databases/$(database)/documents/classSessions/$(sid))
+             || get(/databases/$(database)/documents/classSessions/$(sid))
+                  .data.teacherId == request.auth.uid
+             // Co-enseignant d'une classe partagée : la fiche de classe liste
+             // les séances des collègues, et le recalcul des cumuls relit les
+             // `participants` de TOUTES les séances `ended` de la classe — y
+             // compris les leurs. Sans cette clause, le recalcul d'une classe
+             // partagée échouait à moitié, séance par séance, en silence.
+             || mesClasses().hasAny([
+                  get(/databases/$(database)/documents/classSessions/$(sid)).data.classId
+                ]);
+    }
+
+    // Idem pour le directeur, sur l'établissement. Le directeur qui enseigne
+    // (double rôle) prépare ses séances par le même wizard : la même tolérance
+    // à la séance pas encore écrite s'applique, pour la même raison.
+    function seanceDeMonEtablissement(sid) {
+      return !exists(/databases/$(database)/documents/classSessions/$(sid))
+             || get(/databases/$(database)/documents/classSessions/$(sid))
+                  .data.establishmentId == myEstablishment();
     }
 
     // Leaderboards collection

@@ -1,3 +1,4 @@
+import type { ClassGameContext } from './class';
 import type { ProgramGameContext } from './program';
 
 // ===== PLAYER TYPES =====
@@ -91,6 +92,12 @@ export interface GameState {
   ranking?: string[]; // Liste ordonnée des playerIds par rang final (index 0 = 1er, etc.)
   challengeContext?: ChallengeContext;
   programContext?: ProgramGameContext;
+  /**
+   * Séance de classe, quand la partie est jouée en Mode Classe.
+   * Purement informatif pour le moteur, qui l'ignore : il sert à l'écran de jeu
+   * pour savoir où remonter progression et réponses (cf. `classService`).
+   */
+  classContext?: ClassGameContext;
   createdAt: number;
   updatedAt: number;
 }
@@ -126,6 +133,8 @@ export interface FundingEvent {
   sponsorLogoUrl?: string;
   /** Lien externe de l'opportunité réelle du sponsor (sauvegardable dans le profil). */
   sponsorLinkUrl?: string;
+  /** Édition sponsorisée d'origine — sert à attribuer les métriques au bon sponsor. */
+  sponsorEditionId?: string;
 }
 
 // Option de réponse pour un duel (toutes sont "correctes" mais avec des points différents)
@@ -211,6 +220,8 @@ export interface OpportunityEvent {
   sponsorLogoUrl?: string;
   /** Lien externe de l'opportunité réelle du sponsor (sauvegardable dans le profil). */
   sponsorLinkUrl?: string;
+  /** Édition sponsorisée d'origine — sert à attribuer les métriques au bon sponsor. */
+  sponsorEditionId?: string;
 }
 
 /**
@@ -225,6 +236,13 @@ export interface SavedSponsorOpportunity {
   logoUrl?: string;
   linkUrl: string;
   savedAt: number;
+  /**
+   * Édition sponsorisée d'où provient la carte — nécessaire pour attribuer le
+   * CLIC (ouverture du lien depuis le profil) au bon sponsor.
+   * Optionnel : les items sauvegardés AVANT l'ajout des métriques n'ont pas ce
+   * champ ; leur clic ne peut alors pas être compté (perte acceptable, non rattrapable).
+   */
+  editionId?: string;
 }
 
 export interface ChallengeEvent {
@@ -442,3 +460,22 @@ export type {
   ProgramPlayAccess,
   ProgramPlayAccessReason,
 } from './program';
+
+// Mode Classe (lot 5) — parcours élève
+export type {
+  ClassLearnerChoice,
+  ClassJoinLookup,
+  ClassLinkResult,
+  ClassJoinErrorKind,
+  ClassLink,
+  MyClass,
+  ClassSessionStatus,
+  ClassSessionSummary,
+  ClassSessionContent,
+  ClassParticipantStatus,
+  ClassProgress,
+  ClassAnswer,
+  ClassGameContext,
+} from './class';
+// `ClassJoinError` est une CLASSE : export de valeur, pas de type.
+export { ClassJoinError } from './class';

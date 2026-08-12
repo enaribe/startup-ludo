@@ -378,6 +378,9 @@ const en: Record<string, string> = {
   'game.onlineGameDesc': 'Take on players from around the world in real time.',
   'game.tagRanking': 'Ranking',
   'game.tagAccountRequired': 'Account required',
+  'game.classGameTitle': 'CLASS MODE',
+  'game.classGameDesc': 'Join the session started by your teacher and play with your class.',
+  'game.tagWithClass': 'With your class',
   'game.noProjectHeader': 'New project required',
   'game.noProjectTitle': 'NO PROJECT',
   'game.createMyStartup': 'Create my company',
@@ -1173,6 +1176,54 @@ const en: Record<string, string> = {
   'forceUpdate.title': 'UPDATE REQUIRED',
   'forceUpdate.description': 'A new version of Startup Ludo is available. Update the app to keep playing.',
   'forceUpdate.button': 'UPDATE NOW',
+
+  // ═══ Class Mode — learner journey ═══
+  // Home
+
+  // Code entry
+  'class.joinHeader': 'My class',
+  'class.joinTitle': 'JOIN A CLASS',
+  'class.joinSubtitle': 'Enter the 6-character code given by your teacher.',
+  'class.codeLabel': 'Class code',
+  'class.codeHint': 'The code is valid for a few minutes only. Your teacher can show it again if needed.',
+  'class.joinCta': 'CONTINUE',
+  'class.guestBlocked': 'Create an account to join your class: it keeps your progress and your certificates.',
+
+  // Name selection
+  'class.pickHeader': 'My class',
+  'class.pickTitle': 'WHO ARE YOU?',
+  'class.pickSubtitle': 'Pick your name from your class list.',
+  'class.nameTakenBadge': 'Taken',
+  'class.allNamesTaken': 'Every name in this class is already linked. Let your teacher know.',
+  'class.confirmTitle': 'ARE YOU {{name}}?',
+  'class.confirmBody': 'This choice is final: your account will be linked to this name for the whole year. Only your teacher can fix a mistake.',
+  'class.confirmCta': 'YES, THAT\'S ME',
+  'class.confirmCancel': 'THAT\'S NOT ME',
+
+  // My class and its sessions
+  'class.myClassesHeader': 'My class',
+  'class.myClassFallback': 'My class',
+  'class.learnerFallback': 'Learner',
+  'class.linkedAs': 'Linked as {{name}}',
+  'class.sessionsTitle': 'RUNNING SESSIONS',
+  'class.sessionLive': 'Live',
+  'class.sessionFallbackTitle': 'Class session',
+  'class.sessionDuration': 'Planned duration: {{minutes}} min',
+  'class.joinSessionCta': 'JOIN THE SESSION',
+  'class.noSessionTitle': 'NO SESSION',
+  'class.noSessionBody': 'Your session will show up here as soon as your teacher starts it.',
+  'class.noClassTitle': 'NO CLASS',
+  'class.noClassBody': 'You are not linked to any class. Ask your teacher for the code.',
+
+  // Errors — a DISTINCT message per cause, or the learner stays stuck
+  'class.errorInvalidCode': 'This code is no longer valid. Ask your teacher to reactivate it.',
+  'class.errorRateLimited': 'Too many attempts. Wait about {{minutes}} min before trying again.',
+  'class.errorOffline': 'No connection. Check your network and try again.',
+  'class.errorUnauthenticated': 'Sign in with your account to join your class.',
+  'class.errorNameTaken': 'This name was just picked by another learner. Select yours.',
+  'class.errorConflict': 'This name is no longer available. Select yours from the list.',
+  'class.errorEmptyClass': 'No learners in this class yet. Let your teacher know.',
+  'class.errorUnknown': 'Something went wrong. Try again in a moment.',
 };
 
 export default en;

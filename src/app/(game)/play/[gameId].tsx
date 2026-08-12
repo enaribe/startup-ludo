@@ -48,6 +48,7 @@ import { useGameStore, useSettingsStore, useAuthStore, useAudioUiStore } from '@
 import { useOnlineGame } from '@/hooks/useOnlineGame';
 import { useTurnMachine, type TurnActions } from '@/hooks/useTurnMachine';
 import { useDuel } from '@/hooks/useDuel';
+import { useClassSessionReporter } from '@/hooks/useClassSessionReporter';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
@@ -185,6 +186,14 @@ export default function PlayScreen() {
   const currentPlayer = useGameStore(
     (s) => s.game ? s.game.players[s.game.currentPlayerIndex] ?? null : null
   );
+
+  // ===== MODE CLASSE =====
+  // Remontée de la partie vers la séance de l'enseignant. Inerte (no-op) sur
+  // toute partie qui n'est pas une séance de classe — le hook est donc monté
+  // sans condition. Rien de ce qu'il expose n'est `await`-able : la boucle de
+  // jeu ne peut pas se retrouver à attendre le réseau (cf. son en-tête).
+  const classContext = useGameStore((s) => s.game?.classContext);
+  const classReporter = useClassSessionReporter(classContext);
 
   // Settings
   const soundEnabled = useSettingsStore((s) => s.soundEnabled);
@@ -1056,15 +1065,84 @@ export default function PlayScreen() {
     return undefined;
   }, [isOnline, game?.status, game?.winner, game?.id, router, game]);
 
+  // ===== MODE CLASSE : progression et fin de partie =====
+  //
+  // Le joueur local est le PREMIER de la liste : une séance de classe se joue
+  // en solo (chaque élève sur son téléphone), l'élève est donc `players[0]` —
+  // même construction que les parties programme.
+  const classLocalPlayer = game?.players[0] ?? null;
+
+  // Position de l'élève sur le plateau, ramenée à un entier lisible par
+  // l'enseignant. Les pions à la maison valent 0 ; ceux du chemin final et
+  // arrivés sont projetés APRÈS le circuit (36 cases) pour rester croissants —
+  // sans quoi un élève sur le point de gagner afficherait « case 2 ».
+  const classCellIndex = useMemo(() => {
+    const pawn = classLocalPlayer?.pawns?.[0];
+    if (!pawn) return 0;
+    switch (pawn.status) {
+      case 'circuit': return pawn.position;
+      case 'final': return 36 + pawn.position;
+      case 'finished': return 40;
+      default: return 0;
+    }
+  }, [classLocalPlayer?.pawns]);
+
+  // Envoi throttlé (10 s) : le hook absorbe le débit et n'écrit jamais de façon
+  // bloquante. Cet effet se contente de lui pousser l'état courant à chaque
+  // changement notable — case, jetons, tour.
+  useEffect(() => {
+    if (!classReporter.actif || !classLocalPlayer) return;
+    classReporter.signalerProgression({
+      cellIndex: classCellIndex,
+      tokens: classLocalPlayer.tokens,
+      // Le nombre de cartes jouées n'est pas suivi par le moteur : le numéro de
+      // tour en est l'approximation la plus fidèle sans y toucher (une carte au
+      // plus par tour). À affiner au lot 6 si le rapport l'exige.
+      cardsPlayed: game?.currentTurn ?? 0,
+    });
+  }, [classReporter, classLocalPlayer, classCellIndex, game?.currentTurn]);
+
+  // Fin de séance. Branché sur `status === 'finished'` plutôt que sur `handleWin` :
+  // c'est le seul état atteint par TOUTES les sorties de partie (victoire,
+  // défaite, forfait, fin distante). Le hook se garde lui-même contre les
+  // appels répétés, l'écriture ne peut donc pas partir deux fois.
+  useEffect(() => {
+    if (!classReporter.actif || game?.status !== 'finished' || !classLocalPlayer) return;
+    classReporter.signalerFin({
+      progress: {
+        cellIndex: classCellIndex,
+        tokens: classLocalPlayer.tokens,
+        cardsPlayed: game?.currentTurn ?? 0,
+      },
+      score: classLocalPlayer.tokens,
+    });
+  }, [classReporter, game?.status, game?.currentTurn, classLocalPlayer, classCellIndex]);
+
   // ===== EVENT POPUP HANDLERS =====
 
   const handleQuizAnswer = useCallback(
     (correct: boolean, reward: number, selectedIndex: number) => {
+      // ===== MODE CLASSE — point d'accroche UNIQUE des réponses =====
+      // C'est cette ligne qui alimentera le rapport pédagogique de l'enseignant
+      // (notions maîtrisées par catégorie). Elle est placée AVANT la résolution
+      // pour lire `quizData` tant qu'il est renseigné — `setQuizData(null)`
+      // ci-dessous vide l'état au rendu suivant. `category` vient du quiz joué,
+      // donc du contenu généré depuis le cours du prof.
+      // L'appel est synchrone et non bloquant : il ne peut ni retarder ni faire
+      // échouer la résolution de l'événement, quoi qu'il arrive au réseau.
+      if (quizData) {
+        classReporter.signalerReponse({
+          quizId: quizData.id,
+          category: quizData.category,
+          correct,
+        });
+      }
+
       actions.resolveEvent({ ok: correct, reward, selectedIndex });
       setQuizData(null);
       handleEventResolve();
     },
-    [actions, handleEventResolve]
+    [actions, handleEventResolve, quizData, classReporter]
   );
 
   const handleFundingAccept = useCallback(

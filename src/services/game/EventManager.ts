@@ -6,6 +6,7 @@
  */
 
 import type { EventType } from '@/types';
+import { getCachedSponsorViews, watchSponsorViews } from '@/services/firebase/sponsorMetricsService';
 import {
   getEdition,
   type EditionId,
@@ -60,6 +61,8 @@ export interface GeneratedFundingEvent {
     sponsored?: boolean;
     sponsorLogoUrl?: string;
     sponsorLinkUrl?: string;
+    /** Édition d'où vient la carte sponsor — sert au comptage des métriques. */
+    sponsorEditionId?: string;
   };
 }
 
@@ -86,6 +89,8 @@ export interface GeneratedOpportunityEvent {
     sponsored?: boolean;
     sponsorLogoUrl?: string;
     sponsorLinkUrl?: string;
+    /** Édition d'où vient la carte sponsor — sert au comptage des métriques. */
+    sponsorEditionId?: string;
   };
 }
 
@@ -187,6 +192,24 @@ export class EventManager {
   setEdition(editionId: EditionId): void {
     this.editionId = editionId;
     this.reset();
+    this.ensureSponsorViewsWatched(editionId);
+  }
+
+  /**
+   * Amorce le suivi du total de vues d'une édition SPONSORISÉE avec un plafond.
+   * Appelé au démarrage d'une partie (setEdition) et à la première génération
+   * d'événement pour une édition tierce en online (generateEventForEdition) :
+   * ce sont les deux seuls chemins par lesquels une édition entre en jeu, y
+   * compris quand le popup sponsor n'a PAS été affiché (match rapide, joueur qui
+   * rejoint un salon, édition d'un adversaire). Sans plafond configuré, aucun
+   * abonnement n'est ouvert : on ne paie pas de lecture inutile.
+   * `watchSponsorViews` est idempotent (un seul listener par édition).
+   */
+  private ensureSponsorViewsWatched(editionId: EditionId): void {
+    const sponsor = getEdition(editionId).sponsor;
+    if (!sponsor?.enabled) return;
+    if (typeof sponsor.viewsGoal !== 'number' || sponsor.viewsGoal <= 0) return;
+    watchSponsorViews(editionId);
   }
 
   /**
@@ -230,6 +253,7 @@ export class EventManager {
     this.usedChallengeIds.clear();
     this.usedSponsorCardIds.clear();
     this.sponsorStatusLogged = false;
+    this.sponsorStoppedLogged = false;
     // Repart d'une mémoire « récents » vierge pour la nouvelle partie/niveau.
     this.recentIds = new WeakMap();
   }
@@ -244,6 +268,34 @@ export class EventManager {
     const sponsor = getEdition(this.editionId).sponsor;
     this.logSponsorStatusOnce(sponsor);
     if (!sponsor?.enabled) return null;
+
+    // Diffusion suspendue par l'admin → on se comporte comme une édition
+    // non sponsorisée (contenu normal), sans jamais bloquer le jeu.
+    if (sponsor.paused === true) {
+      if (__DEV__ && !this.sponsorStoppedLogged) {
+        this.sponsorStoppedLogged = true;
+        console.log(`[Sponsor] Diffusion SUSPENDUE (paused) sur "${this.editionId}" → contenu normal`);
+      }
+      return null;
+    }
+
+    // Plafond de vues acheté atteint → idem, contenu normal.
+    // Le total vient du cache alimenté par watchSponsorViews() (lecture O(1),
+    // aucune I/O ici : pickSponsorCard est appelé dans la boucle de jeu).
+    if (typeof sponsor.viewsGoal === 'number' && sponsor.viewsGoal > 0) {
+      const views = getCachedSponsorViews(this.editionId);
+      if (views >= sponsor.viewsGoal) {
+        if (__DEV__ && !this.sponsorStoppedLogged) {
+          this.sponsorStoppedLogged = true;
+          console.log(
+            `[Sponsor] Plafond de vues ATTEINT sur "${this.editionId}" ` +
+              `(${views}/${sponsor.viewsGoal}) → contenu normal`
+          );
+        }
+        return null;
+      }
+    }
+
     const pool = (kind === 'funding' ? sponsor.fundings : sponsor.opportunities) ?? [];
     const available = pool.filter((card) => card.text && !this.usedSponsorCardIds.has(card.id));
     if (available.length === 0) {
@@ -274,6 +326,8 @@ export class EventManager {
 
   /** État sponsor loggé une seule fois par partie, au premier passage sur une case concernée. */
   private sponsorStatusLogged = false;
+  /** Arrêt de diffusion (paused / plafond atteint) loggé une seule fois par partie. */
+  private sponsorStoppedLogged = false;
   private logSponsorStatusOnce(sponsor: ReturnType<typeof getEdition>['sponsor']): void {
     if (!__DEV__ || this.sponsorStatusLogged) return;
     this.sponsorStatusLogged = true;
@@ -359,6 +413,8 @@ export class EventManager {
   generateEventForEdition(eventType: EventType, editionId: EditionId): GeneratedGameEvent | null {
     const previousEdition = this.editionId;
     this.editionId = editionId;
+    // Online : l'édition d'un adversaire n'est jamais passée à setEdition().
+    this.ensureSponsorViewsWatched(editionId);
     const event = this.generateEvent(eventType);
     this.editionId = previousEdition;
     return event;
@@ -463,6 +519,7 @@ export class EventManager {
           sponsored: true,
           sponsorLogoUrl: sponsorCard.logoUrl || undefined,
           sponsorLinkUrl: sponsorCard.linkUrl || undefined,
+          sponsorEditionId: this.editionId,
         },
       };
     }
@@ -576,6 +633,7 @@ export class EventManager {
           sponsored: true,
           sponsorLogoUrl: sponsorCard.logoUrl || undefined,
           sponsorLinkUrl: sponsorCard.linkUrl || undefined,
+          sponsorEditionId: this.editionId,
         },
       };
     }
@@ -736,6 +794,18 @@ export class EventManager {
 
     // Choix du type : 50/50 si les deux sont dispo, sinon celui qui a des items
     const pickOpp = hasOpp && (!hasChal || Math.random() < 0.5);
+
+    // Les cases `event` sont la SEULE source d'opportunités du plateau
+    // (CIRCUIT_EVENTS ne contient aucune case 'opportunity' : 4 'funding' et
+    // 6 'event'). Sans ce passage par generateOpportunityEvent(), une carte
+    // opportunité sponsor achetée ne serait jamais tirée — donc jamais vue ni
+    // facturée. Le tirage sponsor (25 %, anti-répétition, plafond) reste
+    // entièrement géré par pickSponsorCard() ; si aucune carte sponsor ne sort,
+    // on retombe sur le contenu normal ci-dessous.
+    if (pickOpp) {
+      const sponsored = this.generateOpportunityEvent();
+      if (sponsored?.data.sponsored) return sponsored;
+    }
 
     if (pickOpp) {
       const picked = this.pickRandomUnused(opportunities, this.usedOpportunityIds);
