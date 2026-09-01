@@ -62,6 +62,7 @@ import type {
   ClassLinkResult,
   ClassProgress,
   ClassSessionContent,
+  ClassSessionLookup,
   ClassSessionSummary,
   MyClass,
 } from '@/types/class';
@@ -223,6 +224,55 @@ export async function rejoindreClasseParCode(code: string): Promise<ClassJoinLoo
 }
 
 /**
+ * Résout un code de SALLE D'ATTENTE — la porte du QR projeté par l'enseignant.
+ *
+ * Décalque de `rejoindreClasseParCode`, sur `/api/session/join/[code]` : même
+ * absence d'authentification (route publique, bornée par l'expiration du code
+ * et la limite de tentatives par IP), même normalisation locale qui économise
+ * un appel réseau ET un crédit de quota sur une saisie hors alphabet.
+ *
+ * ⚠️ CE QU'ELLE NE FAIT PAS : autoriser l'entrée. Elle désigne une séance et
+ * projette la liste des noms de SA classe. C'est la règle Firestore
+ * `estCetEleve()` qui vérifie ensuite que l'appelant est rattaché à cette
+ * classe précise — un élève d'une autre classe obtient donc bien cette réponse,
+ * puis se voit refuser l'écriture par la base. L'écran compare `classId` au
+ * rattachement local pour l'annoncer proprement, mais la garantie n'est pas là.
+ *
+ * @throws `ClassJoinError` — mêmes cas que `rejoindreClasseParCode`.
+ */
+export async function rejoindreSeanceParCode(code: string): Promise<ClassSessionLookup> {
+  const codeNormalise = normaliserCodeClasse(code);
+  if (!estCodeClasseValide(codeNormalise)) throw new ClassJoinError('invalid_code');
+
+  const reponse = await appelApi(`${baseApi()}/api/session/join/${codeNormalise}`, {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+  });
+  if (!reponse.ok) throw await erreurDepuisReponse(reponse);
+
+  const donnees = (await reponse.json()) as Partial<ClassSessionLookup>;
+  const learners = Array.isArray(donnees.learners) ? donnees.learners : [];
+
+  return {
+    sessionId: donnees.sessionId ?? '',
+    classId: donnees.classId ?? '',
+    className: donnees.className ?? '',
+    sessionTitle: donnees.sessionTitle ?? '',
+    editionId: donnees.editionId ?? '',
+    demarree: donnees.demarree === true,
+    // Re-normalisation défensive : l'écran grise sur `taken`, une valeur
+    // absente ne doit jamais se lire comme « libre ».
+    learners: learners.map(
+      (e): ClassLearnerChoice => ({
+        id: String(e.id ?? ''),
+        displayName: String(e.displayName ?? ''),
+        taken: e.taken === true,
+      })
+    ),
+  };
+}
+
+/**
  * Étape 2 du rattachement — lie DÉFINITIVEMENT ce compte à un nom de la classe.
  *
  * Le serveur écrit, dans une seule transaction : `learners.linkedUid`,
@@ -352,6 +402,8 @@ function versSeance(id: string, data: Record<string, unknown>): ClassSessionSumm
   const contentPackId = typeof data['contentPackId'] === 'string' ? data['contentPackId'] : undefined;
   const title = typeof data['title'] === 'string' ? data['title'] : undefined;
   const startedAt = typeof data['startedAt'] === 'number' ? data['startedAt'] : undefined;
+  const startedPlayingAt =
+    typeof data['startedPlayingAt'] === 'number' ? data['startedPlayingAt'] : undefined;
 
   return {
     id,
@@ -365,6 +417,7 @@ function versSeance(id: string, data: Record<string, unknown>): ClassSessionSumm
     ...(contentPackId ? { contentPackId } : {}),
     ...(title ? { title } : {}),
     ...(startedAt ? { startedAt } : {}),
+    ...(startedPlayingAt ? { startedPlayingAt } : {}),
   };
 }
 
@@ -429,6 +482,41 @@ export function ecouterSeancesEnCours(
       // Index manquant, règles, hors ligne : on n'efface pas la liste déjà
       // affichée — l'élève garde sa séance sous les yeux et peut la rejoindre.
       firebaseLog('Abonnement aux séances en cours en échec', error);
+    }
+  );
+}
+
+/**
+ * Écoute UNE séance précise — le moteur de la SALLE D'ATTENTE.
+ *
+ * L'élève entré par le QR patiente sur `startedPlayingAt` : quand l'enseignant
+ * appuie sur « Démarrer la partie », le champ apparaît et toute la salle part
+ * ensemble, à la seconde. Sans temps réel, chacun devrait tirer pour rafraîchir
+ * et le départ groupé — tout l'intérêt de la salle d'attente — serait perdu.
+ *
+ * Lecture PAR ID, jamais en requête : la règle Firestore autorise l'élève
+ * rattaché à lire la séance de SA classe, mais un `where` ne pourrait rien
+ * promettre sur `classId` et le listing serait refusé en bloc.
+ *
+ * Le callback reçoit `null` si la séance disparaît ou devient illisible — c'est
+ * le cas quand l'enseignant clôture : l'écran doit alors sortir l'élève.
+ */
+export function ecouterSeance(
+  sessionId: string,
+  callback: (seance: ClassSessionSummary | null) => void
+): () => void {
+  if (!sessionId) return () => undefined;
+
+  return onSnapshot(
+    doc(getFirestore(), FIRESTORE_COLLECTIONS.classSessions, sessionId),
+    (snap) => {
+      const data = snap.data();
+      callback(data ? versSeance(snap.id, data as Record<string, unknown>) : null);
+    },
+    (error) => {
+      // Règles, hors ligne : on ne prétend pas que la séance n'existe plus —
+      // l'écran garde son état et laisse l'élève réessayer.
+      firebaseLog('Abonnement à la séance en échec', error);
     }
   );
 }
@@ -606,6 +694,11 @@ export function enregistrerReponse(sessionId: string, learnerId: string, reponse
       learnerId,
       status: 'playing',
       answers: arrayUnion(reponse),
+      lastEvent: {
+        kind: reponse.correct === true ? 'quiz_ok' : 'quiz_ko',
+        label: reponse.category ?? '',
+        at: reponse.answeredAt ?? Date.now(),
+      },
     },
     'enregistrerReponse'
   );

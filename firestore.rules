@@ -275,10 +275,156 @@ service cloud.firestore {
     // (`trackSponsorMetric`) qui valide l'appelant, l'editionId et le cardId
     // avant d'incrémenter avec l'Admin SDK. Non implémenté ici pour rester
     // cohérent avec l'existant et éviter la latence d'un appel par carte vue.
+    // ══════════════════════════════════════════════════════════════════
+    // ESPACE ANNONCEUR — CAMPAGNES (lot 4)
+    // ══════════════════════════════════════════════════════════════════
+    //
+    // Une campagne (« mise en visibilité ») appartient à SON annonceur
+    // (`ownerUid`). Le sponsor ne circule qu'entre `draft` et `in_review` :
+    // `active`, `rejected`, `paused`, `ended` sont posés par la modération
+    // CONCREE — s'auto-activer reviendrait à se passer de la vérification des
+    // 48 h, qui est le contrat de confiance vis-à-vis des joueurs.
+    match /campaigns/{cid} {
+      allow read: if isSuperAdmin()
+                  || (isSponsor() && resource.data.ownerUid == request.auth.uid);
+      allow create: if isSponsor()
+                    && request.resource.data.ownerUid == request.auth.uid
+                    && request.resource.data.status == 'draft';
+      allow update: if isSuperAdmin()
+                    || (isSponsor()
+                        && resource.data.ownerUid == request.auth.uid
+                        && request.resource.data.ownerUid == request.auth.uid
+                        && resource.data.status in ['draft', 'in_review']
+                        && request.resource.data.status in ['draft', 'in_review']
+                        // Les mois réservés sont posés par la transaction
+                        // serveur : un client qui les écrirait s'attribuerait
+                        // une exclusivité sans passer par le calendrier.
+                        && request.resource.data.get('reservationMonths', [])
+                             == resource.data.get('reservationMonths', []));
+      allow delete: if isSuperAdmin()
+                    || (isSponsor()
+                        && resource.data.ownerUid == request.auth.uid
+                        && resource.data.status == 'draft');
+    }
+
+    // L'EXCLUSIVITÉ d'une édition : un document par édition × mois, créé par la
+    // seule transaction Admin SDK (`POST /api/annonceur/reserver`). Lecture par
+    // les comptes annonceurs (le calendrier affiche les mois pris et par qui) —
+    // pas par les joueurs, qui n'ont rien à y lire.
+    match /editionReservations/{rid} {
+      allow read: if isSuperAdmin() || isSponsor();
+      allow write: if false;
+    }
+
+    // Le FEED lu par le mobile : projection compacte des campagnes ACTIVES,
+    // écrite par le seul serveur à chaque décision de modération. Lecture
+    // publique, comme le contenu du jeu (`editions`) : le tirage doit marcher
+    // aussi pour un invité, même si ses vues ne sont pas comptées.
+    match /sponsorFeed/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // ESPACE ANNONCEUR — FACTURATION (lot 6)
+    // ══════════════════════════════════════════════════════════════════
+    //
+    // Le SOLDE et les FACTURES sont de l'argent : écriture Admin SDK
+    // uniquement, sans exception. L'annonceur lit son compte et ses factures ;
+    // il ne peut modifier que ses informations de facturation (raison sociale,
+    // NINEA, contact) — jamais un montant.
+    // ══════════════════════════════════════════════════════════════════
+    // INSCRIPTION LIBRE DU BACK-OFFICE (plan I1)
+    // ══════════════════════════════════════════════════════════════════
+    //
+    // Un compte s'inscrit librement mais N'A AUCUN DROIT tant que ses claims
+    // ne sont pas posés : la demande est le seul document qu'il touche. Le
+    // STATUT n'est jamais modifiable par le demandeur — approbations par
+    // Admin SDK uniquement. La direction lit les demandes ENSEIGNANT de son
+    // établissement (circuit d'affectation, plan I4).
+    match /signupRequests/{uid} {
+      allow read: if isSuperAdmin()
+                  || (isAuthenticated() && request.auth.uid == uid)
+                  || (isEstabAdmin()
+                      && resource.data.get('establishmentId', '') == myEstablishment());
+      allow create: if isAuthenticated()
+                    && request.auth.uid == uid
+                    && request.resource.data.status == 'pending';
+      allow update, delete: if false;
+    }
+
+    match /advertisers/{uid} {
+      allow read: if isSuperAdmin() || (isSponsor() && request.auth.uid == uid);
+
+      // ═══ CRÉATION PAR L'ANNONCEUR — SES INFOS DE FACTURATION, RIEN D'AUTRE ═══
+      //
+      // Le document naissait UNIQUEMENT à la première alimentation par CONCREE
+      // (`allow create: if false`). Conséquence : un annonceur fraîchement
+      // inscrit ne pouvait pas enregistrer sa raison sociale ni son NINEA avant
+      // d'avoir payé — l'inverse de l'ordre réel, où l'on renseigne sa
+      // facturation AVANT de régler. Il tombait sur un refus parlant d'une
+      // « initialisation » qu'il ne pouvait pas déclencher lui-même.
+      //
+      // La création lui est donc ouverte, mais bornée aux MÊMES champs que la
+      // mise à jour : il ne peut pas s'inventer un solde, ni poser un plafond,
+      // ni quoi que ce soit qui engage CONCREE. `balanceFcfa` reste absent du
+      // document tant que le serveur ne l'écrit pas — un solde manquant se lit
+      // comme zéro côté écran, jamais comme un crédit.
+      allow create: if isSponsor() && request.auth.uid == uid
+                    && request.resource.data.keys()
+                         .hasOnly(['billingInfo', 'updatedAt', 'createdAt']);
+
+      allow update: if isSponsor() && request.auth.uid == uid
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['billingInfo', 'updatedAt']);
+      allow delete: if false;
+
+      match /topUps/{topUpId} {
+        allow read: if isSuperAdmin() || (isSponsor() && request.auth.uid == uid);
+        allow write: if false;
+      }
+    }
+
+    match /invoices/{invoiceId} {
+      allow read: if isSuperAdmin()
+                  || (isSponsor() && resource.data.ownerUid == request.auth.uid);
+      allow write: if false;
+    }
+
+    // Signalements joueurs d'une carte sponsor : UN vote par joueur, create-only
+    // (même patron que `touched` : l'unicité est garantie par la règle, pas par
+    // le client). Trois votes distincts déclenchent une revérification HUMAINE
+    // par la route d'entretien — jamais une sanction automatique côté client.
+    match /sponsorReports/{cardId}/votes/{uid} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated() && request.auth.uid == uid;
+      allow update, delete: if false;
+    }
+
     match /sponsorMetrics/{editionId} {
       allow read: if isAuthenticated();
       allow create, update: if isAuthenticated();
       allow delete: if isAdmin();
+
+      // Buckets quotidiens (télémétrie v2) : mêmes droits que le document
+      // parent — incréments par tout joueur authentifié, courbes lues par
+      // l'admin. Les sous-collections n'héritent jamais du parent.
+      match /daily/{day} {
+        allow read: if isAuthenticated();
+        allow create, update: if isAuthenticated();
+        allow delete: if isAdmin();
+      }
+
+      // Marqueur « personne unique » : UN document par joueur, CREATE-ONLY.
+      // C'est la règle qui fonde le compteur `uniqueViews` : le premier
+      // contact crée le marqueur (et incrémente), tout passage suivant est
+      // refusé ici — l'unicité est garantie par la règle, pas par le client
+      // (un cache local effacé ou une réinstallation ne double donc rien).
+      match /touched/{uid} {
+        allow read: if isAdmin();
+        allow create: if isAuthenticated() && request.auth.uid == uid;
+        allow update, delete: if false;
+      }
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -654,7 +800,27 @@ service cloud.firestore {
                   // refusait la requête EN BLOC. Ici le filtre fixe `classId`,
                   // et le get() sur la classe parente prouve l'appartenance à
                   // son établissement — même ancrage que pour les `learners`.
-                  || (isEstabAdmin() && classeParenteDeMonEtablissement(resource.data.classId));
+                  || (isEstabAdmin() && classeParenteDeMonEtablissement(resource.data.classId))
+                  // ÉLÈVE RATTACHÉ, séance ouverte — la clause qui rend la SALLE
+                  // D'ATTENTE possible (PLAN-CODE-SESSION.md).
+                  //
+                  // Sans elle, l'élève entré par le QR ne peut pas lire la
+                  // séance : il ne verrait donc jamais `startedPlayingAt`
+                  // apparaître, et resterait bloqué sur l'écran d'attente alors
+                  // que l'enseignant a lancé la partie.
+                  //
+                  // Le périmètre est EXACTEMENT celui du contenu de séance
+                  // (`content/{document=**}`, plus bas) : séance `running` ET
+                  // `classLinks/{uid}.classId == classId`. Le code d'entrée
+                  // n'ouvre donc rien par lui-même — un élève d'une autre classe
+                  // qui scanne le QR est refusé ICI, pas seulement dans l'app.
+                  //
+                  // ⚠️ Lecture par ID uniquement (`getDoc`), jamais en requête :
+                  // un `where` ne pourrait rien promettre sur `classId`, et
+                  // Firestore refuserait le listing en bloc.
+                  || (isAuthenticated()
+                      && resource.data.status == 'running'
+                      && eleveRattacheA(resource.data.classId));
 
       // `request.resource` : la séance n'existe pas encore, on contrôle ce qui
       // est écrit. L'enseignant s'y désigne lui-même et vise une de SES classes.
@@ -676,7 +842,16 @@ service cloud.firestore {
                         && resource.data.teacherId == request.auth.uid
                         && request.resource.data.teacherId == request.auth.uid
                         && mesClasses().hasAny([resource.data.classId])
-                        && request.resource.data.classId == resource.data.classId);
+                        && request.resource.data.classId == resource.data.classId)
+                    // La DIRECTION peut CLÔTURER une séance de son
+                    // établissement — et seulement ça (status/endedAt).
+                    // Découvert à l'usage : une séance jamais terminée par son
+                    // enseignant reste « en cours » indéfiniment, visible par
+                    // les élèves, et la direction ne pouvait rien faire.
+                    || (isEstabAdmin()
+                        && resource.data.establishmentId == myEstablishment()
+                        && request.resource.data.diff(resource.data).affectedKeys()
+                             .hasOnly(['status', 'endedAt', 'updatedAt']));
 
       allow delete: if isSuperAdmin()
                     || (isSchoolRole() && resource.data.teacherId == request.auth.uid);

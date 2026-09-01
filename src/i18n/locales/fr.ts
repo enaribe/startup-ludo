@@ -315,6 +315,15 @@ const fr = {
   'profile.menuStats': 'STATISTIQUES DÉTAILLÉES',
   'profile.menuCommunity': 'REJOINDRE LA COMMUNAUTÉ',
   'profile.menuNetwork': 'RÉSEAU & AMIS',
+  // ===== Région déclarée (Espace Annonceur, lot 2) =====
+  'region.header': 'Ton profil',
+  'region.title': 'OÙ HABITES-TU ?',
+  'region.body': 'Choisis ta région pour voir les opportunités et financements près de chez toi.',
+  'region.confirm': 'CONFIRMER',
+  'region.later': 'Plus tard',
+  'region.settingTitle': 'Ma région',
+  'region.settingEmpty': 'Non renseignée',
+
   'profile.menuSettings': 'PARAMÈTRE',
   'profile.menuHelp': 'AIDE & SUPPORT',
   'profile.menuAchievements': 'ACHIEVEMENTS',
@@ -1160,6 +1169,16 @@ const fr = {
   'sponsoredEdition.play': 'JOUER',
 
   // Événements sponsor en partie — bouton Sauvegarder + section Profil
+  'sponsorEvent.report': 'Signaler cette carte',
+  'sponsorEvent.reported': 'Signalée — merci, notre équipe va vérifier.',
+  'sponsorEvent.flipDetails': 'VOIR LES DÉTAILS',
+  'sponsorEvent.flipBack': 'RETOUR À LA CARTE',
+  'sponsorEvent.sponsoredBy': 'Sponsorisé par {{name}}',
+  'sponsorEvent.advantage': 'Avantage',
+  'sponsorEvent.eligibility': 'Éligibilité',
+  'sponsorEvent.deadline': 'Date limite',
+  'sponsorEvent.learnMore': 'EN SAVOIR PLUS',
+  'sponsorEvent.eventLabel': 'ÉVÉNEMENT',
   'sponsorEvent.save': 'Sauvegarder pour plus tard',
   'sponsorEvent.saved': 'Sauvegardée — à retrouver dans ton profil',
   'profile.savedOpportunitiesTitle': 'Mes opportunités',
@@ -1225,6 +1244,17 @@ const fr = {
   'class.errorConflict': 'Ce nom n\'est plus disponible. Sélectionne le tien dans la liste.',
   'class.errorEmptyClass': 'Aucun élève dans cette classe pour le moment. Préviens ton enseignant.',
   'class.errorUnknown': 'Une erreur est survenue. Réessaie dans un instant.',
+
+  // ── Salle d'attente : le QR projeté par l'enseignant ──
+  'class.sessionResolving': 'On rejoint la partie…',
+  'class.sessionJoined': 'Tu es dans la partie !',
+  'class.sessionWaitingTeacher': 'En attente du départ…',
+  'class.sessionStartingNow': 'La partie démarre !',
+  'class.sessionKeepOpen': 'Garde cet écran ouvert : la partie se lance toute seule.',
+  'class.sessionRefusedTitle': 'Impossible de rejoindre',
+  'class.sessionOtherClass':
+    'Cette séance est réservée à la classe {{className}}. Ton compte est rattaché à une autre classe.',
+  'class.sessionClosed': 'Cette séance est terminée.',
 } as const;
 
 export default fr;

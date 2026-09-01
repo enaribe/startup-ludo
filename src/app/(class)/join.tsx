@@ -28,6 +28,7 @@ import {
   estCodeClasseValide,
   normaliserCodeClasse,
   rejoindreClasseParCode,
+  rejoindreSeanceParCode,
 } from '@/services/firebase/classService';
 import { useAuthStore } from '@/stores';
 import { SPACING } from '@/styles/spacing';
@@ -96,6 +97,29 @@ export default function ClassJoinScreen() {
     setChargement(true);
     setErreur(null);
     try {
+      // ═══ DEUX CODES, UN SEUL CHAMP ═══
+      //
+      // Le code d'une SALLE D'ATTENTE (celui projeté au tableau avec le QR) et
+      // le code de RATTACHEMENT à une classe partagent le même alphabet : rien
+      // ne les distingue à la lecture. On essaie donc la séance d'abord — c'est
+      // le cas courant depuis la refonte — et on retombe sur le rattachement
+      // classique si le code n'ouvre aucune séance.
+      //
+      // L'ordre compte : l'inverse enverrait vers le rattachement un élève qui
+      // veut juste rejoindre la partie en cours, et lui ferait rechoisir son nom.
+      try {
+        await rejoindreSeanceParCode(codeNormalise);
+        router.push({ pathname: '/(class)/session/[code]', params: { code: codeNormalise } });
+        return;
+      } catch (erreurSeance) {
+        // Seul un code inconnu justifie le repli : une panne réseau ou un quota
+        // dépassé doivent remonter tels quels, sinon l'élève verrait le message
+        // du SECOND essai, qui décrirait mal ce qui s'est passé.
+        if (!(erreurSeance instanceof ClassJoinError) || erreurSeance.kind !== 'invalid_code') {
+          throw erreurSeance;
+        }
+      }
+
       const resultat = await rejoindreClasseParCode(codeNormalise);
       // Une classe sans aucun élève actif : le prof n'a pas encore saisi sa
       // liste. Sans ce garde-fou, l'écran suivant afficherait un vide sans

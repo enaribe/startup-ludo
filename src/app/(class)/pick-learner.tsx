@@ -41,6 +41,12 @@ export default function PickLearnerScreen() {
     classId?: string;
     className?: string;
     learners?: string;
+    /**
+     * Code de la SALLE D'ATTENTE d'où vient l'élève (QR projeté), s'il y a lieu.
+     * Présent = il rejoint une partie qui l'attend ; à la fin du rattachement on
+     * l'y renvoie plutôt que vers la liste de ses classes.
+     */
+    sessionCode?: string;
   }>();
 
   const code = params.code ?? '';
@@ -98,7 +104,18 @@ export default function PickLearnerScreen() {
       setSelection(null);
       // `replace` et non `push` : le rattachement est fait, revenir en arrière
       // vers la saisie du code n'aurait plus aucun sens.
-      router.replace('/(class)/my-classes');
+      //
+      // `sessionCode` n'est présent que si l'élève arrive d'une SALLE D'ATTENTE
+      // (QR projeté ou code de séance). Dans ce cas il ne veut pas la liste de
+      // ses classes : il veut entrer dans la partie qui l'attend, maintenant.
+      if (params.sessionCode) {
+        router.replace({
+          pathname: '/(class)/session/[code]',
+          params: { code: params.sessionCode },
+        });
+      } else {
+        router.replace('/(class)/my-classes');
+      }
     } catch (error) {
       setSelection(null);
       if (error instanceof ClassJoinError) {
@@ -112,7 +129,7 @@ export default function PickLearnerScreen() {
     } finally {
       setChargement(false);
     }
-  }, [selection, chargement, code, className, rememberLink, router, t]);
+  }, [selection, chargement, code, className, params.sessionCode, rememberLink, router, t]);
 
   /** Repli quand le serveur n'a pas rédigé de message. */
   const messageParDefaut = useCallback(

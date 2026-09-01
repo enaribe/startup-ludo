@@ -46,6 +46,26 @@ export interface ClassLinkResult {
 }
 
 /**
+ * Réponse de `GET /api/session/join/[code]` — la SALLE D'ATTENTE projetée par
+ * l'enseignant (QR ou code dicté).
+ *
+ * Étend `ClassJoinLookup` : c'est la même projection de liste d'élèves, plus
+ * ce qui identifie la séance. Un élève déjà rattaché à `classId` entre
+ * directement ; les autres passent par le choix du nom, exactement comme au
+ * rattachement classique.
+ */
+export interface ClassSessionLookup extends ClassJoinLookup {
+  /** Séance à rejoindre. */
+  sessionId: string;
+  /** Titre donné par l'enseignant, pour l'annoncer avant d'entrer. */
+  sessionTitle: string;
+  /** Édition support de la séance. */
+  editionId: string;
+  /** True si la partie a déjà démarré — l'élève rejoint alors en cours de route. */
+  demarree: boolean;
+}
+
+/**
  * Nature d'un échec de rattachement. L'écran en tire un message DISTINCT :
  * « code invalide » et « pas de réseau » n'appellent pas le même geste de la
  * part de l'élève, et le confondre bloque une classe entière.
@@ -139,6 +159,14 @@ export interface ClassSessionSummary {
   durationMinutes: number;
   /** Début effectif, en millisecondes epoch. */
   startedAt?: number;
+  /**
+   * Instant où l'enseignant a lancé la partie, en ms epoch.
+   *
+   * Absent = SALLE D'ATTENTE : la séance est ouverte, les élèves rejoignent et
+   * patientent. Présent = le jeu est parti. C'est ce champ que l'écran d'attente
+   * surveille pour démarrer tout le monde en même temps.
+   */
+  startedPlayingAt?: number;
 }
 
 /**

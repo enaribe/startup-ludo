@@ -315,6 +315,15 @@ const en: Record<string, string> = {
   'profile.menuStats': 'DETAILED STATISTICS',
   'profile.menuCommunity': 'JOIN THE COMMUNITY',
   'profile.menuNetwork': 'NETWORK & FRIENDS',
+  // ===== Declared region (Advertiser space, lot 2) =====
+  'region.header': 'Your profile',
+  'region.title': 'WHERE DO YOU LIVE?',
+  'region.body': 'Pick your region to see opportunities and funding near you.',
+  'region.confirm': 'CONFIRM',
+  'region.later': 'Later',
+  'region.settingTitle': 'My region',
+  'region.settingEmpty': 'Not set',
+
   'profile.menuSettings': 'SETTINGS',
   'profile.menuHelp': 'HELP & SUPPORT',
   'profile.menuAchievements': 'ACHIEVEMENTS',
@@ -1159,6 +1168,16 @@ const en: Record<string, string> = {
   'sponsoredEdition.play': 'PLAY',
 
   // Sponsor events in game — Save button + Profile section
+  'sponsorEvent.report': 'Report this card',
+  'sponsorEvent.reported': 'Reported — thanks, our team will review it.',
+  'sponsorEvent.flipDetails': 'SEE DETAILS',
+  'sponsorEvent.flipBack': 'BACK TO CARD',
+  'sponsorEvent.sponsoredBy': 'Sponsored by {{name}}',
+  'sponsorEvent.advantage': 'Benefit',
+  'sponsorEvent.eligibility': 'Eligibility',
+  'sponsorEvent.deadline': 'Deadline',
+  'sponsorEvent.learnMore': 'LEARN MORE',
+  'sponsorEvent.eventLabel': 'EVENT',
   'sponsorEvent.save': 'Save for later',
   'sponsorEvent.saved': 'Saved — find it in your profile',
   'profile.savedOpportunitiesTitle': 'My opportunities',
@@ -1224,6 +1243,17 @@ const en: Record<string, string> = {
   'class.errorConflict': 'This name is no longer available. Select yours from the list.',
   'class.errorEmptyClass': 'No learners in this class yet. Let your teacher know.',
   'class.errorUnknown': 'Something went wrong. Try again in a moment.',
+
+  // ── Waiting room: the QR code projected by the teacher ──
+  'class.sessionResolving': 'Joining the game…',
+  'class.sessionJoined': 'You’re in!',
+  'class.sessionWaitingTeacher': 'Waiting for the start…',
+  'class.sessionStartingNow': 'The game is starting!',
+  'class.sessionKeepOpen': 'Keep this screen open — the game starts on its own.',
+  'class.sessionRefusedTitle': 'Can’t join',
+  'class.sessionOtherClass':
+    'This session is reserved for class {{className}}. Your account belongs to another class.',
+  'class.sessionClosed': 'This session has ended.',
 };
 
 export default en;
