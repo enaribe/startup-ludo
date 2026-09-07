@@ -391,6 +391,17 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Intentions de paiement (PayDunya). Écriture SERVEUR EXCLUSIVE : ces
+    // documents portent l'idempotence du crédit — un client capable d'en
+    // remettre une à `pending` pourrait se faire créditer deux fois.
+    // La lecture reste ouverte au propriétaire pour que son écran puisse
+    // suivre l'état d'un paiement en cours.
+    match /paymentIntents/{intentId} {
+      allow read: if isSuperAdmin()
+                  || (isSponsor() && resource.data.ownerUid == request.auth.uid);
+      allow write: if false;
+    }
+
     // Signalements joueurs d'une carte sponsor : UN vote par joueur, create-only
     // (même patron que `touched` : l'unicité est garantie par la règle, pas par
     // le client). Trois votes distincts déclenchent une revérification HUMAINE

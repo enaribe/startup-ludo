@@ -15,6 +15,12 @@ service firebase.storage {
       );
     }
 
+    // Compte annonceur : MEME claim que dans firestore.rules, pour que les deux
+    // jeux de regles ne puissent pas diverger sur qui est annonceur.
+    function isSponsor() {
+      return isAuthenticated() && request.auth.token.sponsor == true;
+    }
+
     function isValidImage() {
       return request.resource.contentType.matches('image/.*')
         && request.resource.size < 5 * 1024 * 1024; // max 5 Mo
@@ -67,6 +73,31 @@ service firebase.storage {
       allow read: if true;
       allow write: if isAdmin() && isValidImage();
       allow delete: if isAdmin();
+    }
+
+    // Visuels d'une campagne annonceur (logo du cartouche, photo d'habillage).
+    //
+    // POURQUOI CETTE REGLE EXISTE : le chemin `campaigns/{id}/...` ne
+    // correspondait a aucun match et tombait donc dans le refus global du bas
+    // de fichier — tout upload de logo echouait en `storage/unauthorized`.
+    //
+    // `isSponsor()` plutot que `isAdmin()` : un annonceur porte bien
+    // `admin: true` en plus de `sponsor: true`, si bien qu'`isAdmin()` aurait
+    // « marche » — mais aurait aussi ouvert l'ecriture a TOUT admin (etablissement,
+    // enseignant) sur les visuels de n'importe quelle campagne. On ouvre au role
+    // qui a une raison metier d'ecrire ici, pas au premier role qui passe.
+    //
+    // Lecture publique : ces visuels sont affiches dans le jeu, y compris a un
+    // joueur non connecte — meme regime que `editions/` juste au-dessus.
+    //
+    // Le SVG est accepte (`image/*`) car l'interface l'annonce. Un SVG peut
+    // porter du script, mais Firebase Storage le sert depuis un domaine
+    // distinct de l'application : il ne s'execute donc pas en meme origine, et
+    // les visuels sont de toute facon rendus via <img>, qui n'execute rien.
+    match /campaigns/{campaignId}/{fileName} {
+      allow read: if true;
+      allow write: if isSponsor() && isValidImage();
+      allow delete: if isSponsor() || isAdmin();
     }
 
     // Avatars utilisateurs — lecture publique, écriture par le propriétaire uniquement
