@@ -209,6 +209,14 @@ export interface EditionSponsor {
   fundings?: SponsorEventCard[];
   /** Volume de vues acheté par le sponsor ; au-delà, les cartes ne sont plus tirées. */
   viewsGoal?: number;
+  /**
+   * Fin d'exclusivité (ms) : dernier instant du dernier mois réservé. Au-delà,
+   * l'habillage ne s'affiche plus, même si le back-office n'a pas encore
+   * exécuté sa tâche d'entretien — celle-ci est déclenchée à la main, donc
+   * s'appuyer sur elle seule laisserait diffuser un sponsor dont la période
+   * payée est terminée, sur un créneau déjà revendu au suivant.
+   */
+  endAt?: number | null;
   /** Diffusion suspendue manuellement (admin) ou budget épuisé. */
   paused?: boolean;
 }
