@@ -28,6 +28,7 @@ import { GameButton } from '@/components/ui/GameButton';
 import { RadialBackground } from '@/components/ui/RadialBackground';
 import { AuthInput, AuthHeader } from '@/components/auth';
 import { useTranslation } from '@/i18n';
+import { EMAIL_OTP_ENABLED } from '@/config/features';
 import { useAuthStore, useUserStore } from '@/stores';
 import { updateUserProfile } from '@/services/firebase/auth';
 import { createUserProfile, getUserProfile, updateFirestoreUserProfile } from '@/services/firebase';
@@ -60,6 +61,15 @@ export default function CompleteProfileScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [availability, setAvailability] = useState<AvailabilityState>('idle');
+
+  // Filet de sécurité : un nouvel inscrit email qui a tué l'app avant de
+  // saisir son OTP revient ici au boot suivant — on le renvoie d'abord à la
+  // vérification. Les comptes anciens ne passent jamais par cet écran.
+  useEffect(() => {
+    if (EMAIL_OTP_ENABLED && user?.email && !user.emailVerified) {
+      router.replace('/(auth)/verify-email');
+    }
+  }, [user?.email, user?.emailVerified, router]);
 
   // Jeton pour ignorer les résultats de vérifications obsolètes (course de debounce)
   const checkSeqRef = useRef(0);
@@ -125,7 +135,9 @@ export default function CompleteProfileScreen() {
       setProfile(profile);
       clearNeedsProfileCompletion();
 
-      router.replace('/(tabs)/home');
+      // Enchaîne sur la page « Fais-nous connaissance » (région, âge,
+      // situation…) — elle redirige vers l'accueil une fois remplie.
+      router.replace('/(auth)/profile-details');
     } catch (err) {
       console.error('Failed to update profile:', err);
       // Si la réservation a échoué, le pseudo a été pris entre-temps

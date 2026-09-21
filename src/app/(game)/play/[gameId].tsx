@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Image, Pressable, StyleSheet, Switch, Text, View, type LayoutChangeEvent } from 'react-native';
+import { AppState, Image, Pressable, StyleSheet, Switch, Text, View, type LayoutChangeEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient as SvgLinearGradient, Rect, Stop } from 'react-native-svg';
 
@@ -43,6 +43,17 @@ import { Button } from '@/components/ui/Button';
 import { GameButton } from '@/components/ui/GameButton';
 import { Modal } from '@/components/ui/Modal';
 import { GamePopup, RadialBackground } from '@/components/ui';
+import { trackEvent } from '@/services/analytics';
+import {
+  clearGameInProgress,
+  markGameInProgress,
+  setBackgroundedHint,
+  setNetworkLostHint,
+  updateGameProgress,
+  type GameQuitScreen,
+} from '@/services/analytics/gameQuitTracker';
+import { getEventAtCircuitPosition } from '@/config/boardConfig';
+import database from '@react-native-firebase/database';
 import { eventManager } from '@/services/game/EventManager';
 import { useGameStore, useSettingsStore, useAuthStore, useAudioUiStore } from '@/stores';
 import { useOnlineGame } from '@/hooks/useOnlineGame';
@@ -54,7 +65,7 @@ import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { getRandomDuelQuestions, localizeReceivedDuelQuestions } from '@/data/duelQuestions';
 import { rollRandomJoker } from '@/data/jokers';
-import { crashLog } from '@/utils/gameLog';
+import { crashLog, gameLog } from '@/utils/gameLog';
 import type { ChallengeEvent, FundingEvent, OpportunityEvent, Player, PlayerColor, QuizEvent, DuelResult, DuelQuestion, Joker, JokerType } from '@/types';
 
 // Online : délai max d'attente du choix de capture d'un attrapé distant avant
@@ -788,7 +799,7 @@ export default function PlayScreen() {
 
       crashLog('duel remote received', { challengerId, opponentId, questionsCount: questions?.length, myId: userId });
 
-      console.log('[DUEL-DEBUG] remoteEvent duel reçu', {
+      gameLog('duel', 'remoteEvent duel reçu', {
         challengerId,
         opponentId,
         questionsCount: questions?.length,
@@ -799,7 +810,7 @@ export default function PlayScreen() {
       if (challengerId && opponentId && questions && questions.length > 0) {
         if (userId === challengerId) {
           // Je suis le challenger — duel déjà configuré localement
-          console.log('[DUEL-DEBUG] je suis le challenger, rien à faire');
+          gameLog('duel', 'je suis le challenger, rien à faire');
         } else if (userId === opponentId) {
           // Je suis l'adversaire — rejoindre le duel si différent
           const currentDuel = duelRef.current;
@@ -808,7 +819,7 @@ export default function PlayScreen() {
             currentDuel.duelState?.challengerId !== challengerId ||
             currentDuel.duelState?.opponentId !== opponentId;
 
-          console.log('[DUEL-DEBUG] je suis l\'adversaire', {
+          gameLog('duel', 'je suis l\'adversaire', {
             isActive: currentDuel.isActive,
             isDifferentDuel,
           });
@@ -816,7 +827,7 @@ export default function PlayScreen() {
             setIsEventSpectator(false);
             setDuelTriggered(true);
             duelRef.current.joinDuel(challengerId, opponentId, questions);
-            console.log('[DUEL-DEBUG] joinDuel appelé');
+            gameLog('duel', 'joinDuel appelé');
           }
         } else {
           // Je suis spectateur (3-4 joueurs)
@@ -1534,15 +1545,134 @@ export default function PlayScreen() {
     onlineGame.clearRemoteEmojiReaction();
   }, [isOnline, onlineGame.remoteEmojiReaction, onlineGame]);
 
+  // ===== MARQUEUR « PARTIE EN COURS » (game_quit : crash / arrière-plan / réseau) =====
+  // Entretenu pendant le jeu et effacé à toute sortie propre : s'il survit
+  // jusqu'au prochain lancement, flushAbandonedGame() émettra le game_quit
+  // rétroactif avec la raison mémorisée (voir gameQuitTracker).
+
+  // Pose du marqueur à l'entrée en partie ; retiré au démontage (sortie propre).
+  useEffect(() => {
+    if (!game?.id) return;
+    markGameInProgress({
+      mode: game.mode,
+      edition: game.edition,
+      playersCount: game.players.length,
+      startedAt: game.createdAt,
+    });
+    return () => clearGameInProgress();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game?.id]);
+
+  // Case du pion du JOUEUR LOCAL (celui qui pourrait quitter) : index circuit,
+  // ou sa zone ('home'/'final'/'finished'). Valeur primitive → dep d'effet sûre.
+  const localQuitPlayer = game?.players.find((p) => (isOnline ? p.id === userId : !p.isAI));
+  const localQuitPawn = localQuitPlayer?.pawns?.[0];
+  const localBoardPosition: number | string | null =
+    localQuitPawn == null
+      ? null
+      : localQuitPawn.status === 'circuit'
+        ? localQuitPawn.position
+        : localQuitPawn.status;
+
+  // Tour courant, écran, case et événement affichés, tenus à jour dans le
+  // marqueur — c'est ce qui permet de savoir SUR QUELLE CASE et PENDANT QUEL
+  // événement (quiz, duel, financement…) le joueur a lâché la partie. Une
+  // partie TERMINÉE efface le marqueur : game_finished est déjà parti, un
+  // kill sur l'écran des résultats ne doit pas produire un faux game_quit.
+  useEffect(() => {
+    if (!game?.id) return;
+    if (game.status === 'finished') {
+      clearGameInProgress();
+      return;
+    }
+    const screen: GameQuitScreen =
+      isOnline && onlineGame.opponentDisconnected ? 'attente_adversaire' : 'plateau_de_jeu';
+    updateGameProgress({
+      turnNumber: game.currentTurn,
+      screen,
+      boardPosition: localBoardPosition,
+      caseEventType:
+        typeof localBoardPosition === 'number'
+          ? getEventAtCircuitPosition(localBoardPosition)
+          : null,
+      activeEvent: game.pendingEvent?.type ?? null,
+    });
+  }, [
+    game?.id,
+    game?.currentTurn,
+    game?.status,
+    game?.pendingEvent?.type,
+    localBoardPosition,
+    isOnline,
+    onlineGame.opponentDisconnected,
+  ]);
+
+  // Indice « app_backgrounded » : posé quand l'app part en arrière-plan en
+  // pleine partie, retiré si elle revient (l'utilisateur n'a pas abandonné).
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'background') setBackgroundedHint(true);
+      else if (state === 'active') setBackgroundedHint(false);
+    });
+    return () => sub.remove();
+  }, []);
+
+  // Indice « network_lost » (parties en ligne) : suit la connexion RTDB.
+  useEffect(() => {
+    if (!isOnline) return;
+    const ref = database().ref('.info/connected');
+    const handler = ref.on('value', (snap) => {
+      setNetworkLostHint(snap.val() === false);
+    });
+    return () => ref.off('value', handler);
+  }, [isOnline]);
+
   // ===== QUIT HANDLER =====
 
   const handleQuit = useCallback(() => {
     setShowQuitConfirm(false);
+    // Partie quittée volontairement : sans cet événement, un abandon serait
+    // invisible (game_started sans game_finished) dans les funnels.
+    const game = useGameStore.getState().game;
+    // Trace de diagnostic : distingue « handleQuit jamais appelé » de « appelé
+    // mais sans partie en mémoire », deux causes de game_quit manquant qui se
+    // ressemblent depuis le dashboard.
+    if (__DEV__) {
+      console.log('[Quit] confirmation reçue — partie en mémoire :', game ? 'oui' : 'NON (aucun événement ne partira)');
+    }
+    if (game) {
+      const local = game.players.find((p) => (isOnline ? p.id === userId : !p.isAI));
+      const pawn = local?.pawns?.[0];
+      const boardPosition =
+        pawn == null ? null : pawn.status === 'circuit' ? pawn.position : pawn.status;
+      trackEvent('game_quit', {
+        mode: game.mode,
+        edition: game.edition,
+        players_count: game.players.length,
+        turn_number: game.currentTurn,
+        screen: game.status === 'finished'
+          ? 'resultats'
+          : isOnline && onlineGame.opponentDisconnected
+            ? 'attente_adversaire'
+            : 'plateau_de_jeu',
+        board_position: boardPosition ?? 'inconnue',
+        case_event_type:
+          typeof boardPosition === 'number'
+            ? getEventAtCircuitPosition(boardPosition)
+            : 'none',
+        active_event: game.pendingEvent?.type ?? 'none',
+        reason: 'voluntary',
+        duration_seconds: Math.round((Date.now() - game.createdAt) / 1000),
+      });
+    }
+    // Sortie propre : le marqueur crash/arrière-plan n'a plus lieu d'être.
+    clearGameInProgress();
     if (isOnline) {
       onlineGame.forfeit();
     }
+    if (__DEV__) console.log('[Quit] retour à l’accueil');
     router.replace('/(tabs)/home');
-  }, [router, isOnline, onlineGame]);
+  }, [router, isOnline, onlineGame, userId]);
 
   // ===== PAWN MOVE ANIMATION COMPLETE (kept for GameBoard) =====
 
@@ -2197,7 +2327,7 @@ export default function PlayScreen() {
           }
         }
 
-        console.log('[DUEL-DEBUG] rendu popup', {
+        gameLog('duel', 'rendu popup', {
           phase: duel.currentPhase,
           isActive: duel.isActive,
           hasChallenger: !!duel.challenger,

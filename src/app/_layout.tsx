@@ -9,7 +9,7 @@ import {
     OpenSans_700Bold,
 } from '@expo-google-fonts/open-sans';
 import { SpaceMono_400Regular } from '@expo-google-fonts/space-mono';
-import { Stack } from 'expo-router';
+import { Stack, usePathname } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useRef } from 'react';
@@ -35,7 +35,8 @@ import {
 import { refreshIdeationFromFirestore } from '@/constants/ideation';
 import { useBackgroundMusic } from '@/hooks/useBackgroundMusic';
 import { resetGuestBannerDismissOnAppStart } from '@/hooks/useGuestBannerDismiss';
-import { initCustomerIO } from '@/services/analytics';
+import { initAmplitude, trackAmplitudeScreen } from '@/services/analytics';
+import { flushAbandonedGame } from '@/services/analytics/gameQuitTracker';
 
 // Keep splash screen visible while loading resources
 SplashScreen.preventAutoHideAsync();
@@ -69,6 +70,18 @@ function InvitationListenerGate() {
     return undefined;
   }, [user, startListening, stopListening]);
 
+  return null;
+}
+
+/**
+ * Envoie chaque changement d'écran à Amplitude (« Screen Viewed ») —
+ * alimente Pathfinder (parcours réels) et l'écran de sortie des funnels.
+ */
+function ScreenTrackerGate() {
+  const pathname = usePathname();
+  useEffect(() => {
+    if (pathname) trackAmplitudeScreen(pathname);
+  }, [pathname]);
   return null;
 }
 
@@ -125,8 +138,11 @@ export default function RootLayout() {
     if (authInitialized.current) return;
     authInitialized.current = true;
     console.log('[App] Starting auth initialization...');
-    // Customer.io doit être initialisé avant l'identify déclenché par l'auth
-    initCustomerIO();
+    // Amplitude doit être initialisé avant l'identify déclenché par l'auth
+    initAmplitude();
+    // Partie terminée anormalement au dernier lancement (crash, arrière-plan,
+    // réseau) ? → émet le game_quit rétroactif mémorisé.
+    void flushAbandonedGame();
     const unsubscribe = useAuthStore.getState().initializeAuth();
 
     // Safety timeout: if auth doesn't initialize within 5 seconds, force it
@@ -228,6 +244,7 @@ export default function RootLayout() {
                 }}
               />
             </Stack>
+            <ScreenTrackerGate />
             <PresenceGate />
             <InvitationListenerGate />
             <GameInvitationPopup />

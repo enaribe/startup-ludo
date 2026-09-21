@@ -157,6 +157,14 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
       // Les succès débloqués sont stockés en tableau dans le doc userStats
       achievements: (statsData?.achievements as string[] | undefined) ?? [],
       startups,
+      // Champs ABSENTS du doc → undefined : l'écran « Fais-nous
+      // connaissance » sait alors quelles questions poser. Ne jamais y
+      // mettre de valeur par défaut.
+      region: userData.region,
+      ageRange: userData.ageRange,
+      situations: userData.situations,
+      acquisitionSource: userData.acquisitionSource,
+      acquisitionSourceDetail: userData.acquisitionSourceDetail,
       createdAt: createdAtMs,
     };
   } catch (error) {
@@ -172,7 +180,15 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
 // Update user profile
 export const updateFirestoreUserProfile = async (
   userId: string,
-  updates: { displayName?: string; avatarUrl?: string | null }
+  updates: {
+    displayName?: string;
+    avatarUrl?: string | null;
+    region?: string;
+    acquisitionSource?: string;
+    acquisitionSourceDetail?: string;
+    ageRange?: string;
+    situations?: string[];
+  }
 ): Promise<void> => {
   try {
     firebaseLog('Updating user profile', { userId, updates });

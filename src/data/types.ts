@@ -217,6 +217,15 @@ export interface EditionSponsor {
    * payée est terminée, sur un créneau déjà revendu au suivant.
    */
   endAt?: number | null;
+  /**
+   * Campagne à laquelle attribuer les vues de cet habillage.
+   *
+   * Le jeu ne connaît que l'`editionId` : sans ce champ, il compte sous
+   * `sponsorMetrics/{editionId}`, une clé PARTAGÉE par tous les annonceurs
+   * qui se succèdent sur l'édition. L'espace annonceur lit les métriques par
+   * campagne et n'y retrouvait donc rien.
+   */
+  campaignId?: string;
   /** Diffusion suspendue manuellement (admin) ou budget épuisé. */
   paused?: boolean;
 }

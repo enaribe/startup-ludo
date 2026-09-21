@@ -24,6 +24,7 @@ import { usePushPermissionPrompt } from '@/hooks/usePushPermissionPrompt';
 import { useReturnBonus } from '@/hooks/useReturnBonus';
 import { useStartupCreationPrompt } from '@/hooks/useStartupCreationPrompt';
 import { useGuestBannerDismiss } from '@/hooks/useGuestBannerDismiss';
+import { trackAmplitudeEvent } from '@/services/analytics';
 
 import { formatXP, getRankProgress, getXPForNextRank } from '@/config/progression';
 import { useAuthStore, useProgramStore, useUserStore } from '@/stores';
@@ -120,6 +121,10 @@ export default function HomeScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
+
+  useEffect(() => {
+    trackAmplitudeEvent('Viewed Home Page', { prompt_version: 'BA400.4' }); // helps improve this setup flow — safe to remove once you've verified the event lands
+  }, []);
   const user = useAuthStore((state) => state.user);
   const profile = useUserStore((state) => state.profile);
 
@@ -127,7 +132,7 @@ export default function HomeScreen() {
   const programs = useProgramStore((state) => state.programs);
 
   const [showInfo, setShowInfo] = useState(false);
-  const { visible: showOnboarding, complete: completeOnboarding } = useOnboarding();
+  const { visible: showOnboarding, complete: completeOnboarding, abandon: abandonOnboarding } = useOnboarding();
   const { visible: showStartupPrompt, dismiss: dismissStartupPrompt } = useStartupCreationPrompt();
   const { visible: showReturnBonus, claim: claimReturnBonus, dismiss: dismissReturnBonus } = useReturnBonus();
   const { visible: showPushPrompt, accept: acceptPushPrompt, dismiss: dismissPushPrompt } = usePushPermissionPrompt();
@@ -146,6 +151,9 @@ export default function HomeScreen() {
   const startupPromptVisible = showStartupPrompt && !onboardingVisible && !returnBonusVisible;
   const pushPromptVisible =
     showPushPrompt && !onboardingVisible && !returnBonusVisible && !startupPromptVisible;
+
+  // Note : les anciens popups « région » et « canal d'acquisition » ont été
+  // remplacés par la page (auth)/profile-details, posée AVANT l'accueil.
 
   const { showProgression: showProgressionParam, xpGained: xpGainedParam, valorisationGain: valorisationGainParam } =
     useLocalSearchParams<{ showProgression?: string; xpGained?: string; valorisationGain?: string }>();
@@ -490,6 +498,7 @@ export default function HomeScreen() {
       <OnboardingModal
         visible={onboardingVisible}
         onComplete={completeOnboarding}
+        onAbandon={abandonOnboarding}
       />
 
       {/* Popup bonus reconnexion */}
@@ -515,6 +524,7 @@ export default function HomeScreen() {
         }}
         onDismiss={dismissStartupPrompt}
       />
+
 
       {/* Popup progression post-partie */}
       <ProgressionPopup

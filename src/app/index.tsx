@@ -25,7 +25,9 @@ import { PrivacyPolicyModal } from '@/components/common/PrivacyPolicyModal';
 import { GameButton } from '@/components/ui/GameButton';
 import { RadialBackground } from '@/components/ui/RadialBackground';
 import { usePrivacyAcceptance } from '@/hooks/usePrivacyAcceptance';
+import { isProfileDetailsComplete } from '@/data/profileOptions';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { useUserStore } from '@/stores/useUserStore';
 import { SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 
@@ -110,6 +112,7 @@ export default function WelcomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { loginAsGuest, isAuthenticated, isInitialized, phoneAuthStep, user, needsProfileCompletion } = useAuthStore();
+  const profile = useUserStore((s) => s.profile);
   const [isGuestLoading, setIsGuestLoading] = useState(false);
   const { accepted, loading: privacyLoading, acceptPrivacy } = usePrivacyAcceptance();
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
@@ -133,15 +136,19 @@ export default function WelcomeScreen() {
   // Redirect if already authenticated (wait for auth to be initialized first)
   // Les invités restent sur l'accueil pour pouvoir choisir entre jouer en invité ou créer un compte.
   // Si le compte n'a pas de pseudo unique → écran de complétion du profil.
+  // Si le profil déclaratif (région, âge, situation) est incomplet → page
+  // « Fais-nous connaissance » avant l'accueil (remplace les popups en cascade).
   useEffect(() => {
     if (!showSplash && isInitialized && isAuthenticated && !user?.isGuest) {
       if (needsProfileCompletion) {
         router.replace('/(auth)/complete-profile');
+      } else if (profile && !isProfileDetailsComplete(profile)) {
+        router.replace('/(auth)/profile-details');
       } else {
         router.replace('/(tabs)/home');
       }
     }
-  }, [showSplash, isAuthenticated, isInitialized, user?.isGuest, needsProfileCompletion, router]);
+  }, [showSplash, isAuthenticated, isInitialized, user?.isGuest, needsProfileCompletion, profile, router]);
 
   // Retour depuis Safari (reCAPTCHA iOS) : phoneAuthStep est encore 'code_sent' ou 'verifying'
   // Expo Router atterrit sur index via le scheme URL → rediriger vers phone-auth pour afficher l'OTP

@@ -28,6 +28,7 @@ import { RadialBackground } from '@/components/ui/RadialBackground';
 import { GradientBorder } from '@/components/ui/GradientBorder';
 import { AuthInput, AuthHeader, SocialAuthButtons } from '@/components/auth';
 import { useTranslation } from '@/i18n';
+import { EMAIL_OTP_ENABLED } from '@/config/features';
 import { useAuthStore } from '@/stores';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -45,17 +46,20 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState('');
 
   // Redirection auto une fois l'utilisateur authentifié.
-  // Si le compte n'a pas encore de pseudo unique → écran de complétion du profil.
+  // Inscription email → vérification OTP d'abord ; ensuite pseudo unique.
+  // Google/Apple arrivent avec un email déjà vérifié par le fournisseur.
   // On ignore les invités : un guest doit pouvoir accéder à cet écran pour se créer un vrai compte.
   useEffect(() => {
     if (isAuthenticated && !user?.isGuest) {
-      if (needsProfileCompletion) {
+      if (EMAIL_OTP_ENABLED && user?.email && !user.emailVerified) {
+        router.replace('/(auth)/verify-email');
+      } else if (needsProfileCompletion) {
         router.replace('/(auth)/complete-profile');
       } else {
         router.replace('/(tabs)/home');
       }
     }
-  }, [isAuthenticated, user?.isGuest, needsProfileCompletion, router]);
+  }, [isAuthenticated, user?.isGuest, user?.email, user?.emailVerified, needsProfileCompletion, router]);
 
   const isFormValid =
     displayName.trim().length >= 2 &&

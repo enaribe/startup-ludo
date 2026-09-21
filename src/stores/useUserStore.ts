@@ -22,7 +22,7 @@ import {
 } from '@/services/analytics';
 
 /**
- * Pousse les attributs de progression du profil vers Customer.io
+ * Pousse les attributs de progression du profil vers Amplitude
  * (segments « il te manque X XP », ciblage par rang, etc.).
  */
 function syncProgressionAttributes(profile: UserProfile): void {
@@ -130,7 +130,7 @@ export const useUserStore = create<UserStore>()(
         });
         // Refresh progression info when profile is set
         get().refreshProgressionInfo();
-        // Customer.io : attributs initiaux du profil (segments de campagnes)
+        // Analytics : attributs initiaux du profil (segments de campagnes)
         if (profile) syncProgressionAttributes(profile);
       },
 
@@ -211,7 +211,7 @@ export const useUserStore = create<UserStore>()(
         // Refresh all progression info
         get().refreshProgressionInfo();
 
-        // Customer.io : rang atteint + attributs à jour (campagnes progression)
+        // Analytics : rang atteint + attributs à jour (campagnes progression)
         if (rankUp) {
           trackRankReached({ rank: rankUp.id, previousRank: getRankFromXP(oldXP).id });
         }
@@ -282,7 +282,7 @@ export const useUserStore = create<UserStore>()(
             state.profile.startups.push(startup);
           }
         });
-        // Customer.io : coupe la campagne « crée ta startup » + attributs valorisation
+        // Analytics : coupe la campagne « crée ta startup » + attributs valorisation
         const profile = get().profile;
         if (profile) {
           trackStartupCreated({ sector: startup.sector, name: startup.name });
@@ -326,7 +326,7 @@ export const useUserStore = create<UserStore>()(
             state.profile.achievements.push(achievementId);
           }
         });
-        // Customer.io : badge débloqué (rappel « Nouveau badge ! »)
+        // Analytics : badge débloqué (rappel « Nouveau badge ! »)
         if (!alreadyUnlocked && get().profile) {
           trackAchievementUnlocked({
             achievementId,

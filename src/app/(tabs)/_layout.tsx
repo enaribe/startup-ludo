@@ -5,7 +5,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
 import { FONTS } from '@/styles/typography';
+import { isProfileDetailsComplete } from '@/data/profileOptions';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { useUserStore } from '@/stores/useUserStore';
 import { LoadingScreen } from '@/components/common/LoadingScreen';
 import { AccueilIcon, PortfolioIcon, ClassementIcon, ProfilIcon } from '@/components/icons';
 
@@ -75,14 +77,24 @@ const hapticTabListeners = () => ({
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { isAuthenticated, isLoading } = useAuthStore();
+  const { isAuthenticated, isLoading, needsProfileCompletion, user } = useAuthStore();
+  const profile = useUserStore((s) => s.profile);
 
-  // Auth guard - redirect to welcome if not authenticated
+  // Auth guard - redirect to welcome if not authenticated.
+  // Un compte sans pseudo unique (inscription interrompue par une course de
+  // navigation) est renvoyé vers l'écran de complétion du profil.
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    if (isLoading) return;
+    if (!isAuthenticated) {
       router.replace('/');
+    } else if (needsProfileCompletion && !user?.isGuest) {
+      router.replace('/(auth)/complete-profile');
+    } else if (!user?.isGuest && profile && !isProfileDetailsComplete(profile)) {
+      // Profil déclaratif incomplet (compte existant) : la page
+      // « Fais-nous connaissance » remplace les popups de l'accueil.
+      router.replace('/(auth)/profile-details');
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [isAuthenticated, isLoading, needsProfileCompletion, user?.isGuest, profile, router]);
 
   // Show loading while checking auth
   if (isLoading) {

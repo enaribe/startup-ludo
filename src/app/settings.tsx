@@ -25,6 +25,9 @@ import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RadialBackground } from '@/components/ui/RadialBackground';
+import { SPONSOR_FEATURES_ENABLED } from '@/config/features';
+import RegionPromptPopup from '@/components/profile/RegionPromptPopup';
+import { regionLabel } from '@/data/regions';
 import { DynamicGradientBorder } from '@/components/ui/GradientBorder';
 import { GameButton } from '@/components/ui/GameButton';
 import { Avatar } from '@/components/ui/Avatar';
@@ -178,6 +181,7 @@ export default function SettingsScreen() {
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showRegionPopup, setShowRegionPopup] = useState(false);
 
   const resetTutorial = useTutorialStore((s) => s.reset);
 
@@ -344,6 +348,20 @@ export default function SettingsScreen() {
           <Text style={styles.langHint}>
             {t('settings.languageHint')}
           </Text>
+
+          {/* Région déclarée — modifiable à tout moment (déménagement, erreur).
+              Masquée pour les invités : pas de profil où l'enregistrer. */}
+          {SPONSOR_FEATURES_ENABLED && !!profile && (
+            <SettingRow
+              icon="location"
+              iconColor="#4CAF50"
+              title={t('region.settingTitle')}
+              subtitle={profile.region ? regionLabel(profile.region) : t('region.settingEmpty')}
+              onPress={() => setShowRegionPopup(true)}
+              showArrow
+              isLast
+            />
+          )}
         </SettingSection>
 
         {/* Section À propos */}
@@ -502,6 +520,13 @@ export default function SettingsScreen() {
           </Animated.View>
         </View>
       </Modal>
+
+      {/* Modification de la région déclarée (pas de « Plus tard » : on est venu exprès) */}
+      <RegionPromptPopup
+        visible={showRegionPopup}
+        onClose={() => setShowRegionPopup(false)}
+        allowLater={false}
+      />
     </View>
   );
 }

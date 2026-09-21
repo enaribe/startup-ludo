@@ -11,7 +11,14 @@
     "lint": "expo lint",
     "test:rules": "firebase emulators:exec --only firestore \"node --test test/*.test.mjs\""
   },
+  "overrides": {
+    "@amplitude/analytics-react-native": {
+      "@react-native-async-storage/async-storage": "$@react-native-async-storage/async-storage"
+    }
+  },
   "dependencies": {
+    "@amplitude/analytics-react-native": "^1.6.9",
+    "@amplitude/plugin-session-replay-react-native": "^0.5.1",
     "@expo-google-fonts/luckiest-guy": "^0.4.1",
     "@expo-google-fonts/open-sans": "^0.4.2",
     "@expo-google-fonts/space-mono": "^0.4.2",
@@ -21,14 +28,13 @@
     "@react-native-firebase/auth": "23.8.8",
     "@react-native-firebase/database": "23.8.8",
     "@react-native-firebase/firestore": "23.8.8",
+    "@react-native-firebase/messaging": "^23.8.8",
     "@react-native-firebase/storage": "23.8.8",
     "@react-native-google-signin/google-signin": "^16.1.1",
     "@react-navigation/bottom-tabs": "^7.4.0",
     "@react-navigation/elements": "^2.6.3",
     "@react-navigation/native": "^7.1.8",
     "@shopify/flash-list": "^2.2.0",
-    "customerio-expo-plugin": "^3.6.2",
-    "customerio-reactnative": "^6.5.2",
     "expo": "~54.0.32",
     "expo-apple-authentication": "~8.0.8",
     "expo-audio": "^1.1.1",

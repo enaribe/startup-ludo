@@ -1,15 +1,28 @@
 /**
- * SponsorEventPopup — Carte SPONSOR tirée en partie (édition sponsorisée).
+ * SponsorEventPopup — Carte SPONSOR tirée en partie.
  *
- * Design fourni (maquette) : même habillage vert que les opportunités
- * (header ampoule + dés) pour les deux types (OPPORTUNITÉ / FINANCEMENT),
- * avec le logo du sponsor au-dessus du texte dans le panneau clair,
- * badge « +N » jetons et bouton CONTINUER.
+ * Deux générations de cartes cohabitent :
+ *   - modèle historique (édition sponsorisée) : recto seul, comme avant ;
+ *   - campagne annonceur (feed, lot 4) : RECTO/VERSO. Le verso porte la mention
+ *     « Sponsorisé par X », la description détaillée, l'avantage, les critères,
+ *     la date limite et le CTA au libellé configuré par l'annonceur.
+ *
+ * LE FLIP est un retournement 3D (rotateY) avec échange du contenu à mi-course
+ * (90°) : la face arrière n'est jamais rendue en miroir, et les deux faces
+ * peuvent avoir des hauteurs différentes sans artefacts. Le premier flip d'une
+ * carte est compté (`trackSponsorCardFlip`) — c'est le « taux de curiosité »
+ * du tableau de bord annonceur.
  */
 
 import { memo, useEffect, useRef, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
+import { Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  FadeIn,
+  FadeInDown,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 
 import { GameButton } from '@/components/ui/GameButton';
@@ -19,6 +32,9 @@ import { usePlaySoundOnOpen } from '@/hooks/useSound';
 import { useTranslation } from '@/i18n';
 import { saveSponsorOpportunity } from '@/services/firebase/savedOpportunityService';
 import {
+  signalerCarteSponsor,
+  trackSponsorCardClick,
+  trackSponsorCardFlip,
   trackSponsorCardSave,
   trackSponsorCardView,
 } from '@/services/firebase/sponsorMetricsService';
@@ -28,12 +44,30 @@ import { COLORS } from '@/styles/colors';
 import { BORDER_RADIUS, SHADOWS, SPACING } from '@/styles/spacing';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { OpportunityHeader } from './OpportunityHeader';
+import { FundingHeader, makeFundLabel } from './FundingPopup';
+
+/** Verso d'une carte campagne (contrat du feed annonceur). */
+export interface SponsorVersoContent {
+  description: string;
+  avantage?: string;
+  criteres?: string;
+  dateLimite?: string;
+}
 
 interface SponsorEventPopupProps {
   visible: boolean;
-  /** Libellé du header : OPPORTUNITÉ ou FINANCEMENT. */
+  /** Libellé du header : OPPORTUNITÉ, FINANCEMENT ou ÉVÉNEMENT. */
   label: string;
-  /** Texte de la carte sponsor. */
+  /**
+   * Type de carte — décide du BANDEAU.
+   *
+   * Une carte de financement s'affichait sous le bandeau opportunité
+   * (ampoule verte) : elle annonçait un type et en montrait un autre. Passé
+   * explicitement plutôt que déduit du `label`, qui est traduit et ne peut pas
+   * servir de test.
+   */
+  kind?: 'opportunite' | 'financement' | 'evenement';
+  /** Texte de la carte sponsor (recto). */
   description: string;
   /** Jetons gagnés (badge « +N »). */
   value: number;
@@ -47,12 +81,22 @@ interface SponsorEventPopupProps {
    */
   savePayload?: Omit<SavedSponsorOpportunity, 'savedAt'>;
   /**
-   * Identifiants de la carte sponsor pour le comptage des métriques
-   * (vue + sauvegarde). Optionnels : si absents, rien n'est compté et le
-   * popup fonctionne exactement comme avant.
+   * Identifiants pour le comptage des métriques (vue, flip, clic, sauvegarde).
+   * `editionId` est la CLÉ du doc sponsorMetrics : id d'édition (modèle
+   * historique) ou id de campagne (feed). Optionnels : sans eux, rien n'est
+   * compté et le popup fonctionne comme avant.
    */
   cardId?: string;
   editionId?: string;
+  // ===== Verso (campagne annonceur, lot 4) =====
+  /** Nom de la structure (« Sponsorisé par X »). */
+  structure?: string;
+  /** Libellé du CTA du verso, configuré par l'annonceur. */
+  ctaLabel?: string;
+  /** Contenu du verso — sa présence active le flip. */
+  verso?: SponsorVersoContent;
+  /** URL ouverte par le CTA du verso. */
+  ctaUrl?: string;
   onAccept: () => void;
   onClose: () => void;
   isSpectator?: boolean;
@@ -62,6 +106,7 @@ interface SponsorEventPopupProps {
 export const SponsorEventPopup = memo(function SponsorEventPopup({
   visible,
   label,
+  kind,
   description,
   value,
   logoUrl,
@@ -69,6 +114,10 @@ export const SponsorEventPopup = memo(function SponsorEventPopup({
   savePayload,
   cardId,
   editionId,
+  structure,
+  ctaLabel,
+  verso,
+  ctaUrl,
   onAccept,
   onClose,
   isSpectator = false,
@@ -81,14 +130,60 @@ export const SponsorEventPopup = memo(function SponsorEventPopup({
   const canSave = !!savePayload && !!user && !user.isGuest;
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [signalee, setSignalee] = useState(false);
 
-  // Nouvelle carte affichée → réinitialise l'état du bouton Sauvegarder
+  // ── Flip recto/verso ──
+  const rotation = useSharedValue(0);
+  const [faceVerso, setFaceVerso] = useState(false);
+  const flipCompte = useRef(false);
+  const swapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const aUnVerso = !!verso?.description;
+
+  const flipStyle = useAnimatedStyle(() => ({
+    transform: [{ perspective: 1000 }, { rotateY: `${rotation.value}deg` }],
+  }));
+
+  const basculer = () => {
+    if (!aUnVerso) return;
+    const versVerso = !faceVerso;
+    rotation.value = withTiming(versVerso ? 180 : 0, { duration: 450 });
+    // Échange du contenu à mi-course : la face n'apparaît jamais en miroir.
+    if (swapTimer.current) clearTimeout(swapTimer.current);
+    swapTimer.current = setTimeout(() => setFaceVerso(versVerso), 225);
+    // Premier retournement de CETTE carte = un « flip » (taux de curiosité).
+    if (versVerso && !flipCompte.current && editionId && cardId) {
+      flipCompte.current = true;
+      trackSponsorCardFlip(editionId, cardId);
+    }
+  };
+
+  const ouvrirCta = () => {
+    if (!ctaUrl) return;
+    if (editionId && cardId) trackSponsorCardClick(editionId, cardId);
+    Linking.openURL(ctaUrl).catch(() => {
+      // Lien mort : la modération le mettra en pause à la vérification hebdo.
+    });
+  };
+
+  // Nouvelle carte affichée → réinitialise sauvegarde ET face affichée
   useEffect(() => {
     if (visible) {
       setSaved(false);
       setSaving(false);
+      setSignalee(false);
+      setFaceVerso(false);
+      rotation.value = 0;
+      flipCompte.current = false;
     }
-  }, [visible, savePayload?.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, savePayload?.id, cardId]);
+
+  useEffect(
+    () => () => {
+      if (swapTimer.current) clearTimeout(swapTimer.current);
+    },
+    []
+  );
 
   /**
    * Garde anti-double-comptage : mémorise la clé « édition/carte » de la
@@ -147,81 +242,165 @@ export const SponsorEventPopup = memo(function SponsorEventPopup({
 
   return (
     <Modal visible={visible} onClose={onClose} closeOnBackdrop={false} showCloseButton={false} bareContent>
-      <Animated.View entering={FadeIn.duration(220)} style={styles.card}>
-        <OpportunityHeader label={label} />
-
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          bounces={false}
-        >
-          {isSpectator && spectatorText && (
-            <View style={styles.spectatorBanner}>
-              <Ionicons name="eye" size={14} color={COLORS.white} />
-              <Text style={styles.spectatorText}>{spectatorText}</Text>
-            </View>
+      <Animated.View entering={FadeIn.duration(220)} style={flipStyle}>
+        {/* Contre-rotation à 180° : le contenu du verso reste lisible. */}
+        <View style={[styles.card, faceVerso && styles.cardMirror]}>
+          {kind === 'financement' ? (
+            <FundingHeader label={makeFundLabel(label)} />
+          ) : (
+            <OpportunityHeader label={label} />
           )}
 
-          {/* Panneau clair : logo sponsor + texte */}
-          <View style={styles.descriptionBox}>
-            {logoUrl ? (
-              <Image source={{ uri: logoUrl }} style={styles.sponsorLogo} resizeMode="contain" />
-            ) : null}
-            <Text style={styles.description}>{description}</Text>
-          </View>
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+          >
+            {isSpectator && spectatorText && !faceVerso && (
+              <View style={styles.spectatorBanner}>
+                <Ionicons name="eye" size={14} color={COLORS.white} />
+                <Text style={styles.spectatorText}>{spectatorText}</Text>
+              </View>
+            )}
 
-          {/* Badge gain */}
-          <Animated.View entering={FadeInDown.delay(200).duration(250)} style={styles.gainRow}>
-            <View style={styles.badge}>
-              <OutlinedText
-                text={`+${value}`}
-                style={styles.badgeText}
-                outlineColor="#2E7D32"
-                outlineWidth={2}
-              />
-            </View>
-          </Animated.View>
+            {!faceVerso ? (
+              <>
+                {/* ═══ RECTO ═══ */}
+                <View style={styles.descriptionBox}>
+                  {logoUrl ? (
+                    <Image source={{ uri: logoUrl }} style={styles.sponsorLogo} resizeMode="contain" />
+                  ) : null}
+                  <Text style={styles.description}>{description}</Text>
+                </View>
 
-          {/* Bouton SAUVEGARDER — le joueur retrouve l'opportunité dans son Profil */}
-          {canSave && (
-            <Animated.View entering={FadeInDown.delay(300).duration(220)} style={styles.saveWrap}>
-              <Pressable
-                onPress={handleSave}
-                disabled={saved || saving}
-                style={[styles.saveButton, saved && styles.saveButtonSaved]}
-                hitSlop={6}
-              >
-                <Ionicons
-                  name={saved ? 'checkmark-circle' : 'bookmark-outline'}
-                  size={17}
-                  color={saved ? '#2E7D32' : COLORS.info}
-                />
-                <Text style={[styles.saveText, saved && styles.saveTextSaved]}>
-                  {saved ? t('sponsorEvent.saved') : t('sponsorEvent.save')}
-                </Text>
-              </Pressable>
-            </Animated.View>
-          )}
+                <Animated.View entering={FadeInDown.delay(200).duration(250)} style={styles.gainRow}>
+                  <View style={styles.badge}>
+                    <OutlinedText
+                      text={`+${value}`}
+                      style={styles.badgeText}
+                      outlineColor="#2E7D32"
+                      outlineWidth={2}
+                    />
+                  </View>
+                </Animated.View>
 
-          {/* Bouton CONTINUER */}
-          {!isSpectator && (
-            <Animated.View entering={FadeInDown.delay(400).duration(220)} style={styles.buttonWrap}>
-              <GameButton
-                title={t('eventPopup.continue')}
-                onPress={onAccept}
-                variant="green"
-                fullWidth
-              />
-            </Animated.View>
-          )}
+                {/* Pilule flip — cartes campagne uniquement */}
+                {aUnVerso && (
+                  <Pressable onPress={basculer} style={styles.flipButton} hitSlop={6}>
+                    <Ionicons name="sync" size={15} color="#2E7D32" />
+                    <Text style={styles.flipText}>{t('sponsorEvent.flipDetails')}</Text>
+                  </Pressable>
+                )}
 
-          {/* Bouton FERMER en mode spectateur (IA joue) */}
-          {isSpectator && onSpectatorClose && (
-            <Animated.View entering={FadeInDown.delay(300).duration(220)} style={styles.buttonWrap}>
-              <GameButton title={t('eventPopup.close')} onPress={onSpectatorClose} variant="blue" fullWidth />
-            </Animated.View>
-          )}
-        </ScrollView>
+                {canSave && (
+                  <Animated.View entering={FadeInDown.delay(300).duration(220)} style={styles.saveWrap}>
+                    <Pressable
+                      onPress={handleSave}
+                      disabled={saved || saving}
+                      style={[styles.saveButton, saved && styles.saveButtonSaved]}
+                      hitSlop={6}
+                    >
+                      <Ionicons
+                        name={saved ? 'checkmark-circle' : 'bookmark-outline'}
+                        size={17}
+                        color={saved ? '#2E7D32' : COLORS.info}
+                      />
+                      <Text style={[styles.saveText, saved && styles.saveTextSaved]}>
+                        {saved ? t('sponsorEvent.saved') : t('sponsorEvent.save')}
+                      </Text>
+                    </Pressable>
+                  </Animated.View>
+                )}
+
+                {!isSpectator && (
+                  <Animated.View entering={FadeInDown.delay(400).duration(220)} style={styles.buttonWrap}>
+                    <GameButton
+                      title={t('eventPopup.continue')}
+                      onPress={onAccept}
+                      variant="green"
+                      fullWidth
+                    />
+                  </Animated.View>
+                )}
+
+                {isSpectator && onSpectatorClose && (
+                  <Animated.View entering={FadeInDown.delay(300).duration(220)} style={styles.buttonWrap}>
+                    <GameButton title={t('eventPopup.close')} onPress={onSpectatorClose} variant="blue" fullWidth />
+                  </Animated.View>
+                )}
+              </>
+            ) : (
+              <>
+                {/* ═══ VERSO ═══ */}
+                <View style={styles.descriptionBox}>
+                  {logoUrl ? (
+                    <Image source={{ uri: logoUrl }} style={styles.sponsorLogoSmall} resizeMode="contain" />
+                  ) : null}
+                  {!!structure && (
+                    <Text style={styles.sponsoredBy}>
+                      {t('sponsorEvent.sponsoredBy', { name: structure })}
+                    </Text>
+                  )}
+                  <Text style={styles.versoDescription}>{verso?.description}</Text>
+
+                  {!!verso?.avantage && (
+                    <Text style={styles.versoLigne}>
+                      <Text style={styles.versoLibelle}>{t('sponsorEvent.advantage')} : </Text>
+                      {verso.avantage}
+                    </Text>
+                  )}
+                  {!!verso?.criteres && (
+                    <Text style={styles.versoLigne}>
+                      <Text style={styles.versoLibelle}>{t('sponsorEvent.eligibility')} : </Text>
+                      {verso.criteres}
+                    </Text>
+                  )}
+                  {!!verso?.dateLimite && (
+                    <Text style={[styles.versoLigne, styles.versoDeadline]}>
+                      <Text style={styles.versoLibelle}>{t('sponsorEvent.deadline')} : </Text>
+                      {new Date(verso.dateLimite).toLocaleDateString()}
+                    </Text>
+                  )}
+                </View>
+
+                {/* CTA de l'annonceur — remplace CONTINUER sur cette face */}
+                {!!ctaUrl && (
+                  <View style={styles.buttonWrap}>
+                    <GameButton
+                      title={ctaLabel || t('sponsorEvent.learnMore')}
+                      onPress={ouvrirCta}
+                      variant="green"
+                      fullWidth
+                    />
+                  </View>
+                )}
+
+                <Pressable onPress={basculer} style={[styles.flipButton, styles.flipButtonVerso]} hitSlop={6}>
+                  <Ionicons name="sync" size={15} color="#2E7D32" />
+                  <Text style={styles.flipText}>{t('sponsorEvent.flipBack')}</Text>
+                </Pressable>
+
+                {/* Signalement — discret, en dernier : trois joueurs distincts
+                    renvoient la carte en revérification humaine. */}
+                {!!cardId && (
+                  <Pressable
+                    onPress={() => {
+                      if (signalee) return;
+                      setSignalee(true);
+                      signalerCarteSponsor(cardId);
+                    }}
+                    hitSlop={8}
+                    style={styles.reportWrap}
+                  >
+                    <Text style={[styles.reportText, signalee && styles.reportTextDone]}>
+                      {signalee ? t('sponsorEvent.reported') : t('sponsorEvent.report')}
+                    </Text>
+                  </Pressable>
+                )}
+              </>
+            )}
+          </ScrollView>
+        </View>
       </Animated.View>
     </Modal>
   );
@@ -235,6 +414,11 @@ const styles = StyleSheet.create({
     width: '92%',
     ...SHADOWS.xl,
     overflow: 'hidden',
+  },
+  // À 180° de rotation, le conteneur est en miroir : cette contre-rotation
+  // remet le contenu du verso à l'endroit.
+  cardMirror: {
+    transform: [{ rotateY: '180deg' }],
   },
   scrollContent: {
     paddingTop: SPACING[4],
@@ -274,12 +458,46 @@ const styles = StyleSheet.create({
     height: 56,
     marginBottom: SPACING[3],
   },
+  sponsorLogoSmall: {
+    width: '50%',
+    height: 36,
+    marginBottom: SPACING[2],
+  },
   description: {
     fontFamily: FONTS.bodyMedium,
     fontSize: FONT_SIZES.base,
     color: '#2C3E50',
     textAlign: 'center',
     lineHeight: 22,
+  },
+  sponsoredBy: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.xs,
+    color: '#7F8E9E',
+    marginBottom: SPACING[2],
+  },
+  versoDescription: {
+    fontFamily: FONTS.bodyMedium,
+    fontSize: FONT_SIZES.sm,
+    color: '#2C3E50',
+    textAlign: 'left',
+    lineHeight: 20,
+    width: '100%',
+  },
+  versoLigne: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.sm,
+    color: '#3D4C61',
+    lineHeight: 19,
+    width: '100%',
+    marginTop: SPACING[2],
+  },
+  versoLibelle: {
+    fontFamily: FONTS.bodySemiBold,
+    color: '#2C3E50',
+  },
+  versoDeadline: {
+    color: '#B84A0C',
   },
   gainRow: {
     alignItems: 'center',
@@ -302,8 +520,44 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.xl,
     color: COLORS.white,
   },
+  flipButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING[2],
+    paddingVertical: SPACING[2],
+    paddingHorizontal: SPACING[4],
+    borderRadius: BORDER_RADIUS.full,
+    borderWidth: 1.5,
+    borderColor: '#2E7D32',
+    backgroundColor: 'rgba(76, 175, 80, 0.08)',
+    marginBottom: SPACING[3],
+  },
+  flipButtonVerso: {
+    marginTop: SPACING[3],
+    marginBottom: 0,
+  },
+  flipText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.sm,
+    color: '#2E7D32',
+  },
   buttonWrap: {
     width: '100%',
+  },
+  reportWrap: {
+    marginTop: SPACING[3],
+    paddingVertical: SPACING[1],
+  },
+  reportText: {
+    fontFamily: FONTS.body,
+    fontSize: FONT_SIZES.xs,
+    color: '#9AA6B2',
+    textDecorationLine: 'underline',
+    textAlign: 'center',
+  },
+  reportTextDone: {
+    color: '#2E7D32',
+    textDecorationLine: 'none',
   },
   saveWrap: {
     width: '100%',

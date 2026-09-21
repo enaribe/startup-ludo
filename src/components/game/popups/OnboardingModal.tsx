@@ -28,6 +28,7 @@ import Svg, { Defs, LinearGradient, Path, RadialGradient, Rect, Stop } from 'rea
 
 import { GameButton } from '@/components/ui/GameButton';
 import { OutlinedText } from '@/components/ui/OutlinedText';
+import { trackEvent } from '@/services/analytics';
 import { useTranslation } from '@/i18n';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
@@ -248,9 +249,14 @@ function SlideDots({ current, total }: { current: number; total: number }) {
 
 const TOTAL_SLIDES = 4;
 
+/** Noms d'étapes STABLES pour Amplitude (funnel de l'onboarding). */
+const STEP_NAMES = ['bienvenue', 'creer_entreprise', 'meilleur_entrepreneur', 'xp_et_rangs'] as const;
+
 interface OnboardingModalProps {
   visible: boolean;
   onComplete: () => void;
+  /** Fermeture avant la fin (PASSER, back Android) — reçoit l'étape en cours. */
+  onAbandon: (stepName: string) => void;
 }
 
 // ─── Slide animé (se monte/démonte comme un GamePopup indépendant) ────────────
@@ -330,6 +336,7 @@ function AnimatedSlide({
 export const OnboardingModal = memo(function OnboardingModal({
   visible,
   onComplete,
+  onAbandon,
 }: OnboardingModalProps) {
   const { t } = useTranslation();
   const [slideIndex, setSlideIndex] = useState(0);
@@ -341,22 +348,31 @@ export const OnboardingModal = memo(function OnboardingModal({
   const isLastSlide = slideIndex === TOTAL_SLIDES - 1;
 
   const goNext = useCallback(() => {
+    // Funnel Amplitude : chaque étape franchie (SUIVANT / TERMINER) est comptée
+    trackEvent('onboarding_step_completed', {
+      step_name: STEP_NAMES[slideIndex],
+      step_index: slideIndex + 1,
+    });
     if (isLastSlide) {
       onComplete();
       return;
     }
     setSlideIndex((i) => i + 1);
-  }, [isLastSlide, onComplete]);
+  }, [slideIndex, isLastSlide, onComplete]);
+
+  const abandon = useCallback(() => {
+    onAbandon(STEP_NAMES[slideIndex] ?? 'inconnu');
+  }, [slideIndex, onAbandon]);
 
   return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={onComplete}>
+    <Modal visible={visible} transparent animationType="none" onRequestClose={abandon}>
       <View style={styles.backdrop}>
         {/* key={slideIndex} force le démontage/remontage → animation d'entrée GamePopup à chaque slide */}
         <AnimatedSlide
           key={slideIndex}
           slideIndex={slideIndex}
           onNext={goNext}
-          onSkip={onComplete}
+          onSkip={abandon}
           isLast={isLastSlide}
           t={t}
         />

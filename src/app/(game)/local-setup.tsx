@@ -21,6 +21,8 @@ import { useTranslation } from '@/i18n';
 import { EditionTileIcon } from '@/components/icons';
 import { RadialBackground, DynamicGradientBorder, GameButton } from '@/components/ui';
 import { StartupSelectionModal } from '@/components/game/StartupSelectionModal';
+import { SPONSOR_FEATURES_ENABLED } from '@/config/features';
+import { habillageDiffusable } from '@/utils/sponsorEdition';
 import { SponsoredEditionPopup } from '@/components/game/popups';
 import { getDefaultProjectsForEdition, getMatchingUserStartups } from '@/data/defaultProjects';
 import { getLocalizedEdition, type Edition } from '@/data/types';
@@ -253,6 +255,10 @@ export default function LocalSetupScreen() {
   const [selectedEdition, setSelectedEdition] = useState('classic');
   // Édition sponsorisée en attente de confirmation (popup « JOUER »)
   const [sponsorEdition, setSponsorEdition] = useState<Edition | null>(null);
+  // Fermeture PROPRE du popup sponsor : visible passe à false (dismiss natif)
+  // avant le démontage — un Modal démonté encore « présenté » bloque la
+  // présentation du modal suivant (sélection de startup) sur iOS.
+  const [sponsorPopupVisible, setSponsorPopupVisible] = useState(false);
 
   // Step 3: Ideation
   const [startupSelections, setStartupSelections] = useState<Record<number, StartupSelection>>({});
@@ -743,8 +749,29 @@ export default function LocalSetupScreen() {
                       onPress={() => {
                         // Édition sponsorisée → popup sponsor, « SUIVANT » valide et avance.
                         // Sinon → le tap valide le choix et avance directement.
-                        if (edition.sponsor?.enabled && edition.sponsor.imageUrl) {
+                        // Pourquoi le popup s'affiche ou non : les trois
+                        // conditions echouaient en silence, donc « je ne vois
+                        // pas les vues » ne disait pas laquelle etait fausse.
+                        if (__DEV__) {
+                        const sp = edition.sponsor;
+                        console.log(
+                        `[Sponsor] edition "${edition.id}" choisie —`,
+                        !SPONSOR_FEATURES_ENABLED
+                        ? 'circuit sponsor DESACTIVE (SPONSOR_FEATURES_ENABLED=false)'
+                        : !sp
+                        ? 'aucun habillage sur cette edition'
+                        : !sp.enabled
+                        ? `habillage "${sp.name ?? '-'}" DESACTIVE (enabled=false)`
+                        : sp.paused === true
+                          ? `habillage "${sp.name ?? '-'}" EN PAUSE (paused=true)`
+                        : !sp.imageUrl
+                        ? `habillage "${sp.name ?? '-'}" sans visuel (imageUrl manquant)`
+                        : `habillage "${sp.name ?? '-'}" actif -> popup`
+                        );
+                        }
+                        if (SPONSOR_FEATURES_ENABLED && habillageDiffusable(edition.sponsor)) {
                           setSponsorEdition(edition);
+                          setSponsorPopupVisible(true);
                         } else {
                           advanceWithEdition(edition.id);
                         }
@@ -980,17 +1007,27 @@ export default function LocalSetupScreen() {
       {/* Popup édition sponsorisée : « SUIVANT » valide le choix et avance */}
       {sponsorEdition?.sponsor ? (
         <SponsoredEditionPopup
-          visible
+          visible={sponsorPopupVisible}
           editionName={getLocalizedEdition(sponsorEdition, language).name.replace(/^Édition\s+/i, '')}
           sponsor={sponsorEdition.sponsor}
           editionId={sponsorEdition.id}
           buttonTitle={t('common.next')}
           onPlay={() => {
             const editionId = sponsorEdition.id;
-            setSponsorEdition(null);
-            advanceWithEdition(editionId);
+            // 1. Fermer le popup proprement (dismiss natif via visible=false),
+            // 2. attendre la fin du dismiss, démonter, PUIS avancer : présenter
+            //    le modal de sélection de startup pendant une fermeture en
+            //    cours serait avalé silencieusement (iOS/Android).
+            setSponsorPopupVisible(false);
+            setTimeout(() => {
+              setSponsorEdition(null);
+              advanceWithEdition(editionId);
+            }, 450);
           }}
-          onDismiss={() => setSponsorEdition(null)}
+          onDismiss={() => {
+            setSponsorPopupVisible(false);
+            setTimeout(() => setSponsorEdition(null), 350);
+          }}
         />
       ) : null}
 

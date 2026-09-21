@@ -17,6 +17,9 @@ admin.initializeApp();
 // Export Notification Functions (FCM direct, hors Customer.io)
 export { onGameInvitationCreated } from './notifications/onGameInvitationCreated';
 
+// Export Auth Functions (vérification d'email par OTP via Brevo)
+export { sendEmailOtp, verifyEmailOtp } from './auth/emailOtp';
+
 // Export User Functions
 export { onUserCreate } from './user/onUserCreate';
 export {

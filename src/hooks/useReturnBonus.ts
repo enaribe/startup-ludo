@@ -70,7 +70,7 @@ export function useReturnBonus() {
     setVisible(false);
     // Créditer l'XP immédiatement
     addXP(RETURN_BONUS_XP);
-    // Customer.io : coupe la campagne « ton bonus t'attend »
+    // Analytics : coupe la campagne « ton bonus t'attend »
     trackReturnBonusClaimed({ xp: RETURN_BONUS_XP });
     // Persister le timestamp de réclamation
     try {

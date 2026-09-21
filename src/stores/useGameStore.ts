@@ -17,17 +17,35 @@ import type { GameState, GameMode, Player, GameEvent, PlayerColor, PawnState, Ev
 import { newJokerId } from '@/data/jokers';
 import { GameEngine, type MoveResult, type ValidMove } from '@/services/game/GameEngine';
 import { eventManager, type GameContentPack, type GeneratedGameEvent } from '@/services/game/EventManager';
-import type { EditionId } from '@/data';
+import { getEdition, type EditionId } from '@/data';
 import type { CheckpointData } from '@/utils/onlineCodec';
 import { useChallengeStore } from '@/stores/useChallengeStore';
 import { useProgramStore } from '@/stores/useProgramStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { useUserStore } from '@/stores/useUserStore';
 import { MAX_TOKENS } from '@/config/boardConfig';
+import { SPONSOR_FEATURES_ENABLED } from '@/config/features';
 import { gameLog } from '@/utils/gameLog';
 import { resetDuelQuestionPool } from '@/data/duelQuestions';
 import { resetJokerPool, markJokerUsed } from '@/data/jokers';
 import { trackEvent } from '@/services/analytics';
+import {
+  trackSponsoredGameEnd,
+  trackSponsoredGameStart,
+} from '@/services/firebase/sponsorMetricsService';
+
+// ═══ Exposition d'une édition SPONSORISÉE (télémétrie annonceur, lot 1) ═══
+// Mémoire de la partie sponsorisée en cours, au niveau module : une seule
+// partie à la fois, et l'état ne doit pas survivre à un rechargement du store.
+let sponsoredGameStartedAt: number | null = null;
+
+/**
+ * Fin de partie causée par un forfait adverse (l'adversaire a quitté) :
+ * posé juste avant les endGame déclenchés par un forfait, consommé (et
+ * remis à false) par endGame → propriété `reason` sur online_game_won/lost.
+ */
+let endByForfeit = false;
+let sponsoredGameEdition: string | null = null;
 
 /** Action compacte recue d'un joueur distant via RTDB */
 export interface RemoteAction {
@@ -307,6 +325,23 @@ export const useGameStore = create<GameStore>()(
           }
         }
 
+        // ═══ SPONSOR × MODE CLASSE ═══
+        // Une séance scolaire n'est JAMAIS un espace publicitaire : même si
+        // l'enseignant a choisi une édition sponsorisée, aucune carte sponsor
+        // n'est tirée (et donc aucune métrique annonceur n'est comptée) pendant
+        // une partie de classe. Pour toute partie ordinaire, le circuit sponsor
+        // est (ré)armé et la partie compte comme exposition de l'édition.
+        eventManager.setSponsorSuppressed(!!classContext);
+        if (SPONSOR_FEATURES_ENABLED && !classContext && getEdition(edition as EditionId).sponsor?.enabled) {
+          trackSponsoredGameStart(edition);
+          sponsoredGameStartedAt = Date.now();
+          sponsoredGameEdition = edition;
+        } else {
+          sponsoredGameStartedAt = null;
+          sponsoredGameEdition = null;
+        }
+        endByForfeit = false;
+
         if (challengeContext) {
           const { challenges } = useChallengeStore.getState();
           gameLog('store', '[GameStore] Challenge mode, challenges in store:', challenges.length);
@@ -416,6 +451,15 @@ export const useGameStore = create<GameStore>()(
         const game = get().game;
         // Ne tracker qu'une fois (endGame peut être rappelé sur une partie déjà finie)
         if (game && game.status !== 'finished') {
+          // Durée d'exposition de l'édition sponsorisée (bornée côté service).
+          if (sponsoredGameEdition && sponsoredGameStartedAt) {
+            trackSponsoredGameEnd(
+              sponsoredGameEdition,
+              (Date.now() - sponsoredGameStartedAt) / 1000
+            );
+            sponsoredGameStartedAt = null;
+            sponsoredGameEdition = null;
+          }
           // Résultat du joueur local (campagnes « revanche ? » / « encore chaud ? »)
           const localUserId = useUserStore.getState().profile?.userId;
           const won = localUserId != null && winnerId === localUserId;
@@ -435,8 +479,11 @@ export const useGameStore = create<GameStore>()(
               : winnerName;
             trackEvent(won ? 'online_game_won' : 'online_game_lost', {
               opponent_name: opponentName,
+              // Fin normale vs victoire/défaite par abandon de l'adversaire
+              reason: endByForfeit ? 'adversaire_a_quitte' : 'normal',
             });
           }
+          endByForfeit = false;
         }
 
         set((state) => {
@@ -471,7 +518,8 @@ export const useGameStore = create<GameStore>()(
           get().game?.players.filter((p) => !p.isForfeited && p.rank === undefined) ?? [];
 
         if (remainingActive.length <= 1) {
-          // Plus qu'un actif (ou zéro) → fin de partie.
+          // Plus qu'un actif (ou zéro) → fin de partie CAUSÉE par le forfait.
+          endByForfeit = true;
           // Le dernier actif (s'il existe) est classé en dernier.
           const last = remainingActive[0];
           if (last) {
@@ -1233,6 +1281,7 @@ export const useGameStore = create<GameStore>()(
           case 'f': {
             // Forfeit — opponent quit, winner declared
             const winnerId = (action.d as { winner: string }).winner;
+            endByForfeit = true;
             get().endGame(winnerId);
             break;
           }

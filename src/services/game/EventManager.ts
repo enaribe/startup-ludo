@@ -6,7 +6,12 @@
  */
 
 import type { EventType } from '@/types';
-import { getCachedSponsorViews, watchSponsorViews } from '@/services/firebase/sponsorMetricsService';
+import { SPONSOR_FEATURES_ENABLED } from '@/config/features';
+import { cleAttribution, getCachedSponsorViews, watchSponsorViews } from '@/services/firebase/sponsorMetricsService';
+import { getCachedFeedCards, watchSponsorFeed } from '@/services/firebase/sponsorFeedService';
+// Import DIRECT (pas le barrel) : le barrel réexporte useGameStore → EventManager,
+// le cycle laisserait le store indéfini à l'initialisation des modules.
+import { useUserStore } from '@/stores/useUserStore';
 import {
   getEdition,
   type EditionId,
@@ -63,6 +68,14 @@ export interface GeneratedFundingEvent {
     sponsorLinkUrl?: string;
     /** Édition d'où vient la carte sponsor — sert au comptage des métriques. */
     sponsorEditionId?: string;
+    /** Bandeau de la carte campagne (feed annonceur). */
+    sponsorKind?: 'financement' | 'opportunite' | 'evenement';
+    /** Nom de la structure annonceuse (« Sponsorisé par X » au verso). */
+    sponsorStructure?: string;
+    /** Libellé du CTA du verso, configuré par l'annonceur. */
+    sponsorCtaLabel?: string;
+    /** Verso de la carte recto/verso (campagne annonceur). */
+    sponsorVerso?: { description: string; avantage?: string; criteres?: string; dateLimite?: string };
   };
 }
 
@@ -91,6 +104,14 @@ export interface GeneratedOpportunityEvent {
     sponsorLinkUrl?: string;
     /** Édition d'où vient la carte sponsor — sert au comptage des métriques. */
     sponsorEditionId?: string;
+    /** Bandeau de la carte campagne (feed annonceur). */
+    sponsorKind?: 'financement' | 'opportunite' | 'evenement';
+    /** Nom de la structure annonceuse (« Sponsorisé par X » au verso). */
+    sponsorStructure?: string;
+    /** Libellé du CTA du verso, configuré par l'annonceur. */
+    sponsorCtaLabel?: string;
+    /** Verso de la carte recto/verso (campagne annonceur). */
+    sponsorVerso?: { description: string; avantage?: string; criteres?: string; dateLimite?: string };
   };
 }
 
@@ -141,6 +162,21 @@ const SPONSOR_EVENT_CHANCE = 0.25;
 
 // ===== CLASSE PRINCIPALE =====
 
+/**
+ * Résultat d'un tirage sponsor : la carte, SA CLÉ DE MÉTRIQUES (id d'édition
+ * pour le modèle historique, id de campagne pour le feed — c'est le doc
+ * `sponsorMetrics/{clé}` qui sera incrémenté), et le contenu du verso pour les
+ * cartes de campagne (recto/verso).
+ */
+interface SponsorPick {
+  card: { id: string; text: string; tokens?: number; logoUrl?: string; linkUrl?: string };
+  metricsKey: string;
+  kindCampagne?: 'financement' | 'opportunite' | 'evenement';
+  structure?: string;
+  ctaLabel?: string;
+  verso?: { description: string; avantage?: string; criteres?: string; dateLimite?: string };
+}
+
 export class EventManager {
   private usedQuizIds: Set<string> = new Set();
   private usedDuelIds: Set<string> = new Set();
@@ -149,10 +185,18 @@ export class EventManager {
   private usedChallengeIds: Set<string> = new Set();
   private usedSponsorCardIds: Set<string> = new Set();
   // Mémoire des DERNIERS ids montrés par Set (partagée par référence du Set).
-  // Sert à éviter qu'un contenu juste vu ressorte immédiatement après un
-  // recyclage (pool épuisé — cas fréquent quand le pion refait un tour de plateau).
+  // Sert à éviter qu'un contenu juste vu ressorte après un recyclage (pool
+  // épuisé — cas fréquent en séance de classe : ~10 quiz générés, deux joueurs
+  // qui consomment, le paquet fait plusieurs tours dans une partie).
+  //
+  // L'historique conservé doit couvrir TOUT le pool (borné à MAX_RECENT) : à
+  // l'épuisement, `pickRandomUnused` exclut jusqu'à `pool - 1` derniers montrés,
+  // ce qui garantit qu'une carte ne revient pas avant que toutes les autres
+  // soient repassées — y compris D'UN TOUR DE PAQUET À L'AUTRE. L'ancienne
+  // fenêtre fixe de 4 laissait revenir très vite les cartes d'un petit paquet,
+  // et c'est exactement ce que les joueurs percevaient comme « ça se répète ».
   private recentIds: WeakMap<Set<string>, string[]> = new WeakMap();
-  private static readonly RECENT_WINDOW = 4;
+  private static readonly MAX_RECENT = 64;
   private contentPack: GameContentPack | null = null;
   /** Langue d'affichage du contenu (préférence joueur). Applique translations[lang] partout. */
   private lang: string = 'fr';
@@ -206,6 +250,15 @@ export class EventManager {
    * `watchSponsorViews` est idempotent (un seul listener par édition).
    */
   private ensureSponsorViewsWatched(editionId: EditionId): void {
+    // Circuit sponsor désactivé : ni feed ni compteurs de vues (aucune
+    // lecture Firestore inutile pendant la phase de test).
+    if (!SPONSOR_FEATURES_ENABLED) return;
+
+    // Le feed des campagnes concerne TOUTES les parties (pas seulement les
+    // éditions sponsorisées) : l'écoute s'ouvre ici, au premier point commun
+    // de tout démarrage de partie. Idempotente et à un seul document.
+    watchSponsorFeed();
+
     const sponsor = getEdition(editionId).sponsor;
     if (!sponsor?.enabled) return;
     if (typeof sponsor.viewsGoal !== 'number' || sponsor.viewsGoal <= 0) return;
@@ -253,9 +306,27 @@ export class EventManager {
     this.usedChallengeIds.clear();
     this.usedSponsorCardIds.clear();
     this.sponsorStatusLogged = false;
-    this.sponsorStoppedLogged = false;
+    // Le diagnostic du feed se rejoue à chaque partie : le profil du joueur
+    // (région, secteur) peut avoir changé entre deux, et c'est justement ce
+    // qui décide de l'éligibilité.
+    this.feedLogged.clear();
     // Repart d'une mémoire « récents » vierge pour la nouvelle partie/niveau.
     this.recentIds = new WeakMap();
+  }
+
+  /**
+   * Coupe TOUT le circuit sponsor pour la partie en cours (tirage ET, par
+   * ricochet, métriques — une carte jamais tirée n'est jamais comptée).
+   *
+   * Posé par `initGame` pour les parties de MODE CLASSE : une séance scolaire
+   * n'est pas un espace publicitaire, même si l'enseignant a choisi une édition
+   * sponsorisée (décision du plan Espace Annonceur, §3). Repassé à `false` par
+   * chaque partie ordinaire.
+   */
+  private sponsorSuppressed = false;
+
+  setSponsorSuppressed(suppressed: boolean): void {
+    this.sponsorSuppressed = suppressed;
   }
 
   /**
@@ -264,70 +335,191 @@ export class EventManager {
    * Retourne null si l'édition n'est pas sponsorisée, si toutes les cartes
    * ont été vues, ou si le tirage tombe sur le contenu normal.
    */
-  private pickSponsorCard(kind: 'opportunity' | 'funding') {
-    const sponsor = getEdition(this.editionId).sponsor;
-    this.logSponsorStatusOnce(sponsor);
-    if (!sponsor?.enabled) return null;
+  private pickSponsorCard(kind: 'opportunity' | 'funding'): SponsorPick | null {
+    // Circuit sponsor désactivé (fonctionnalité pas encore prête) : aucune
+    // carte sponsor ne sort, le contenu normal de l'édition prend le relais.
+    if (!SPONSOR_FEATURES_ENABLED) return null;
+    if (this.sponsorSuppressed) return null;
 
-    // Diffusion suspendue par l'admin → on se comporte comme une édition
-    // non sponsorisée (contenu normal), sans jamais bloquer le jeu.
-    if (sponsor.paused === true) {
-      if (__DEV__ && !this.sponsorStoppedLogged) {
-        this.sponsorStoppedLogged = true;
-        console.log(`[Sponsor] Diffusion SUSPENDUE (paused) sur "${this.editionId}" → contenu normal`);
+    // ═══ DEUX SOURCES, UN SEUL TIRAGE ═══
+    // Les candidats viennent de l'ÉDITION sponsorisée (modèle historique) ET du
+    // FEED des campagnes annonceurs actives (lot 4, toutes parties confondues).
+    // Un seul jet de probabilité sur le pool combiné : deux jets successifs
+    // doubleraient la pression publicitaire sur les cases concernées.
+    const candidats: SponsorPick[] = [];
+
+    // ── Les cartes viennent TOUTES du feed des campagnes ──
+    //
+    // L'édition portait autrefois ses propres cartes (`sponsor.opportunities`
+    // / `sponsor.fundings`), tirées ici même. Elles ont été migrées en
+    // campagnes : deux circuits alimentaient le même tirage, mais un seul
+    // était facturé, plafonné et borné dans le temps. Une carte encastrée
+    // diffusait indéfiniment, sans compteur de vues propre ni budget —
+    // invisible du modèle économique.
+    //
+    // L'habillage d'édition (visuel, logo, popup au choix de l'édition) n'est
+    // pas concerné : il vit toujours dans `editions/{id}.sponsor` et reste
+    // piloté par `enabled`, `paused`, `viewsGoal` et `endAt`, réunis dans
+    // `habillageDiffusable()` (src/utils/sponsorEdition.ts) et appliqués là où
+    // le popup est affiché. Ce commentaire affirmait que `paused` était lu :
+    // il ne l'était nulle part, et une diffusion mise en pause continuait de
+    // s'afficher.
+    this.logSponsorStatusOnce(getEdition(this.editionId).sponsor);
+
+    // ── Source 2 : le feed des campagnes actives ──
+    const kindsFeed: string[] =
+      kind === 'funding' ? ['financement'] : ['opportunite', 'evenement'];
+    const maintenant = Date.now();
+    // Diagnostic : SIX filtres écartaient une carte en silence. Impossible de
+    // savoir, en jouant, si une carte promue n'apparaît pas parce qu'elle est
+    // inéligible ou simplement parce que le tirage à 25 % n'est pas tombé.
+    this.logFeedUneFois(kind, kindsFeed, maintenant);
+    for (const fc of getCachedFeedCards()) {
+      if (!kindsFeed.includes(fc.kind)) continue;
+      if (this.usedSponsorCardIds.has(fc.id)) continue;
+      // Période de diffusion (bornes posées par l'annonceur, null = en continu).
+      if (fc.startAt && maintenant < fc.startAt) continue;
+      if (fc.endAt && maintenant > fc.endAt) continue;
+      // Plafond de vues PAR CAMPAGNE : mêmes mécanique et cache que l'édition —
+      // la clé de métriques d'une campagne est son propre id.
+      if (fc.viewsGoal > 0) {
+        watchSponsorViews(fc.id);
+        if (getCachedSponsorViews(fc.id) >= fc.viewsGoal) continue;
       }
-      return null;
+      if (!this.matchTargeting(fc.targeting)) continue;
+      candidats.push({
+        card: {
+          id: fc.id,
+          text: fc.text,
+          tokens: fc.tokens,
+          logoUrl: fc.logoUrl ?? undefined,
+          linkUrl: fc.ctaUrl ?? undefined,
+        },
+        metricsKey: fc.id,
+        kindCampagne: fc.kind,
+        structure: fc.structure || undefined,
+        ctaLabel: fc.ctaLabel || undefined,
+        verso: fc.verso
+          ? {
+              description: fc.verso.description,
+              avantage: fc.verso.avantage ?? undefined,
+              criteres: fc.verso.criteres ?? undefined,
+              dateLimite: fc.verso.dateLimite ?? undefined,
+            }
+          : undefined,
+      });
     }
 
-    // Plafond de vues acheté atteint → idem, contenu normal.
-    // Le total vient du cache alimenté par watchSponsorViews() (lecture O(1),
-    // aucune I/O ici : pickSponsorCard est appelé dans la boucle de jeu).
-    if (typeof sponsor.viewsGoal === 'number' && sponsor.viewsGoal > 0) {
-      const views = getCachedSponsorViews(this.editionId);
-      if (views >= sponsor.viewsGoal) {
-        if (__DEV__ && !this.sponsorStoppedLogged) {
-          this.sponsorStoppedLogged = true;
-          console.log(
-            `[Sponsor] Plafond de vues ATTEINT sur "${this.editionId}" ` +
-              `(${views}/${sponsor.viewsGoal}) → contenu normal`
-          );
-        }
-        return null;
-      }
-    }
-
-    const pool = (kind === 'funding' ? sponsor.fundings : sponsor.opportunities) ?? [];
-    const available = pool.filter((card) => card.text && !this.usedSponsorCardIds.has(card.id));
-    if (available.length === 0) {
-      if (__DEV__ && pool.length > 0) {
-        console.log(`[Sponsor] Tirage ${kind} : toutes les cartes sponsor déjà vues cette partie → contenu normal`);
-      }
-      return null;
-    }
+    if (candidats.length === 0) return null;
     if (Math.random() >= SPONSOR_EVENT_CHANCE) {
       if (__DEV__) {
         console.log(
           `[Sponsor] Tirage ${kind} : perdu (${Math.round(SPONSOR_EVENT_CHANCE * 100)} % de chance, ` +
-            `${available.length} carte(s) dispo) → contenu normal`
+            `${candidats.length} carte(s) dispo) → contenu normal`
         );
       }
       return null;
     }
-    const card = available[Math.floor(Math.random() * available.length)]!;
-    this.usedSponsorCardIds.add(card.id);
+
+    const choisi = candidats[Math.floor(Math.random() * candidats.length)]!;
+    this.usedSponsorCardIds.add(choisi.card.id);
     if (__DEV__) {
       console.log(
-        `[Sponsor] Tirage ${kind} : GAGNÉ → carte "${card.text.slice(0, 60)}" ` +
-          `(+${card.tokens ?? FIXED_POINTS[kind]}, logo: ${card.logoUrl ? 'oui' : 'non'}, lien: ${card.linkUrl ? 'oui' : 'non'})`
+        `[Sponsor] Tirage ${kind} : GAGNÉ → carte "${choisi.card.text.slice(0, 60)}" ` +
+          `(+${choisi.card.tokens ?? FIXED_POINTS[kind]}, source: ${choisi.metricsKey === this.editionId ? 'édition' : 'campagne'})`
       );
     }
-    return card;
+    return choisi;
+  }
+
+  /**
+   * Le joueur correspond-il au ciblage d'une carte du feed ?
+   * Liste vide = tout le monde. Un profil sans région/secteur ne correspond
+   * qu'aux campagnes NON ciblées : servir une carte « Dakar » à un joueur qui
+   * n'a rien déclaré fausserait la promesse de ciblage vendue à l'annonceur.
+   */
+  /** Feed déjà diagnostiqué pour ce type de case — une fois par partie suffit. */
+  private feedLogged = new Set<string>();
+
+  /**
+   * Dit, carte par carte, si elle PEUT s'afficher et sinon pourquoi.
+   *
+   * Tester une carte promue en jouant est pénible : même éligible, elle n'a
+   * que 25 % de chance d'être tirée sur une case adaptée. Sans ce diagnostic,
+   * une carte absente pouvait vouloir dire six choses différentes — mauvais
+   * type de case, période close, plafond atteint, ciblage non satisfait, feed
+   * vide, ou simplement le hasard.
+   *
+   * Ce log répond à une seule question : « si je tombe sur la bonne case,
+   * est-ce que cette carte peut sortir ? »
+   */
+  private logFeedUneFois(kind: 'funding' | 'opportunity', kindsFeed: string[], maintenant: number): void {
+    if (!__DEV__ || this.feedLogged.has(kind)) return;
+    this.feedLogged.add(kind);
+
+    const toutes = getCachedFeedCards();
+    const caseLabel = kind === 'funding' ? 'FINANCEMENT' : 'OPPORTUNITÉ';
+    if (toutes.length === 0) {
+      console.log(
+        `[Feed] Case ${caseLabel} : le feed est VIDE — aucune campagne carte active, ` +
+          'ou la publication du feed n’a pas encore eu lieu côté back-office.'
+      );
+      return;
+    }
+
+    const profile = useUserStore.getState().profile;
+    const region = profile?.region ?? '(non renseignée)';
+    const secteur = cleAttribution(profile?.startups?.[0]?.sector);
+    const lignes: string[] = [];
+    let eligibles = 0;
+
+    for (const fc of toutes) {
+      const titre = `"${fc.text.slice(0, 34)}"`;
+      let motif: string | null = null;
+      if (!kindsFeed.includes(fc.kind)) motif = `type "${fc.kind}" — ne sort pas sur une case ${caseLabel}`;
+      else if (this.usedSponsorCardIds.has(fc.id)) motif = 'déjà tirée dans cette partie';
+      else if (fc.startAt && maintenant < fc.startAt) motif = `diffusion pas encore ouverte (${new Date(fc.startAt).toLocaleDateString('fr-FR')})`;
+      else if (fc.endAt && maintenant > fc.endAt) motif = `diffusion terminée (${new Date(fc.endAt).toLocaleDateString('fr-FR')})`;
+      else if (fc.viewsGoal > 0 && getCachedSponsorViews(fc.id) >= fc.viewsGoal)
+        motif = `objectif de ${fc.viewsGoal} vues atteint`;
+      else if (fc.targeting.regions.length > 0 && !fc.targeting.regions.includes(profile?.region ?? ''))
+        motif = `ciblée sur ${fc.targeting.regions.join(', ')} — votre région : ${region}`;
+      else if (fc.targeting.sectors.length > 0 && !fc.targeting.sectors.includes(secteur))
+        motif = `ciblée sur ${fc.targeting.sectors.join(', ')} — votre secteur : ${secteur}`;
+
+      if (motif) lignes.push(`   ✗ ${titre} — ${motif}`);
+      else {
+        eligibles += 1;
+        lignes.push(`   ✓ ${titre} — ÉLIGIBLE, sortira si le tirage tombe`);
+      }
+    }
+
+    console.log(
+      `[Feed] Case ${caseLabel} : ${eligibles}/${toutes.length} carte(s) éligible(s) — ` +
+        `${Math.round(SPONSOR_EVENT_CHANCE * 100)} % de chance par case\n${lignes.join('\n')}`
+    );
+  }
+
+  private matchTargeting(targeting: { sectors: string[]; regions: string[] }): boolean {
+    try {
+      const profile = useUserStore.getState().profile;
+      if (targeting.regions.length > 0) {
+        const region = profile?.region ?? '';
+        if (!region || !targeting.regions.includes(region)) return false;
+      }
+      if (targeting.sectors.length > 0) {
+        const secteur = cleAttribution(profile?.startups?.[0]?.sector);
+        if (secteur === 'non-renseigne' || !targeting.sectors.includes(secteur)) return false;
+      }
+      return true;
+    } catch {
+      // Store indisponible : seules les campagnes sans ciblage passent.
+      return targeting.sectors.length === 0 && targeting.regions.length === 0;
+    }
   }
 
   /** État sponsor loggé une seule fois par partie, au premier passage sur une case concernée. */
   private sponsorStatusLogged = false;
-  /** Arrêt de diffusion (paused / plafond atteint) loggé une seule fois par partie. */
-  private sponsorStoppedLogged = false;
   private logSponsorStatusOnce(sponsor: ReturnType<typeof getEdition>['sponsor']): void {
     if (!__DEV__ || this.sponsorStatusLogged) return;
     this.sponsorStatusLogged = true;
@@ -335,11 +527,13 @@ export class EventManager {
       console.log(`[Sponsor] Partie sur "${this.editionId}" : édition non sponsorisée, aucun événement sponsor ne sera tiré`);
       return;
     }
-    const opp = (sponsor.opportunities ?? []).filter((c) => c.text).length;
-    const fund = (sponsor.fundings ?? []).filter((c) => c.text).length;
+    // Le diagnostic comptait les cartes ENCASTRÉES de l'édition. Elles ne sont
+    // plus tirées : les annoncer ici ferait chercher en partie des cartes qui
+    // n'arriveront jamais par ce chemin. C'est le feed qu'il faut compter.
+    const cartesFeed = getCachedFeedCards().length;
     console.log(
-      `[Sponsor] Partie sur "${this.editionId}" sponsorisée par "${sponsor.name}" : ` +
-        `${opp} opportunité(s) et ${fund} financement(s) sponsor, ${Math.round(SPONSOR_EVENT_CHANCE * 100)} % de chance par case`
+      `[Sponsor] Partie sur "${this.editionId}" habillée par "${sponsor.name}" : ` +
+        `${cartesFeed} carte(s) de campagne dans le feed, ${Math.round(SPONSOR_EVENT_CHANCE * 100)} % de chance par case`
     );
   }
 
@@ -430,27 +624,35 @@ export class EventManager {
 
     let available = items.filter((item) => !usedIds.has(item.id));
 
-    // Pool épuisé : on recycle en resettant le Set. Mais on EXCLUT les derniers
-    // contenus montrés pour éviter qu'un item juste vu ressorte immédiatement
-    // (ex. le pion refait un tour de plateau et retombe sur une case du même type).
+    // Pool épuisé : recyclage. On ne repart PAS de zéro — la moitié la plus
+    // récemment montrée du paquet RESTE marquée « utilisée » (et ne se libère
+    // qu'en étant re-montrée, puisque chaque tirage se ré-ajoute au Set).
+    // Garantie obtenue : au passage d'un tour de paquet à l'autre, une carte ne
+    // peut pas revenir avant qu'au moins la moitié du paquet soit repassée.
+    // L'ancien reset total n'excluait les récents que pour LE tirage suivant :
+    // dès le deuxième, une carte vue deux tirages plus tôt pouvait ressortir —
+    // exactement ce que les joueurs signalaient comme « ça se répète ».
     if (available.length === 0) {
       usedIds.clear();
       const recent = this.recentIds.get(usedIds) ?? [];
-      // On garde au moins 1 candidat : la fenêtre d'exclusion ne dépasse jamais
-      // la taille du pool - 1.
-      const windowSize = Math.min(recent.length, Math.max(0, items.length - 1));
-      const excluded = new Set(recent.slice(-windowSize));
-      available = items.filter((item) => !excluded.has(item.id));
+      // Seuls les récents appartenant à CE pool comptent (les pools filtrés —
+      // par difficulté notamment — partagent le même Set).
+      const idsDuPool = new Set(items.map((item) => item.id));
+      const aConserver = recent.filter((id) => idsDuPool.has(id));
+      const garde = Math.min(aConserver.length, Math.floor((items.length - 1) / 2));
+      for (const id of aConserver.slice(-garde)) usedIds.add(id);
+      available = items.filter((item) => !usedIds.has(item.id));
       if (available.length === 0) available = items; // filet de sécurité
     }
 
     const chosen = available[Math.floor(Math.random() * available.length)] ?? null;
 
-    // Mémorise l'id choisi dans la fenêtre récente (borne à RECENT_WINDOW).
+    // Mémorise l'id choisi dans l'historique récent (borné à MAX_RECENT — assez
+    // pour couvrir n'importe quel pool réellement recyclé en partie).
     if (chosen) {
       const recent = this.recentIds.get(usedIds) ?? [];
       recent.push(chosen.id);
-      while (recent.length > EventManager.RECENT_WINDOW) recent.shift();
+      while (recent.length > EventManager.MAX_RECENT) recent.shift();
       this.recentIds.set(usedIds, recent);
     }
 
@@ -503,23 +705,27 @@ export class EventManager {
    * Génère un financement aléatoire (évite les doublons)
    */
   generateFundingEvent(): GeneratedFundingEvent | null {
-    // Édition sponsorisée : ~25 % de chance de tirer un financement sponsor
-    const sponsorCard = this.pickSponsorCard('funding');
-    if (sponsorCard) {
-      const amount = sponsorCard.tokens ?? FIXED_POINTS.funding;
+    // Sponsor : ~25 % de chance (édition sponsorisée + campagnes du feed)
+    const pick = this.pickSponsorCard('funding');
+    if (pick) {
+      const amount = pick.card.tokens ?? FIXED_POINTS.funding;
       return {
         type: 'funding',
         data: {
-          id: sponsorCard.id,
+          id: pick.card.id,
           name: '',
-          description: sponsorCard.text,
+          description: pick.card.text,
           type: 'partenariat',
           amount,
           rarity: this.inferRarity(amount),
           sponsored: true,
-          sponsorLogoUrl: sponsorCard.logoUrl || undefined,
-          sponsorLinkUrl: sponsorCard.linkUrl || undefined,
-          sponsorEditionId: this.editionId,
+          sponsorLogoUrl: pick.card.logoUrl || undefined,
+          sponsorLinkUrl: pick.card.linkUrl || undefined,
+          sponsorEditionId: pick.metricsKey,
+          sponsorKind: pick.kindCampagne,
+          sponsorStructure: pick.structure,
+          sponsorCtaLabel: pick.ctaLabel,
+          sponsorVerso: pick.verso,
         },
       };
     }
@@ -617,23 +823,27 @@ export class EventManager {
    * Génère une opportunité aléatoire (évite les doublons)
    */
   generateOpportunityEvent(): GeneratedOpportunityEvent | null {
-    // Édition sponsorisée : ~25 % de chance de tirer une opportunité sponsor
-    const sponsorCard = this.pickSponsorCard('opportunity');
-    if (sponsorCard) {
-      const value = sponsorCard.tokens ?? FIXED_POINTS.opportunity;
+    // Sponsor : ~25 % de chance (édition sponsorisée + campagnes du feed)
+    const pick = this.pickSponsorCard('opportunity');
+    if (pick) {
+      const value = pick.card.tokens ?? FIXED_POINTS.opportunity;
       return {
         type: 'opportunity',
         data: {
-          id: sponsorCard.id,
+          id: pick.card.id,
           title: '',
-          description: sponsorCard.text,
+          description: pick.card.text,
           effect: 'tokens',
           value,
           rarity: this.inferRarity(value),
           sponsored: true,
-          sponsorLogoUrl: sponsorCard.logoUrl || undefined,
-          sponsorLinkUrl: sponsorCard.linkUrl || undefined,
-          sponsorEditionId: this.editionId,
+          sponsorLogoUrl: pick.card.logoUrl || undefined,
+          sponsorLinkUrl: pick.card.linkUrl || undefined,
+          sponsorEditionId: pick.metricsKey,
+          sponsorKind: pick.kindCampagne,
+          sponsorStructure: pick.structure,
+          sponsorCtaLabel: pick.ctaLabel,
+          sponsorVerso: pick.verso,
         },
       };
     }

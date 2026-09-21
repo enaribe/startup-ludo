@@ -133,8 +133,23 @@ export interface FundingEvent {
   sponsorLogoUrl?: string;
   /** Lien externe de l'opportunité réelle du sponsor (sauvegardable dans le profil). */
   sponsorLinkUrl?: string;
-  /** Édition sponsorisée d'origine — sert à attribuer les métriques au bon sponsor. */
+  /** Édition sponsorisée d'origine — sert à attribuer les métriques au bon sponsor.
+   *  Pour une carte du FEED (campagne annonceur), c'est l'ID DE LA CAMPAGNE :
+   *  les métriques s'écrivent sous sponsorMetrics/{campagneId}. */
   sponsorEditionId?: string;
+  /** Bandeau de la carte campagne (financement/opportunite/evenement). */
+  sponsorKind?: 'financement' | 'opportunite' | 'evenement';
+  /** Nom de la structure annonceuse (« Sponsorisé par X » au verso). */
+  sponsorStructure?: string;
+  /** Libellé du bouton du verso, configuré par l'annonceur (34 car. max). */
+  sponsorCtaLabel?: string;
+  /** Verso de la carte recto/verso (campagne annonceur). Absent = pas de flip. */
+  sponsorVerso?: {
+    description: string;
+    avantage?: string;
+    criteres?: string;
+    dateLimite?: string;
+  };
 }
 
 // Option de réponse pour un duel (toutes sont "correctes" mais avec des points différents)
@@ -220,8 +235,23 @@ export interface OpportunityEvent {
   sponsorLogoUrl?: string;
   /** Lien externe de l'opportunité réelle du sponsor (sauvegardable dans le profil). */
   sponsorLinkUrl?: string;
-  /** Édition sponsorisée d'origine — sert à attribuer les métriques au bon sponsor. */
+  /** Édition sponsorisée d'origine — sert à attribuer les métriques au bon sponsor.
+   *  Pour une carte du FEED (campagne annonceur), c'est l'ID DE LA CAMPAGNE :
+   *  les métriques s'écrivent sous sponsorMetrics/{campagneId}. */
   sponsorEditionId?: string;
+  /** Bandeau de la carte campagne (financement/opportunite/evenement). */
+  sponsorKind?: 'financement' | 'opportunite' | 'evenement';
+  /** Nom de la structure annonceuse (« Sponsorisé par X » au verso). */
+  sponsorStructure?: string;
+  /** Libellé du bouton du verso, configuré par l'annonceur (34 car. max). */
+  sponsorCtaLabel?: string;
+  /** Verso de la carte recto/verso (campagne annonceur). Absent = pas de flip. */
+  sponsorVerso?: {
+    description: string;
+    avantage?: string;
+    criteres?: string;
+    dateLimite?: string;
+  };
 }
 
 /**
@@ -271,6 +301,8 @@ export interface User {
   displayName: string;
   photoURL?: string;
   isGuest: boolean;
+  /** Email confirmé (OTP saisi dans l'app, ou fournisseur Google/Apple). */
+  emailVerified: boolean;
   createdAt: number;
   lastLogin: number;
 }
@@ -287,6 +319,26 @@ export interface UserProfile {
   totalTokensEarned: number;
   achievements: string[];
   startups: Startup[];
+  /**
+   * Région déclarée par le joueur (id de `PLAYER_REGIONS` : 14 régions du
+   * Sénégal + 'diaspora'). Déclaratif et modifiable au profil — jamais issu
+   * d'une géolocalisation (décision du plan Espace Annonceur, §3). Alimente la
+   * répartition régionale des métriques sponsor et le futur ciblage.
+   */
+  region?: string;
+  /**
+   * Canal par lequel le joueur a découvert l'app (id de ACQUISITION_SOURCES :
+   * bouche à oreille, réseaux sociaux, école/programme…). Déclaré une seule
+   * fois via le popup de l'accueil ; alimente la propriété utilisateur
+   * `acquisition_source` côté Amplitude (cohortes par canal).
+   */
+  acquisitionSource?: string;
+  /** Précision libre saisie quand le canal choisi est « autre ». */
+  acquisitionSourceDetail?: string;
+  /** Tranche d'âge déclarée (id de AGE_RANGES) — ciblage Espace Annonceur. */
+  ageRange?: string;
+  /** Situations déclarées (ids de SITUATIONS, multi) — ciblage Espace Annonceur. */
+  situations?: string[];
   createdAt: number;
 }
 
@@ -385,6 +437,12 @@ export interface Settings {
   language: 'fr' | 'en';
   theme: 'light' | 'dark' | 'system';
   notifications: boolean;
+  /**
+   * Dernier « Plus tard » du popup de région (ms epoch), `null` si jamais
+   * refusé. Relance douce : le popup se représente 24 h après un refus, tant
+   * que la région n'est pas renseignée.
+   */
+  regionPromptLastDismissedAt: number | null;
 }
 
 // ===== GAME INVITATION TYPES =====

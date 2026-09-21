@@ -29,6 +29,9 @@ interface SettingsStoreActions {
   toggleNotifications: () => void;
   setNotifications: (enabled: boolean) => void;
 
+  // Popup de région (Espace Annonceur, lot 2)
+  dismissRegionPrompt: () => void;
+
   // Hydration
   setHydrated: () => void;
 
@@ -45,6 +48,7 @@ const initialState: SettingsStoreState = {
   language: 'fr',
   theme: 'system',
   notifications: true,
+  regionPromptLastDismissedAt: null,
   isHydrated: false,
 };
 
@@ -114,6 +118,12 @@ export const useSettingsStore = create<SettingsStore>()(
           });
         },
 
+        dismissRegionPrompt: () => {
+          set((state) => {
+            state.regionPromptLastDismissedAt = Date.now();
+          });
+        },
+
         setHydrated: () => {
           set((state) => {
             state.isHydrated = true;
@@ -137,6 +147,7 @@ export const useSettingsStore = create<SettingsStore>()(
           soundEnabled: state.soundEnabled,
           musicEnabled: state.musicEnabled,
           hapticsEnabled: state.hapticsEnabled,
+          regionPromptLastDismissedAt: state.regionPromptLastDismissedAt,
           language: state.language,
           theme: state.theme,
           notifications: state.notifications,

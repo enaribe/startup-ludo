@@ -3,9 +3,7 @@
  * (`pushTokens/{userId}`) pour les notifications DIRECTES envoyées par nos
  * Cloud Functions via FCM pur (invitation de partie, etc.).
  *
- * Customer.io n'est PAS utilisé pour ces notifications directes : il reste
- * réservé aux campagnes marketing (onboarding, réactivation, broadcasts).
- * Le token est simplement lu depuis le SDK (qui le récupère auprès de FCM).
+ * Le token est lu via @react-native-firebase/messaging (voir analytics/push.ts).
  *
  * Doc Firestore : { userId, tokens: { [token]: { platform, updatedAt } } }
  * → plusieurs devices par joueur, nettoyage des tokens invalides côté function.

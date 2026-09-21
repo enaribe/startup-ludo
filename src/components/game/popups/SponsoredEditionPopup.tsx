@@ -102,15 +102,30 @@ export const SponsoredEditionPopup = memo(function SponsoredEditionPopup({
       countedEditionId.current = null;
       return;
     }
-    if (!editionId || countedEditionId.current === editionId) return;
+    if (!editionId) {
+      if (__DEV__) console.log('[Sponsor] popup ouvert SANS editionId — rien ne sera compté');
+      return;
+    }
+    if (countedEditionId.current === editionId) {
+      // Attendu : re-render (animation, « en savoir plus »…) sur un popup déjà
+      // compté. Dit explicitement, sinon l'absence d'incrément inquiète.
+      if (__DEV__) console.log(`[Sponsor] "${editionId}" déjà compté pour cette ouverture`);
+      return;
+    }
     countedEditionId.current = editionId;
 
-    trackSponsoredEditionView(editionId);
+    if (__DEV__) {
+      console.log(
+        `[Sponsor] popup ouvert sur "${editionId}" → comptage d’une vue` +
+          (sponsor.campaignId ? ` (campagne ${sponsor.campaignId})` : ' (aucune campagne liée)')
+      );
+    }
+    trackSponsoredEditionView(editionId, sponsor.campaignId);
     // Le joueur vient de choisir cette édition sponsorisée : on amorce ici
     // l'abonnement au total de vues, pour que le plafond (`viewsGoal`) soit
     // déjà connu quand la partie démarre et tire ses premières cartes.
     watchSponsorViews(editionId);
-  }, [visible, editionId]);
+  }, [visible, editionId, sponsor.campaignId]);
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onDismiss}>
@@ -188,7 +203,10 @@ export const SponsoredEditionPopup = memo(function SponsoredEditionPopup({
           buttonTitle={buttonTitle}
           onPlay={() => {
             setShowDetail(false);
-            onPlay();
+            // Modal natif plein écran (animation « slide ») : attendre la fin
+            // de sa fermeture avant de fermer le popup parent — deux dismiss
+            // simultanés bloquent la présentation du modal suivant (iOS).
+            setTimeout(onPlay, 320);
           }}
           onBack={() => setShowDetail(false)}
         />

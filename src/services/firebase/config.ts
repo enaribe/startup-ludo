@@ -64,6 +64,10 @@ export const FIRESTORE_COLLECTIONS = {
   savedOpportunities: 'savedOpportunities',
   /** Métriques des cartes sponsor (vues/sauvegardes/clics) — un doc par édition. */
   sponsorMetrics: 'sponsorMetrics',
+  // Feed des campagnes annonceurs actives — écrit par le seul back-office.
+  sponsorFeed: 'sponsorFeed',
+  // Signalements joueurs des cartes sponsor (un vote create-only par joueur).
+  sponsorReports: 'sponsorReports',
 
   // ===== Mode Classe (lot 5) — parcours élève =====
   /**
@@ -157,6 +161,16 @@ export interface FirestoreUser {
   avatarUrl: string | null;
   createdAt: FirebaseTimestamp | FirebaseFirestoreTypes.Timestamp;
   updatedAt: FirebaseTimestamp | FirebaseFirestoreTypes.Timestamp;
+  /** Région déclarée par le joueur (id de PLAYER_REGIONS) — Espace Annonceur, lot 2. */
+  region?: string;
+  /** Tranche d'âge déclarée (id de AGE_RANGES) — écran « Fais-nous connaissance ». */
+  ageRange?: string;
+  /** Situations déclarées (ids de SITUATIONS, multi). */
+  situations?: string[];
+  /** Canal de découverte de l'app (id de ACQUISITION_SOURCES). */
+  acquisitionSource?: string;
+  /** Précision libre quand le canal est « autre ». */
+  acquisitionSourceDetail?: string;
   settings: {
     soundEnabled: boolean;
     musicEnabled: boolean;

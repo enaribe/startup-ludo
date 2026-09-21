@@ -219,7 +219,7 @@ export const useProgramStore = create<ProgramStoreState & ProgramStoreActions>()
           get().setError("Impossible de synchroniser l'inscription au programme.");
         });
 
-        // Customer.io : campagne « ton parcours t'attend »
+        // Analytics : campagne « ton parcours t'attend »
         trackProgramEnrolled({
           programId,
           programName: program.name,

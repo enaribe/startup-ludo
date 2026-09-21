@@ -45,6 +45,7 @@ export default function PhoneAuthScreen() {
     phoneAuthStep,
     phoneNumber: storedPhoneNumber,
     isAuthenticated,
+    user,
     needsProfileCompletion,
     sendPhoneCode,
     verifyPhoneCode,
@@ -67,9 +68,11 @@ export default function PhoneAuthScreen() {
   // Ne pas reset au démontage pour éviter la perte d'état quand iOS revient de reCAPTCHA
   // Le reset est géré manuellement dans handleBack
 
-  // Redirect after successful authentication
+  // Redirect after successful authentication.
+  // On ignore les invités : un guest (compte anonyme) est déjà "authentifié",
+  // sans cette garde l'écran redirigeait vers l'accueil dès son ouverture.
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && !user?.isGuest) {
       if (needsProfileCompletion) {
         // New user - needs to complete profile
         router.replace('/(auth)/complete-profile');
@@ -78,7 +81,7 @@ export default function PhoneAuthScreen() {
         router.replace('/(tabs)/home');
       }
     }
-  }, [isAuthenticated, needsProfileCompletion, router]);
+  }, [isAuthenticated, user?.isGuest, needsProfileCompletion, router]);
 
   const handleSendCode = useCallback(async () => {
     if (!isPhoneValid) return;

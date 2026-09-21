@@ -1,13 +1,11 @@
 /**
- * Événements Customer.io — catalogue typé.
+ * Événements produit — catalogue typé (doc interne CONCREE).
  *
- * Chaque helper correspond à un déclencheur de la bibliothèque de
- * notifications push (doc interne CONCREE). Les campagnes côté dashboard
- * Customer.io s'appuient sur ces noms d'événements et attributs :
- * NE PAS les renommer sans mettre à jour les campagnes.
+ * Ces noms d'événements et attributs alimentent les funnels, cohortes et
+ * segments Amplitude : NE PAS les renommer sans mettre à jour les analyses.
  */
 
-import { setProfileAttributes, trackEvent } from './customerio';
+import { setProfileAttributes, trackEvent } from './tracking';
 
 // ─── Parties ────────────────────────────────────────────────────────────────
 

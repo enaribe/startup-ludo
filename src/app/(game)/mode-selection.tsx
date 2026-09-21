@@ -7,6 +7,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LocalModeIcon, OnlineModeIcon } from '@/components/game/ModeSelectionIcons';
+import { CLASS_MODE_ENABLED } from '@/config/features';
 import { RocketIcon } from '@/components/icons';
 import { useTranslation } from '@/i18n';
 import { DynamicGradientBorder, GameButton, GamePopup, OutlinedText, ProgressionPopup, RadialBackground } from '@/components/ui';
@@ -256,7 +257,7 @@ export default function GameModeSelectionScreen() {
         {/* Mode Classe — icône école verte. Masquée pour un invité : le
             rattachement exige un vrai compte (le serveur refuse les anonymes),
             proposer une porte qui se refermera aussitôt n'aiderait personne. */}
-        {!isGuest && (
+        {CLASS_MODE_ENABLED && !isGuest && (
           <Animated.View entering={FadeInDown.delay(400).duration(500)}>
             <Pressable onPress={handleClassMode}>
               <DynamicGradientBorder

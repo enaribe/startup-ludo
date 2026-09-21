@@ -60,7 +60,7 @@ const FUND_ICON = (
   </G>
 );
 
-const makeFundLabel = (text: string) => (
+export const makeFundLabel = (text: string) => (
   <SvgText
     x="68"
     y="50"
@@ -80,7 +80,14 @@ const FUND_DECOR_RIGHT = (
   </>
 );
 
-function FundingHeader({ label }: { label: ReactNode }) {
+/**
+ * Bandeau FINANCEMENT — exporté pour `SponsorEventPopup`.
+ *
+ * Une carte sponsor de type financement s'affichait sous le bandeau
+ * OPPORTUNITÉ (ampoule), le seul auquel ce composant avait accès. Elle
+ * annonçait donc un type et en montrait un autre.
+ */
+export function FundingHeader({ label }: { label: ReactNode }) {
   return (
     <PopupHeader
       color="#4CAF50"
@@ -169,9 +176,14 @@ export const FundingPopup = memo(function FundingPopup({
   if (funding.sponsored) {
     return (
       <SponsorEventPopup
+        kind={funding.sponsorKind}
         visible={visible}
         label={t('fundingPopup.header')}
         description={funding.description}
+        structure={funding.sponsorStructure}
+        ctaLabel={funding.sponsorCtaLabel}
+        verso={funding.sponsorVerso}
+        ctaUrl={funding.sponsorLinkUrl}
         value={funding.amount}
         logoUrl={funding.sponsorLogoUrl}
         savePayload={

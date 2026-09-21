@@ -32,7 +32,7 @@ import { useSocialStore } from './useSocialStore';
 import { useProgramStore } from './useProgramStore';
 import { useSettingsStore } from './useSettingsStore';
 import { clearLeaderboardCache } from '@/hooks/useLeaderboardCache';
-import { identifyUser, clearIdentity } from '@/services/analytics';
+import { identifyUser, clearIdentity, trackAmplitudeEvent } from '@/services/analytics';
 
 interface AuthState {
   user: User | null;
@@ -89,6 +89,7 @@ const mapAuthUserToUser = (authUser: AuthUser): User => ({
   email: authUser.email ?? '',
   displayName: authUser.displayName ?? 'Joueur',
   isGuest: authUser.isAnonymous,
+  emailVerified: authUser.emailVerified,
   photoURL: authUser.photoURL ?? undefined,
   createdAt: Date.now(),
   lastLogin: Date.now(),
@@ -149,7 +150,7 @@ export const useAuthStore = create<AuthStore>()(
               state.isInitialized = true;
             });
 
-            // Customer.io : identifier le joueur pour le tracking et les campagnes.
+            // Analytics : identifier le joueur pour le tracking et les campagnes.
             // `language` permet de servir les textes de notifs dans la bonne langue.
             identifyUser(authUser.id, {
               email: authUser.email ?? undefined,
@@ -159,7 +160,7 @@ export const useAuthStore = create<AuthStore>()(
               app_version: Constants.expoConfig?.version,
             });
 
-            // Notifications directes (FCM pur, hors Customer.io) : rafraîchir le
+            // Notifications directes (FCM pur) : rafraîchir le
             // token du device si la permission est déjà accordée. No-op sinon.
             if (!authUser.isAnonymous) {
               registerPushToken(authUser.id);
@@ -234,6 +235,14 @@ export const useAuthStore = create<AuthStore>()(
               });
             }
           } else {
+            // Null transitoire pendant une opération d'auth en cours (ex :
+            // inscription depuis une session invitée — Firebase émet un
+            // sign-out avant d'annoncer le nouveau compte). L'opération
+            // (register/login/logout) pose elle-même l'état final dans tous
+            // ses chemins : ignorer cet événement évite que les gardes de
+            // navigation éjectent l'utilisateur vers l'écran d'accueil.
+            if (_get().isInitialized && _get().isLoading) return;
+
             // User is signed out
             set((state) => {
               state.user = null;
@@ -298,6 +307,11 @@ export const useAuthStore = create<AuthStore>()(
         set((state) => {
           state.isLoading = true;
           state.error = null;
+          // Posé AVANT l'appel Firebase : le listener onAuthStateChanged met
+          // isAuthenticated=true dès la création du compte et les écrans
+          // redirigent aussitôt — le flag doit déjà être correct pour arriver
+          // sur complete-profile et non sur home.
+          state.needsProfileCompletion = true;
         });
 
         try {
@@ -309,6 +323,9 @@ export const useAuthStore = create<AuthStore>()(
             email: authUser.email,
             displayName,
           });
+
+          // Funnel d'activation : étape « compte créé »
+          trackAmplitudeEvent('account_created', { method: 'email' });
 
           set((state) => {
             state.user = user;
@@ -323,6 +340,7 @@ export const useAuthStore = create<AuthStore>()(
           set((state) => {
             state.error = error instanceof Error ? error.message : "Erreur d'inscription";
             state.isLoading = false;
+            state.needsProfileCompletion = false;
           });
         }
       },
@@ -377,6 +395,8 @@ export const useAuthStore = create<AuthStore>()(
               displayName: authUser.displayName ?? 'Joueur',
               photoURL: authUser.photoURL,
             });
+            // Funnel d'activation : étape « compte créé »
+            trackAmplitudeEvent('account_created', { method: 'google' });
           }
 
           set((state) => {
@@ -414,6 +434,8 @@ export const useAuthStore = create<AuthStore>()(
               email: authUser.email,
               displayName: authUser.displayName ?? 'Joueur',
             });
+            // Funnel d'activation : étape « compte créé »
+            trackAmplitudeEvent('account_created', { method: 'apple' });
           }
 
           set((state) => {
@@ -512,6 +534,9 @@ export const useAuthStore = create<AuthStore>()(
             state.needsProfileCompletion = isNewUser;
           });
 
+          // Funnel d'activation : étape « compte créé »
+          if (isNewUser) trackAmplitudeEvent('account_created', { method: 'phone' });
+
           useUserStore.getState().setProfile(profile);
         } catch (error) {
           set((state) => {
@@ -575,7 +600,10 @@ export const useAuthStore = create<AuthStore>()(
           if (currentUserId) {
             await unregisterPushToken(currentUserId);
           }
-          // Customer.io : oublier l'utilisateur avant la déconnexion
+          // Déconnexion VOLONTAIRE (≠ simple fermeture d'app) — émis AVANT
+          // clearIdentity (reset Amplitude) pour être attribué au bon joueur.
+          trackAmplitudeEvent('logout');
+          // Analytics : oublier l'utilisateur avant la déconnexion
           clearIdentity();
           // Sign out from Google if signed in
           await signOutFromGoogle();
@@ -602,7 +630,7 @@ export const useAuthStore = create<AuthStore>()(
         });
 
         try {
-          // Customer.io : oublier l'utilisateur avant la suppression
+          // Analytics : oublier l'utilisateur avant la suppression
           clearIdentity();
           // Delete user account from Firebase
           await firebaseDeleteAccount();

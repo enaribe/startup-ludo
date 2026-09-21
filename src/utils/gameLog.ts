@@ -29,7 +29,7 @@ const GAME_LOG_FLAGS: Record<LogCategory, boolean> = {
   remote: false,
   duel: false,
   popup: false,
-  crash: true,  // ⚡ Logs spéciaux pour le debug du crash Motorola - à désactiver après fix
+  crash: false, // Débug du crash Motorola — rallumer ponctuellement si besoin
 };
 
 /** Log normal — filtré par catégorie */
@@ -59,6 +59,10 @@ export const gameError = (category: LogCategory, ...args: unknown[]): void => {
  */
 export const crashLog = (tag: string, data?: Record<string, unknown>): void => {
   if (!__DEV__) return;
+  // Passe désormais par le drapeau `crash` comme toute autre catégorie : il
+  // l'ignorait, si bien qu'éteindre la catégorie ne suffisait pas à faire
+  // taire les 35 points d'instrumentation du crash Motorola.
+  if (!GAME_LOG_FLAGS.crash) return;
   // eslint-disable-next-line no-console
   console.log(`[CRASH-DEBUG] ${tag}`, data ?? '');
 };

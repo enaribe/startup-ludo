@@ -39,7 +39,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.resetMonthlyStats = exports.resetWeeklyStats = exports.updateLeaderboard = exports.onUserCreate = exports.onGameInvitationCreated = void 0;
+exports.resetMonthlyStats = exports.resetWeeklyStats = exports.updateLeaderboard = exports.onUserCreate = exports.verifyEmailOtp = exports.sendEmailOtp = exports.onGameInvitationCreated = void 0;
 const admin = __importStar(require("firebase-admin"));
 // Initialize Firebase Admin SDK
 admin.initializeApp();
@@ -49,6 +49,10 @@ admin.initializeApp();
 // Export Notification Functions (FCM direct, hors Customer.io)
 var onGameInvitationCreated_1 = require("./notifications/onGameInvitationCreated");
 Object.defineProperty(exports, "onGameInvitationCreated", { enumerable: true, get: function () { return onGameInvitationCreated_1.onGameInvitationCreated; } });
+// Export Auth Functions (vérification d'email par OTP via Brevo)
+var emailOtp_1 = require("./auth/emailOtp");
+Object.defineProperty(exports, "sendEmailOtp", { enumerable: true, get: function () { return emailOtp_1.sendEmailOtp; } });
+Object.defineProperty(exports, "verifyEmailOtp", { enumerable: true, get: function () { return emailOtp_1.verifyEmailOtp; } });
 // Export User Functions
 var onUserCreate_1 = require("./user/onUserCreate");
 Object.defineProperty(exports, "onUserCreate", { enumerable: true, get: function () { return onUserCreate_1.onUserCreate; } });

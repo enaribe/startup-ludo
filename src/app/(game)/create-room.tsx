@@ -21,6 +21,8 @@ import { Avatar } from '@/components/ui/Avatar';
 import { EditionTileIcon } from '@/components/icons';
 import { getDefaultProjectsForEdition, getMatchingUserStartups } from '@/data/defaultProjects';
 import { getLocalizedEdition, type Edition } from '@/data/types';
+import { SPONSOR_FEATURES_ENABLED } from '@/config/features';
+import { habillageDiffusable } from '@/utils/sponsorEdition';
 import { SponsoredEditionPopup } from '@/components/game/popups';
 import { useEditions } from '@/hooks';
 import { useMultiplayer } from '@/hooks/useMultiplayer';
@@ -528,7 +530,27 @@ export default function CreateRoomScreen() {
                   key={edition.id}
                   onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    if (edition.sponsor?.enabled && edition.sponsor.imageUrl) {
+                    // Pourquoi le popup s'affiche ou non : les trois
+                    // conditions echouaient en silence, donc « je ne vois
+                    // pas les vues » ne disait pas laquelle etait fausse.
+                    if (__DEV__) {
+                    const sp = edition.sponsor;
+                    console.log(
+                    `[Sponsor] edition "${edition.id}" choisie —`,
+                    !SPONSOR_FEATURES_ENABLED
+                    ? 'circuit sponsor DESACTIVE (SPONSOR_FEATURES_ENABLED=false)'
+                    : !sp
+                    ? 'aucun habillage sur cette edition'
+                    : !sp.enabled
+                    ? `habillage "${sp.name ?? '-'}" DESACTIVE (enabled=false)`
+                    : sp.paused === true
+                      ? `habillage "${sp.name ?? '-'}" EN PAUSE (paused=true)`
+                    : !sp.imageUrl
+                    ? `habillage "${sp.name ?? '-'}" sans visuel (imageUrl manquant)`
+                    : `habillage "${sp.name ?? '-'}" actif -> popup`
+                    );
+                    }
+                    if (SPONSOR_FEATURES_ENABLED && habillageDiffusable(edition.sponsor)) {
                       // Édition sponsorisée → fermer ce modal puis afficher le popup sponsor
                       setShowEditionModal(false);
                       setSponsorEdition(edition);

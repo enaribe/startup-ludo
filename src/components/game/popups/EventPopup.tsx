@@ -158,11 +158,20 @@ export const EventPopup = memo(function EventPopup({
   if (isOpportunity && (event as OpportunityEvent).sponsored) {
     return (
       <SponsorEventPopup
+        kind={(event as OpportunityEvent).sponsorKind}
         visible={visible}
-        label={t('eventPopup.opportunityLabel')}
+        label={
+          (event as OpportunityEvent).sponsorKind === 'evenement'
+            ? t('sponsorEvent.eventLabel')
+            : t('eventPopup.opportunityLabel')
+        }
         description={event.description}
         value={event.value}
         logoUrl={(event as OpportunityEvent).sponsorLogoUrl}
+        structure={(event as OpportunityEvent).sponsorStructure}
+        ctaLabel={(event as OpportunityEvent).sponsorCtaLabel}
+        verso={(event as OpportunityEvent).sponsorVerso}
+        ctaUrl={(event as OpportunityEvent).sponsorLinkUrl}
         savePayload={
           (event as OpportunityEvent).sponsorLinkUrl
             ? {

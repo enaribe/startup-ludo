@@ -641,9 +641,15 @@ describe('classSessions', () => {
     );
   });
 
-  it("le directeur ne PILOTE PAS une séance (lecture seule)", async () => {
-    await assertFails(
+  it("le directeur CLÔTURE une séance de son établissement (politique du 17/08)", async () => {
+    await assertSucceeds(
       updateDoc(doc(db(UID_DIRECTEUR_A), 'classSessions', SEANCE_A1), { status: 'ended' })
+    );
+  });
+
+  it("le directeur ne modifie PAS le reste d'une séance (durée refusée)", async () => {
+    await assertFails(
+      updateDoc(doc(db(UID_DIRECTEUR_A), 'classSessions', SEANCE_A1), { durationMinutes: 5 })
     );
   });
 
@@ -1165,9 +1171,327 @@ describe('audit #2 — cumuls, classe partagée, double rôle', () => {
     );
   });
 
-  it("le directeur ne pilote toujours PAS la séance d'un enseignant", async () => {
-    await assertFails(
+  it("le directeur clôture la séance d'un enseignant (politique du 17/08)", async () => {
+    await assertSucceeds(
       updateDoc(doc(db(UID_DIRECTEUR_A), 'classSessions', SEANCE_A1), { status: 'ended' })
+    );
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// TÉLÉMÉTRIE SPONSOR V2 — buckets quotidiens et personnes uniques
+//
+// Le compteur « personnes uniques » repose ENTIÈREMENT sur la règle
+// create-only de `touched/{uid}` : si elle cède (update accepté, ou création
+// au nom d'un autre), le chiffre vendu aux annonceurs devient faux.
+// ═══════════════════════════════════════════════════════════════════════
+
+describe('sponsorMetrics — télémétrie v2', () => {
+  before(reinitialiser);
+
+  it('un joueur authentifié incrémente un bucket quotidien', async () => {
+    await assertSucceeds(
+      setDoc(
+        doc(db(UID_ELEVE), 'sponsorMetrics', 'agritech', 'daily', '2026-08-13'),
+        { date: '2026-08-13', totals: { views: 1 } },
+        { merge: true }
+      )
+    );
+  });
+
+  it('un joueur CRÉE son marqueur « personne unique »', async () => {
+    await assertSucceeds(
+      setDoc(doc(db(UID_ELEVE), 'sponsorMetrics', 'agritech', 'touched', UID_ELEVE), {
+        firstSeenAt: Date.now(),
+      })
+    );
+  });
+
+  it('le marqueur ne se RÉÉCRIT pas (create-only — fondement du comptage unique)', async () => {
+    await assertFails(
+      setDoc(doc(db(UID_ELEVE), 'sponsorMetrics', 'agritech', 'touched', UID_ELEVE), {
+        firstSeenAt: 0,
+      })
+    );
+  });
+
+  it("personne ne crée le marqueur d'un AUTRE joueur", async () => {
+    await assertFails(
+      setDoc(doc(db(UID_ELEVE), 'sponsorMetrics', 'agritech', 'touched', UID_ELEVE_NON_RATTACHE), {
+        firstSeenAt: Date.now(),
+      })
+    );
+  });
+
+  it('le marqueur ne se supprime pas, même par un admin sponsor', async () => {
+    await assertFails(
+      deleteDoc(doc(db(UID_SPONSOR), 'sponsorMetrics', 'agritech', 'touched', UID_ELEVE))
+    );
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// ESPACE ANNONCEUR — CAMPAGNES (lot 4)
+//
+// La frontière testée : un sponsor ne voit que SES campagnes, ne circule
+// qu'entre draft et in_review (jamais vers active — ce serait sauter la
+// modération), ne touche pas aux mois réservés, et personne côté client
+// n'écrit ni les réservations d'exclusivité ni le feed du mobile.
+// ═══════════════════════════════════════════════════════════════════════
+
+describe('campaigns — espace annonceur', () => {
+  before(async () => {
+    await reinitialiser();
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const d = ctx.firestore();
+      await setDoc(doc(d, 'campaigns', 'camp_sponsor'), {
+        ownerUid: UID_SPONSOR,
+        format: 'card',
+        status: 'draft',
+        reservationMonths: [],
+      });
+      await setDoc(doc(d, 'campaigns', 'camp_autre'), {
+        ownerUid: 'uid_autre_annonceur',
+        format: 'card',
+        status: 'draft',
+      });
+      await setDoc(doc(d, 'editionReservations', 'agritech_2026-10'), {
+        editionId: 'agritech',
+        month: '2026-10',
+        campaignId: 'camp_x',
+        ownerUid: 'uid_autre_annonceur',
+        structure: 'Autre',
+      });
+      await setDoc(doc(d, 'sponsorFeed', 'cards'), { cards: [], updatedAt: 1 });
+    });
+  });
+
+  it('le sponsor CRÉE un brouillon à son nom', async () => {
+    await assertSucceeds(
+      setDoc(doc(db(UID_SPONSOR), 'campaigns', 'camp_new'), {
+        ownerUid: UID_SPONSOR,
+        format: 'card',
+        status: 'draft',
+      })
+    );
+  });
+
+  it("le sponsor ne crée PAS une campagne déjà active (contournement de modération)", async () => {
+    await assertFails(
+      setDoc(doc(db(UID_SPONSOR), 'campaigns', 'camp_triche'), {
+        ownerUid: UID_SPONSOR,
+        format: 'card',
+        status: 'active',
+      })
+    );
+  });
+
+  it('le sponsor SOUMET son brouillon (draft → in_review)', async () => {
+    await assertSucceeds(
+      updateDoc(doc(db(UID_SPONSOR), 'campaigns', 'camp_sponsor'), {
+        status: 'in_review',
+        submittedAt: Date.now(),
+      })
+    );
+  });
+
+  it("le sponsor ne s'AUTO-ACTIVE pas (in_review → active refusé)", async () => {
+    await assertFails(
+      updateDoc(doc(db(UID_SPONSOR), 'campaigns', 'camp_sponsor'), { status: 'active' })
+    );
+  });
+
+  it("le sponsor ne s'attribue PAS de mois réservés", async () => {
+    await assertFails(
+      updateDoc(doc(db(UID_SPONSOR), 'campaigns', 'camp_sponsor'), {
+        reservationMonths: ['2026-11'],
+      })
+    );
+  });
+
+  it("le sponsor ne lit PAS la campagne d'un autre annonceur", async () => {
+    await assertFails(getDoc(doc(db(UID_SPONSOR), 'campaigns', 'camp_autre')));
+  });
+
+  it('le sponsor LIT le calendrier des réservations (mois pris affichés)', async () => {
+    await assertSucceeds(
+      getDoc(doc(db(UID_SPONSOR), 'editionReservations', 'agritech_2026-10'))
+    );
+  });
+
+  it("personne ne s'écrit une réservation d'exclusivité (Admin SDK seul)", async () => {
+    await assertFails(
+      setDoc(doc(db(UID_SPONSOR), 'editionReservations', 'culture_2026-12'), {
+        editionId: 'culture',
+        month: '2026-12',
+        campaignId: 'camp_sponsor',
+        ownerUid: UID_SPONSOR,
+      })
+    );
+  });
+
+  it("l'élève lit le feed (le tirage doit marcher pour tout joueur)", async () => {
+    await assertSucceeds(getDoc(doc(db(UID_ELEVE), 'sponsorFeed', 'cards')));
+  });
+
+  it("personne n'écrit le feed depuis un client", async () => {
+    await assertFails(
+      setDoc(doc(db(UID_SPONSOR), 'sponsorFeed', 'cards'), { cards: [{ id: 'triche' }] })
+    );
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// SIGNALEMENTS JOUEURS (lot 5) — un vote create-only par joueur
+// ═══════════════════════════════════════════════════════════════════════
+
+describe('sponsorReports — signalements', () => {
+  before(reinitialiser);
+
+  it('un joueur SIGNALE une carte (création de son vote)', async () => {
+    await assertSucceeds(
+      setDoc(doc(db(UID_ELEVE), 'sponsorReports', 'camp_x', 'votes', UID_ELEVE), {
+        reportedAt: Date.now(),
+      })
+    );
+  });
+
+  it('le vote ne se réécrit pas (un joueur = une voix)', async () => {
+    await assertFails(
+      setDoc(doc(db(UID_ELEVE), 'sponsorReports', 'camp_x', 'votes', UID_ELEVE), {
+        reportedAt: 0,
+      })
+    );
+  });
+
+  it("personne ne vote au nom d'un autre joueur", async () => {
+    await assertFails(
+      setDoc(doc(db(UID_ELEVE), 'sponsorReports', 'camp_x', 'votes', UID_ELEVE_NON_RATTACHE), {
+        reportedAt: Date.now(),
+      })
+    );
+  });
+
+  it('un vote ne se supprime pas (pas de retrait de signalement)', async () => {
+    await assertFails(
+      deleteDoc(doc(db(UID_ELEVE), 'sponsorReports', 'camp_x', 'votes', UID_ELEVE))
+    );
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// FACTURATION ANNONCEUR (lot 6) — l'argent est Admin SDK uniquement
+// ═══════════════════════════════════════════════════════════════════════
+
+describe('advertisers et invoices — facturation', () => {
+  before(async () => {
+    await reinitialiser();
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const d = ctx.firestore();
+      await setDoc(doc(d, 'advertisers', UID_SPONSOR), {
+        balanceFcfa: 500000, billingInfo: { raisonSociale: 'ADEPME' },
+      });
+      await setDoc(doc(d, 'invoices', `${UID_SPONSOR}_2026-07`), {
+        ownerUid: UID_SPONSOR, totalFcfa: 100000, status: 'due',
+      });
+    });
+  });
+
+  it('l’annonceur LIT son compte et sa facture', async () => {
+    await assertSucceeds(getDoc(doc(db(UID_SPONSOR), 'advertisers', UID_SPONSOR)));
+    await assertSucceeds(getDoc(doc(db(UID_SPONSOR), 'invoices', `${UID_SPONSOR}_2026-07`)));
+  });
+
+  it('l’annonceur met à jour SES infos de facturation (et rien d’autre)', async () => {
+    await assertSucceeds(
+      updateDoc(doc(db(UID_SPONSOR), 'advertisers', UID_SPONSOR), {
+        billingInfo: { raisonSociale: 'ADEPME', ninea: '12345' }, updatedAt: 1,
+      })
+    );
+  });
+
+  it('l’annonceur ne se CRÉDITE pas lui-même', async () => {
+    await assertFails(
+      updateDoc(doc(db(UID_SPONSOR), 'advertisers', UID_SPONSOR), { balanceFcfa: 99999999 })
+    );
+  });
+
+  it('personne ne marque sa propre facture payée', async () => {
+    await assertFails(
+      updateDoc(doc(db(UID_SPONSOR), 'invoices', `${UID_SPONSOR}_2026-07`), { status: 'paid' })
+    );
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// INSCRIPTION LIBRE (plan I1) — la demande est le seul document du candidat
+// ═══════════════════════════════════════════════════════════════════════
+
+describe('signupRequests — inscription libre', () => {
+  before(async () => {
+    await reinitialiser();
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const d = ctx.firestore();
+      await setDoc(doc(d, 'signupRequests', UID_ELEVE), {
+        type: 'teacher', status: 'pending', establishmentId: ETAB_A, displayName: 'Candidat',
+      });
+    });
+  });
+
+  it('un compte crée SA demande en pending', async () => {
+    await assertSucceeds(
+      setDoc(doc(db(UID_ELEVE_NON_RATTACHE), 'signupRequests', UID_ELEVE_NON_RATTACHE), {
+        type: 'sponsor', status: 'pending', displayName: 'Structure X',
+      })
+    );
+  });
+
+  it("personne ne s'inscrit déjà approuvé (contournement)", async () => {
+    await assertFails(
+      setDoc(doc(db(UID_ELEVE_NON_RATTACHE), 'signupRequests', UID_ELEVE_NON_RATTACHE), {
+        type: 'sponsor', status: 'approved',
+      })
+    );
+  });
+
+  it('le demandeur ne change PAS son statut', async () => {
+    await assertFails(
+      updateDoc(doc(db(UID_ELEVE), 'signupRequests', UID_ELEVE), { status: 'approved' })
+    );
+  });
+
+  it("la direction LIT les demandes enseignant de SON établissement", async () => {
+    await assertSucceeds(getDoc(doc(db(UID_DIRECTEUR_A), 'signupRequests', UID_ELEVE)));
+  });
+
+  it("la direction d'un AUTRE établissement ne lit pas la demande", async () => {
+    await assertFails(getDoc(doc(db(UID_DIRECTEUR_B), 'signupRequests', UID_ELEVE)));
+  });
+});
+
+// ═══ La direction clôture une séance zombie de SON établissement (17/08) ═══
+describe('classSessions — clôture par la direction', () => {
+  before(reinitialiser);
+
+  it('le directeur TERMINE une séance de son établissement', async () => {
+    await assertSucceeds(
+      updateDoc(doc(db(UID_DIRECTEUR_A), 'classSessions', SEANCE_A1), {
+        status: 'ended', endedAt: Date.now(),
+      })
+    );
+  });
+
+  it("le directeur ne RÉÉCRIT pas le contenu de la séance (title refusé)", async () => {
+    await assertFails(
+      updateDoc(doc(db(UID_DIRECTEUR_A), 'classSessions', SEANCE_A2), {
+        status: 'ended', title: 'détourné',
+      })
+    );
+  });
+
+  it("le directeur d'un AUTRE établissement ne clôture rien", async () => {
+    await assertFails(
+      updateDoc(doc(db(UID_DIRECTEUR_B), 'classSessions', SEANCE_A2), { status: 'ended' })
     );
   });
 });

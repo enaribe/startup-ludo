@@ -13,6 +13,7 @@ import { useTranslation } from '@/i18n';
 import { useAuthStore, useUserStore } from '@/stores';
 import { useSocialStore } from '@/stores/useSocialStore';
 import { RadialBackground, DynamicGradientBorder, Avatar } from '@/components/ui';
+import { SPONSOR_FEATURES_ENABLED } from '@/config/features';
 import { getRankFromXP, getRankProgress, getXPForNextRank } from '@/config/progression';
 import { useAvatarPicker } from '@/hooks/useAvatarPicker';
 import { AvatarPickerModal } from '@/components/profile/AvatarPickerModal';
@@ -268,7 +269,7 @@ export default function ProfilScreen() {
           </View>
 
           {/* Opportunités sponsor sauvegardées en partie — clic = ouvre le lien */}
-          <SavedOpportunitiesCard width={contentWidth} />
+          {SPONSOR_FEATURES_ENABLED && <SavedOpportunitiesCard width={contentWidth} />}
         </View>
       </ScrollView>
 
