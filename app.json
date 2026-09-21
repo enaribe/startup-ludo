@@ -2,7 +2,7 @@
   "expo": {
     "name": "Startup Ludo",
     "slug": "startup-ludo",
-    "version": "2.3.1",
+    "version": "2.4.0",
     "orientation": "portrait",
     "icon": "./assets/images/iconludo.png",
     "scheme": "startupludo",
@@ -11,7 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.startupludo.app",
-      "buildNumber": "86",
+      "buildNumber": "87",
       "googleServicesFile": "./GoogleService-Info.plist",
       "usesAppleSignIn": true,
       "infoPlist": {
@@ -24,7 +24,7 @@
     },
     "android": {
       "package": "com.startupludo.app",
-      "versionCode": 44,
+      "versionCode": 45,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#0C243E",
