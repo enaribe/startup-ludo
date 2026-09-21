@@ -14,7 +14,7 @@
  *
  * → Passer à `false` pour tout désactiver d'un coup.
  */
-export const SPONSOR_FEATURES_ENABLED = true;
+export const SPONSOR_FEATURES_ENABLED = false;
 
 /**
  * CLASS_MODE_ENABLED — Mode Classe (parcours élève : rattachement par code
@@ -24,7 +24,7 @@ export const SPONSOR_FEATURES_ENABLED = true;
  *
  * → Passer à `false` pour tout désactiver d'un coup.
  */
-export const CLASS_MODE_ENABLED = true;
+export const CLASS_MODE_ENABLED = false;
 
 /**
  * EMAIL_OTP_ENABLED — vérification d'email par code à l'inscription
