@@ -221,7 +221,7 @@ export default function PickLearnerScreen() {
                 {/* Avatar du jeu : mêmes initiales et mêmes couleurs que
                     partout ailleurs — l'élève retrouve un objet connu. */}
                 <View style={learner.taken && styles.avatarTaken}>
-                  <Avatar name={learner.displayName} size="lg" showBorder />
+                  <Avatar name={learner.displayName} size="md" showBorder />
                 </View>
 
                 <Text
@@ -340,22 +340,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     // Marge négative : chaque cellule porte sa moitié d'écart, la grille
-    // reste alignée sur les bords du contenu.
-    marginHorizontal: -SPACING[1],
+    // reste alignée sur les bords du contenu. 12 px de part et d'autre —
+    // à 4 px, les deux colonnes se touchaient presque et la grille se lisait
+    // comme un bloc unique.
+    marginHorizontal: -SPACING[3],
   },
-  gridCell: { width: '50%', paddingHorizontal: SPACING[1], paddingBottom: SPACING[2] },
+  gridCell: { width: '50%', paddingHorizontal: SPACING[3], paddingBottom: SPACING[3] },
   learnerCard: {
     alignItems: 'center',
     gap: SPACING[2],
-    paddingVertical: SPACING[4],
-    paddingHorizontal: SPACING[3],
+    paddingVertical: SPACING[3],
+    paddingHorizontal: SPACING[2],
     borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    // Fond et bordure RENFORCÉS : à 0.06/0.12, l'avatar et sa bordure dorée
+    // écrasaient la carte — on ne voyait que des pastilles flottantes, sans
+    // rien qui dise « ceci est un bouton ».
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.20)',
     // Hauteur fixe : un prénom sur deux lignes ne doit pas décaler la carte
     // voisine, sinon la grille ondule pendant le balayage.
-    minHeight: 148,
+    minHeight: 132,
     justifyContent: 'center',
   },
   learnerCardPressed: {
@@ -374,10 +379,12 @@ const styles = StyleSheet.create({
     // `flex: 1` venait de la disposition en ligne : dans une carte centrée il
     // étirait le texte sur toute la hauteur restante.
     fontFamily: FONTS.bodySemiBold,
-    fontSize: FONT_SIZES.md,
+    // 14 px et non 16 : « Abdoulaye C. » debordait d'une demi-largeur d'ecran
+    // sur un telephone de 360 px, et se faisait couper au milieu du prenom.
+    fontSize: 14,
     color: '#FFFFFF',
     textAlign: 'center',
-    lineHeight: 19,
+    lineHeight: 18,
   },
   learnerNameTaken: { color: 'rgba(255,255,255,0.4)' },
   takenBadge: {
