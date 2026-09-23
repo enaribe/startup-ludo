@@ -385,6 +385,10 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     textAlign: 'center',
     lineHeight: 18,
+    // `alignSelf: stretch` : sans lui le Text prend la largeur de son contenu
+    // et se centre sur la carte, pas sur l'avatar — deux axes différents, d'où
+    // le décalage visible dès qu'un nom est plus large que la pastille.
+    alignSelf: 'stretch',
   },
   learnerNameTaken: { color: 'rgba(255,255,255,0.4)' },
   takenBadge: {
