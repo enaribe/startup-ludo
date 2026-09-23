@@ -22,7 +22,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { GameButton, GamePopup, RadialBackground } from '@/components/ui';
+import { Avatar, GameButton, GamePopup, RadialBackground } from '@/components/ui';
 import { useTranslation } from '@/i18n';
 import { rattacherEleve } from '@/services/firebase/classService';
 import { useClassStore } from '@/stores';
@@ -191,38 +191,54 @@ export default function PickLearnerScreen() {
           </Animated.View>
         )}
 
-        <View style={styles.list}>
+        {/*
+          * GRILLE DE CARTES, pas une liste de lignes.
+          *
+          * L'élève cherche SON nom parmi trente, debout, sur le téléphone d'à
+          * côté, pendant que la classe attend. Une liste verticale impose de
+          * lire ligne à ligne ; une grille laisse balayer, et l'avatar coloré
+          * sert de repère avant même que le nom soit lu.
+          *
+          * Deux colonnes : trois rendraient les prénoms illisibles sur un
+          * écran de 360 px, une seule ne vaudrait pas mieux qu'avant.
+          */}
+        <View style={styles.grid}>
           {learners.map((learner, index) => (
             <Animated.View
               key={learner.id}
+              style={styles.gridCell}
               entering={FadeInDown.delay(100 + Math.min(index, 12) * 30).duration(400)}
             >
               <Pressable
                 onPress={() => handleSelect(learner)}
                 disabled={learner.taken || chargement}
                 style={({ pressed }) => [
-                  styles.learnerRow,
-                  learner.taken && styles.learnerRowTaken,
-                  pressed && !learner.taken && styles.learnerRowPressed,
+                  styles.learnerCard,
+                  learner.taken && styles.learnerCardTaken,
+                  pressed && !learner.taken && styles.learnerCardPressed,
                 ]}
               >
-                <View style={[styles.avatarDot, learner.taken && styles.avatarDotTaken]}>
-                  <Ionicons
-                    name={learner.taken ? 'lock-closed' : 'person'}
-                    size={16}
-                    color={learner.taken ? 'rgba(255,255,255,0.35)' : '#0C243E'}
-                  />
+                {/* Avatar du jeu : mêmes initiales et mêmes couleurs que
+                    partout ailleurs — l'élève retrouve un objet connu. */}
+                <View style={learner.taken && styles.avatarTaken}>
+                  <Avatar name={learner.displayName} size="lg" showBorder />
                 </View>
+
                 <Text
                   style={[styles.learnerName, learner.taken && styles.learnerNameTaken]}
-                  numberOfLines={1}
+                  numberOfLines={2}
                 >
                   {learner.displayName}
                 </Text>
-                {learner.taken ? (
-                  <Text style={styles.takenBadge}>{t('class.nameTakenBadge')}</Text>
-                ) : (
-                  <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.4)" />
+
+                {/* Le cadenas est POSÉ SUR l'avatar plutôt qu'en badge à côté :
+                    « ce nom est pris » se lit sur la personne, pas dans une
+                    mention qu'il faut chercher. */}
+                {learner.taken && (
+                  <View style={styles.lockOverlay}>
+                    <Ionicons name="lock-closed" size={13} color="rgba(255,255,255,0.75)" />
+                    <Text style={styles.takenBadge}>{t('class.nameTakenBadge')}</Text>
+                  </View>
                 )}
               </Pressable>
             </Animated.View>
@@ -319,42 +335,49 @@ const styles = StyleSheet.create({
     marginTop: SPACING[2],
     lineHeight: 20,
   },
-  list: { marginTop: SPACING[5], gap: SPACING[2] },
-  learnerRow: {
+  grid: {
+    marginTop: SPACING[5],
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    // Marge négative : chaque cellule porte sa moitié d'écart, la grille
+    // reste alignée sur les bords du contenu.
+    marginHorizontal: -SPACING[1],
+  },
+  gridCell: { width: '50%', paddingHorizontal: SPACING[1], paddingBottom: SPACING[2] },
+  learnerCard: {
     alignItems: 'center',
-    gap: SPACING[3],
-    paddingVertical: SPACING[3],
-    paddingHorizontal: SPACING[4],
-    borderRadius: 16,
+    gap: SPACING[2],
+    paddingVertical: SPACING[4],
+    paddingHorizontal: SPACING[3],
+    borderRadius: 18,
     backgroundColor: 'rgba(255,255,255,0.06)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.12)',
-  },
-  learnerRowPressed: {
-    backgroundColor: 'rgba(255,188,64,0.14)',
-    borderColor: 'rgba(255,188,64,0.5)',
-  },
-  // Nom déjà pris : grisé ET non pressable (le Pressable est `disabled`).
-  learnerRowTaken: {
-    backgroundColor: 'rgba(255,255,255,0.02)',
-    borderColor: 'rgba(255,255,255,0.06)',
-    opacity: 0.55,
-  },
-  avatarDot: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#FFBC40',
-    alignItems: 'center',
+    // Hauteur fixe : un prénom sur deux lignes ne doit pas décaler la carte
+    // voisine, sinon la grille ondule pendant le balayage.
+    minHeight: 148,
     justifyContent: 'center',
   },
-  avatarDotTaken: { backgroundColor: 'rgba(255,255,255,0.1)' },
+  learnerCardPressed: {
+    backgroundColor: 'rgba(255,188,64,0.14)',
+    borderColor: 'rgba(255,188,64,0.5)',
+    transform: [{ scale: 0.97 }],
+  },
+  learnerCardTaken: {
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    borderColor: 'rgba(255,255,255,0.06)',
+  },
+  /** L'avatar d'un nom pris s'efface, la carte reste lisible. */
+  avatarTaken: { opacity: 0.35 },
+  lockOverlay: { flexDirection: 'row', alignItems: 'center', gap: SPACING[1] },
   learnerName: {
-    flex: 1,
+    // `flex: 1` venait de la disposition en ligne : dans une carte centrée il
+    // étirait le texte sur toute la hauteur restante.
     fontFamily: FONTS.bodySemiBold,
     fontSize: FONT_SIZES.md,
     color: '#FFFFFF',
+    textAlign: 'center',
+    lineHeight: 19,
   },
   learnerNameTaken: { color: 'rgba(255,255,255,0.4)' },
   takenBadge: {
