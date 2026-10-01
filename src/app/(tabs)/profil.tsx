@@ -18,7 +18,6 @@ import { getRankFromXP, getRankProgress, getXPForNextRank } from '@/config/progr
 import { useAvatarPicker } from '@/hooks/useAvatarPicker';
 import { AvatarPickerModal } from '@/components/profile/AvatarPickerModal';
 import { RankProgressionPopup } from '@/components/profile/RankProgressionPopup';
-import { SavedOpportunitiesCard } from '@/components/profile/SavedOpportunitiesCard';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -83,6 +82,10 @@ const AchievementIcon = memo(function AchievementIcon({ size = 28 }: IconProps) 
   return <Ionicons name="ribbon" size={size} color="#1F91D0" />;
 });
 
+const OpportunitiesIcon = memo(function OpportunitiesIcon({ size = 28 }: IconProps) {
+  return <Ionicons name="bookmark" size={size} color="#1F91D0" />;
+});
+
 /** Ordre grille comme maquette : stats | communauté | réseau | paramètres | aide | achievements */
 const MENU_ITEMS = [
   { id: 'stats', titleKey: 'profile.menuStats', Icon: StatsDetailedIcon },
@@ -91,6 +94,10 @@ const MENU_ITEMS = [
   { id: 'settings', titleKey: 'profile.menuSettings', Icon: SettingsIcon },
   { id: 'help', titleKey: 'profile.menuHelp', Icon: HelpIcon },
   { id: 'achievements', titleKey: 'profile.menuAchievements', Icon: AchievementIcon },
+  // Cartes sponsor sauvegardées en partie — écran dédié, comme les succès.
+  // La liste s'affichait dépliée plus bas dans le profil : elle grandissait à
+  // chaque sauvegarde et repoussait le reste de la page.
+  { id: 'opportunities', titleKey: 'profile.menuOpportunities', Icon: OpportunitiesIcon },
 ] as const;
 
 export default function ProfilScreen() {
@@ -129,6 +136,9 @@ export default function ProfilScreen() {
         break;
       case 'achievements':
         router.push('/achievements' as never);
+        break;
+      case 'opportunities':
+        router.push('/opportunities' as never);
         break;
       case 'community':
         Linking.openURL('https://chat.whatsapp.com/HMOY7uJBbNd4O64gysmitZ');
@@ -243,7 +253,11 @@ export default function ProfilScreen() {
           </Animated.View>
 
           <View style={[styles.menuGrid, { gap: gridGap }]}>
-            {MENU_ITEMS.map((item, index) => (
+            {/* « Mes opportunités » suit le drapeau sponsor : circuit coupé,
+                entrée masquée — comme partout ailleurs dans l'app. */}
+            {MENU_ITEMS.filter(
+              (item) => item.id !== 'opportunities' || SPONSOR_FEATURES_ENABLED
+            ).map((item, index) => (
               <Animated.View
                 key={item.id}
                 entering={FadeInDown.delay(180 + index * 40).duration(420)}
@@ -268,8 +282,6 @@ export default function ProfilScreen() {
             ))}
           </View>
 
-          {/* Opportunités sponsor sauvegardées en partie — clic = ouvre le lien */}
-          {SPONSOR_FEATURES_ENABLED && <SavedOpportunitiesCard width={contentWidth} />}
         </View>
       </ScrollView>
 

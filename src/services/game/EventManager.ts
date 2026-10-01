@@ -411,6 +411,7 @@ export class EventManager {
     }
 
     if (candidats.length === 0) return null;
+
     if (Math.random() >= SPONSOR_EVENT_CHANCE) {
       if (__DEV__) {
         console.log(
@@ -702,33 +703,63 @@ export class EventManager {
   }
 
   /**
-   * Génère un financement aléatoire (évite les doublons)
+   * Habille un tirage sponsor en événement « financement ».
+   *
+   * Fonction à part plutôt qu'un objet construit sur place : `generateEvent`
+   * et son pendant opportunité posent les mêmes champs, et les dupliquer les
+   * ferait diverger au premier ajout.
    */
+  private versEvenementFunding(pick: SponsorPick): GeneratedFundingEvent {
+    const amount = pick.card.tokens ?? FIXED_POINTS.funding;
+    return {
+      type: 'funding',
+      data: {
+        id: pick.card.id,
+        name: '',
+        description: pick.card.text,
+        type: 'partenariat',
+        amount,
+        rarity: this.inferRarity(amount),
+        sponsored: true,
+        sponsorLogoUrl: pick.card.logoUrl || undefined,
+        sponsorLinkUrl: pick.card.linkUrl || undefined,
+        sponsorEditionId: pick.metricsKey,
+        sponsorKind: pick.kindCampagne,
+        sponsorStructure: pick.structure,
+        sponsorCtaLabel: pick.ctaLabel,
+        sponsorVerso: pick.verso,
+      },
+    };
+  }
+
+  /** Pendant de `versEvenementFunding` pour les cases opportunité/événement. */
+  private versEvenementOpportunity(pick: SponsorPick): GeneratedOpportunityEvent {
+    const value = pick.card.tokens ?? FIXED_POINTS.opportunity;
+    return {
+      type: 'opportunity',
+      data: {
+        id: pick.card.id,
+        title: '',
+        description: pick.card.text,
+        effect: 'tokens',
+        value,
+        rarity: this.inferRarity(value),
+        sponsored: true,
+        sponsorLogoUrl: pick.card.logoUrl || undefined,
+        sponsorLinkUrl: pick.card.linkUrl || undefined,
+        sponsorEditionId: pick.metricsKey,
+        sponsorKind: pick.kindCampagne,
+        sponsorStructure: pick.structure,
+        sponsorCtaLabel: pick.ctaLabel,
+        sponsorVerso: pick.verso,
+      },
+    };
+  }
+
   generateFundingEvent(): GeneratedFundingEvent | null {
     // Sponsor : ~25 % de chance (édition sponsorisée + campagnes du feed)
     const pick = this.pickSponsorCard('funding');
-    if (pick) {
-      const amount = pick.card.tokens ?? FIXED_POINTS.funding;
-      return {
-        type: 'funding',
-        data: {
-          id: pick.card.id,
-          name: '',
-          description: pick.card.text,
-          type: 'partenariat',
-          amount,
-          rarity: this.inferRarity(amount),
-          sponsored: true,
-          sponsorLogoUrl: pick.card.logoUrl || undefined,
-          sponsorLinkUrl: pick.card.linkUrl || undefined,
-          sponsorEditionId: pick.metricsKey,
-          sponsorKind: pick.kindCampagne,
-          sponsorStructure: pick.structure,
-          sponsorCtaLabel: pick.ctaLabel,
-          sponsorVerso: pick.verso,
-        },
-      };
-    }
+    if (pick) return this.versEvenementFunding(pick);
 
     const pool = this.contentPack?.fundings.length
       ? this.contentPack.fundings
@@ -825,28 +856,7 @@ export class EventManager {
   generateOpportunityEvent(): GeneratedOpportunityEvent | null {
     // Sponsor : ~25 % de chance (édition sponsorisée + campagnes du feed)
     const pick = this.pickSponsorCard('opportunity');
-    if (pick) {
-      const value = pick.card.tokens ?? FIXED_POINTS.opportunity;
-      return {
-        type: 'opportunity',
-        data: {
-          id: pick.card.id,
-          title: '',
-          description: pick.card.text,
-          effect: 'tokens',
-          value,
-          rarity: this.inferRarity(value),
-          sponsored: true,
-          sponsorLogoUrl: pick.card.logoUrl || undefined,
-          sponsorLinkUrl: pick.card.linkUrl || undefined,
-          sponsorEditionId: pick.metricsKey,
-          sponsorKind: pick.kindCampagne,
-          sponsorStructure: pick.structure,
-          sponsorCtaLabel: pick.ctaLabel,
-          sponsorVerso: pick.verso,
-        },
-      };
-    }
+    if (pick) return this.versEvenementOpportunity(pick);
 
     const pool = this.contentPack?.opportunities.length
       ? this.contentPack.opportunities

@@ -20,6 +20,7 @@ import { useGameStore, useAuthStore, useUserStore } from '@/stores';
 import { useTranslation } from '@/i18n';
 import { EditionTileIcon } from '@/components/icons';
 import { RadialBackground, DynamicGradientBorder, GameButton } from '@/components/ui';
+import { IdeationPopup } from '@/components/game/IdeationPopup';
 import { StartupSelectionModal } from '@/components/game/StartupSelectionModal';
 import { SPONSOR_FEATURES_ENABLED } from '@/config/features';
 import { habillageDiffusable } from '@/utils/sponsorEdition';
@@ -27,7 +28,7 @@ import { SponsoredEditionPopup } from '@/components/game/popups';
 import { getDefaultProjectsForEdition, getMatchingUserStartups } from '@/data/defaultProjects';
 import { getLocalizedEdition, type Edition } from '@/data/types';
 import { useEditions } from '@/hooks';
-import type { PlayerColor } from '@/types';
+import type { PlayerColor, Startup } from '@/types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CONTENT_WIDTH = SCREEN_WIDTH - 36;
@@ -255,6 +256,8 @@ export default function LocalSetupScreen() {
   const [selectedEdition, setSelectedEdition] = useState('classic');
   // Édition sponsorisée en attente de confirmation (popup « JOUER »)
   const [sponsorEdition, setSponsorEdition] = useState<Edition | null>(null);
+  // Idéation dans un popup : édition sans startup compatible pour le joueur
+  const [ideationEditionId, setIdeationEditionId] = useState<string | null>(null);
   // Fermeture PROPRE du popup sponsor : visible passe à false (dismiss natif)
   // avant le démontage — un Modal démonté encore « présenté » bloque la
   // présentation du modal suivant (sélection de startup) sur iOS.
@@ -354,7 +357,10 @@ export default function LocalSetupScreen() {
     const takenIds = new Set<string>();
     players.forEach((player, index) => {
       if (player.isAI) {
-        const pool = sourceProjects.filter((p) => !takenIds.has(p.id));
+        // Sans remise tant que possible ; pool épuisé (éditions à 2 projets,
+        // 3 IA) → on recycle plutôt que de laisser une IA sans projet.
+        let pool = sourceProjects.filter((p) => !takenIds.has(p.id));
+        if (pool.length === 0) pool = sourceProjects;
         if (pool.length === 0) return;
         const randomProject = pool[Math.floor(Math.random() * pool.length)]!;
         newSelections[index] = {
@@ -424,10 +430,87 @@ export default function LocalSetupScreen() {
   // directement au step 3 (plus de bouton « SUIVANT » en bas sur cet écran).
   // On passe les projets de l'édition fraîchement choisie à autoSelectAI car
   // le mémo `defaultProjects` n'est pas encore recalculé dans ce tick.
+  //
+  // Le joueur principal joue SA startup : s'il n'en a aucune de compatible
+  // avec l'édition, l'idéation se fait DANS un popup (IdeationPopup) sans
+  // changer d'écran, puis la partie se lance directement.
   const advanceWithEdition = (editionId: string) => {
+    const matching = getMatchingUserStartups(profile?.startups ?? [], editionId);
+    if (matching.length === 0) {
+      setIdeationEditionId(editionId);
+      return;
+    }
     setSelectedEdition(editionId);
     setStep(3);
     autoSelectAI(getDefaultProjectsForEdition(editionId));
+  };
+
+  /**
+   * Lancement direct depuis l'IdeationPopup — le joueur principal joue la
+   * sélection donnée (startup créée OU projet par défaut choisi), les autres
+   * gardent leur choix déjà fait au step 3 le cas échéant, sinon un projet
+   * par défaut tiré sans remise.
+   */
+  const lancerDepuisPopup = (sel: { startupId: string; startupName: string; isDefaultProject: boolean }) => {
+    const editionId = ideationEditionId ?? selectedEdition;
+    setIdeationEditionId(null);
+    setSelectedEdition(editionId);
+
+    const currentUserId = user?.id ?? profile?.userId;
+    const allProjects = getDefaultProjectsForEdition(editionId);
+    const pool = allProjects.filter((p) => p.id !== sel.startupId);
+    const drawProject = () => {
+      // Sans remise tant que possible ; pool épuisé → recycler (jamais
+      // laisser un joueur sans projet, même avec 2 projets par édition).
+      if (pool.length > 0) {
+        return pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
+      }
+      return allProjects.length > 0
+        ? allProjects[Math.floor(Math.random() * allProjects.length)]
+        : undefined;
+    };
+
+    const gamePlayers = players.map((p, index) => {
+      if (index === 0) {
+        return {
+          id: currentUserId && !p.isAI ? currentUserId : 'player_0',
+          name: p.name || t('game.player', { number: 1 }),
+          color: p.color,
+          isAI: p.isAI,
+          isHost: true,
+          isConnected: true,
+          startupId: sel.startupId,
+          startupName: sel.startupName,
+          isDefaultProject: sel.isDefaultProject,
+        };
+      }
+      // Choix déjà fait au step 3 (bouton « créer » ouvert en cours de route)
+      const existing = startupSelections[index];
+      const project = existing ?? (() => {
+        const drawn = drawProject();
+        return drawn
+          ? { startupId: drawn.id, startupName: drawn.name, isDefaultProject: true }
+          : undefined;
+      })();
+      return {
+        id: `player_${index}`,
+        name: p.name || t('game.player', { number: index + 1 }),
+        color: p.color,
+        isAI: p.isAI,
+        isHost: false,
+        isConnected: true,
+        startupId: project?.startupId,
+        startupName: project?.startupName,
+        isDefaultProject: project?.isDefaultProject ?? true,
+      };
+    });
+
+    initGame(gameMode === 'solo' ? 'solo' : 'local', editionId, gamePlayers);
+    router.push('/(game)/play/local');
+  };
+
+  const handleIdeationComplete = (startup: Startup) => {
+    lancerDepuisPopup({ startupId: startup.id, startupName: startup.name, isDefaultProject: false });
   };
 
   const handleStartGame = () => {
@@ -1000,9 +1083,40 @@ export default function LocalSetupScreen() {
             playerName={players[currentSelectingPlayer]?.name}
             onSelect={handleStartupSelected}
             onClose={() => setShowStartupModal(false)}
+            onCreateNew={
+              currentSelectingPlayer === 0
+                ? () => {
+                    // Fermer le modal AVANT d'ouvrir le popup d'idéation
+                    // (jamais deux modales natives empilées — taps avalés).
+                    setShowStartupModal(false);
+                    setTimeout(() => setIdeationEditionId(selectedEdition), 350);
+                  }
+                : undefined
+            }
           />
         );
       })()}
+
+      {/* Idéation dans un popup : le joueur n'a pas de startup compatible
+          avec l'édition choisie — il la crée ici puis la partie se lance. */}
+      {ideationEditionId ? (
+        <IdeationPopup
+          visible
+          editionId={ideationEditionId}
+          editionName={(() => {
+            const ed = editionList.find((e) => e.id === ideationEditionId);
+            return ed
+              ? getLocalizedEdition(ed, language).name.replace(/^Édition\s+/i, '')
+              : ideationEditionId;
+          })()}
+          defaultProjects={getDefaultProjectsForEdition(ideationEditionId)}
+          onClose={() => setIdeationEditionId(null)}
+          onComplete={handleIdeationComplete}
+          onPickDefault={(p) =>
+            lancerDepuisPopup({ startupId: p.id, startupName: p.name, isDefaultProject: true })
+          }
+        />
+      ) : null}
 
       {/* Popup édition sponsorisée : « SUIVANT » valide le choix et avance */}
       {sponsorEdition?.sponsor ? (

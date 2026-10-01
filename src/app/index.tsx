@@ -5,7 +5,7 @@
  * GameButton et les assets existants (shape.png, logostartupludo.png).
  */
 
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { memo, useCallback, useEffect, useState } from 'react';
 import { Dimensions, Image, StyleSheet, View } from 'react-native';
 import Animated, {
@@ -138,17 +138,25 @@ export default function WelcomeScreen() {
   // Si le compte n'a pas de pseudo unique → écran de complétion du profil.
   // Si le profil déclaratif (région, âge, situation) est incomplet → page
   // « Fais-nous connaissance » avant l'accueil (remplace les popups en cascade).
-  useEffect(() => {
-    if (!showSplash && isInitialized && isAuthenticated && !user?.isGuest) {
-      if (needsProfileCompletion) {
-        router.replace('/(auth)/complete-profile');
-      } else if (profile && !isProfileDetailsComplete(profile)) {
-        router.replace('/(auth)/profile-details');
-      } else {
-        router.replace('/(tabs)/home');
+  //
+  // useFocusEffect et non useEffect : cet écran racine reste MONTÉ sous toute
+  // la pile, et l'effet dépend de `profile` — chaque mise à jour du profil
+  // (ex. addStartup/addXP sur l'écran de récap de création) le relançait et
+  // le `replace('/(tabs)/home')` écrasait l'écran en cours. Avec le focus,
+  // il ne redirige qu'au démarrage, quand l'accueil est réellement affiché.
+  useFocusEffect(
+    useCallback(() => {
+      if (!showSplash && isInitialized && isAuthenticated && !user?.isGuest) {
+        if (needsProfileCompletion) {
+          router.replace('/(auth)/complete-profile');
+        } else if (profile && !isProfileDetailsComplete(profile)) {
+          router.replace('/(auth)/profile-details');
+        } else {
+          router.replace('/(tabs)/home');
+        }
       }
-    }
-  }, [showSplash, isAuthenticated, isInitialized, user?.isGuest, needsProfileCompletion, profile, router]);
+    }, [showSplash, isAuthenticated, isInitialized, user?.isGuest, needsProfileCompletion, profile, router])
+  );
 
   // Retour depuis Safari (reCAPTCHA iOS) : phoneAuthStep est encore 'code_sent' ou 'verifying'
   // Expo Router atterrit sur index via le scheme URL → rediriger vers phone-auth pour afficher l'OTP

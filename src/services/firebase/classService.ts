@@ -67,6 +67,10 @@ import type {
   MyClass,
 } from '@/types/class';
 import { ClassJoinError } from '@/types/class';
+// Import DIRECT du store, pas du barrel `@/stores` : celui-ci réexporte
+// useGameStore → EventManager → services, ce qui créerait un cycle. Même
+// précaution que dans `sponsorMetricsService`.
+import { useClassStore } from '@/stores/useClassStore';
 import { CLASS_SESSION_CONTENT_DOC, FIRESTORE_COLLECTIONS, firebaseLog } from './config';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -240,9 +244,114 @@ export async function rejoindreClasseParCode(code: string): Promise<ClassJoinLoo
  *
  * @throws `ClassJoinError` — mêmes cas que `rejoindreClasseParCode`.
  */
+/**
+ * Résout un code de salle d'attente directement dans Firestore.
+ *
+ * Reprend les MÊMES contrôles que `resoudreSeanceParCode()` du back-office :
+ * code expiré, séance close, séance introuvable. La différence est qu'ils se
+ * font ici sur deux lectures par ID au lieu d'un aller-retour HTTP.
+ *
+ * @returns le contexte de séance, ou `null` si le code ne résout rien —
+ *          l'appelant retombe alors sur l'API, qui reste la référence.
+ *
+ * ⚠️ `learners` est VIDE : l'index ne porte aucun nom, volontairement. Les
+ * écrans qui en ont besoin (premier rattachement) déclenchent le repli API.
+ *
+ * Ne jette jamais : toute anomalie vaut « je ne sais pas résoudre », et
+ * l'API prend le relais. Une règle non déployée ou un index absent ne doivent
+ * pas casser un parcours qui fonctionnait avant.
+ */
+async function resoudreCodeDepuisFirestore(code: string): Promise<ClassSessionLookup | null> {
+  try {
+    const db = getFirestore();
+
+    const indexSnap = await getDoc(doc(db, FIRESTORE_COLLECTIONS.sessionCodes, code));
+    const index = indexSnap.data() as
+      | { sessionId?: string; classId?: string; expiresAt?: number }
+      | undefined;
+    if (!index?.sessionId || !index.classId) return null;
+
+    // Expiration vérifiée ICI comme le faisait le serveur : le document peut
+    // survivre à sa séance (suppression ratée, réseau coupé à la clôture), il
+    // ne doit alors plus rien ouvrir.
+    const expire = Number(index.expiresAt ?? 0);
+    if (!expire || expire <= Date.now()) return null;
+
+    // La séance elle-même reste la source de vérité pour l'état : l'index ne
+    // porte pas `status`, et une séance close par la direction doit refermer
+    // la porte immédiatement, sans attendre l'expiration du code.
+    const seanceSnap = await getDoc(doc(db, FIRESTORE_COLLECTIONS.classSessions, index.sessionId));
+    const seance = seanceSnap.data() as
+      | { classId?: string; title?: string; editionId?: string; status?: string; startedPlayingAt?: number }
+      | undefined;
+    if (!seance || seance.status !== 'running') return null;
+
+    classLog('Code résolu depuis Firestore (sans API)', { code, sessionId: index.sessionId });
+
+    return {
+      sessionId: index.sessionId,
+      classId: index.classId,
+      /*
+        Nom de la classe pris dans le CACHE LOCAL.
+
+        Les règles ferment `classes/{id}` à l'élève : ce nom ne transite qu'une
+        fois, dans la réponse de `/api/class/link`, et `useClassStore` le garde
+        depuis. Un élève déjà rattaché l'a donc forcément — c'est précisément
+        le cas que cette résolution directe sert.
+
+        Vide pour une classe inconnue (élève rattaché ailleurs) : l'écran
+        affiche alors un refus sans nommer la classe, ce qui reste juste. Le
+        mettre en dur à « ? » laisserait croire à une donnée manquante.
+      */
+      className: useClassStore.getState().getClassName(index.classId),
+      sessionTitle: String(seance.title ?? ''),
+      editionId: String(seance.editionId ?? ''),
+      demarree: typeof seance.startedPlayingAt === 'number',
+      learners: [],
+    };
+  } catch (error) {
+    // Règles pas encore déployées, hors ligne, index absent : l'API décide.
+    classLog('Résolution directe impossible — repli sur l’API', error);
+    return null;
+  }
+}
+
 export async function rejoindreSeanceParCode(code: string): Promise<ClassSessionLookup> {
   const codeNormalise = normaliserCodeClasse(code);
   if (!estCodeClasseValide(codeNormalise)) throw new ClassJoinError('invalid_code');
+
+  /*
+    ═══ FIRESTORE D'ABORD, API EN REPLI ═══
+
+    Le cas QUOTIDIEN — un élève déjà rattaché qui scanne le QR — n'a besoin que
+    de `sessionId` et `classId`. C'est exactement ce que porte
+    `sessionCodes/{CODE}`, lu en UNE requête par ID, sans joindre le back-office.
+
+    La liste des prénoms ne sert qu'au PREMIER rattachement (une fois par an,
+    écran « Qui es-tu ? »). Elle reste servie par l'API, seule à disposer d'un
+    limiteur par IP : c'est la seule donnée nominative du parcours, et elle n'a
+    pas sa place dans un document lisible par tout compte connaissant le code.
+
+    Résultat : le geste de tous les jours ne dépend plus d'un serveur joignable
+    — ce qui cassait à chaque changement d'IP — et fonctionne désormais en 4G,
+    hors du wifi de l'établissement.
+  */
+  /*
+    ⚠️ RÉSOLUTION DIRECTE RÉSERVÉE À L'ÉLÈVE DÉJÀ RATTACHÉ.
+
+    L'index ne porte aucun nom : un élève qui n'a pas encore choisi le sien
+    recevrait `learners: []` et l'écran l'arrêterait sur « classe vide » — un
+    message faux, qui ferait croire que le professeur n'a pas saisi sa liste.
+
+    `getMonRattachement()` lit `classLinks/{uid}`, un document que seul l'Admin
+    SDK écrit : c'est la preuve fiable que ce compte a déjà un nom dans une
+    classe, et donc qu'il n'a plus besoin de la liste.
+  */
+  const dejaRattache = await getMonRattachement().catch(() => null);
+  if (dejaRattache) {
+    const direct = await resoudreCodeDepuisFirestore(codeNormalise);
+    if (direct) return direct;
+  }
 
   const reponse = await appelApi(`${baseApi()}/api/session/join/${codeNormalise}`, {
     method: 'GET',

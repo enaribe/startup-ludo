@@ -15,8 +15,9 @@
  */
 
 import { memo, useEffect, useRef, useState } from 'react';
-import { Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, {
+  cancelAnimation,
   FadeIn,
   FadeInDown,
   useAnimatedStyle,
@@ -28,6 +29,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { GameButton } from '@/components/ui/GameButton';
 import { Modal } from '@/components/ui/Modal';
 import { OutlinedText } from '@/components/ui/OutlinedText';
+import { ouvrirLienExterne } from '@/utils/lienExterne';
 import { usePlaySoundOnOpen } from '@/hooks/useSound';
 import { useTranslation } from '@/i18n';
 import { saveSponsorOpportunity } from '@/services/firebase/savedOpportunityService';
@@ -143,13 +145,70 @@ export const SponsorEventPopup = memo(function SponsorEventPopup({
     transform: [{ perspective: 1000 }, { rotateY: `${rotation.value}deg` }],
   }));
 
+  /*
+    ── Rebond du badge de gain ──
+    Décalque de `FundingPopup` : le badge monte en échelle à l'ouverture, ce
+    qui fait sentir le gain. Sans lui, la carte sponsor tombait à plat à côté
+    d'une carte financement ordinaire.
+
+    `cancelAnimation` au démontage ET à la fermeture, comme là-bas : une
+    animation qui s'achève après l'unmount accède à une SharedValue libérée et
+    fait planter Android.
+  */
+  const badgeBounce = useSharedValue(0);
+
+  useEffect(() => {
+    if (visible) {
+      badgeBounce.value = 0;
+      badgeBounce.value = withTiming(1, { duration: 250 });
+    } else {
+      cancelAnimation(badgeBounce);
+      badgeBounce.value = 0;
+    }
+    return () => {
+      try {
+        cancelAnimation(badgeBounce);
+      } catch {
+        // ignore
+      }
+    };
+  }, [visible, badgeBounce]);
+
+  const badgeAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: badgeBounce.value }],
+    opacity: badgeBounce.value,
+  }));
+
+  /*
+    ═══ DEMI-TOUR ET RETOUR À PLAT, PAS UNE CARTE LAISSÉE À 180° ═══
+
+    L'animation allait de 0° à 180° et Y RESTAIT : le verso s'affichait donc
+    dans un conteneur retourné, remis à l'endroit par une CONTRE-rotation
+    (`cardMirror`). Deux transformations 3D empilées, et le texte du verso
+    était rastérisé puis retourné — d'où l'impression de vue zoomée et floue
+    que le verso donnait.
+
+    Désormais la carte fait un demi-tour et REVIENT à 0° : on pivote jusqu'à
+    90° (la carte est alors sur la tranche, invisible), on échange le contenu,
+    puis on repart de -90° vers 0°. Le résultat est le même à l'œil — une
+    carte qui se retourne — mais chaque face s'affiche à plat, sans aucune
+    transformation résiduelle. Plus de contre-rotation, donc plus de flou.
+  */
   const basculer = () => {
     if (!aUnVerso) return;
     const versVerso = !faceVerso;
-    rotation.value = withTiming(versVerso ? 180 : 0, { duration: 450 });
-    // Échange du contenu à mi-course : la face n'apparaît jamais en miroir.
+
+    // 1re moitié : jusqu'à la tranche.
+    rotation.value = withTiming(90, { duration: 200 }, (fini) => {
+      if (!fini) return;
+      // 2e moitié : on repart de l'autre côté, contenu déjà échangé.
+      rotation.value = -90;
+      rotation.value = withTiming(0, { duration: 200 });
+    });
+
+    // Échange à la tranche : la face n'apparaît jamais en miroir.
     if (swapTimer.current) clearTimeout(swapTimer.current);
-    swapTimer.current = setTimeout(() => setFaceVerso(versVerso), 225);
+    swapTimer.current = setTimeout(() => setFaceVerso(versVerso), 200);
     // Premier retournement de CETTE carte = un « flip » (taux de curiosité).
     if (versVerso && !flipCompte.current && editionId && cardId) {
       flipCompte.current = true;
@@ -160,9 +219,10 @@ export const SponsorEventPopup = memo(function SponsorEventPopup({
   const ouvrirCta = () => {
     if (!ctaUrl) return;
     if (editionId && cardId) trackSponsorCardClick(editionId, cardId);
-    Linking.openURL(ctaUrl).catch(() => {
-      // Lien mort : la modération le mettra en pause à la vérification hebdo.
-    });
+    // `ouvrirLienExterne` complète le schéma manquant : un lien saisi
+    // « concree.com » était rejeté en silence par `Linking.openURL`, et le
+    // bouton de l'annonceur ne faisait rien du tout.
+    void ouvrirLienExterne(ctaUrl);
   };
 
   // Nouvelle carte affichée → réinitialise sauvegarde ET face affichée
@@ -242,14 +302,46 @@ export const SponsorEventPopup = memo(function SponsorEventPopup({
 
   return (
     <Modal visible={visible} onClose={onClose} closeOnBackdrop={false} showCloseButton={false} bareContent>
-      <Animated.View entering={FadeIn.duration(220)} style={flipStyle}>
-        {/* Contre-rotation à 180° : le contenu du verso reste lisible. */}
-        <View style={[styles.card, faceVerso && styles.cardMirror]}>
+      {/*
+        ⚠️ LA LARGEUR EST PORTÉE PAR LE WRAPPER, PAS SEULEMENT PAR LA CARTE.
+
+        `styles.cardWrap` donne au conteneur animé la même largeur que
+        `FundingPopup` pose directement sur son `Animated.View`. Sans elle, ce
+        wrapper n'avait AUCUNE dimension : la modale l'affiche en
+        `alignItems: 'center'`, donc il se réduisait à son contenu, et le
+        `width: '92%'` de la carte se mesurait sur un parent sans largeur.
+
+        Conséquence visible : le bandeau SVG, déclaré en `width="100%"`, ne se
+        dessinait pas du tout — la carte sponsor s'ouvrait sans en-tête, alors
+        que le code l'appelait bien.
+      */}
+      <Animated.View entering={FadeIn.duration(220)} style={[styles.cardWrap, flipStyle]}>
+        {/*
+          TOUTE LA CARTE RETOURNE — le geste, c'est la carte, pas un bouton.
+
+          Une pilule « VOIR LES DÉTAILS » occupait une place de bouton
+          d'action, en concurrence visuelle avec le vrai CTA de l'annonceur,
+          pour un geste que la carte elle-même suggère.
+
+          `Pressable` et non `TouchableOpacity` : pas d'atténuation au toucher,
+          qui donnerait un clignotement avant le retournement. `disabled` quand
+          il n'y a pas de verso — une carte sans détails ne doit pas réagir.
+        */}
+        <Pressable
+          onPress={basculer}
+          disabled={!aUnVerso}
+          accessibilityRole={aUnVerso ? 'button' : undefined}
+          accessibilityLabel={
+            aUnVerso ? (faceVerso ? t('sponsorEvent.flipBack') : t('sponsorEvent.flipDetails')) : undefined
+          }
+          style={styles.card}
+        >
           {kind === 'financement' ? (
             <FundingHeader label={makeFundLabel(label)} />
           ) : (
             <OpportunityHeader label={label} />
           )}
+
 
           <ScrollView
             contentContainerStyle={styles.scrollContent}
@@ -266,6 +358,29 @@ export const SponsorEventPopup = memo(function SponsorEventPopup({
             {!faceVerso ? (
               <>
                 {/* ═══ RECTO ═══ */}
+                {/*
+                  TITRE — aligné sur la carte financement ordinaire.
+
+                  Celle-ci ouvre sur le nom du financement en `OutlinedText`
+                  vert contouré (`FundingPopup`, `styles.eventName`) ; la carte
+                  sponsor passait directement au logo et à la description, d'où
+                  un bloc plat là où le joueur a l'habitude d'un titre. À
+                  défaut de nom propre, c'est la STRUCTURE qui le porte : c'est
+                  l'information que l'annonceur veut en tête, et elle joue le
+                  même rôle de repère.
+
+                  Seulement SANS logo : les deux ensemble répéteraient la même
+                  chose, le logo portant déjà le nom de la structure.
+                */}
+                {!logoUrl && !!structure && (
+                  <OutlinedText
+                    text={structure}
+                    style={styles.eventName}
+                    outlineColor="#2E7D32"
+                    outlineWidth={2}
+                  />
+                )}
+
                 <View style={styles.descriptionBox}>
                   {logoUrl ? (
                     <Image source={{ uri: logoUrl }} style={styles.sponsorLogo} resizeMode="contain" />
@@ -273,53 +388,65 @@ export const SponsorEventPopup = memo(function SponsorEventPopup({
                   <Text style={styles.description}>{description}</Text>
                 </View>
 
+                {/*
+                  Le badge REBONDIT comme sur la carte financement : il y
+                  apparaît par une montée d'échelle (`badgeAnimStyle`), et
+                  c'est ce qui fait sentir le gain. Ici il se contentait d'un
+                  fondu — à gain égal, la carte sponsor paraissait plus terne.
+                */}
                 <Animated.View entering={FadeInDown.delay(200).duration(250)} style={styles.gainRow}>
-                  <View style={styles.badge}>
+                  <Animated.View style={[styles.badge, badgeAnimStyle]}>
                     <OutlinedText
                       text={`+${value}`}
                       style={styles.badgeText}
                       outlineColor="#2E7D32"
                       outlineWidth={2}
                     />
-                  </View>
+                  </Animated.View>
                 </Animated.View>
 
-                {/* Pilule flip — cartes campagne uniquement */}
-                {aUnVerso && (
-                  <Pressable onPress={basculer} style={styles.flipButton} hitSlop={6}>
-                    <Ionicons name="sync" size={15} color="#2E7D32" />
-                    <Text style={styles.flipText}>{t('sponsorEvent.flipDetails')}</Text>
-                  </Pressable>
-                )}
-
-                {canSave && (
-                  <Animated.View entering={FadeInDown.delay(300).duration(220)} style={styles.saveWrap}>
-                    <Pressable
-                      onPress={handleSave}
-                      disabled={saved || saving}
-                      style={[styles.saveButton, saved && styles.saveButtonSaved]}
-                      hitSlop={6}
-                    >
-                      <Ionicons
-                        name={saved ? 'checkmark-circle' : 'bookmark-outline'}
-                        size={17}
-                        color={saved ? '#2E7D32' : COLORS.info}
-                      />
-                      <Text style={[styles.saveText, saved && styles.saveTextSaved]}>
-                        {saved ? t('sponsorEvent.saved') : t('sponsorEvent.save')}
-                      </Text>
-                    </Pressable>
-                  </Animated.View>
-                )}
-
                 {!isSpectator && (
-                  <Animated.View entering={FadeInDown.delay(400).duration(220)} style={styles.buttonWrap}>
-                    <GameButton
-                      title={t('eventPopup.continue')}
-                      onPress={onAccept}
-                      variant="green"
-                      fullWidth
-                    />
+                  <Animated.View
+                    entering={FadeInDown.delay(400).duration(220)}
+                    style={[styles.buttonWrap, styles.actionsRow]}
+                  >
+                    {/*
+                      SAUVEGARDER — carré, à gauche du bouton principal.
+
+                      C'était une pilule pleine largeur posée AU-DESSUS de
+                      « Continuer » : deux boutons empilés, dont un secondaire
+                      qui prenait la même place que l'action principale et
+                      repoussait le CTA de l'annonceur vers le bas.
+
+                      Sur la même ligne, la hiérarchie se lit d'elle-même :
+                      l'action principale occupe la largeur restante (`flex: 1`
+                      sur son conteneur), le signet reste une icône carrée de
+                      52 px — au-dessus du minimum tactile de 44 px, sans
+                      `hitSlop` à compenser.
+                    */}
+                    {canSave && (
+                      <Pressable
+                        onPress={handleSave}
+                        disabled={saved || saving}
+                        accessibilityRole="button"
+                        accessibilityLabel={saved ? t('sponsorEvent.saved') : t('sponsorEvent.save')}
+                        style={[styles.saveIcon, saved && styles.saveIconSaved]}
+                      >
+                        <Ionicons
+                          name={saved ? 'bookmark' : 'bookmark-outline'}
+                          size={20}
+                          color={saved ? COLORS.white : '#2E7D32'}
+                        />
+                      </Pressable>
+                    )}
+                    <View style={styles.actionPrincipale}>
+                      <GameButton
+                        title={t('eventPopup.continue')}
+                        onPress={onAccept}
+                        variant="green"
+                        fullWidth
+                      />
+                    </View>
                   </Animated.View>
                 )}
 
@@ -363,22 +490,38 @@ export const SponsorEventPopup = memo(function SponsorEventPopup({
                   )}
                 </View>
 
-                {/* CTA de l'annonceur — remplace CONTINUER sur cette face */}
+                {/*
+                  CTA de l'annonceur — remplace CONTINUER sur cette face, avec
+                  le même signet à sa gauche : le verso est justement la face
+                  où le joueur décide de garder l'offre pour plus tard.
+                */}
                 {!!ctaUrl && (
-                  <View style={styles.buttonWrap}>
-                    <GameButton
-                      title={ctaLabel || t('sponsorEvent.learnMore')}
-                      onPress={ouvrirCta}
-                      variant="green"
-                      fullWidth
-                    />
+                  <View style={[styles.buttonWrap, styles.actionsRow]}>
+                    {canSave && (
+                      <Pressable
+                        onPress={handleSave}
+                        disabled={saved || saving}
+                        accessibilityRole="button"
+                        accessibilityLabel={saved ? t('sponsorEvent.saved') : t('sponsorEvent.save')}
+                        style={[styles.saveIcon, saved && styles.saveIconSaved]}
+                      >
+                        <Ionicons
+                          name={saved ? 'bookmark' : 'bookmark-outline'}
+                          size={20}
+                          color={saved ? COLORS.white : '#2E7D32'}
+                        />
+                      </Pressable>
+                    )}
+                    <View style={styles.actionPrincipale}>
+                      <GameButton
+                        title={ctaLabel || t('sponsorEvent.learnMore')}
+                        onPress={ouvrirCta}
+                        variant="green"
+                        fullWidth
+                      />
+                    </View>
                   </View>
                 )}
-
-                <Pressable onPress={basculer} style={[styles.flipButton, styles.flipButtonVerso]} hitSlop={6}>
-                  <Ionicons name="sync" size={15} color="#2E7D32" />
-                  <Text style={styles.flipText}>{t('sponsorEvent.flipBack')}</Text>
-                </Pressable>
 
                 {/* Signalement — discret, en dernier : trois joueurs distincts
                     renvoient la carte en revérification humaine. */}
@@ -400,25 +543,87 @@ export const SponsorEventPopup = memo(function SponsorEventPopup({
               </>
             )}
           </ScrollView>
-        </View>
+        </Pressable>
       </Animated.View>
     </Modal>
   );
 });
 
 const styles = StyleSheet.create({
+  /**
+   * Conteneur animé du flip — porte les DIMENSIONS.
+   *
+   * `FundingPopup` pose `styles.card` directement sur son `Animated.View` ;
+   * ici une vue s'intercale pour la contre-rotation du verso, et c'est elle
+   * qui recevait la largeur. Le wrapper restait donc sans dimension, et un
+   * `width: '92%'` mesuré sur un parent sans largeur ne donne rien : le
+   * bandeau SVG (`width="100%"`) ne se dessinait pas.
+   */
+  cardWrap: {
+    maxWidth: 360,
+    width: '92%',
+  },
+  /**
+   * Signet « sauvegarder » — icône seule, posée sur le bandeau.
+   *
+   * En `position: absolute` pour rester hors du flux : la carte garde la même
+   * mise en page qu'elle soit sauvegardable ou non (un invité ne la voit pas).
+   * Le cercle semi-opaque la détache du dégradé vert du bandeau, où une icône
+   * blanche nue se serait perdue.
+   */
+  /** Signet et bouton principal sur une seule ligne, au pied de la carte. */
+  actionsRow: {
+    // `row-reverse` : le signet est écrit AVANT le bouton dans le JSX (il y
+    // reste secondaire pour un lecteur d'écran) mais s'affiche à sa droite.
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: SPACING[2],
+  },
+  /**
+   * Le bouton principal prend TOUTE la largeur restante.
+   *
+   * Sans ce `flex: 1`, le `fullWidth` du GameButton se mesure sur son contenu
+   * et le bouton se réduit au texte : « CONTINUER » flotterait au milieu, à
+   * côté d'un signet, sans qu'on sache lequel est l'action principale.
+   */
+  actionPrincipale: {
+    flex: 1,
+  },
+  /**
+   * Signet « sauvegarder » — bouton rond, à gauche du bouton principal.
+   *
+   * Dimensions RELEVÉES sur `GameButton` (src/components/ui/GameButton.tsx),
+   * pas estimées : `minHeight: 44`, `borderRadius: 30`, `borderWidth: 2`. Les
+   * deux font donc exactement la même hauteur et le même arrondi, et
+   * s'alignent sans retouche si le bouton du jeu change un jour.
+   *
+   * 44 px est aussi le minimum tactile — aucun `hitSlop` à ajouter. Bordure
+   * verte sur fond très pâle plutôt qu'un aplat : le signet reste visiblement
+   * secondaire à côté du bouton vert plein.
+   */
+  saveIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#2E7D32',
+    backgroundColor: 'rgba(76, 175, 80, 0.10)',
+  },
+  /** Sauvegardé : vert plein et signet rempli — l'état se lit d'un coup d'œil. */
+  saveIconSaved: {
+    backgroundColor: COLORS.success,
+  },
+
   card: {
     backgroundColor: COLORS.white,
     borderRadius: BORDER_RADIUS['3xl'],
-    maxWidth: 360,
-    width: '92%',
+    // Largeur héritée de `cardWrap` : la répéter ici referait dépendre la
+    // carte d'un pourcentage de pourcentage.
+    width: '100%',
     ...SHADOWS.xl,
     overflow: 'hidden',
-  },
-  // À 180° de rotation, le conteneur est en miroir : cette contre-rotation
-  // remet le contenu du verso à l'endroit.
-  cardMirror: {
-    transform: [{ rotateY: '180deg' }],
   },
   scrollContent: {
     paddingTop: SPACING[4],
@@ -504,6 +709,18 @@ const styles = StyleSheet.create({
     width: '100%',
     marginBottom: SPACING[4],
   },
+  /**
+   * Titre du recto — mêmes valeurs que `FundingPopup.styles.eventName`, pour
+   * que les deux cartes ouvrent de la même façon.
+   */
+  eventName: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES.xl,
+    color: '#4CAF50',
+    textAlign: 'center',
+    marginBottom: SPACING[3],
+  },
+
   badge: {
     width: 64,
     height: 64,
@@ -519,27 +736,6 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.title,
     fontSize: FONT_SIZES.xl,
     color: COLORS.white,
-  },
-  flipButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING[2],
-    paddingVertical: SPACING[2],
-    paddingHorizontal: SPACING[4],
-    borderRadius: BORDER_RADIUS.full,
-    borderWidth: 1.5,
-    borderColor: '#2E7D32',
-    backgroundColor: 'rgba(76, 175, 80, 0.08)',
-    marginBottom: SPACING[3],
-  },
-  flipButtonVerso: {
-    marginTop: SPACING[3],
-    marginBottom: 0,
-  },
-  flipText: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: FONT_SIZES.sm,
-    color: '#2E7D32',
   },
   buttonWrap: {
     width: '100%',
@@ -558,33 +754,5 @@ const styles = StyleSheet.create({
   reportTextDone: {
     color: '#2E7D32',
     textDecorationLine: 'none',
-  },
-  saveWrap: {
-    width: '100%',
-    alignItems: 'center',
-    marginBottom: SPACING[3],
-  },
-  saveButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING[2],
-    paddingVertical: SPACING[2],
-    paddingHorizontal: SPACING[4],
-    borderRadius: BORDER_RADIUS.full,
-    borderWidth: 1.5,
-    borderColor: COLORS.info,
-    backgroundColor: 'rgba(33, 150, 243, 0.06)',
-  },
-  saveButtonSaved: {
-    borderColor: '#2E7D32',
-    backgroundColor: 'rgba(76, 175, 80, 0.1)',
-  },
-  saveText: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.info,
-  },
-  saveTextSaved: {
-    color: '#2E7D32',
   },
 });

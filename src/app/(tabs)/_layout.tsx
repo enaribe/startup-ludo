@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Tabs, useRouter } from 'expo-router';
+import { Tabs, useRouter, useSegments } from 'expo-router';
 import { Platform, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -77,8 +77,15 @@ const hapticTabListeners = () => ({
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const segments = useSegments();
   const { isAuthenticated, isLoading, needsProfileCompletion, user } = useAuthStore();
   const profile = useUserStore((s) => s.profile);
+
+  // Les redirections « profil » ne doivent tirer que quand les TABS ont le
+  // focus : ce layout reste monté sous (startup)/(game), et un profil mis à
+  // jour pendant ces flux (ex. addStartup sur l'écran de récap de création)
+  // relançait l'effet → replace → l'écran au-dessus disparaissait subitement.
+  const tabsFocused = segments[0] === '(tabs)';
 
   // Auth guard - redirect to welcome if not authenticated.
   // Un compte sans pseudo unique (inscription interrompue par une course de
@@ -87,14 +94,17 @@ export default function TabsLayout() {
     if (isLoading) return;
     if (!isAuthenticated) {
       router.replace('/');
-    } else if (needsProfileCompletion && !user?.isGuest) {
+      return;
+    }
+    if (!tabsFocused) return;
+    if (needsProfileCompletion && !user?.isGuest) {
       router.replace('/(auth)/complete-profile');
     } else if (!user?.isGuest && profile && !isProfileDetailsComplete(profile)) {
       // Profil déclaratif incomplet (compte existant) : la page
       // « Fais-nous connaissance » remplace les popups de l'accueil.
       router.replace('/(auth)/profile-details');
     }
-  }, [isAuthenticated, isLoading, needsProfileCompletion, user?.isGuest, profile, router]);
+  }, [isAuthenticated, isLoading, tabsFocused, needsProfileCompletion, user?.isGuest, profile, router]);
 
   // Show loading while checking auth
   if (isLoading) {

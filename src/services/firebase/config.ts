@@ -79,6 +79,19 @@ export const FIRESTORE_COLLECTIONS = {
   /** Séances de classe. L'élève ne lit que celles de SA classe en `running`. */
   classSessions: 'classSessions',
   /**
+   * Index des codes de salle d'attente — l'ID du document EST le code
+   * (`sessionCodes/ABC234`), écrit par le back-office à l'ouverture.
+   *
+   * Permet de résoudre un QR scanné SANS joindre le serveur du back-office.
+   * C'était le seul point du parcours élève à en dépendre, et il cassait à
+   * chaque changement de réseau (« impossible de rejoindre »). Le reste du jeu
+   * parle à Firestore, dont le SDK gère DNS, reconnexions et hors-ligne.
+   *
+   * ⚠️ Ce document N'AUTORISE RIEN : il désigne une séance. L'entrée reste
+   * bornée par `classLinks/{uid}` et la règle `estCetEleve()`.
+   */
+  sessionCodes: 'sessionCodes',
+  /**
    * Contenu pédagogique figé d'une séance (`classSessions/{sid}/content`).
    * Un seul document, `generated`, écrit par l'enseignant depuis le back-office.
    */

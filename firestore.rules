@@ -775,6 +775,17 @@ service cloud.firestore {
     // une API en Admin SDK (patron `/api/class/mine` retenu au lot 4a), qui fait
     // le recoupement une fois et sert une projection. La règle ci-dessous reste
     // le filet : elle garantit qu'un accès Firestore direct ne contourne rien.
+    // ═══ SÉANCES PRÊTES À L'EMPLOI — catalogue CONCREE ═══
+    //
+    // Lecture ouverte aux comptes scolaires : le wizard les propose à
+    // l'enseignant au lancement. Écriture réservée au super admin — ce sont
+    // des modèles pédagogiques diffusés à tous les établissements, un
+    // enseignant qui les modifierait changerait la séance des autres.
+    match /readySessions/{rid} {
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin();
+    }
+
     match /classSessions/{sid} {
       // LECTURE DE L'ENSEIGNANT : `teacherId == uid` SEUL, volontairement.
       //
@@ -979,6 +990,47 @@ service cloud.firestore {
              && eleveRattacheA(
                   get(/databases/$(database)/documents/classSessions/$(sid)).data.classId
                 );
+    }
+
+    // ═══ INDEX DES CODES DE SALLE D'ATTENTE ═══
+    //
+    // `sessionCodes/{CODE}` — l'ID du document EST le code projeté. Le mobile
+    // le lit pour résoudre un QR scanné, au lieu d'appeler la route HTTP du
+    // back-office : c'était le SEUL point du parcours élève à dépendre d'un
+    // serveur joignable, et il cassait à chaque changement de réseau.
+    //
+    // ⚠️ CE DOCUMENT N'AUTORISE RIEN. Il DÉSIGNE une séance — `sessionId`,
+    // `classId`, `expiresAt` — exactement ce que renvoyait la route. L'entrée
+    // réelle reste bornée par `classLinks/{uid}`, écrit par le seul Admin SDK,
+    // et par `estCetEleve()` sur les participants. Un élève d'une autre classe
+    // qui scanne le QR lit bien ce document, puis se fait refuser par la base.
+    //
+    // LECTURE AUTHENTIFIÉE, pas publique : l'élève a de toute façon un compte
+    // pour jouer, et l'exiger ferme la collection aux balayages anonymes. Le
+    // code fait 6 caractères sur un alphabet de 32 (~1 milliard de
+    // combinaisons) et meurt avec la séance, mais autant ne pas offrir la
+    // cible gratuitement.
+    //
+    // ÉCRITURE PAR L'ENSEIGNANT DE LA SÉANCE. `class-session-service.ts` tourne
+    // côté client (SDK web), pas en Admin SDK : c'est le compte du professeur
+    // qui écrit. On exige donc qu'il soit un rôle scolaire ET que la séance
+    // visée soit bien la sienne — sinon n'importe quel enseignant pourrait
+    // rediriger le code d'un collègue vers sa propre séance.
+    match /sessionCodes/{code} {
+      allow read: if isAuthenticated();
+
+      allow create, update: if isSchoolRole()
+                            && exists(/databases/$(database)/documents/classSessions/$(request.resource.data.sessionId))
+                            && get(/databases/$(database)/documents/classSessions/$(request.resource.data.sessionId))
+                                 .data.teacherId == request.auth.uid;
+
+      // Suppression à la clôture : même ancrage, mais sur le document EXISTANT
+      // (`resource`), puisqu'aucune donnée n'est écrite.
+      allow delete: if isSuperAdmin()
+                    || (isSchoolRole()
+                        && exists(/databases/$(database)/documents/classSessions/$(resource.data.sessionId))
+                        && get(/databases/$(database)/documents/classSessions/$(resource.data.sessionId))
+                             .data.teacherId == request.auth.uid);
     }
 
     // Miroir de rattachement d'un élève, écrit UNIQUEMENT par l'Admin SDK.

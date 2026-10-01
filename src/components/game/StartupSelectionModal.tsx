@@ -37,6 +37,8 @@ interface StartupSelectionModalProps {
   playerName?: string;
   onSelect: (startupId: string, startupName: string, isDefault: boolean, sector: string) => void;
   onClose: () => void;
+  /** Bouton « + Créer une entreprise » (joueur principal) — ferme le modal, au parent d'ouvrir l'idéation. */
+  onCreateNew?: () => void;
 }
 
 export const StartupSelectionModal = memo(function StartupSelectionModal({
@@ -46,6 +48,7 @@ export const StartupSelectionModal = memo(function StartupSelectionModal({
   playerName,
   onSelect,
   onClose,
+  onCreateNew,
 }: StartupSelectionModalProps) {
   const { t } = useTranslation();
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -95,6 +98,20 @@ export const StartupSelectionModal = memo(function StartupSelectionModal({
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
+        {/* Créer une nouvelle entreprise (idéation dans un popup) */}
+        {onCreateNew && (
+          <Pressable
+            onPress={() => {
+              setSelectedId(null);
+              onCreateNew();
+            }}
+            style={styles.createNewRow}
+          >
+            <Text style={styles.createNewPlus}>＋</Text>
+            <Text style={styles.createNewText}>{t('startupSelect.createNew')}</Text>
+          </Pressable>
+        )}
+
         {/* Startups de l'utilisateur */}
         {userStartups.length > 0 && (
           <View style={styles.section}>
@@ -196,6 +213,28 @@ export const StartupSelectionModal = memo(function StartupSelectionModal({
 });
 
 const styles = StyleSheet.create({
+  createNewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(255, 188, 64, 0.5)',
+    borderRadius: BORDER_RADIUS.lg,
+    paddingVertical: SPACING[3],
+    marginBottom: SPACING[3],
+  },
+  createNewPlus: {
+    fontFamily: FONTS.title,
+    fontSize: FONT_SIZES.md,
+    color: COLORS.primary,
+  },
+  createNewText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.primary,
+  },
   scrollView: {
     flexGrow: 0,
     maxHeight: SCROLL_LIST_MAX_HEIGHT,

@@ -26,6 +26,7 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -104,6 +105,11 @@ export default function SessionWaitingScreen() {
         ]);
         if (annule) return;
 
+        // Code résolu au moins une fois : marqué comme « déjà traité ». Si ce
+        // même code réapparaît plus tard EN ÉCHEC, c'est Android qui rejoue le
+        // lien du QR au relancement depuis les apps récentes — pas un scan.
+        AsyncStorage.setItem(`@class_session_handled:${code}`, '1').catch(() => {});
+
         // Cas 3 — rattaché ailleurs : on nomme la classe attendue plutôt que de
         // laisser la base opposer un refus muet quelques secondes plus tard.
         if (rattachement && rattachement.classId !== seance.classId) {
@@ -140,9 +146,26 @@ export default function SessionWaitingScreen() {
         setEtape({ nom: 'attente', seance });
       } catch (error) {
         if (annule) return;
+        // UNE COUPURE N'EST PAS UN CODE REFUSÉ. Sans ce cas, toute
+        // `ClassJoinError` sans message serveur — timeout, DNS, serveur
+        // injoignable — affichait « Ce code n'est plus valide, demande à ton
+        // enseignant de le réactiver » : l'élève interrompait sa classe pour
+        // un problème de réseau, et l'enseignant cherchait un code qui n'avait
+        // rien. `class.errorOffline` existait déjà, cet écran ne le lisait pas.
+        // Replay d'un vieil intent Android (relance depuis les récents après
+        // un scan passé) : le code avait déjà été traité — retour silencieux
+        // à l'accueil au lieu du loader + « code invalide » fantôme.
+        const dejaTraite = await AsyncStorage.getItem(`@class_session_handled:${code}`).catch(() => null);
+        if (annule) return;
+        if (dejaTraite) {
+          router.replace('/(tabs)/home');
+          return;
+        }
         const message =
           error instanceof ClassJoinError
-            ? (error.serverMessage ?? t('class.errorInvalidCode'))
+            ? error.kind === 'offline'
+              ? t('class.errorOffline')
+              : (error.serverMessage ?? t('class.errorInvalidCode'))
             : t('class.errorUnknown');
         setEtape({ nom: 'refus', message });
       }

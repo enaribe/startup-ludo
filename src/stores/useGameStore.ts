@@ -46,6 +46,14 @@ let sponsoredGameStartedAt: number | null = null;
  */
 let endByForfeit = false;
 let sponsoredGameEdition: string | null = null;
+/**
+ * Campagne de l'habillage, retenue du DÉBUT à la FIN de la partie.
+ *
+ * `endGame` ne relit pas l'édition : sans cette mémoire, la durée de jeu
+ * serait écrite sous l'édition seule, et le tableau de bord de l'annonceur
+ * afficherait une durée moyenne vide — exactement le symptôme observé.
+ */
+let sponsoredGameCampaign: string | undefined;
 
 /** Action compacte recue d'un joueur distant via RTDB */
 export interface RemoteAction {
@@ -333,12 +341,15 @@ export const useGameStore = create<GameStore>()(
         // est (ré)armé et la partie compte comme exposition de l'édition.
         eventManager.setSponsorSuppressed(!!classContext);
         if (SPONSOR_FEATURES_ENABLED && !classContext && getEdition(edition as EditionId).sponsor?.enabled) {
-          trackSponsoredGameStart(edition);
+          const campagne = getEdition(edition as EditionId).sponsor?.campaignId;
+          trackSponsoredGameStart(edition, campagne);
           sponsoredGameStartedAt = Date.now();
           sponsoredGameEdition = edition;
+          sponsoredGameCampaign = campagne;
         } else {
           sponsoredGameStartedAt = null;
           sponsoredGameEdition = null;
+          sponsoredGameCampaign = undefined;
         }
         endByForfeit = false;
 
@@ -455,10 +466,12 @@ export const useGameStore = create<GameStore>()(
           if (sponsoredGameEdition && sponsoredGameStartedAt) {
             trackSponsoredGameEnd(
               sponsoredGameEdition,
-              (Date.now() - sponsoredGameStartedAt) / 1000
+              (Date.now() - sponsoredGameStartedAt) / 1000,
+              sponsoredGameCampaign
             );
             sponsoredGameStartedAt = null;
             sponsoredGameEdition = null;
+            sponsoredGameCampaign = undefined;
           }
           // Résultat du joueur local (campagnes « revanche ? » / « encore chaud ? »)
           const localUserId = useUserStore.getState().profile?.userId;

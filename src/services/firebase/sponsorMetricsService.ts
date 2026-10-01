@@ -162,13 +162,38 @@ function ecrireBucketQuotidien(editionId: string, patch: Record<string, unknown>
 }
 
 /**
- * Éditions dont on a déjà tenté le marqueur d'unicité DANS CETTE SESSION —
- * évite une écriture (vouée au refus) à chaque vue suivante.
+ * Incrémente un compteur dans le TOTAL et dans le bucket du jour.
+ *
+ * Les deux vont systématiquement ensemble : les totaux servent les plafonds et
+ * les cumuls « depuis toujours », les buckets datent la dépense et les
+ * fenêtres « 30 derniers jours ». Chaque métrique ajoutée sans son bucket
+ * produit le même symptôme — un chiffre visible mais une dépense à zéro.
+ *
+ * `cle` est un id d'édition OU de campagne : `sponsorMetrics` est indexé par
+ * les deux, et l'annonceur lit par campagne.
+ */
+function ecrireTotalEtBucket(cle: string, totaux: Record<string, unknown>): void {
+  setDoc(
+    doc(getFirestore(), FIRESTORE_COLLECTIONS.sponsorMetrics, cle),
+    { editionId: cle, totals: totaux, updatedAt: Date.now() },
+    { merge: true }
+  ).catch((error: unknown) => metricsLog(`Échec d'écriture des totaux (${cle})`, error));
+  ecrireBucketQuotidien(cle, { totals: totaux });
+}
+
+/**
+ * Clés dont on a déjà tenté le marqueur d'unicité DANS CETTE SESSION — évite
+ * une écriture (vouée au refus) à chaque vue suivante.
  */
 const uniqueDejaTente = new Set<string>();
 
 /**
- * Compte le joueur comme « personne unique » de l'édition, UNE fois pour toutes.
+ * Compte le joueur comme « personne unique » d'une clé de métriques, UNE fois.
+ *
+ * La CLÉ est un id d'édition OU un id de campagne — `sponsorMetrics` est
+ * indexé par les deux (cf. `trackSponsoredEditionView`). Le paramètre garde
+ * le nom `cle` et non `editionId` : l'appeler avec une campagne est le cas
+ * normal, pas un détournement.
  *
  * MÉCANISME : `touched/{uid}` est CREATE-ONLY dans les règles Firestore. Le
  * premier passage crée le document et incrémente `uniqueViews` ; tout passage
@@ -176,25 +201,25 @@ const uniqueDejaTente = new Set<string>();
  * et n'incrémente rien. L'unicité est donc garantie par la règle, pas par le
  * client — un cache local ne fait qu'économiser des écritures refusées.
  */
-function compterPersonneUnique(editionId: string): void {
+function compterPersonneUnique(cle: string): void {
   const uid = useAuthStore.getState().user?.id;
-  if (!uid || uniqueDejaTente.has(editionId)) return;
-  uniqueDejaTente.add(editionId);
+  if (!uid || uniqueDejaTente.has(cle)) return;
+  uniqueDejaTente.add(cle);
 
   const db = getFirestore();
   const now = Date.now();
-  setDoc(doc(db, FIRESTORE_COLLECTIONS.sponsorMetrics, editionId, 'touched', uid), {
+  setDoc(doc(db, FIRESTORE_COLLECTIONS.sponsorMetrics, cle, 'touched', uid), {
     firstSeenAt: now,
   })
     .then(() => {
-      // Création acceptée = premier contact de CE joueur avec CETTE édition.
+      // Création acceptée = premier contact de CE joueur avec CETTE clé.
       setDoc(
-        doc(db, FIRESTORE_COLLECTIONS.sponsorMetrics, editionId),
+        doc(db, FIRESTORE_COLLECTIONS.sponsorMetrics, cle),
         { totals: { uniqueViews: increment(1) }, updatedAt: Date.now() },
         { merge: true }
       ).catch((error: unknown) => metricsLog('Échec increment uniqueViews', error));
       // Le bucket du jour compte les NOUVELLES personnes touchées ce jour-là.
-      ecrireBucketQuotidien(editionId, { totals: { uniqueViews: increment(1) } });
+      ecrireBucketQuotidien(cle, { totals: { uniqueViews: increment(1) } });
     })
     .catch(() => {
       // Refus attendu (déjà compté un autre jour) : silence, même en dev.
@@ -308,15 +333,15 @@ export function trackSponsorCardFlip(editionId: string, cardId: string): void {
  * À appeler UNIQUEMENT hors Mode Classe : une séance scolaire n'est jamais une
  * exposition publicitaire (décision du plan Espace Annonceur, §3).
  */
-export function trackSponsoredGameStart(editionId: string): void {
+export function trackSponsoredGameStart(editionId: string, campaignId?: string): void {
   if (!editionId || !canTrack()) return;
-  setDoc(
-    doc(getFirestore(), FIRESTORE_COLLECTIONS.sponsorMetrics, editionId),
-    { editionId, totals: { gamesPlayed: increment(1) }, updatedAt: Date.now() },
-    { merge: true }
-  ).catch((error: unknown) => metricsLog(`Échec gamesPlayed (${editionId})`, error));
-  ecrireBucketQuotidien(editionId, { totals: { gamesPlayed: increment(1) } });
-  metricsLog('gamesPlayed +1', { editionId });
+  ecrireTotalEtBucket(editionId, { gamesPlayed: increment(1) });
+  // Sous la CAMPAGNE aussi : son tableau de bord affichait « 0 partie jouée »
+  // et une durée moyenne vide, alors que l'édition en comptait 22 — le chiffre
+  // existait, il n'était simplement jamais recopié sous la clé que
+  // l'annonceur lit. Même raisonnement que pour les vues.
+  if (campaignId) ecrireTotalEtBucket(campaignId, { gamesPlayed: increment(1) });
+  metricsLog('gamesPlayed +1', { editionId, campaignId });
 }
 
 /**
@@ -325,17 +350,17 @@ export function trackSponsoredGameStart(editionId: string): void {
  * La durée est bornée à 4 h : une app restée ouverte toute la nuit ne doit pas
  * offrir 30 000 « secondes d'exposition » à l'annonceur.
  */
-export function trackSponsoredGameEnd(editionId: string, seconds: number): void {
+export function trackSponsoredGameEnd(
+  editionId: string,
+  seconds: number,
+  campaignId?: string
+): void {
   if (!editionId || !canTrack()) return;
   const bornee = Math.max(0, Math.min(4 * 3600, Math.round(seconds)));
   if (bornee === 0) return;
-  setDoc(
-    doc(getFirestore(), FIRESTORE_COLLECTIONS.sponsorMetrics, editionId),
-    { editionId, totals: { playSeconds: increment(bornee) }, updatedAt: Date.now() },
-    { merge: true }
-  ).catch((error: unknown) => metricsLog(`Échec playSeconds (${editionId})`, error));
-  ecrireBucketQuotidien(editionId, { totals: { playSeconds: increment(bornee) } });
-  metricsLog(`playSeconds +${bornee}`, { editionId });
+  ecrireTotalEtBucket(editionId, { playSeconds: increment(bornee) });
+  if (campaignId) ecrireTotalEtBucket(campaignId, { playSeconds: increment(bornee) });
+  metricsLog(`playSeconds +${bornee}`, { editionId, campaignId });
 }
 
 /**
@@ -408,6 +433,21 @@ export function trackSponsoredEditionView(editionId: string, campaignId?: string
     );
     ecrireBucketQuotidien(campaignId, { totals: { editionPopupViews: increment(1) } });
     metricsLog(`vue attribuée à la campagne ${campaignId}`);
+
+    /*
+      PERSONNES UNIQUES — manquait entièrement sur cette voie.
+
+      `compterPersonneUnique` n'était appelée que depuis `trackCardMetric`,
+      donc seulement pour les CARTES sponsors. Une campagne d'habillage
+      d'édition affichait « 36 vues » et « 0 personne touchée » — impossible,
+      puisque chaque vue vient d'un joueur. Le coût par personne touchée
+      restait « — », et l'annonceur n'avait aucune mesure de portée.
+
+      Sous la clé CAMPAGNE, pas l'édition : c'est elle que lit le tableau de
+      bord de l'annonceur. L'unicité reste garantie par la règle create-only
+      sur `touched/{uid}`, qui ne dépend pas de la nature de la clé.
+    */
+    compterPersonneUnique(campaignId);
   } else {
     metricsLog(
       `aucune campagne liée à "${editionId}" — vue comptée sur l'édition seule ` +

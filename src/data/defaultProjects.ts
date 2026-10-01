@@ -182,21 +182,20 @@ export function getDefaultProjectsForEdition(editionId: string): DefaultProject[
 }
 
 /**
- * Filtre les startups de l'utilisateur pour ne garder que celles
- * dont le secteur correspond a l'edition choisie.
+ * Secteurs d'une édition, par ordre de priorité :
+ *  1. champ sectors explicite de l'édition (Firestore)
+ *  2. secteurs dérivés des defaultProjects de l'édition (chaque projet porte son sector)
+ *  3. table EDITION_SECTORS locale (par id d'édition)
+ *  4. fallback classic
+ * Sert au filtrage des startups jouables ET à contraindre le choix du
+ * secteur quand l'idéation est lancée depuis le setup d'une partie.
  */
-export function getMatchingUserStartups(startups: Startup[], editionId: string): Startup[] {
+export function getEditionSectors(editionId: string): string[] {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const { getEdition } = require('./index');
 
-  // Récupérer l'édition depuis la fonction getEdition
   const editionData = getEdition(editionId);
 
-  // Secteurs de l'édition, par ordre de priorité :
-  //  1. champ sectors explicite de l'édition (Firestore)
-  //  2. secteurs dérivés des defaultProjects de l'édition (chaque projet porte son sector)
-  //  3. table EDITION_SECTORS locale (par id d'édition)
-  //  4. fallback classic
   let sectors: string[] = editionData?.sectors ?? [];
   if (sectors.length === 0 && editionData?.defaultProjects?.length) {
     sectors = editionData.defaultProjects
@@ -206,6 +205,15 @@ export function getMatchingUserStartups(startups: Startup[], editionId: string):
   if (sectors.length === 0) {
     sectors = EDITION_SECTORS[editionId as EditionId] || EDITION_SECTORS.classic;
   }
+  return sectors ?? [];
+}
+
+/**
+ * Filtre les startups de l'utilisateur pour ne garder que celles
+ * dont le secteur correspond a l'edition choisie.
+ */
+export function getMatchingUserStartups(startups: Startup[], editionId: string): Startup[] {
+  const sectors = getEditionSectors(editionId);
 
   if (!sectors || sectors.length === 0) {
     return startups; // Pas de filtre si vraiment aucun secteur connu

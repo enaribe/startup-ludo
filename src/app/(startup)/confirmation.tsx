@@ -12,8 +12,10 @@ import { PortfolioIcon } from '@/components/icons';
 import { FONTS, FONT_SIZES } from '@/styles/typography';
 import { COLORS } from '@/styles/colors';
 import { SPACING } from '@/styles/spacing';
-import { useUserStore, useSettingsStore, useAuthStore } from '@/stores';
+import { useUserStore, useSettingsStore, useAuthStore, useGameStore } from '@/stores';
 import { useTranslation } from '@/i18n';
+import { EDITIONS } from '@/data';
+import { getDefaultProjectsForEdition, getMatchingUserStartups } from '@/data/defaultProjects';
 import { addStartup as firestoreAddStartup, updateUserStats } from '@/services/firebase/firestore';
 import { generateValuation, type ValuationFactor } from '@/services/ai';
 import { formatFCFARaw } from '@/utils/currency';
@@ -72,7 +74,10 @@ export default function StartupConfirmationScreen() {
   const addXP = useUserStore((state) => state.addXP);
   const userId = useAuthStore((state) => state.user?.id);
   const userName = useAuthStore((state) => state.user?.displayName);
+  const initGame = useGameStore((state) => state.initGame);
   const hasApplied = useRef(false);
+  /** Startup créée par l'effet ci-dessous — sert au « JOUER MAINTENANT » direct. */
+  const createdStartupRef = useRef<Startup | null>(null);
   const hasRequestedValuation = useRef(false);
   const [showValuationInfo, setShowValuationInfo] = useState(false);
   const [isLoadingValuation, setIsLoadingValuation] = useState(true);
@@ -200,6 +205,7 @@ export default function StartupConfirmationScreen() {
 
     // Save locally (Zustand store)
     addStartup(newStartup);
+    createdStartupRef.current = newStartup;
 
     // Save to Firestore + sync XP (fire-and-forget, only if authenticated)
     if (userId) {
@@ -221,8 +227,57 @@ export default function StartupConfirmationScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoadingValuation]);
 
+  /**
+   * JOUER MAINTENANT — lance DIRECTEMENT une partie locale contre l'IA avec
+   * la startup fraîchement créée (parcours accéléré, zéro écran de setup) :
+   * édition assortie au secteur de la startup, l'IA reçoit un projet par
+   * défaut de la même édition.
+   */
   const handlePlay = () => {
-    router.replace('/(tabs)/home');
+    const startup = createdStartupRef.current;
+    if (!startup) {
+      // Création pas encore appliquée (valorisation en cours) — le bouton est
+      // désactivé dans ce cas, ceci n'est qu'un filet.
+      router.replace('/(tabs)/home');
+      return;
+    }
+
+    // Édition dont les secteurs incluent celui de la startup, sinon classic
+    const editionId =
+      Object.keys(EDITIONS).find(
+        (id) => getMatchingUserStartups([startup], id).length > 0
+      ) ?? 'classic';
+
+    // Projet par défaut de l'édition pour l'IA
+    const aiProjects = getDefaultProjectsForEdition(editionId);
+    const aiProject = aiProjects[Math.floor(Math.random() * aiProjects.length)];
+
+    initGame('solo', editionId, [
+      {
+        id: userId ?? 'player_0',
+        name: userName || t('game.you'),
+        color: 'green',
+        isAI: false,
+        isHost: true,
+        isConnected: true,
+        startupId: startup.id,
+        startupName: startup.name,
+        isDefaultProject: false,
+      },
+      {
+        id: 'player_1',
+        name: t('game.ai'),
+        color: 'blue',
+        isAI: true,
+        isHost: false,
+        isConnected: true,
+        startupId: aiProject?.id,
+        startupName: aiProject?.name,
+        isDefaultProject: true,
+      },
+    ]);
+    // replace : le back depuis le plateau ne doit pas revenir sur ce récap
+    router.replace('/(game)/play/local');
   };
 
   const handleGoHome = () => {
@@ -401,6 +456,7 @@ export default function StartupConfirmationScreen() {
             title={t('startup.playNow')}
             variant="yellow"
             fullWidth
+            disabled={isLoadingValuation}
             onPress={handlePlay}
           />
           <GameButton
