@@ -6,7 +6,7 @@
  */
 
 import type { EventType } from '@/types';
-import { SPONSOR_FEATURES_ENABLED } from '@/config/features';
+import { CIBLAGE_SPONSOR_ACTIF, SPONSOR_FEATURES_ENABLED } from '@/config/features';
 import { cleAttribution, getCachedSponsorViews, watchSponsorViews } from '@/services/firebase/sponsorMetricsService';
 import { getCachedFeedCards, watchSponsorFeed } from '@/services/firebase/sponsorFeedService';
 // Import DIRECT (pas le barrel) : le barrel réexporte useGameStore → EventManager,
@@ -74,6 +74,10 @@ export interface GeneratedFundingEvent {
     sponsorStructure?: string;
     /** Libellé du CTA du verso, configuré par l'annonceur. */
     sponsorCtaLabel?: string;
+    /** Fond de l'encart du logo, choisi par l'annonceur (`#RRGGBB`). */
+    sponsorLogoBgColor?: string;
+    /** Couleur du texte du recto, choisie par l'annonceur (`#RRGGBB`). */
+    sponsorTextColor?: string;
     /** Verso de la carte recto/verso (campagne annonceur). */
     sponsorVerso?: { description: string; avantage?: string; criteres?: string; dateLimite?: string };
   };
@@ -110,6 +114,10 @@ export interface GeneratedOpportunityEvent {
     sponsorStructure?: string;
     /** Libellé du CTA du verso, configuré par l'annonceur. */
     sponsorCtaLabel?: string;
+    /** Fond de l'encart du logo, choisi par l'annonceur (`#RRGGBB`). */
+    sponsorLogoBgColor?: string;
+    /** Couleur du texte du recto, choisie par l'annonceur (`#RRGGBB`). */
+    sponsorTextColor?: string;
     /** Verso de la carte recto/verso (campagne annonceur). */
     sponsorVerso?: { description: string; avantage?: string; criteres?: string; dateLimite?: string };
   };
@@ -155,10 +163,26 @@ const DEFAULT_QUIZ_CONFIG = {
 const FUNDING_TYPES = ['investisseur', 'subvention', 'crowdfunding', 'concours', 'partenariat'] as const;
 
 /**
- * Probabilité qu'une case opportunité/financement tire une carte SPONSOR
- * (édition sponsorisée uniquement, tant qu'il reste des cartes non vues).
+ * Probabilité qu'une case opportunité/financement tire une carte SPONSOR,
+ * tant qu'il reste des cartes éligibles non vues dans la partie.
+ *
+ * ═══ 60 % DEPUIS LE 07/10/2026 (25 % AUPARAVANT) ═══
+ *
+ * À 25 %, une carte promue ne sortait qu'une case sur quatre — et encore
+ * fallait-il que ce soit une case du BON TYPE. Avec le peu de campagnes
+ * actives aujourd'hui, un joueur pouvait faire une partie entière sans en voir
+ * aucune, et l'annonceur consommait son budget à un rythme invisible.
+ *
+ * ⚠️ CE CURSEUR ARBITRE ENTRE DEUX INTÉRÊTS OPPOSÉS. Trop bas, l'annonceur ne
+ * voit rien venir ; trop haut, le jeu devient un catalogue publicitaire et le
+ * joueur décroche — on perdrait l'audience qu'on vend. 60 % reste en-dessous
+ * du seuil où la carte promue devient le cas NORMAL d'une case concernée.
+ *
+ * À REVOIR À LA BAISSE quand le nombre de campagnes actives augmentera : la
+ * pression publicitaire ressentie dépend du produit `chance × nombre de
+ * cartes`, pas de la chance seule. Dix campagnes à 60 % satureraient.
  */
-const SPONSOR_EVENT_CHANCE = 0.25;
+const SPONSOR_EVENT_CHANCE = 0.6;
 
 // ===== CLASSE PRINCIPALE =====
 
@@ -169,7 +193,16 @@ const SPONSOR_EVENT_CHANCE = 0.25;
  * cartes de campagne (recto/verso).
  */
 interface SponsorPick {
-  card: { id: string; text: string; tokens?: number; logoUrl?: string; linkUrl?: string };
+  card: {
+    id: string;
+    text: string;
+    tokens?: number;
+    logoUrl?: string;
+    linkUrl?: string;
+    /** Couleurs choisies par l'annonceur (`#RRGGBB`), absentes = défauts du jeu. */
+    logoBgColor?: string;
+    textColor?: string;
+  };
   metricsKey: string;
   kindCampagne?: 'financement' | 'opportunite' | 'evenement';
   structure?: string;
@@ -335,7 +368,14 @@ export class EventManager {
    * Retourne null si l'édition n'est pas sponsorisée, si toutes les cartes
    * ont été vues, ou si le tirage tombe sur le contenu normal.
    */
-  private pickSponsorCard(kind: 'opportunity' | 'funding'): SponsorPick | null {
+  private pickSponsorCard(
+    kind: 'opportunity' | 'funding',
+    /**
+     * Test uniquement (`previsualiserCarteSponsor`) : saute le jet de 25 % et
+     * ne consomme pas la carte. Tous les autres filtres restent appliqués.
+     */
+    forcer = false
+  ): SponsorPick | null {
     // Circuit sponsor désactivé (fonctionnalité pas encore prête) : aucune
     // carte sponsor ne sort, le contenu normal de l'édition prend le relais.
     if (!SPONSOR_FEATURES_ENABLED) return null;
@@ -394,6 +434,8 @@ export class EventManager {
           tokens: fc.tokens,
           logoUrl: fc.logoUrl ?? undefined,
           linkUrl: fc.ctaUrl ?? undefined,
+          logoBgColor: fc.logoBgColor ?? undefined,
+          textColor: fc.textColor ?? undefined,
         },
         metricsKey: fc.id,
         kindCampagne: fc.kind,
@@ -411,6 +453,11 @@ export class EventManager {
     }
 
     if (candidats.length === 0) return null;
+
+    // Prévisualisation : première candidate, sans jeter le dé et SANS la
+    // marquer comme vue — tester une carte ne doit pas la retirer du tirage
+    // de la partie en cours.
+    if (forcer) return candidats[0]!;
 
     if (Math.random() >= SPONSOR_EVENT_CHANCE) {
       if (__DEV__) {
@@ -483,9 +530,20 @@ export class EventManager {
       else if (fc.endAt && maintenant > fc.endAt) motif = `diffusion terminée (${new Date(fc.endAt).toLocaleDateString('fr-FR')})`;
       else if (fc.viewsGoal > 0 && getCachedSponsorViews(fc.id) >= fc.viewsGoal)
         motif = `objectif de ${fc.viewsGoal} vues atteint`;
-      else if (fc.targeting.regions.length > 0 && !fc.targeting.regions.includes(profile?.region ?? ''))
+      // Les deux tests ci-dessous sont sautés quand le ciblage est en pause :
+      // un diagnostic qui écarterait une carte que le tirage accepte serait
+      // pire que pas de diagnostic du tout.
+      else if (
+        CIBLAGE_SPONSOR_ACTIF &&
+        fc.targeting.regions.length > 0 &&
+        !fc.targeting.regions.includes(profile?.region ?? '')
+      )
         motif = `ciblée sur ${fc.targeting.regions.join(', ')} — votre région : ${region}`;
-      else if (fc.targeting.sectors.length > 0 && !fc.targeting.sectors.includes(secteur))
+      else if (
+        CIBLAGE_SPONSOR_ACTIF &&
+        fc.targeting.sectors.length > 0 &&
+        !fc.targeting.sectors.includes(secteur)
+      )
         motif = `ciblée sur ${fc.targeting.sectors.join(', ')} — votre secteur : ${secteur}`;
 
       if (motif) lignes.push(`   ✗ ${titre} — ${motif}`);
@@ -502,6 +560,10 @@ export class EventManager {
   }
 
   private matchTargeting(targeting: { sectors: string[]; regions: string[] }): boolean {
+    // Ciblage en pause : toute carte passe. Le drapeau est lu ICI, au point
+    // unique où la décision se prend — les valeurs saisies par l'annonceur
+    // restent intactes en base, seule leur application est suspendue.
+    if (!CIBLAGE_SPONSOR_ACTIF) return true;
     try {
       const profile = useUserStore.getState().profile;
       if (targeting.regions.length > 0) {
@@ -727,6 +789,8 @@ export class EventManager {
         sponsorKind: pick.kindCampagne,
         sponsorStructure: pick.structure,
         sponsorCtaLabel: pick.ctaLabel,
+        sponsorLogoBgColor: pick.card.logoBgColor,
+        sponsorTextColor: pick.card.textColor,
         sponsorVerso: pick.verso,
       },
     };
@@ -751,9 +815,68 @@ export class EventManager {
         sponsorKind: pick.kindCampagne,
         sponsorStructure: pick.structure,
         sponsorCtaLabel: pick.ctaLabel,
+        sponsorLogoBgColor: pick.card.logoBgColor,
+        sponsorTextColor: pick.card.textColor,
         sponsorVerso: pick.verso,
       },
     };
+  }
+
+  /**
+   * ═══ OUTIL DE TEST (__DEV__) — prévisualise la première carte éligible ═══
+   *
+   * Vérifier une carte promue en jouant est presque impossible : il faut
+   * tomber sur une case du BON TYPE (une carte « financement » ne sort jamais
+   * sur une case opportunité) puis gagner un tirage à 25 %. Un annonceur qui
+   * vient de publier ne peut pas contrôler son rendu, et nous non plus.
+   *
+   * Court-circuite EXACTEMENT DEUX CHOSES : le type de case et le jet de
+   * probabilité. Tout le reste est le circuit réel — feed Firestore, période
+   * de diffusion, plafond de vues, ciblage, et l'habillage en événement
+   * (`versEvenement*`, partagé avec le tirage). Ce qu'on voit est donc ce que
+   * le joueur verra.
+   *
+   * @returns l'événement prêt à afficher, ou un motif d'échec lisible.
+   */
+  previsualiserCarteSponsor():
+    | { ok: true; evenement: GeneratedFundingEvent | GeneratedOpportunityEvent }
+    | { ok: false; motif: string } {
+    if (!SPONSOR_FEATURES_ENABLED) {
+      return { ok: false, motif: 'Circuit sponsor désactivé (SPONSOR_FEATURES_ENABLED = false).' };
+    }
+    if (this.sponsorSuppressed) {
+      return { ok: false, motif: 'Partie en Mode Classe : les cartes sponsors y sont coupées.' };
+    }
+
+    const feed = getCachedFeedCards();
+    if (feed.length === 0) {
+      return {
+        ok: false,
+        motif:
+          'Feed vide : aucune campagne carte active reçue. Vérifiez qu’une campagne est ' +
+          '« active » au format « card » et que le back-office a republié le feed.',
+      };
+    }
+
+    // Les deux types de case, pour trouver n'importe quelle carte éligible
+    // quel que soit son `kind`. `forcer` neutralise le seul hasard.
+    const pick =
+      this.pickSponsorCard('funding', true) ?? this.pickSponsorCard('opportunity', true);
+    if (!pick) {
+      return {
+        ok: false,
+        motif:
+          `${feed.length} carte(s) dans le feed, mais aucune éligible : période close, ` +
+          'plafond de vues atteint, ciblage non satisfait, ou toutes déjà tirées. ' +
+          'Le détail par carte est dans les logs [Feed].',
+      };
+    }
+
+    const evenement =
+      pick.kindCampagne === 'financement'
+        ? this.versEvenementFunding(pick)
+        : this.versEvenementOpportunity(pick);
+    return { ok: true, evenement };
   }
 
   generateFundingEvent(): GeneratedFundingEvent | null {

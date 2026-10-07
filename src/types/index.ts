@@ -143,6 +143,10 @@ export interface FundingEvent {
   sponsorStructure?: string;
   /** Libellé du bouton du verso, configuré par l'annonceur (34 car. max). */
   sponsorCtaLabel?: string;
+  /** Fond de l'encart du logo, choisi par l'annonceur (`#RRGGBB`). */
+  sponsorLogoBgColor?: string;
+  /** Couleur du texte du recto, choisie par l'annonceur (`#RRGGBB`). */
+  sponsorTextColor?: string;
   /** Verso de la carte recto/verso (campagne annonceur). Absent = pas de flip. */
   sponsorVerso?: {
     description: string;
@@ -245,6 +249,10 @@ export interface OpportunityEvent {
   sponsorStructure?: string;
   /** Libellé du bouton du verso, configuré par l'annonceur (34 car. max). */
   sponsorCtaLabel?: string;
+  /** Fond de l'encart du logo, choisi par l'annonceur (`#RRGGBB`). */
+  sponsorLogoBgColor?: string;
+  /** Couleur du texte du recto, choisie par l'annonceur (`#RRGGBB`). */
+  sponsorTextColor?: string;
   /** Verso de la carte recto/verso (campagne annonceur). Absent = pas de flip. */
   sponsorVerso?: {
     description: string;
@@ -434,6 +442,15 @@ export interface Settings {
   soundEnabled: boolean;
   musicEnabled: boolean;
   hapticsEnabled: boolean;
+  /**
+   * Outils de test visibles en partie (bouton « Carte sponsor »).
+   *
+   * Réglage de DÉVELOPPEMENT : l'entrée des paramètres qui le pilote n'est
+   * affichée qu'en `__DEV__`, et le bouton du plateau l'est aussi. Le stocker
+   * évite d'avoir à recompiler pour l'activer, et de l'imposer à qui ne teste
+   * pas les cartes promues.
+   */
+  outilsTestVisibles: boolean;
   language: 'fr' | 'en';
   theme: 'light' | 'dark' | 'system';
   notifications: boolean;

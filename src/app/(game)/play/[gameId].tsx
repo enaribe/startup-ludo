@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, Image, Pressable, StyleSheet, Switch, Text, View, type LayoutChangeEvent } from 'react-native';
+import { Alert, AppState, Image, Pressable, StyleSheet, Switch, Text, View, type LayoutChangeEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient as SvgLinearGradient, Rect, Stop } from 'react-native-svg';
 
@@ -1156,8 +1156,45 @@ export default function PlayScreen() {
     [actions, handleEventResolve, quizData, classReporter]
   );
 
+  /**
+   * Prévisualisation en cours (__DEV__) : la carte affichée ne vient PAS d'une
+   * case, aucun tour n'est en attente. La fermer ne doit donc ni créditer de
+   * jetons ni faire avancer le jeu — sinon le bouton de test deviendrait une
+   * machine à jetons.
+   */
+  const apercuSponsorRef = useRef(false);
+
+  /**
+   * Affiche la première carte promue éligible, sans attendre le hasard.
+   * Outil de test : cf. le commentaire du bouton, plus bas dans le rendu.
+   */
+  const afficherCarteSponsorTest = useCallback(() => {
+    const resultat = eventManager.previsualiserCarteSponsor();
+    if (!resultat.ok) {
+      console.log(`[Sponsor/test] Impossible d'afficher une carte : ${resultat.motif}`);
+      Alert.alert('Aucune carte à afficher', resultat.motif);
+      return;
+    }
+    apercuSponsorRef.current = true;
+    const { evenement } = resultat;
+    console.log(
+      `[Sponsor/test] Affichage forcé de "${evenement.data.description.slice(0, 50)}" ` +
+        `(${evenement.type}, id ${evenement.data.id}) — ⚠️ compte 1 vue facturée`
+    );
+    if (evenement.type === 'funding') {
+      setFundingData(evenement.data as unknown as FundingEvent);
+    } else {
+      setOpportunityData(evenement.data as unknown as OpportunityEvent);
+    }
+  }, []);
+
   const handleFundingAccept = useCallback(
     (amount: number) => {
+      if (apercuSponsorRef.current) {
+        apercuSponsorRef.current = false;
+        setFundingData(null);
+        return;
+      }
       actions.resolveEvent({ ok: true, reward: amount });
       setFundingData(null);
       handleEventResolve();
@@ -1167,6 +1204,13 @@ export default function PlayScreen() {
 
   const handleEventAccept = useCallback(
     (value: number, effect: string) => {
+      // Prévisualisation (__DEV__) : on ferme sans rien créditer ni résoudre.
+      if (apercuSponsorRef.current) {
+        apercuSponsorRef.current = false;
+        setOpportunityData(null);
+        setChallengeData(null);
+        return;
+      }
       const isPositive = effect === 'tokens';
       actions.resolveEvent({ ok: isPositive, reward: value });
       setOpportunityData(null);
@@ -2065,6 +2109,45 @@ export default function PlayScreen() {
             <Text style={settingsStyles.rowLabel}>Revoir le tutoriel</Text>
             <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.5)" />
           </Pressable>
+
+          {/*
+            ═══ OUTIL DE TEST — BUILDS DE DÉVELOPPEMENT UNIQUEMENT ═══
+
+            `__DEV__` vaut `false` en production et le bloc disparaît au
+            minify : aucun joueur ne peut le voir.
+
+            Rangé ici plutôt que flottant sur le plateau : il y masquait une
+            case et se retrouvait sur toutes les captures d'écran.
+
+            Il existe parce qu'une carte promue est presque intestable en
+            jouant : il faut tomber sur une case du BON TYPE puis gagner le
+            tirage. Il ne court-circuite QUE ces deux obstacles — feed réel,
+            période, plafond, ciblage et habillage restent ceux du jeu.
+
+            ⚠️ CHAQUE APPUI COMPTE UNE VUE FACTURÉE : `SponsorEventPopup`
+            incrémente le compteur dès qu'il s'affiche, sans savoir d'où vient
+            la carte.
+          */}
+          {__DEV__ && (
+            <>
+              <View style={settingsStyles.separator} />
+              <Pressable
+                style={settingsStyles.row}
+                onPress={() => {
+                  // La popup se ferme AVANT : sur iOS, deux <Modal> ne peuvent
+                  // pas s'afficher en même temps — la carte ne sortirait jamais.
+                  setShowSettings(false);
+                  setTimeout(() => afficherCarteSponsorTest(), 350);
+                }}
+              >
+                <Ionicons name="megaphone-outline" size={22} color="#F5A623" />
+                <Text style={[settingsStyles.rowLabel, { color: '#F5A623' }]}>
+                  Tester une carte sponsor
+                </Text>
+                <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.5)" />
+              </Pressable>
+            </>
+          )}
         </View>
       </GamePopup>
 

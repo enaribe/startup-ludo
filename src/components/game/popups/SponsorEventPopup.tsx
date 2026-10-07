@@ -93,6 +93,16 @@ interface SponsorEventPopupProps {
   // ===== Verso (campagne annonceur, lot 4) =====
   /** Nom de la structure (« Sponsorisé par X »). */
   structure?: string;
+  /**
+   * Fond de l'encart qui porte le logo (`#RRGGBB`), choisi par l'annonceur.
+   *
+   * Le fond était figé à `#F8F9FA` : un logo blanc ou très clair — la
+   * déclinaison que beaucoup de structures fournissent — y était invisible.
+   */
+  logoBgColor?: string;
+  /** Couleur du texte du recto (`#RRGGBB`). Va de pair avec `logoBgColor` :
+   *  un fond sombre rendrait le texte par défaut illisible. */
+  textColor?: string;
   /** Libellé du CTA du verso, configuré par l'annonceur. */
   ctaLabel?: string;
   /** Contenu du verso — sa présence active le flip. */
@@ -117,6 +127,8 @@ export const SponsorEventPopup = memo(function SponsorEventPopup({
   cardId,
   editionId,
   structure,
+  logoBgColor,
+  textColor,
   ctaLabel,
   verso,
   ctaUrl,
@@ -133,6 +145,18 @@ export const SponsorEventPopup = memo(function SponsorEventPopup({
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [signalee, setSignalee] = useState(false);
+
+  /*
+    Couleurs de l'annonceur, défauts du jeu à défaut.
+
+    Le FOND s'applique aux deux faces : c'est l'encart qui porte le logo, et le
+    verso le montre aussi. Le TEXTE ne s'applique qu'au RECTO : le verso porte
+    des mentions légales — éligibilité, date limite — qui doivent rester
+    lisibles quelle que soit la charte choisie, et sa date limite garde son
+    orange d'alerte.
+  */
+  const fondEncart = logoBgColor || '#F8F9FA';
+  const couleurTexte = textColor || '#2C3E50';
 
   // ── Flip recto/verso ──
   const rotation = useSharedValue(0);
@@ -381,11 +405,11 @@ export const SponsorEventPopup = memo(function SponsorEventPopup({
                   />
                 )}
 
-                <View style={styles.descriptionBox}>
+                <View style={[styles.descriptionBox, { backgroundColor: fondEncart }]}>
                   {logoUrl ? (
                     <Image source={{ uri: logoUrl }} style={styles.sponsorLogo} resizeMode="contain" />
                   ) : null}
-                  <Text style={styles.description}>{description}</Text>
+                  <Text style={[styles.description, { color: couleurTexte }]}>{description}</Text>
                 </View>
 
                 {/*
@@ -459,7 +483,7 @@ export const SponsorEventPopup = memo(function SponsorEventPopup({
             ) : (
               <>
                 {/* ═══ VERSO ═══ */}
-                <View style={styles.descriptionBox}>
+                <View style={[styles.descriptionBox, { backgroundColor: fondEncart }]}>
                   {logoUrl ? (
                     <Image source={{ uri: logoUrl }} style={styles.sponsorLogoSmall} resizeMode="contain" />
                   ) : null}

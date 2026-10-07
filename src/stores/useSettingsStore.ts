@@ -18,6 +18,7 @@ interface SettingsStoreActions {
   // Haptics
   toggleHaptics: () => void;
   setHapticsEnabled: (enabled: boolean) => void;
+  setOutilsTestVisibles: (visible: boolean) => void;
 
   // Language
   setLanguage: (language: 'fr' | 'en') => void;
@@ -45,6 +46,8 @@ const initialState: SettingsStoreState = {
   soundEnabled: true,
   musicEnabled: true,
   hapticsEnabled: true,
+  // Masqué par défaut : on l'allume quand on vient tester, pas l'inverse.
+  outilsTestVisibles: false,
   language: 'fr',
   theme: 'system',
   notifications: true,
@@ -91,6 +94,12 @@ export const useSettingsStore = create<SettingsStore>()(
         setHapticsEnabled: (enabled) => {
           set((state) => {
             state.hapticsEnabled = enabled;
+          });
+        },
+
+        setOutilsTestVisibles: (visible) => {
+          set((state) => {
+            state.outilsTestVisibles = visible;
           });
         },
 
@@ -147,6 +156,7 @@ export const useSettingsStore = create<SettingsStore>()(
           soundEnabled: state.soundEnabled,
           musicEnabled: state.musicEnabled,
           hapticsEnabled: state.hapticsEnabled,
+          outilsTestVisibles: state.outilsTestVisibles,
           regionPromptLastDismissedAt: state.regionPromptLastDismissedAt,
           language: state.language,
           theme: state.theme,

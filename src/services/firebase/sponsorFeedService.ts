@@ -27,6 +27,10 @@ export interface FeedCard {
   text: string;
   structure: string;
   logoUrl: string | null;
+  /** Fond de l'encart du logo (`#RRGGBB`), `null` = défaut du jeu. */
+  logoBgColor: string | null;
+  /** Couleur du texte du recto (`#RRGGBB`), `null` = défaut du jeu. */
+  textColor: string | null;
   ctaUrl: string | null;
   ctaLabel: string | null;
   verso: {
@@ -49,6 +53,17 @@ function feedLog(message: string, data?: unknown): void {
   if (__DEV__) console.log(`[SponsorFeed] ${message}`, data ?? '');
 }
 
+/**
+ * Couleur hexadécimale `#RRGGBB`, ou `null`.
+ *
+ * Le feed est un document Firestore : rien ne garantit son contenu côté
+ * client. Une chaîne arbitraire passée à un style React Native fait planter le
+ * rendu sur Android — on valide donc avant, et on retombe sur le défaut.
+ */
+function couleurValide(valeur: unknown): string | null {
+  return typeof valeur === 'string' && /^#[0-9a-f]{6}$/i.test(valeur) ? valeur : null;
+}
+
 /** Coercition défensive d'une carte brute du feed. */
 function normaliser(brut: unknown): FeedCard | null {
   if (!brut || typeof brut !== 'object') return null;
@@ -69,6 +84,11 @@ function normaliser(brut: unknown): FeedCard | null {
     text,
     structure: typeof c.structure === 'string' ? c.structure : '',
     logoUrl: typeof c.logoUrl === 'string' ? c.logoUrl : null,
+    // Couleurs validées à la lecture : une valeur hors format irait droit dans
+    // un style React Native, où une couleur invalide fait planter le rendu sur
+    // Android. Mieux vaut retomber sur le défaut du jeu.
+    logoBgColor: couleurValide(c.logoBgColor),
+    textColor: couleurValide(c.textColor),
     ctaUrl: typeof c.ctaUrl === 'string' ? c.ctaUrl : null,
     ctaLabel: typeof c.ctaLabel === 'string' ? c.ctaLabel : null,
     verso:

@@ -51,7 +51,19 @@ export const JOKER_CATALOG: Record<JokerType, JokerMetadata> = {
   },
 };
 
-export const ALL_JOKER_TYPES: JokerType[] = ['dice_choice', 'reroll', 'shield', 'steal', 'investment'];
+/**
+ * Jokers EN CIRCULATION : seuls ces types peuvent être tirés sur une case
+ * joker. Les types commentés restent définis dans le catalogue et leurs
+ * effets fonctionnent toujours (un joker déjà en inventaire reste jouable) —
+ * décommenter une ligne suffit à remettre le type en circulation.
+ */
+export const ALL_JOKER_TYPES: JokerType[] = [
+  'dice_choice',
+  // 'reroll',
+  'shield',
+  'steal',
+  // 'investment',
+];
 
 /**
  * Libellés traduits d'un joker. `JOKER_CATALOG` reste la source des données
@@ -78,7 +90,7 @@ export function resetJokerPool(): void {
 
 /**
  * Tire un joker aléatoire en évitant les répétitions : un même joker ne
- * revient pas tant que les 4 types n'ont pas tous été tirés.
+ * revient pas tant que tous les types en circulation n'ont pas été tirés.
  */
 export function rollRandomJoker(): JokerType {
   let available = ALL_JOKER_TYPES.filter((t) => !usedJokerTypes.has(t));

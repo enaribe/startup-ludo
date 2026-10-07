@@ -38,6 +38,7 @@
  * pas la boucle de jeu, et leur échec doit être affiché à l'élève.
  */
 
+import Constants from 'expo-constants';
 import auth from '@react-native-firebase/auth';
 import {
   arrayUnion,
@@ -92,9 +93,99 @@ import { CLASS_SESSION_CONTENT_DOC, FIRESTORE_COLLECTIONS, firebaseLog } from '.
  */
 const DEFAUT_ADMIN_API_URL = 'http://localhost:3000';
 
-/** Base d'API normalisée : sans slash final, pour concaténer sans doublon. */
-function baseApi(): string {
-  const brute = process.env.EXPO_PUBLIC_ADMIN_API_URL ?? DEFAUT_ADMIN_API_URL;
+/**
+ * Ports candidats du back-office en développement, dans l'ordre d'essai.
+ *
+ * ⚠️ PLUSIEURS, ET C'EST NÉCESSAIRE. Next prend 3000 par défaut, mais passe au
+ * suivant si le port est occupé — et sur ce poste plusieurs projets se
+ * disputent la plage. Un port figé donnait « Network request failed » alors
+ * que le serveur tournait bel et bien, deux ports plus loin.
+ *
+ * Le premier qui répond est retenu pour toute la session (cf. `baseApiResolue`).
+ */
+const PORTS_ADMIN_DEV = [3000, 3001, 3002, 3003];
+
+/**
+ * Adresse du back-office DÉDUITE du serveur Metro, en développement.
+ *
+ * ═══ POURQUOI ═══
+ *
+ * `EXPO_PUBLIC_ADMIN_API_URL` fige une IP au build. Or l'IP du poste de
+ * développement change à chaque réseau — quatre fois en quelques jours ici
+ * (192.168.1.232 → 192.168.20.82 → 192.168.1.14 → 192.168.20.30). À chaque
+ * fois l'app tentait de joindre une machine inexistante, attendait quinze
+ * secondes, puis affichait « impossible de rejoindre ».
+ *
+ * Metro, lui, connaît TOUJOURS la bonne adresse : le téléphone vient de s'y
+ * connecter pour charger le bundle. `hostUri` vaut « 192.168.20.30:8081 ».
+ * On en reprend l'hôte, on change le port, et l'URL est juste par
+ * construction — plus rien à maintenir à la main.
+ *
+ * ⚠️ DÉVELOPPEMENT UNIQUEMENT (`__DEV__`). En production, Metro n'existe pas
+ * et la variable d'environnement reste la seule source — elle doit y pointer
+ * vers le vrai domaine du back-office.
+ */
+function hoteMetro(): string | null {
+  if (!__DEV__) return null;
+  try {
+    const hote = Constants.expoConfig?.hostUri?.split(':')[0];
+    // Un hôte vide ou `localhost` ne vaut rien depuis un téléphone : c'est
+    // l'appareil lui-même qu'il désignerait, pas le Mac.
+    if (!hote || hote === 'localhost' || hote === '127.0.0.1') return null;
+    return hote;
+  } catch {
+    return null;
+  }
+}
+
+/** Base retenue pour la session, une fois le bon port trouvé. */
+let baseApiResolue: string | null = null;
+
+/**
+ * Trouve le port sur lequel le back-office écoute, en les essayant tour à tour.
+ *
+ * Une requête légère par candidat, avec un délai court : un port fermé répond
+ * immédiatement par un refus de connexion, le surcoût est négligeable. Tout
+ * code HTTP vaut succès — même un 404 prouve qu'un serveur est là, et c'est la
+ * seule chose qu'on cherche à savoir.
+ *
+ * Le résultat est mémorisé : la recherche n'a lieu qu'une fois par session.
+ */
+async function trouverBaseApi(): Promise<string | null> {
+  if (baseApiResolue) return baseApiResolue;
+  const hote = hoteMetro();
+  if (!hote) return null;
+
+  for (const port of PORTS_ADMIN_DEV) {
+    const base = `http://${hote}:${port}`;
+    try {
+      const controleur = new AbortController();
+      const minuterie = setTimeout(() => controleur.abort(), 2000);
+      await fetch(`${base}/api/class/join/__ping__`, { signal: controleur.signal });
+      clearTimeout(minuterie);
+      baseApiResolue = base;
+      classLog(`Back-office trouvé sur ${base}`);
+      return base;
+    } catch {
+      // Port fermé ou injoignable : on passe au suivant, sans bruit.
+    }
+  }
+  classLog(`Back-office introuvable sur ${hote} (ports ${PORTS_ADMIN_DEV.join(', ')})`);
+  return null;
+}
+
+/**
+ * Base d'API normalisée : sans slash final, pour concaténer sans doublon.
+ *
+ * ORDRE DE PRIORITÉ :
+ *   1. `EXPO_PUBLIC_ADMIN_API_URL` — ce qui est explicitement configuré fait
+ *      foi, y compris en développement (pour viser un serveur distant) ;
+ *   2. l'hôte Metro, en développement — l'IP du Mac, toujours à jour ;
+ *   3. `localhost`, dernier recours (simulateur iOS, où il désigne le Mac).
+ */
+async function baseApi(): Promise<string> {
+  const brute =
+    process.env.EXPO_PUBLIC_ADMIN_API_URL || (await trouverBaseApi()) || DEFAUT_ADMIN_API_URL;
   return brute.replace(/\/+$/, '');
 }
 
@@ -203,7 +294,7 @@ export async function rejoindreClasseParCode(code: string): Promise<ClassJoinLoo
   // On économise un appel réseau ET un crédit du quota de tentatives.
   if (!estCodeClasseValide(codeNormalise)) throw new ClassJoinError('invalid_code');
 
-  const reponse = await appelApi(`${baseApi()}/api/class/join/${codeNormalise}`, {
+  const reponse = await appelApi(`${await baseApi()}/api/class/join/${codeNormalise}`, {
     method: 'GET',
     headers: { Accept: 'application/json' },
   });
@@ -261,21 +352,55 @@ export async function rejoindreClasseParCode(code: string): Promise<ClassJoinLoo
  * l'API prend le relais. Une règle non déployée ou un index absent ne doivent
  * pas casser un parcours qui fonctionnait avant.
  */
-async function resoudreCodeDepuisFirestore(code: string): Promise<ClassSessionLookup | null> {
+/**
+ * Verdict de la résolution directe.
+ *
+ * Trois états et non un simple `null`, parce que « ce code n'existe pas » et
+ * « je ne sais pas » appellent des suites OPPOSÉES : le premier est une
+ * réponse définitive, le second justifie d'interroger l'API.
+ *
+ * Les confondre faisait tenter l'API sur un code manifestement périmé —
+ * quinze secondes d'attente, puis « impossible de rejoindre » au lieu de
+ * « ce code n'est plus valide ».
+ */
+type ResolutionDirecte =
+  | { etat: 'resolu'; seance: ClassSessionLookup }
+  /** Firestore a répondu : ce code n'ouvre rien. Inutile de demander à l'API. */
+  | { etat: 'inconnu' }
+  /** Lecture impossible (hors ligne, règles, document illisible) : l'API décide. */
+  | { etat: 'indecis' };
+
+async function resoudreCodeDepuisFirestore(code: string): Promise<ResolutionDirecte> {
   try {
     const db = getFirestore();
 
     const indexSnap = await getDoc(doc(db, FIRESTORE_COLLECTIONS.sessionCodes, code));
+
+    /*
+      ═══ « LE CODE N'EXISTE PAS » EST UNE RÉPONSE, PAS UNE IGNORANCE ═══
+
+      Firestore a répondu, et il n'y a aucun index pour ce code. Inutile
+      d'interroger l'API : elle rendrait le même verdict, après quinze
+      secondes d'attente si le serveur est injoignable — et l'élève verrait
+      « impossible de rejoindre » là où la vraie réponse est « ce code n'est
+      plus valide ».
+
+      C'est exactement ce qui s'est produit : un QR périmé scanné hors du
+      réseau du back-office affichait une erreur de connexion.
+    */
+    if (!indexSnap.exists) return { etat: 'inconnu' };
+
     const index = indexSnap.data() as
       | { sessionId?: string; classId?: string; expiresAt?: number }
       | undefined;
-    if (!index?.sessionId || !index.classId) return null;
+    // Document présent mais inexploitable : on ne tranche pas, l'API décide.
+    if (!index?.sessionId || !index.classId) return { etat: 'indecis' };
 
     // Expiration vérifiée ICI comme le faisait le serveur : le document peut
     // survivre à sa séance (suppression ratée, réseau coupé à la clôture), il
     // ne doit alors plus rien ouvrir.
     const expire = Number(index.expiresAt ?? 0);
-    if (!expire || expire <= Date.now()) return null;
+    if (!expire || expire <= Date.now()) return { etat: 'inconnu' };
 
     // La séance elle-même reste la source de vérité pour l'état : l'index ne
     // porte pas `status`, et une séance close par la direction doit refermer
@@ -284,11 +409,14 @@ async function resoudreCodeDepuisFirestore(code: string): Promise<ClassSessionLo
     const seance = seanceSnap.data() as
       | { classId?: string; title?: string; editionId?: string; status?: string; startedPlayingAt?: number }
       | undefined;
-    if (!seance || seance.status !== 'running') return null;
+    // Séance close ou introuvable : verdict ferme, l'API dirait la même chose.
+    if (!seance || seance.status !== 'running') return { etat: 'inconnu' };
 
     classLog('Code résolu depuis Firestore (sans API)', { code, sessionId: index.sessionId });
 
     return {
+      etat: 'resolu',
+      seance: {
       sessionId: index.sessionId,
       classId: index.classId,
       /*
@@ -308,11 +436,13 @@ async function resoudreCodeDepuisFirestore(code: string): Promise<ClassSessionLo
       editionId: String(seance.editionId ?? ''),
       demarree: typeof seance.startedPlayingAt === 'number',
       learners: [],
+      },
     };
   } catch (error) {
-    // Règles pas encore déployées, hors ligne, index absent : l'API décide.
+    // Règles pas déployées, hors ligne, permission refusée : on NE TRANCHE
+    // PAS. L'API reste la référence, elle sait peut-être répondre.
     classLog('Résolution directe impossible — repli sur l’API', error);
-    return null;
+    return { etat: 'indecis' };
   }
 }
 
@@ -350,10 +480,20 @@ export async function rejoindreSeanceParCode(code: string): Promise<ClassSession
   const dejaRattache = await getMonRattachement().catch(() => null);
   if (dejaRattache) {
     const direct = await resoudreCodeDepuisFirestore(codeNormalise);
-    if (direct) return direct;
+    if (direct.etat === 'resolu') return direct.seance;
+    /*
+      Verdict FERME : Firestore a répondu que ce code n'ouvre rien. On s'arrête
+      là plutôt que d'appeler l'API, qui dirait la même chose — après quinze
+      secondes d'attente quand le back-office est injoignable, et avec le
+      mauvais message à l'arrivée (« impossible de rejoindre » au lieu de « ce
+      code n'est plus valide »).
+
+      Seul `indecis` — hors ligne, règles non déployées — laisse l'API trancher.
+    */
+    if (direct.etat === 'inconnu') throw new ClassJoinError('invalid_code');
   }
 
-  const reponse = await appelApi(`${baseApi()}/api/session/join/${codeNormalise}`, {
+  const reponse = await appelApi(`${await baseApi()}/api/session/join/${codeNormalise}`, {
     method: 'GET',
     headers: { Accept: 'application/json' },
   });
@@ -407,7 +547,7 @@ export async function rattacherEleve(code: string, learnerId: string): Promise<C
     throw new ClassJoinError('offline');
   }
 
-  const reponse = await appelApi(`${baseApi()}/api/class/link`, {
+  const reponse = await appelApi(`${await baseApi()}/api/class/link`, {
     method: 'POST',
     headers: {
       Accept: 'application/json',

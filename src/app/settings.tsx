@@ -168,6 +168,8 @@ export default function SettingsScreen() {
     setHapticsEnabled,
     setNotifications,
     setLanguage,
+    outilsTestVisibles,
+    setOutilsTestVisibles,
   } = useSettingsStore();
 
   const logout = useAuthStore((state) => state.logout);
@@ -417,6 +419,33 @@ export default function SettingsScreen() {
               subtitle={t('settings.deleteAccountDesc')}
               onPress={() => setShowDeleteModal(true)}
               showArrow
+              isLast
+            />
+          </SettingSection>
+        )}
+
+        {/*
+          ═══ OUTILS DE DÉVELOPPEMENT — `__DEV__` SEULEMENT ═══
+
+          `__DEV__` vaut `false` en production : la section entière disparaît au
+          minify, aucun joueur ne peut la voir.
+
+          L'interrupteur pilote le bouton « Carte sponsor » du plateau. Il est
+          ici et non sur le plateau lui-même parce qu'une carte promue est
+          presque intestable en jouant — il faut tomber sur une case du bon
+          type puis gagner le tirage —, mais le bouton encombrait l'écran de
+          jeu en permanence. Masqué par défaut : on l'allume quand on vient
+          tester.
+        */}
+        {__DEV__ && (
+          <SettingSection title="Développement" delay={360}>
+            <SettingRow
+              icon="megaphone-outline"
+              iconColor="#F5A623"
+              title="Bouton carte sponsor"
+              subtitle="Affiche en partie un bouton qui force l’aperçu d’une carte promue"
+              value={outilsTestVisibles}
+              onToggle={setOutilsTestVisibles}
               isLast
             />
           </SettingSection>
