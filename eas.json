@@ -47,7 +47,9 @@
         "buildType": "apk"
       },
       "env": {
-        "APP_ENV": "preview"
+        "APP_ENV": "preview",
+        "EXPO_PUBLIC_ADMIN_API_URL": "https://startup-ludo-admin.vercel.app",
+        "EXPO_PUBLIC_AMPLITUDE_API_KEY": "e16e5b73c355aa4d2d30e7a1bcfc211e"
       }
     },
     "production": {
@@ -60,7 +62,9 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "APP_ENV": "production"
+        "APP_ENV": "production",
+        "EXPO_PUBLIC_ADMIN_API_URL": "https://startup-ludo-admin.vercel.app",
+        "EXPO_PUBLIC_AMPLITUDE_API_KEY": "e16e5b73c355aa4d2d30e7a1bcfc211e"
       }
     }
   },
